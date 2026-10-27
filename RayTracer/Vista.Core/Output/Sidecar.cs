@@ -60,12 +60,15 @@ namespace Vista.Output;
 /// valley's pool. Schema 24 (M1.14) added <see cref="AutoCamera"/>: how the auto camera chose the camera, when it did. Schema 25 (M1.14's
 /// follow-up) added the detail budget: its limits and each scored framing's share in <see cref="AutoCamera"/> (the limits' frame size is
 /// now the final frame's, <c>finalFrameWidth</c>, not the triangles' alone), and <see cref="Detail"/>, the budget over a preview with
-/// <c>--debug detail</c>.</para>
+/// <c>--debug detail</c>. Schema 26 (M1.15) added <see cref="Estimate"/>, what a final would take (the kind <c>estimate</c>, written as
+/// <c>&lt;preview&gt;.estimate.json</c>), and, in <see cref="Render"/>, the render's video memory as planned and as measured
+/// (<see cref="RenderInfo.Memory"/>; the stats gained the peak and DXGI's budget) and its trace's clock with the live ETA's checkpoints
+/// (<see cref="RenderInfo.Trace"/>).</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 25;
+    public const int CurrentSchema = 26;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -127,8 +130,11 @@ public sealed record Sidecar
     /// <summary>The ground's materials (schema 17, vista-plan §10 M1.12).</summary>
     public MaterialsInfo? Materials { get; init; }
 
-    /// <summary>Renderer statistics; absent for a dry run.</summary>
+    /// <summary>Renderer statistics; absent for a dry run and an estimate.</summary>
     public RenderInfo? Render { get; init; }
+
+    /// <summary>What the final render would take (schema 26, vista-plan §10 M1.15, <c>--estimate</c>); absent unless estimated.</summary>
+    public EstimateInfo? Estimate { get; init; }
 
     /// <summary>Which stages ran for this image and which it reused from an earlier render in the same process (schema 9).</summary>
     public required StageInfo Stages { get; init; }
@@ -460,6 +466,18 @@ public sealed record RenderInfo(RenderStats Stats, double RaysPerSample, double 
         ArgumentNullException.ThrowIfNull(stats);
         return new RenderInfo(stats, stats.RaysPerSample(), stats.RaysPerSecond(), dispatchBudgetMs);
     }
+
+    /// <summary>The render's video memory as planned and as measured (schema 26, vista-plan §10 M1.15); absent when the render was reused.</summary>
+    public MemoryInfo? Memory { get; init; }
+
+    /// <summary>The trace's clock and the live ETA's checkpoints (schema 26, vista-plan §10 M1.15); absent when the render was reused.</summary>
+    public TraceInfo? Trace { get; init; }
+
+    /// <summary>
+    /// The noise the image shows, in steps of the 8-bit PNG at the 95th percentile of its pixels, from its own variance (schema 26, vista-plan
+    /// §10 M1.15, <see cref="NoiseMeter"/>; with <c>--debug variance</c>, against which an estimate's noise is checked); absent without it.
+    /// </summary>
+    public double? NoiseSteps { get; init; }
 }
 
 /// <summary>

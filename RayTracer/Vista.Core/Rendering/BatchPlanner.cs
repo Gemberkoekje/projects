@@ -21,6 +21,16 @@ public sealed record BatchPlannerOptions
     /// <summary>Upper bound on samples per pixel in one dispatch (keeps progress and ETA updates flowing).</summary>
     public int MaxSamplesPerDispatch { get; init; } = 64;
 
+    /// <summary>
+    /// A probe's stop (vista-plan §10 M1.15): the planner issues nothing more once a pass ends with at least this much GPU time measured,
+    /// at least two passes done (the first carries the ramp), and the pass that ended as large as the passes will settle at (the dispatch
+    /// budget over the cost that pass measured, as the estimate approaches it): a full-frame pass grows as the cost estimate falls (one
+    /// sample, one, two, three, four...), slowly near the end, and a sample costs more in a larger one. So a render traces the first
+    /// passes of a final exactly as the final will, up to the pass size the rest of it keeps, and no more; at ten times this GPU time it
+    /// stops anyway. Infinite (the default) traces every sample.
+    /// </summary>
+    public double StopAfterGpuSeconds { get; init; } = double.PositiveInfinity;
+
     /// <summary>Problems with these options (empty when valid).</summary>
     public IReadOnlyList<string> Validate()
     {
@@ -31,6 +41,8 @@ public sealed record BatchPlannerOptions
             errors.Add("Initial cost must be positive.");
         if (MaxSamplesPerDispatch < 1)
             errors.Add("At least one sample per dispatch.");
+        if (double.IsNaN(StopAfterGpuSeconds) || StopAfterGpuSeconds < 0.0)
+            errors.Add("A probe stops after a non-negative GPU time.");
         return errors;
     }
 }
@@ -63,6 +75,10 @@ public readonly record struct SampleBatch(int Index, int RowStart, int RowCount,
 ///
 /// <para>Cost model: <c>ns per pixel-sample</c>. A slower measurement replaces the estimate at once (a
 /// heavy region must not trip the TDR on the next dispatch); a faster one only pulls it halfway down.</para>
+///
+/// <para>A probe (<see cref="BatchPlannerOptions.StopAfterGpuSeconds"/>, vista-plan §10 M1.15) stops at a pass's end: the image then
+/// holds <see cref="SamplesCompleted"/> samples a pixel, not <see cref="SamplesPerPixel"/>, and a renderer's means over the samples asked
+/// for are that share too dark.</para>
 /// </summary>
 public sealed class BatchPlanner
 {
@@ -73,6 +89,10 @@ public sealed class BatchPlanner
     private int _passSampleCount;
     private readonly Dictionary<int, SampleBatch> _outstanding = [];
     private int _issued;
+    private int _passesDone;
+    private bool _stopped;
+    private double _passGpuNs;
+    private long _passPixelSamples;
 
     /// <summary>Creates a planner for a <paramref name="width"/>×<paramref name="height"/> image at <paramref name="samplesPerPixel"/>.</summary>
     public BatchPlanner(int width, int height, int samplesPerPixel, BatchPlannerOptions? options = null)
@@ -103,8 +123,14 @@ public sealed class BatchPlanner
     /// <summary>Current cost estimate in nanoseconds per pixel-sample.</summary>
     public double CostNsPerPixelSample { get; private set; }
 
-    /// <summary>True while there is work left to issue.</summary>
-    public bool HasNext => _passFirstSample < SamplesPerPixel;
+    /// <summary>True while there is work left to issue (and a probe has not stopped).</summary>
+    public bool HasNext => _passFirstSample < SamplesPerPixel && !_stopped;
+
+    /// <summary>True when a probe stopped before its last sample (<see cref="BatchPlannerOptions.StopAfterGpuSeconds"/>).</summary>
+    public bool Stopped => _stopped;
+
+    /// <summary>The samples every pixel has once the issued passes are complete: all of them, unless a probe stopped.</summary>
+    public int SamplesCompleted => _passFirstSample;
 
     /// <summary>True once every batch has been issued and reported complete.</summary>
     public bool IsComplete => !HasNext && _outstanding.Count == 0;
@@ -127,6 +153,12 @@ public sealed class BatchPlanner
     /// <summary>Remaining time at the current cost estimate.</summary>
     public TimeSpan EstimatedRemaining =>
         TimeSpan.FromMilliseconds((PixelSamplesTotal - PixelSamplesCompleted) * CostNsPerPixelSample / 1e6);
+
+    /// <summary>Raised by <see cref="Next"/> with the batch it planned (a <see cref="TraceClock"/> starts its wall clock on the first).</summary>
+    public event Action<SampleBatch>? Issued;
+
+    /// <summary>Raised by <see cref="Complete"/> with the batch and its GPU time, once the planner has taken it in (vista-plan §10 M1.15's live ETA).</summary>
+    public event Action<SampleBatch, TimeSpan>? Completed;
 
     /// <summary>Plans the next dispatch. Throws when <see cref="HasNext"/> is false.</summary>
     public SampleBatch Next()
@@ -164,6 +196,7 @@ public sealed class BatchPlanner
             _rowCursor = 0;
             _passFirstSample += _passSampleCount;
         }
+        Issued?.Invoke(batch);
         return batch;
     }
 
@@ -178,9 +211,34 @@ public sealed class BatchPlanner
         Elapsed += gpuTime;
 
         double observed = gpuTime.Ticks * 100.0 / pixelSamples; // 1 tick = 100 ns
-        if (!double.IsFinite(observed) || observed <= 0.0)
-            return;
-        CostNsPerPixelSample = observed > CostNsPerPixelSample ? observed : 0.5 * (CostNsPerPixelSample + observed);
+        if (double.IsFinite(observed) && observed > 0.0)
+            CostNsPerPixelSample = observed > CostNsPerPixelSample ? observed : 0.5 * (CostNsPerPixelSample + observed);
+        _passGpuNs += gpuTime.Ticks * 100.0;
+        _passPixelSamples += pixelSamples;
+        if (batch.RowStart + batch.RowCount >= Height)
+        {
+            double passCostNs = _passGpuNs / _passPixelSamples;
+            (_passGpuNs, _passPixelSamples) = (0.0, 0L);
+            double seconds = Elapsed.TotalSeconds;
+            if (++_passesDone >= 2 && seconds >= _options.StopAfterGpuSeconds && _outstanding.Count == 0 && _rowCursor == 0
+                && (_passSampleCount >= SettledPassSamples(passCostNs) || seconds >= 10.0 * _options.StopAfterGpuSeconds))
+                _stopped = true;
+        }
+        Completed?.Invoke(batch, gpuTime);
+    }
+
+    /// <summary>
+    /// The samples a pixel the passes settle at once the cost estimate reaches <paramref name="costNs"/>, as <see cref="Next"/> plans a pass:
+    /// several samples while one over the frame fits the budget, else one in row bands.
+    /// </summary>
+    private int SettledPassSamples(double costNs)
+    {
+        double budgetPixelSamples = _budgetNs / costNs;
+        double frame = (double)Width * Height;
+        int remaining = Math.Max(1, SamplesPerPixel - _passFirstSample);
+        return budgetPixelSamples >= frame
+            ? (int)Math.Clamp(Math.Floor(budgetPixelSamples / frame), 1.0, Math.Min(remaining, _options.MaxSamplesPerDispatch))
+            : 1;
     }
 
     private int RowsFor(double budgetPixelSamples, int samples) =>

@@ -154,4 +154,49 @@ public sealed class BatchPlannerTests
         planner.Complete(a, TimeSpan.FromMilliseconds(1));
         Assert.IsFalse(planner.IsComplete, "more work remains");
     }
+
+    [TestMethod]
+    public void Probe_TracesTheFinalsFirstPasses_AndStopsWhenTheyStopGrowing()
+    {
+        // A 1000×1000 frame at 40 ns a pixel-sample: the first pass in row bands while the estimate falls from 2 µs, then full-frame
+        // passes that grow until their size settles (vista-plan §10 M1.15).
+        var options = new BatchPlannerOptions { StopAfterGpuSeconds = 0.3 };
+        var probe = new BatchPlanner(1000, 1000, 256, options);
+        List<SampleBatch> probed = Drive(probe, _ => 40.0);
+        Assert.IsTrue(probe.Stopped && probe.IsComplete && !probe.HasNext);
+        Assert.IsTrue(probe.SamplesCompleted is >= 2 and < 256, $"{probe.SamplesCompleted} samples");
+        Assert.AreEqual(probe.SamplesCompleted * 1_000_000L, probe.PixelSamplesCompleted, "it stopped at a pass's end");
+        Assert.IsTrue(probe.Elapsed.TotalSeconds is >= 0.3 and < 3.0, "past its time, short of its cap");
+        int[] passSizes = [.. probed.Where(b => b.RowStart + b.RowCount == 1000).Select(b => b.SampleCount)];
+        Assert.IsTrue(passSizes.Length >= 2);
+
+        // The final, unstopped, issues exactly the same batches first, then carries on at the pass size the probe ended with.
+        var final = new BatchPlanner(1000, 1000, 256, options with { StopAfterGpuSeconds = double.PositiveInfinity });
+        List<SampleBatch> all = Drive(final, _ => 40.0);
+        AssertExactCover(final, all);
+        CollectionAssert.AreEqual(probed, all.Take(probed.Count).ToList());
+        Assert.IsTrue(all.Skip(probed.Count).SkipLast(1).All(b => b.SampleCount == passSizes[^1]),
+            $"later passes keep {passSizes[^1]} samples: {string.Join(",", all.Skip(probed.Count).Select(b => b.SampleCount))}");
+        Assert.IsFalse(final.Stopped);
+    }
+
+    [TestMethod]
+    public void Probe_StopsAtTenTimesItsTime_WhateverThePasses()
+    {
+        var probe = new BatchPlanner(1000, 1000, 256, new BatchPlannerOptions { StopAfterGpuSeconds = 0.05 });
+        Drive(probe, _ => 40.0);
+        Assert.IsTrue(probe.Stopped);
+        Assert.IsTrue(probe.Elapsed.TotalSeconds >= 0.5, $"{probe.Elapsed.TotalSeconds} s");
+        Assert.IsTrue(probe.SamplesCompleted < 30);
+    }
+
+    [TestMethod]
+    public void Probe_TracesAtLeastTwoPasses()
+    {
+        var probe = new BatchPlanner(100, 100, 16, new BatchPlannerOptions { StopAfterGpuSeconds = 0.0 });
+        Drive(probe, _ => 40.0);
+        Assert.IsTrue(probe.Stopped);
+        Assert.IsTrue(probe.SamplesCompleted >= 2, "the first pass carries the ramp");
+        Assert.ThrowsExactly<ArgumentException>(() => new BatchPlanner(10, 10, 1, new BatchPlannerOptions { StopAfterGpuSeconds = double.NaN }));
+    }
 }

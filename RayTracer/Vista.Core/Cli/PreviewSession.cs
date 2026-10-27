@@ -40,9 +40,14 @@ namespace Vista.Cli;
 /// incident meter (<see cref="IncidentMeter"/>) and display-encoded through AgX unless the request asks otherwise; since M1.11c it
 /// is dithered before its 8-bit rounding, or written at 16 bits.</para>
 ///
+/// <para>Since M1.15 a request may ask for an estimate instead (<c>--estimate</c>, <c>PreviewSession.Estimate.cs</c>), and every image
+/// render plans its video memory first (refused when it does not fit the GPU's budget, warned about when it is tight) and runs under a
+/// <see cref="TraceClock"/>, whose live ETA goes to <see cref="Progress"/> and whose checkpoints and the memory's plan and peak go in the
+/// sidecar.</para>
+///
 /// <para>Not thread-safe: one render at a time.</para>
 /// </summary>
-public sealed class PreviewSession
+public sealed partial class PreviewSession
 {
     private readonly IVistaRenderer? _renderer;
     private readonly IDenoiser? _denoiser;
@@ -81,6 +86,18 @@ public sealed class PreviewSession
 
     /// <summary>True when the session can render (it has a renderer); false for a dry-run session.</summary>
     public bool CanRender => _renderer is not null;
+
+    /// <summary>
+    /// The seconds from the process's start to the session's first run, before the renderer was made (vista-plan §10 M1.15): an estimate
+    /// counts them, since a final run repeats them. 0 when unknown.
+    /// </summary>
+    public double StartupSeconds { get; init; }
+
+    /// <summary>Told at once what the sidecar's warnings will say later, when it matters before a render starts (a tight video memory).</summary>
+    public Action<string>? Notice { get; init; }
+
+    /// <summary>Told the image render's progress and its live ETA after every batch (vista-plan §7.2, §10 M1.15).</summary>
+    public Action<TraceProgress>? Progress { get; init; }
 
     /// <summary>
     /// The image the last run rendered or reused (null before one, and after a run that failed or rendered nothing), for tools that
@@ -196,7 +213,22 @@ public sealed class PreviewSession
         IReadOnlyList<SlopeBand>? snowBySlope = null;
         DenoiseInfo? denoised = null;
         DetailInfo? detail = null;
-        if (_renderer is null || request.DryRun)
+        EstimateInfo? estimate = null;
+        VistaScene SceneWith(CameraSpec view, TerrainMesh viewMesh) =>
+            new(recipe, request.Seed, view, terrain, viewMesh, almanac.Sun, materials, air, groundAltitude)
+            {
+                Ground = ground,
+                Quadrature = request.Quadrature,
+                LowAir = lowAir,
+            };
+        if (request.Estimate && _renderer is not null && !request.DryRun)
+        {
+            // The estimate (vista-plan §10 M1.15) instead of the image: PreviewSession.Estimate.cs.
+            var view = new EstimateView(SceneWith(camera, mesh), settings, frame, world.Surface, air.PlanetRadiusMetres + groundAltitude,
+                ForestOf(ground, groundAltitude));
+            (estimate, exposure) = Estimate(request, view, SceneWith, stages, timings, warnings, Sibling);
+        }
+        else if (_renderer is null || request.DryRun)
         {
             (byte[] map, int size) = DebugImages.HeightMap(terrain, camera);
             PngEncoder.Write(Sibling(".heightmap.png"), map, size, size, PngColor.Rgb);
@@ -233,15 +265,8 @@ public sealed class PreviewSession
         }
         else
         {
-            var scene = new VistaScene(recipe, request.Seed, camera, terrain, mesh, almanac.Sun, materials, air, groundAltitude)
-            {
-                Ground = ground,
-                Quadrature = request.Quadrature,
-                LowAir = lowAir,
-            };
-            var aovs = new HashSet<Aov>(PreviewPipeline.AovsFor(request.Debug));
-            if (request.Denoise is not null)
-                aovs.UnionWith([Aov.Albedo, Aov.Normal]);
+            VistaScene scene = SceneWith(camera, mesh);
+            HashSet<Aov> aovs = AovsOf(request);
             var built = new HashSet<string>(StringComparer.Ordinal);
             bool rendered = false;
 
@@ -253,11 +278,18 @@ public sealed class PreviewSession
             {
                 output = _render;
                 stages[PreviewStage.Render] = true;
+                renderInfo = RenderInfo.From(output.Stats, settings.Batching.DispatchBudgetMs);
             }
             else
             {
                 (_render, _renderKey) = (null, null);
-                output = _renderer.Render(scene, settings, aovs, new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, settings.Batching));
+                // Its video memory planned before anything is allocated (M1.15): refused when it does not fit, warned about when tight.
+                MemoryPlan plan = CheckMemory(scene, settings, aovs, warnings);
+                var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, settings.Batching);
+                var clock = new TraceClock(planner, _time);
+                if (Progress is { } progress)
+                    clock.Progressed += progress;
+                output = _renderer.Render(scene, settings, aovs, planner);
                 if (output.Width != window.Width || output.Height != window.Height)
                     throw new InvalidOperationException($"Renderer returned {output.Width}×{output.Height}, expected {window.Width}×{window.Height}.");
                 if (output.Xyz.Length != window.Pixels * 3)
@@ -266,63 +298,15 @@ public sealed class PreviewSession
                 built.UnionWith(output.Stats.StageSeconds.Keys);
                 rendered = true;
                 stages[PreviewStage.Render] = false;
-            }
-            timings["render"] = Lap(stopwatch);
-            renderInfo = RenderInfo.From(output.Stats, settings.Batching.DispatchBudgetMs);
-
-            // The exposure meter reads neither the size nor the loupe, so every size and loupe of this view is exposed alike and
-            // the meter is reused across them; the camera's compensation and the meter's own (M1.11b) are applied after it. The
-            // incident meter (M1.10a) reads the air's LUTs the render just built: the light on a grey card where the camera stands.
-            // The average meter renders the whole frame at a fixed size.
-            double meterCompensation = request.MeterCompensationEv
-                ?? (request.Meter == Metering.Incident ? IncidentMeter.DefaultCompensationEv : 0.0);
-            if (request.Meter == Metering.Incident)
-            {
-                // Keyed by the view's air frame (the scene's own, VistaScene.AirFrame): the sun, the camera's altitude, the air; and the
-                // wavelengths it is measured at (M1.12a).
-                IncidentLight light;
-                if (_incident is not null && _incidentKey == (frame, request.Quadrature))
+                renderInfo = RenderInfo.From(output.Stats, settings.Batching.DispatchBudgetMs) with
                 {
-                    light = _incident;
-                    stages[PreviewStage.ExposureMeter] = true;
-                }
-                else
-                {
-                    (_incident, _incidentKey) = (null, null);
-                    light = _renderer.MeasureIncidentLight(scene);
-                    (_incident, _incidentKey) = (light, (frame, request.Quadrature));
-                    built.UnionWith(light.StageSeconds.Keys);
-                    rendered = true;
-                    stages[PreviewStage.ExposureMeter] = false;
-                }
-                exposure = IncidentMeter.Measure(light, frame, Tables(materials, scene.Wavelengths()), camera.ExposureEv + meterCompensation);
-            }
-            else
-            {
-                RenderSettings meter = AutoExposure.MeterSettings(settings);
-                var meterKey = RenderKey.Of(scene, meter);
-                RenderOutput metered;
-                if (_meter is not null && meterKey == _meterKey)
-                {
-                    metered = _meter;
-                    stages[PreviewStage.ExposureMeter] = true;
-                }
-                else
-                {
-                    (_meter, _meterKey) = (null, null);
-                    metered = _renderer.Render(scene, meter, new HashSet<Aov>(), new BatchPlanner(meter.Width, meter.Height, meter.SamplesPerPixel, meter.Batching));
-                    (_meter, _meterKey) = (metered, meterKey);
-                    built.UnionWith(metered.Stats.StageSeconds.Keys);
-                    rendered = true;
-                    stages[PreviewStage.ExposureMeter] = false;
-                }
-                exposure = AutoExposure.Measure(metered.Xyz, camera.ExposureEv + meterCompensation);
-                exposure = exposure with
-                {
-                    Average = exposure.Average! with { MeterWidth = meter.Width, MeterHeight = meter.Height, MeterSamplesPerPixel = meter.SamplesPerPixel },
+                    Memory = MemoryInfo.Of(plan, output.Stats.PeakVideoMemoryBytes),
+                    Trace = TraceInfo.Of(clock),
                 };
             }
-            exposure = exposure with { CompensationEv = camera.ExposureEv, MeterCompensationEv = meterCompensation };
+            timings["render"] = Lap(stopwatch);
+
+            exposure = MeterExposure(request, scene, settings, frame, materials, stages, built, ref rendered);
             timings["exposureMeter"] = Lap(stopwatch);
             MarkRendererStages(stages, rendered, built, settings);
 
@@ -330,32 +314,17 @@ public sealed class PreviewSession
                 snowBySlope = SnowBySlope.Measure(ids, normals);
 
             float[] linear = DisplayTransform.XyzToLinearRec709(output.Xyz);
-            WriteDisplayPng(request.OutPath, linear, exposure.AppliedEv, request, window);
-            outputs["beauty"] = Path.GetFileName(request.OutPath);
-            ExrEncoder.WriteRgb(Sibling(".exr"), linear, window.Width, window.Height);
-            outputs["beautyExr"] = baseName + ".exr";
-            foreach (DebugOutput debug in request.Debug.OrderBy(d => d))
+            if (output.Aovs.TryGetValue(Aov.Variance, out float[]? variance))
             {
-                string role = debug.ToString().ToLowerInvariant();
-                byte[] rgb;
-                if (debug == DebugOutput.Detail)
+                // The noise the image shows (M1.15), from its own variance: what an estimate's preview predicted it would.
+                float[] steps = NoiseMeter.OneSampleSteps(linear, output.Xyz, variance, settings.SamplesPerPixel, exposure.AppliedEv, request.Display, request.Look);
+                renderInfo = renderInfo with
                 {
-                    // The auto camera's detail budget over the beauty (M1.14's follow-up); a loupe's pixels are not the frame's buffer.
-                    if (!request.Loupe.IsEmpty)
-                    {
-                        warnings.Add("The detail budget's image is of the whole frame: not written for a loupe.");
-                        continue;
-                    }
-                    (rgb, detail) = DetailImage(output, linear, exposure.AppliedEv, request, camera, almanac.Sun, world.Surface,
-                        air.PlanetRadiusMetres + groundAltitude);
-                }
-                else
-                {
-                    rgb = DebugImage(debug, output, materials);
-                }
-                PngEncoder.Write(Sibling($".{role}.png"), rgb, window.Width, window.Height, PngColor.Rgb);
-                outputs[role] = $"{baseName}.{role}.png";
+                    NoiseSteps = NoiseMeter.StepsAt(NoiseMeter.PercentileOf(steps, NoiseMeter.Percentile), settings.SamplesPerPixel),
+                };
             }
+            detail = WriteImages(request, output, linear, exposure, window, camera, almanac.Sun, world.Surface, air.PlanetRadiusMetres + groundAltitude,
+                request.OutPath, Sibling, baseName, outputs, warnings, out _);
             timings["write"] = Lap(stopwatch);
 
             if (request.Denoise is { } denoise)
@@ -394,10 +363,13 @@ public sealed class PreviewSession
             }
         }
 
-        outputs["sidecar"] = baseName + ".json";
+        // An estimate's sidecar sits beside the final's own, never in its place.
+        string sidecarSuffix = estimate is null ? ".json" : ".estimate.json";
+        outputs["sidecar"] = baseName + sidecarSuffix;
+        string kind = estimate is null ? "preview" : "estimate";
         var sidecar = new Sidecar
         {
-            Kind = request.DryRun || _renderer is null ? "dryRun" : "preview",
+            Kind = request.DryRun || _renderer is null ? "dryRun" : kind,
             CreatedUtc = _time.GetUtcNow().UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
             Engine = EngineInfo.Current(request.DryRun ? null : _renderer?.DeviceName),
             Recipe = recipe,
@@ -445,14 +417,148 @@ public sealed class PreviewSession
                 ? info with { SnowBySlope = snowBySlope }
                 : null,
             Render = renderInfo,
+            Estimate = estimate,
             Stages = new StageInfo([.. stages.Where(s => !s.Value).Select(s => s.Key)], [.. stages.Where(s => s.Value).Select(s => s.Key)]),
             Watch = watch is null ? null : watch with { RunSeconds = total.Elapsed.TotalSeconds },
             TimingsSeconds = timings,
             Outputs = outputs,
             Warnings = warnings,
         };
-        File.WriteAllText(Sibling(".json"), VistaJson.Serialize(sidecar));
+        File.WriteAllText(Sibling(sidecarSuffix), VistaJson.Serialize(sidecar));
         return sidecar;
+    }
+
+    /// <summary>The renderer outputs <paramref name="request"/>'s image needs: its debug images' and, when it denoises, the albedo and the normal.</summary>
+    private static HashSet<Aov> AovsOf(PreviewRequest request)
+    {
+        var aovs = new HashSet<Aov>(PreviewPipeline.AovsFor(request.Debug));
+        if (request.Denoise is not null)
+            aovs.UnionWith([Aov.Albedo, Aov.Normal]);
+        return aovs;
+    }
+
+    /// <summary>
+    /// The video memory of an image render, planned before it (vista-plan §10 M1.15): a render that does not fit the GPU's budget is
+    /// refused with the plan's numbers; a tight one is warned about at once (<see cref="Notice"/>) and in the sidecar.
+    /// </summary>
+    private MemoryPlan CheckMemory(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, List<string> warnings)
+    {
+        MemoryPlan plan = _renderer!.PlanMemory(scene, settings, aovs);
+        if (plan.Warning() is { } warning)
+        {
+            if (!plan.Fits)
+                throw new InsufficientMemoryException(warning);
+            warnings.Add(warning);
+            Notice?.Invoke(warning);
+        }
+        return plan;
+    }
+
+    /// <summary>
+    /// The PNG's exposure for <paramref name="scene"/> (vista-plan §10 M1.3, M1.10a, M1.11b), metering it unless the session's last meter
+    /// reading is for the same view. The exposure meter reads neither the size nor the loupe, so every size and loupe of this view is
+    /// exposed alike and the meter is reused across them; the camera's compensation and the meter's own (M1.11b) are applied after it. The
+    /// incident meter (M1.10a) reads the air's LUTs the render just built: the light on a grey card where the camera stands. The average
+    /// meter renders the whole frame at a fixed size.
+    /// </summary>
+    private ExposureInfo MeterExposure(PreviewRequest request, VistaScene scene, RenderSettings settings, AtmosphereFrame frame,
+        IReadOnlyList<VistaMaterial> materials, SortedDictionary<PreviewStage, bool> stages, HashSet<string> built, ref bool rendered)
+    {
+        CameraSpec camera = scene.Camera;
+        ExposureInfo exposure;
+        double meterCompensation = request.MeterCompensationEv
+            ?? (request.Meter == Metering.Incident ? IncidentMeter.DefaultCompensationEv : 0.0);
+        if (request.Meter == Metering.Incident)
+        {
+            // Keyed by the view's air frame (the scene's own, VistaScene.AirFrame): the sun, the camera's altitude, the air; and the
+            // wavelengths it is measured at (M1.12a).
+            IncidentLight light;
+            if (_incident is not null && _incidentKey == (frame, request.Quadrature))
+            {
+                light = _incident;
+                stages[PreviewStage.ExposureMeter] = true;
+            }
+            else
+            {
+                (_incident, _incidentKey) = (null, null);
+                light = _renderer!.MeasureIncidentLight(scene);
+                (_incident, _incidentKey) = (light, (frame, request.Quadrature));
+                built.UnionWith(light.StageSeconds.Keys);
+                rendered = true;
+                stages[PreviewStage.ExposureMeter] = false;
+            }
+            exposure = IncidentMeter.Measure(light, frame, Tables(materials, scene.Wavelengths()), camera.ExposureEv + meterCompensation);
+        }
+        else
+        {
+            RenderSettings meter = AutoExposure.MeterSettings(settings);
+            var meterKey = RenderKey.Of(scene, meter);
+            RenderOutput metered;
+            if (_meter is not null && meterKey == _meterKey)
+            {
+                metered = _meter;
+                stages[PreviewStage.ExposureMeter] = true;
+            }
+            else
+            {
+                (_meter, _meterKey) = (null, null);
+                metered = _renderer!.Render(scene, meter, new HashSet<Aov>(), new BatchPlanner(meter.Width, meter.Height, meter.SamplesPerPixel, meter.Batching));
+                (_meter, _meterKey) = (metered, meterKey);
+                built.UnionWith(metered.Stats.StageSeconds.Keys);
+                rendered = true;
+                stages[PreviewStage.ExposureMeter] = false;
+            }
+            exposure = AutoExposure.Measure(metered.Xyz, camera.ExposureEv + meterCompensation);
+            exposure = exposure with
+            {
+                Average = exposure.Average! with { MeterWidth = meter.Width, MeterHeight = meter.Height, MeterSamplesPerPixel = meter.SamplesPerPixel },
+            };
+        }
+        return exposure with { CompensationEv = camera.ExposureEv, MeterCompensationEv = meterCompensation };
+    }
+
+    /// <summary>
+    /// Writes the beauty as PNG (<paramref name="beautyPath"/>) and EXR and the requested debug images (<paramref name="path"/> turns a
+    /// suffix into a sibling's path), recording each in <paramref name="outputs"/> under <paramref name="baseName"/> when given; returns the
+    /// detail budget's measure when its image was written, and in <paramref name="beautySeconds"/> how long the PNG and the EXR took.
+    /// </summary>
+    private DetailInfo? WriteImages(PreviewRequest request, RenderOutput output, float[] linear, ExposureInfo exposure, PixelWindow window,
+        CameraSpec camera, SunPosition sun, HeightField surface, double radius, string beautyPath, Func<string, string> path, string baseName,
+        SortedDictionary<string, string>? outputs, List<string> warnings, out double beautySeconds)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        WriteDisplayPng(beautyPath, linear, exposure.AppliedEv, request, window);
+        ExrEncoder.WriteRgb(path(".exr"), linear, window.Width, window.Height);
+        beautySeconds = stopwatch.Elapsed.TotalSeconds;
+        if (outputs is not null)
+        {
+            outputs["beauty"] = Path.GetFileName(beautyPath);
+            outputs["beautyExr"] = baseName + ".exr";
+        }
+        DetailInfo? detail = null;
+        foreach (DebugOutput debug in request.Debug.OrderBy(d => d))
+        {
+            string role = debug.ToString().ToLowerInvariant();
+            byte[] rgb;
+            if (debug == DebugOutput.Detail)
+            {
+                // The auto camera's detail budget over the beauty (M1.14's follow-up); a loupe's pixels are not the frame's buffer.
+                if (!request.Loupe.IsEmpty)
+                {
+                    warnings.Add("The detail budget's image is of the whole frame: not written for a loupe.");
+                    continue;
+                }
+                (rgb, detail) = DetailImage(output, linear, exposure.AppliedEv, request, camera, sun, surface, radius);
+            }
+            else
+            {
+                rgb = DebugImage(debug, output, MaterialCatalog.For(request.Mesh.Materials));
+            }
+            PngEncoder.Write(path($".{role}.png"), rgb, window.Width, window.Height, PngColor.Rgb);
+            if (outputs is not null)
+                outputs[role] = $"{baseName}.{role}.png";
+        }
+        return detail;
     }
 
     /// <summary>

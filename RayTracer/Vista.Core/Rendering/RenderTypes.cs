@@ -284,6 +284,13 @@ public interface IVistaRenderer
     /// <see cref="Output.IncidentMeter"/>) from the scene's atmosphere LUTs, building whichever of them the scene changed.
     /// </summary>
     IncidentLight MeasureIncidentLight(VistaScene scene);
+
+    /// <summary>
+    /// The video memory a render of <paramref name="scene"/> with these settings and outputs would take in a fresh process (vista-plan
+    /// §10 M1.15, <see cref="MemoryPlan"/>), planned from the sizes of the buffers it would allocate, before any of them is; with the
+    /// budget DXGI gives the process now.
+    /// </summary>
+    MemoryPlan PlanMemory(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs);
 }
 
 /// <summary>
@@ -380,6 +387,15 @@ public sealed record RenderStats
     /// measured): the number the 8 GB budget (vista-plan §7.1) is about.
     /// </summary>
     public long VideoMemoryBytes { get; init; }
+
+    /// <summary>
+    /// The most video memory the process held during the render (vista-plan §10 M1.15): DXGI's local segment, read after every
+    /// allocation the render made and polled while it ran; 0 when not measured. A plan (<see cref="MemoryPlan"/>) is checked against it.
+    /// </summary>
+    public long PeakVideoMemoryBytes { get; init; }
+
+    /// <summary>DXGI's video memory budget for the process when the render began, in bytes (0 when not measured).</summary>
+    public long VideoMemoryBudgetBytes { get; init; }
 
     /// <summary>Mean rays per pixel-sample.</summary>
     public double RaysPerSample() => PixelSamples > 0 ? (double)RaysTraced / PixelSamples : 0.0;

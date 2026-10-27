@@ -182,6 +182,18 @@ public sealed record PreviewRequest
     /// planted shot instead of read from a file; null to use the camera file (or the default camera).
     /// </summary>
     public AutoCameraSettings? AutoCamera { get; init; }
+
+    /// <summary>
+    /// Estimate this render instead of making it (vista-plan §7.2, §10 M1.15, <c>--estimate</c>): run the stages it would, trace a probe at
+    /// its size and detail, render the preview for its noise, plan its video memory, and write <c>&lt;preview&gt;.estimate.json</c> only.
+    /// </summary>
+    public bool Estimate { get; init; }
+
+    /// <summary>
+    /// The estimate's noise target (<c>--noise</c>), in steps of the 8-bit PNG at the 95th percentile of the frame's pixels: the estimate
+    /// also says how many samples meet it and what they take; null for none.
+    /// </summary>
+    public double? NoiseTarget { get; init; }
 }
 
 /// <summary>
@@ -199,7 +211,7 @@ public sealed record PreviewRequest
 ///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature blend | bins | redTail | engine]
 ///           [--forest on | off] [--canopy kernels | rough] [--snow on | off] [--pools on | flat]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
-///           [--dither on | off] [--png16] [--auto-camera [--finalists 10] [--detail-budget on | off]]
+///           [--dither on | off] [--png16] [--auto-camera [--finalists 10] [--detail-budget on | off]] [--estimate [--noise 1]]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. <c>--sliders</c> names the slider
@@ -235,6 +247,8 @@ public sealed record PreviewRequest
 /// candidates scored from their composition buffers, and the best <c>--finalists</c> rendered small for the squint test (0: none, the
 /// buffers' best wins; a dry run renders none). It writes the pick as <c>&lt;preview&gt;.camera.json</c>. <c>--detail-budget off</c> measures
 /// the detail budget (M1.14's follow-up) without ranking any frame down by it: M1.14's search as it was.
+/// <c>--estimate</c> estimates the render instead of making it (M1.15): its time as a range and its video memory against the GPU's
+/// budget, in <c>&lt;preview&gt;.estimate.json</c>; <c>--noise</c> adds the samples a noise target needs.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -301,7 +315,11 @@ public static class PreviewCommandLine
         "--auto-camera: choose the camera for the recipe's mountains instead of --camera: candidates around the planted shot scored\n" +
         "  from their composition buffers, the best --finalists <n> (default 10; 0 for none) rendered small for the squint test.\n" +
         "  Writes the pick as <preview>.camera.json and the scores in the sidecar. --detail-budget on (default) | off: rank down frames\n" +
-        "  whose lit rock and snow the final frame shows finer than the terrain carries (--debug detail shows them), or only measure it.";
+        "  whose lit rock and snow the final frame shows finer than the terrain carries (--debug detail shows them), or only measure it.\n" +
+        "--estimate: estimate this render instead of making it: the stages it repeats run and are timed, a few passes over the whole\n" +
+        "  frame at its size and detail project the trace, the preview gives its noise, and its video memory is planned against the\n" +
+        "  GPU's budget. Writes <preview>.estimate.json only. --noise <steps>: also the samples that bring the noise down to that many\n" +
+        "  steps of the 8-bit PNG (95% of the pixels), and their time.";
 
     /// <summary>The slider-file fields each slider option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> SliderOptionFields { get; } =
@@ -354,10 +372,14 @@ public static class PreviewCommandLine
         "--snowline", "--visibility", "--valley-haze", "--mist", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
         "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists", "--detail-budget",
+        "--noise",
     };
 
     /// <summary>The options that take no value.</summary>
-    internal static IReadOnlySet<string> FlagOptions { get; } = new HashSet<string>(StringComparer.Ordinal) { "--dry-run", "--denoise", "--png16", "--auto-camera" };
+    internal static IReadOnlySet<string> FlagOptions { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "--dry-run", "--denoise", "--png16", "--auto-camera", "--estimate",
+    };
 
     /// <summary>
     /// Splits <paramref name="args"/> from <paramref name="start"/> into <c>--option value</c> pairs and the flags
@@ -465,6 +487,21 @@ public static class PreviewCommandLine
         {
             problems.Add("--finalists and --detail-budget need --auto-camera.");
         }
+        bool estimate = flags.Contains("--estimate");
+        double? noise = null;
+        if (values.TryGetValue("--noise", out string? noiseText))
+        {
+            if (double.TryParse(noiseText, NumberStyles.Float, CultureInfo.InvariantCulture, out double steps) && steps is > 0.0 and <= 255.0)
+                noise = steps;
+            else
+                problems.Add($"--noise must be a number of 8-bit steps above 0 (at most 255), got '{noiseText}'.");
+            if (!estimate)
+                problems.Add("--noise is the estimate's noise target: it needs --estimate.");
+        }
+        if (estimate && dryRun)
+            problems.Add("--estimate measures on the GPU: it cannot be a dry run.");
+        if (estimate && !loupe.IsEmpty)
+            problems.Add("--estimate estimates the whole frame: leave out --loupe.");
 
         if (problems.Count > before)
             return null;
@@ -504,6 +541,8 @@ public static class PreviewCommandLine
             Snow = snow,
             Pools = pools,
             AutoCamera = autoCamera,
+            Estimate = estimate,
+            NoiseTarget = noise,
         };
     }
 

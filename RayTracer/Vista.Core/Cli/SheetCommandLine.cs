@@ -110,6 +110,8 @@ public static class SheetCommandLine
         }
         PreviewRequest? baseRequest = PreviewCommandLine.Build(
             values, flags, recipeRequired: axis?.SuppliesRecipe != true, seedRequired: axis?.SuppliesSeed != true, problems);
+        if (flags.Contains("--estimate"))
+            problems.Add("--estimate estimates one render: run it with --preview, not --sheet.");
 
         if (problems.Count > 0)
             return false;

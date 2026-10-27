@@ -376,3 +376,17 @@ of the frame (`budget.png`); and with `-Before` (an earlier run's `-Out`) the pi
 ```
 powershell -File vista-views/autocam/render.ps1 [-Seeds 1,2,3,4,5,6,7,42] [-Seed 42] [-Recipe <recipe>] [-Paintings <a.png,b.png>] [-Before <earlier -Out>] [-Sheets finalists,seeds,paintings,repeat,budget,changed] [-Out folder]
 ```
+
+## Estimate checks (M1.15)
+
+`estimate/check.ps1` checks `--estimate` against the final itself on seven views at 3840×2160, 64 spp, seed 42: the sky camera on a
+summer day (sky-heavy), the ledger's aerial and default views (terrain-heavy) and its golden-hour down-slope view (the valleys'
+pools), the aerial view at summer dawn (twilight) and in mid-April (snow down to the forest), and the pools' fog-sea camera with the
+mist pinned at 200 m (a march through dense mist). For each, `--estimate --noise 1` and then the final run, each a fresh process timed
+on the wall from outside; it prints the whole run's range against the final's wall time, the trace's range against the final's trace,
+the planned peak video memory against the final's measured peak (inside the plan's 3%), and the live ETA's worst error at 10–50% of the
+trace, and writes `check.csv`. `-Rounds` repeats the set.
+
+```
+powershell -File vista-views/estimate/check.ps1 [-Views sky,aerial,default,down-slope,dawn,snow,fog-sea] [-Rounds 2] [-Spp 64] [-Width 3840] [-Out folder] [-Keep]
+```

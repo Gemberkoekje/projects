@@ -142,6 +142,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         CreateIncidentPipeline();
         CreateFixedResources();
         _initSeconds[RenderStageKeys.ShaderCompile] = Lap(stopwatch);
+        MeasureBaseMemory();
     }
 
     /// <inheritdoc />
@@ -249,6 +250,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
 
         var stages = new SortedDictionary<string, double>(_initSeconds, StringComparer.Ordinal);
         _initSeconds.Clear();
+        long budget = VideoMemoryBudget;
+        using IDisposable memoryWatch = WatchMemory();
         var stopwatch = Stopwatch.StartNew();
         ID3D12PipelineState pipeline = settings.Atmosphere switch
         {
@@ -266,6 +269,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             UploadMesh(scene.Mesh);
             EnsureNormalMaps(scene.Mesh.NormalMaps);
             EnsureMaterials(scene.Mesh.Materials);
+            NoteMemory();
             stages[RenderStageKeys.MeshUpload] = Lap(stopwatch);
             BuildAccelerationStructures(scene.Mesh);
             stages[RenderStageKeys.AccelerationBuild] = Lap(stopwatch);
@@ -300,6 +304,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         UploadTables(tables);
         uint mask = MaskFor(aovs);
         EnsureImageBuffers(window.Width, window.Height, mask);
+        NoteMemory();
         ResetRayCounter();
         stages["setup"] = Lap(stopwatch);
 
@@ -361,6 +366,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             StageSeconds = stages,
             AccelerationStructureBytes = _blasBytes,
             VideoMemoryBytes = VideoMemoryUsed,
+            PeakVideoMemoryBytes = Interlocked.Read(ref _peakVideoMemory),
+            VideoMemoryBudgetBytes = budget,
         };
         return new RenderOutput(window.Width, window.Height, xyz, buffers, stats);
     }
@@ -651,7 +658,11 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
     }
 
     /// <summary>The bottom-level build of <paramref name="mesh"/> from buffers at these addresses (zero for a size query).</summary>
-    private static BuildRaytracingAccelerationStructureInputs BlasInputs(TerrainMesh mesh, ulong positions, ulong indices) => new()
+    private static BuildRaytracingAccelerationStructureInputs BlasInputs(TerrainMesh mesh, ulong positions, ulong indices) =>
+        BlasInputs((uint)mesh.VertexCount, (uint)mesh.Indices.Length, positions, indices);
+
+    /// <summary>The bottom-level build of <paramref name="vertexCount"/> vertices and <paramref name="indexCount"/> indices at these addresses.</summary>
+    private static BuildRaytracingAccelerationStructureInputs BlasInputs(uint vertexCount, uint indexCount, ulong positions, ulong indices) => new()
     {
         Type = RaytracingAccelerationStructureType.BottomLevel,
         Layout = ElementsLayout.Array,
@@ -666,10 +677,10 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
                 Triangles = new RaytracingGeometryTrianglesDescription
                 {
                     VertexBuffer = new GpuVirtualAddressAndStride(positions, 3 * sizeof(float)),
-                    VertexCount = (uint)mesh.VertexCount,
+                    VertexCount = vertexCount,
                     VertexFormat = Format.R32G32B32_Float,
                     IndexBuffer = indices,
-                    IndexCount = (uint)mesh.Indices.Length,
+                    IndexCount = indexCount,
                     IndexFormat = Format.R32_UInt,
                     Transform3x4 = 0,
                 },
@@ -677,9 +688,22 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         ],
     };
 
-    private void BuildAccelerationStructures(TerrainMesh mesh)
+    /// <summary>The top-level build of the one instance at <paramref name="instances"/> (zero for a size query).</summary>
+    private static BuildRaytracingAccelerationStructureInputs TlasInputs(ulong instances) => new()
     {
-        BuildRaytracingAccelerationStructureInputs blasInputs = BlasInputs(mesh, _positions!.GPUVirtualAddress, _indices!.GPUVirtualAddress);
+        Type = RaytracingAccelerationStructureType.TopLevel,
+        Layout = ElementsLayout.Array,
+        Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
+        DescriptorsCount = 1,
+        InstanceDescriptions = instances,
+    };
+
+    private void BuildAccelerationStructures(TerrainMesh mesh) => BuildAccelerationStructures((uint)mesh.VertexCount, (uint)mesh.Indices.Length);
+
+    /// <summary>Builds the BLAS of the uploaded <see cref="_positions"/> and <see cref="_indices"/> and the TLAS of its one instance.</summary>
+    private void BuildAccelerationStructures(uint vertexCount, uint indexCount)
+    {
+        BuildRaytracingAccelerationStructureInputs blasInputs = BlasInputs(vertexCount, indexCount, _positions!.GPUVirtualAddress, _indices!.GPUVirtualAddress);
         RaytracingAccelerationStructurePrebuildInfo blasInfo = _device.GetRaytracingAccelerationStructurePrebuildInfo(blasInputs);
         using ID3D12Resource blasScratch = CreateUavBuffer(blasInfo.ScratchDataSizeInBytes);
         _blas = CreateUavBuffer(blasInfo.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
@@ -694,17 +718,11 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         };
         _instance = CreateUploadBuffer<RaytracingInstanceDescription>(MemoryMarshal.CreateReadOnlySpan(ref instance, 1));
 
-        var tlasInputs = new BuildRaytracingAccelerationStructureInputs
-        {
-            Type = RaytracingAccelerationStructureType.TopLevel,
-            Layout = ElementsLayout.Array,
-            Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
-            DescriptorsCount = 1,
-            InstanceDescriptions = _instance.GPUVirtualAddress,
-        };
+        BuildRaytracingAccelerationStructureInputs tlasInputs = TlasInputs(_instance.GPUVirtualAddress);
         RaytracingAccelerationStructurePrebuildInfo tlasInfo = _device.GetRaytracingAccelerationStructurePrebuildInfo(tlasInputs);
         using ID3D12Resource tlasScratch = CreateUavBuffer(tlasInfo.ScratchDataSizeInBytes);
         _tlas = CreateUavBuffer(tlasInfo.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
+        NoteMemory(); // the build's peak: both scratches beside the results
 
         _allocator.Reset();
         _commandList.Reset(_allocator, null);

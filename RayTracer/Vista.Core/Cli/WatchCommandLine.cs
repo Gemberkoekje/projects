@@ -43,6 +43,12 @@ public static class WatchCommandLine
         "they override the command line's and are read again whenever it changes: put --seed, --time or --width there to change\n" +
         "them. A file that does not parse is reported and the session keeps watching. Type quit (or press Ctrl+C) to stop.";
 
+    /// <summary>
+    /// Why a watch takes no <c>--estimate</c> (vista-plan §10 M1.15): an estimate times the stages a fresh run repeats, and a watch keeps
+    /// them, so it would time nothing.
+    /// </summary>
+    private const string EstimateProblem = "--estimate times the stages a fresh run repeats, which a watch keeps: run it with --preview.";
+
     /// <summary>The options a watch takes on its command line: every <c>--preview</c> option and the options file.</summary>
     private static IReadOnlySet<string> ValueOptions { get; } = new HashSet<string>(PreviewCommandLine.ValueOptions, StringComparer.Ordinal) { OptionsOption };
 
@@ -60,6 +66,8 @@ public static class WatchCommandLine
         }
 
         (Dictionary<string, string> values, IReadOnlySet<string> flags) = PreviewCommandLine.SplitOptions(args, 1, ValueOptions, problems);
+        if (flags.Contains("--estimate"))
+            problems.Add(EstimateProblem);
         string optionsPath = values.Remove(OptionsOption, out string? path) ? path : string.Empty;
         if (optionsPath.Length == 0)
         {
@@ -96,6 +104,8 @@ public static class WatchCommandLine
             problems.Add($"The options file cannot name another ({OptionsOption}).");
         if (fileFlags.Contains("--dry-run"))
             problems.Add("--dry-run cannot change while a watch runs; give it on the command line.");
+        if (fileFlags.Contains("--estimate"))
+            problems.Add(EstimateProblem);
         foreach ((string option, string value) in fileValues)
             values[option] = value;
         flags.UnionWith(fileFlags);

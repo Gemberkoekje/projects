@@ -154,6 +154,39 @@ public sealed class PreviewCommandLineTests
         StringAssert.Contains(string.Join("\n", Errors("--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", "--loupe", loupe)), message);
 
     [TestMethod]
+    public void Estimate_AndItsNoiseTarget_AreParsed()
+    {
+        PreviewRequest r = Parse("--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", "--width", "3840", "--estimate", "--noise", "1.5");
+        Assert.IsTrue(r.Estimate);
+        Assert.AreEqual(1.5, r.NoiseTarget);
+        PreviewRequest plain = Parse("--preview", "--recipe", "r", "--seed", "1", "--out", "p.png");
+        Assert.IsFalse(plain.Estimate);
+        Assert.IsNull(plain.NoiseTarget);
+    }
+
+    [TestMethod]
+    [DataRow("--noise 1", "it needs --estimate")]
+    [DataRow("--estimate --noise 0", "--noise must be")]
+    [DataRow("--estimate --noise much", "--noise must be")]
+    [DataRow("--estimate --dry-run", "cannot be a dry run")]
+    [DataRow("--estimate --loupe 0,0,64,64", "leave out --loupe")]
+    public void Estimate_IsChecked(string options, string message) =>
+        StringAssert.Contains(string.Join("\n", Errors(["--preview", "--recipe", "r", "--seed", "1", "--out", "p.png", .. options.Split(' ')])), message);
+
+    [TestMethod]
+    public void Estimate_IsForOnePreview()
+    {
+        Assert.IsFalse(SheetCommandLine.TryParse(["--sheet", "--recipe", "r", "--vary", "seed=1,2", "--out", "s.png", "--estimate"], out _, out IReadOnlyList<string> sheet));
+        StringAssert.Contains(string.Join("\n", sheet), "not --sheet");
+        Assert.IsFalse(WatchCommandLine.TryParse(["--watch", "--recipe", "r", "--seed", "1", "--out", "p.png", "--estimate"], out _, out IReadOnlyList<string> watch));
+        StringAssert.Contains(string.Join("\n", watch), "which a watch keeps");
+        Assert.IsTrue(WatchCommandLine.TryParse(["--watch", "--recipe", "r", "--seed", "1", "--out", "p.png"], out WatchRequest? request, out _));
+        var problems = new List<string>();
+        Assert.IsNull(WatchCommandLine.Merge(request!, "--estimate", problems, out _, out _));
+        StringAssert.Contains(string.Join("\n", problems), "which a watch keeps");
+    }
+
+    [TestMethod]
     public void ModeAndValues_AreChecked()
     {
         StringAssert.Contains(Errors("--recipe", "r")[0], "--preview");

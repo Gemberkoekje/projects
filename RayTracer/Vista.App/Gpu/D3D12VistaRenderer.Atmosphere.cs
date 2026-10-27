@@ -200,6 +200,7 @@ internal sealed partial class D3D12VistaRenderer
         using ID3D12Resource density = CreateUavBuffer((ulong)items4d * 2 * sizeof(float));
         using ID3D12Resource radiance = CreateUavBuffer((ulong)items4d * sizeof(float));
         using ID3D12Resource irradiance = CreateUavBuffer((ulong)itemsGround * sizeof(float));
+        NoteMemory(); // the air's peak: the orders' scratch beside the mesh
 
         double seconds = BuildLut(_directPipeline, itemsGround, 0, new() { [LutSlot.Columns] = _columnsLut, [LutSlot.Output] = irradiance });
         float[] direct = capture is null ? [] : ReadFloats(irradiance, itemsGround);

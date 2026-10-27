@@ -42,6 +42,9 @@ internal sealed class FakeRenderer : IVistaRenderer
     /// <summary>Every scene rendered, in order.</summary>
     public List<VistaScene> Scenes { get; } = [];
 
+    /// <summary>Every image render's settings and outputs, in order (beside <see cref="Scenes"/>).</summary>
+    public List<(RenderSettings Settings, IReadOnlySet<Aov> Aovs)> Renders { get; } = [];
+
     public string DeviceName => Name;
 
     /// <summary>Exposure-meter renders (<see cref="RenderSettings.ExposureMeter"/>), kept apart from the image renders above.</summary>
@@ -67,6 +70,27 @@ internal sealed class FakeRenderer : IVistaRenderer
 
     private static double[] Flat(double value) => [.. Enumerable.Repeat(value, AtmosphereLuts.Wavelengths)];
 
+    /// <summary>The base every fake plan starts from, bytes.</summary>
+    public const long PlanBaseBytes = 100L << 20;
+
+    /// <summary>The fake's budget, bytes; a test lowers it to see a plan that does not fit.</summary>
+    public long BudgetBytes { get; init; } = 8L << 30;
+
+    /// <summary>The scenes memory was planned for, in order.</summary>
+    public List<VistaScene> Plans { get; } = [];
+
+    /// <summary>A plan of the mesh's bytes, twice them for its acceleration structure, and 16 bytes a rendered pixel.</summary>
+    public MemoryPlan PlanMemory(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs)
+    {
+        Plans.Add(scene);
+        return new MemoryPlan(PlanBaseBytes, BudgetBytes,
+        [
+            new MemoryItem("mesh", MemoryPlan.Page(scene.Mesh.ByteSize), MemoryStage.Mesh),
+            new MemoryItem("blas", MemoryPlan.Page(2 * scene.Mesh.ByteSize), MemoryStage.Acceleration),
+            new MemoryItem("imageXyz", MemoryPlan.Page(16L * settings.Rendered.Pixels), MemoryStage.Trace),
+        ]);
+    }
+
     public RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner)
     {
         if (settings.ExposureMeter)
@@ -80,6 +104,7 @@ internal sealed class FakeRenderer : IVistaRenderer
             Settings = settings;
             Planner = planner;
             Requested = aovs;
+            Renders.Add((settings, new HashSet<Aov>(aovs)));
         }
         PixelWindow window = settings.Rendered;
         Assert.AreEqual(window.Width, planner.Width, "the planner is sized to the rendered window");

@@ -55,6 +55,9 @@ namespace Vista.App.Gpu;
 /// <para>Since M1.12 the scene has the ground's materials by rule and their detail, so every check above renders them; and the
 /// materials themselves (<see cref="MaterialChecks"/>): the world's material field is the same twice, the shader's rules match the
 /// C# reference at random places of the world, and the reference render shows several materials.</para>
+///
+/// <para>Then the estimate's video memory (M1.15, <see cref="MemoryChecks"/>): a fresh renderer plans the 640×360 frame with every output,
+/// renders it, and the peak it measured lies within the plan's stated margin.</para>
 /// </summary>
 internal static partial class GpuSelfTest
 {
@@ -145,6 +148,7 @@ internal static partial class GpuSelfTest
         pass &= Check(log, "the loupe sees both sky and terrain", Mixed(loupe));
         pass &= Check(log, "the loupe is that window of the full frame, bit for bit", SameAsCrop(full, loupe, window));
         pass &= Check(log, "the loupe under a 0.05 ms budget is bit-identical", Same(loupe, loupeSplit, compareAovs: true));
+        pass &= MemoryChecks(scene, frame, allAovs, log);
 
         pass &= AtmosphereChecks(renderer, scene, settings, tight, log);
         pass &= LowAirChecks(renderer, recipe, seed, eroded, scene, settings, log);
@@ -950,6 +954,23 @@ internal static partial class GpuSelfTest
             $"  {label}: {s.Dispatches} dispatches, {s.RaysTraced:N0} rays ({s.RaysPerSample():0.00}/sample), " +
             $"{s.TraceSeconds * 1e3:0.0} ms GPU, longest dispatch {s.LongestDispatchSeconds * 1e3:0.00} ms"));
         return output;
+    }
+
+    /// <summary>
+    /// The estimate's video memory (M1.15): a fresh renderer (a device of its own, so its base holds what the process holds now) plans
+    /// <paramref name="scene"/> at <paramref name="settings"/> with <paramref name="aovs"/> before anything of it exists, then renders it;
+    /// the peak it measured must lie within <see cref="MemoryPlan.Margin"/> of the plan's.
+    /// </summary>
+    private static bool MemoryChecks(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, TextWriter log)
+    {
+        using var fresh = new D3D12VistaRenderer();
+        MemoryPlan plan = fresh.PlanMemory(scene, settings, aovs);
+        RenderOutput output = Render(fresh, scene, settings, aovs, new BatchPlannerOptions(), log, "a fresh renderer's frame");
+        long peak = output.Stats.PeakVideoMemoryBytes;
+        string numbers = string.Create(CultureInfo.InvariantCulture,
+            $"planned {plan.PeakBytes / 1048576.0:0.0} MiB at its peak ({plan.PeakStage}), measured {peak / 1048576.0:0.0} MiB");
+        log.WriteLine($"  {numbers}");
+        return Check(log, "the planned video memory meets the measured peak", Math.Abs(peak - plan.PeakBytes) <= MemoryPlan.Margin * plan.PeakBytes ? null : numbers);
     }
 
     internal static bool Check(TextWriter log, string name, string? failure)

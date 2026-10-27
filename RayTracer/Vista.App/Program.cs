@@ -86,12 +86,47 @@ internal static class Program
         if (request.DryRun)
             return Report(PreviewPipeline.Run(request, renderer: null, erosionCache: ErosionCache.Default));
 
+        double startup = SecondsSinceStart(); // before the renderer: its device and shaders are its own stages
         return RunGpu(() =>
         {
             using var renderer = new D3D12VistaRenderer();
             using var denoiser = new OidnDenoiser();
-            return Report(PreviewPipeline.Run(request, renderer, denoiser: denoiser, eroder: renderer, erosionCache: ErosionCache.Default));
+            var eta = new EtaLine(Console.Error);
+            var session = new PreviewSession(renderer, denoiser, eroder: renderer, erosionCache: ErosionCache.Default)
+            {
+                StartupSeconds = startup,
+                Notice = notice => Console.Error.WriteLine($"warning: {notice}"),
+                Progress = eta.Report,
+            };
+            return Report(session.Run(request));
         });
+    }
+
+    /// <summary>Wall seconds since the process started (vista-plan §10 M1.15: an estimate counts them, a final run repeats them).</summary>
+    private static double SecondsSinceStart()
+    {
+        using var self = System.Diagnostics.Process.GetCurrentProcess();
+        return (DateTime.Now - self.StartTime).TotalSeconds;
+    }
+
+    /// <summary>
+    /// The image render's progress and live ETA on the console (vista-plan §7.2, §10 M1.15): a line at most every
+    /// <see cref="IntervalSeconds"/>, so a trace shorter than that prints none.
+    /// </summary>
+    private sealed class EtaLine(TextWriter writer)
+    {
+        private const double IntervalSeconds = 5.0;
+        private double _next = IntervalSeconds;
+
+        public void Report(TraceProgress progress)
+        {
+            if (progress.ElapsedSeconds < _next || progress.Progress >= 1.0)
+                return;
+            _next = progress.ElapsedSeconds + IntervalSeconds;
+            string left = progress.RemainingSeconds is double remaining ? $"about {TimeRange.Describe(remaining)} left" : "first pass";
+            writer.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"trace {progress.Progress * 100.0:0}% · {TimeRange.Describe(progress.ElapsedSeconds)} · {left}"));
+        }
     }
 
     private static int Sheet(string[] args)
@@ -311,15 +346,62 @@ internal static class Program
                 $"{render.RaysPerSecond / 1e6:0.0} Mrays/s; {s.Dispatches} dispatches, {s.TraceSeconds:0.000} s GPU, " +
                 $"longest dispatch {s.LongestDispatchSeconds * 1e3:0.0} ms"));
         }
+        if (sidecar.Render?.Memory is { } memory)
+            Console.WriteLine($"video memory: {MemoryLine(memory, "measured")}");
         if (sidecar.Denoise?.Run is { } denoise)
         {
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"denoised by {denoise.Library} {denoise.Version} on {denoise.Device}: {denoise.Filter}; " +
                 $"{denoise.CommitSeconds * 1e3:0} ms to prepare, {denoise.ExecuteSeconds * 1e3:0} ms to filter"));
         }
+        if (sidecar.Estimate is { } estimate)
+            ReportEstimate(estimate);
         foreach (string warning in sidecar.Warnings)
             Console.Error.WriteLine($"warning: {warning}");
         return 0;
+    }
+
+    /// <summary>The estimate's lines (vista-plan §10 M1.15): the whole run as a range, its parts, the probe, the noise and the video memory.</summary>
+    private static void ReportEstimate(EstimateInfo e)
+    {
+        string Seconds(double s) => s.ToString("0.0", CultureInfo.InvariantCulture);
+        Console.WriteLine($"estimate for {e.Width}×{e.Height} at {e.SamplesPerPixel} spp: " +
+            (e.Total is { } total ? $"{total} for the whole run" : "none: the render does not fit the GPU's memory"));
+        if (e.Trace is { } trace && e.Projection is { } p && e.Write is { } write)
+        {
+            string denoise = e.Denoise is { } d ? $", denoising {d}" : string.Empty;
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  setup {e.Setup} ({string.Join(", ", e.SetupSeconds.Where(s => s.Value >= 0.5).Select(s => $"{s.Key} {Seconds(s.Value)}"))}); " +
+                $"trace {trace} ({p.CostNs:0.00} ns a sample on the GPU, {p.WallPerGpu:0.00}× on the wall); files {write}{denoise}"));
+            string preview = e.Preview is { } v
+                ? string.Create(CultureInfo.InvariantCulture,
+                    $"; preview {v.Width}×{v.Height} at {v.SamplesPerPixel} spp: {v.CostNs:0.00} ns a sample (the final {v.FinalCostRatio:0.00}×)")
+                : string.Empty;
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  probe: {e.Probe!.SamplesPerPixel} spp over the whole frame in {p.ProbePasses} passes, settling at {p.SteadySamples} a pass " +
+                $"(within ±{p.CostSpread * 100.0:0.0}%), {p.RaysPerSample:0.00} rays a sample, {p.RaysPerSecond / 1e6:0.0} Mrays/s{preview}"));
+        }
+        if (e.Noise is { } n)
+        {
+            string target = n.TargetSteps is { } t
+                ? string.Create(CultureInfo.InvariantCulture,
+                    $"; {t:0.##} steps need {n.SamplesForTargetLow}–{n.SamplesForTarget} spp: trace {n.TraceForTarget}, whole run {n.TotalForTarget}")
+                : string.Empty;
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  noise at {e.SamplesPerPixel} spp: {n.StepsAtSamples:0.00} steps of the 8-bit PNG ({n.Percentile * 100.0:0}% of the pixels){target}"));
+        }
+        Console.WriteLine($"  video memory: {MemoryLine(e.Memory, "measured in the probe")}");
+    }
+
+    /// <summary>A memory record as one line: the plan's peak against the budget, and the peak measured (<paramref name="measured"/> says where).</summary>
+    private static string MemoryLine(MemoryInfo m, string measured)
+    {
+        string MiB(long bytes) => (bytes / 1048576.0).ToString("N0", CultureInfo.InvariantCulture) + " MiB";
+        string fit = m.Fits ? (m.Tight ? "tight" : "fits") : "does not fit";
+        string peak = m.MeasuredPeakBytes > 0 && m.PlanError is double error
+            ? string.Create(CultureInfo.InvariantCulture, $"; {measured} {MiB(m.MeasuredPeakBytes)} (the plan {error * 100.0:+0.0;-0.0}%)")
+            : string.Empty;
+        return $"{MiB(m.PlannedPeakBytes)} planned at its peak ({m.PeakStage.ToString().ToLowerInvariant()}) of a {MiB(m.BudgetBytes)} budget: {fit}{peak}";
     }
 
     private static int Report(SheetSidecar sheet)
