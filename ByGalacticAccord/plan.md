@@ -6,8 +6,8 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-10-26):** S1–S4 done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
-[S4 log](log/S4.md)); S5 is next. The UI mockup
+**Status (2026-10-27):** S1–S5 done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
+[S4 log](log/S4.md), [S5 log](log/S5.md)); S6 is next. The UI mockup
 is at <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
@@ -46,9 +46,11 @@ foundation is sound; most of the game logic on top of it changes shape.
 | *Found in S2:* outside the Accord the pilot pays the producer for the goods at pickup and is paid only the fee at handover, so nearly every frontier haul loses money (and AI haulers take them, since their scoring ignores the goods) | S3 (fixed: a delivered Sale pays for the goods) |
 | *Found in S2:* consumers post hauls from a producer at their own location (Helios Prime), a one-hour trip to nowhere | S3 (fixed: a Sale handed over where it is posted) |
 | *Found in S3:* AI actors pay out whatever they hold above a working capital, a sink standing in for spending, growth and failure; without it savers soak up the money supply | S7, S8 (growth and insolvency replace it) |
-| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (in part: such a Sale now ends by its terms, the producer walking away for its break fee or its buyer cancelling for the bond), S5 (raising the offer by negotiation) |
-| *Found in S4:* filling a Sale through a carrier pays only if the player watches its haul: at the usual offer about one in seven goes untaken and the Sale is cancelled for the bond, and the player can raise an offer only by reposting it | S5 (posting and haggling), S6 (what carriers can see) |
-| *Found in S4:* decisions rarely reach the player, which is a payer only of the hauls it posts and the lots it buys | S5 (the player posts wanted Sales and so receives defaults and inspections) |
+| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (in part: such a Sale now ends by its terms, the producer walking away for its break fee or its buyer cancelling for the bond). S5's haggling didn't fix it (walking away rose by 40–85%): carriers' time near the goods binds, not the fee. S6 (what carriers can see), S7 (fleets that grow) |
+| *Found in S4:* filling a Sale through a carrier pays only if the player watches its haul: at the usual offer about one in seven goes untaken and the Sale is cancelled for the bond, and the player can raise an offer only by reposting it | S5 (in part: the player posts a haul at its own price and terms, and haggles with the carriers that answer), S6 (what carriers can see) |
+| *Found in S4:* decisions rarely reach the player, which is a payer only of the hauls it posts and the lots it buys | S5 (in part: the player can post wanted Sales and is then asked about defaults and inspections, but neither bot met a decision in 8,333 game days) |
+| *Found in S5:* the market reader rarely finds a spread worth posting for (2–7 posts in 8,333 game days) and doesn't reliably beat the board taker | S6 (ageing information gives a reader an edge; S6's verify) |
+| *Found in S5:* the share of signed contracts that fail or are cancelled rose from 4.3–4.8% to 6.6–7.5%, and payer default from 41–239 to 474–601 a million ticks, as haggling signs marginal deals | Open: see the questions in [`log/S5.md`](log/S5.md) |
 | *Found in S3:* Dust Runner Kael's armoured freighter costs more to run than it earns in this sector, and an actor can't change its fleet | S7 |
 
 ## 2. How we work
@@ -175,7 +177,13 @@ foundation is sound; most of the game logic on top of it changes shape.
   - A food post at Verdant draws the producer's response.
   - Haggling cannot advance while paused.
   - The bots run a full soak without breaking invariants.
-- **Status:** not started.
+- **Status (2026-10-27):** done. The player posts wanted Sales, lots and hauls at its own price and terms; posts
+  reach AI actors by their presence and are answered over game time, as posted or with a counter; haggles over
+  price, deadline, package and late fee run in game time with the player (replies after 1–12 hours, with tells)
+  and in closed form between AI actors, who haggle about a quarter of wanted Sales. Over a million ticks
+  invariants hold and 7% more contracts are fulfilled than in S4, with 6.6–7.5% failing or cancelled (S4:
+  4.3–4.8%). A board taker and a market reader play a million ticks without breaking an invariant. The client has
+  the post composer, "my posts" with their answers, and haggles as threads. See [`log/S5.md`](log/S5.md).
 
 ### S6 — Information and the news
 
