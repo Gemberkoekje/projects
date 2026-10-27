@@ -57,12 +57,15 @@ namespace Vista.Output;
 /// extinction and the haze's unit. Schema 23 (M1.13b) added the mist's slider in <see cref="SlidersInfo.Values"/> and, in
 /// <see cref="SlidersInfo.Weather"/>, the valleys' pools (<see cref="PoolsInfo"/>): how they were rendered, what the weather told them,
 /// what they added up to and the flat layer the tables carried in their place; the valley haze's layer is now the scene's own
-/// valley's pool. Schema 24 (M1.14) added <see cref="AutoCamera"/>: how the auto camera chose the camera, when it did.</para>
+/// valley's pool. Schema 24 (M1.14) added <see cref="AutoCamera"/>: how the auto camera chose the camera, when it did. Schema 25 (M1.14's
+/// follow-up) added the detail budget: its limits and each scored framing's share in <see cref="AutoCamera"/> (the limits' frame size is
+/// now the final frame's, <c>finalFrameWidth</c>, not the triangles' alone), and <see cref="Detail"/>, the budget over a preview with
+/// <c>--debug detail</c>.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 24;
+    public const int CurrentSchema = 25;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -90,6 +93,9 @@ public sealed record Sidecar
 
     /// <summary>How the auto camera chose <see cref="Camera"/> (schema 24, vista-plan §10 M1.14); absent when it did not.</summary>
     public Composition.AutoCameraInfo? AutoCamera { get; init; }
+
+    /// <summary>The auto camera's detail budget over this image (schema 25, <c>--debug detail</c>); absent without it.</summary>
+    public Composition.DetailInfo? Detail { get; init; }
 
     /// <summary>Image size and quality settings.</summary>
     public required ImageInfo Image { get; init; }

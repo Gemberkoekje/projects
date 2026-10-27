@@ -25,6 +25,11 @@ public enum DebugOutput
     Tier,
     /// <summary>Per-pixel variance heat map.</summary>
     Variance,
+    /// <summary>
+    /// The auto camera's detail budget (vista-plan §10, M1.14's follow-up) over the beauty: lit bare ground the final frame magnifies past
+    /// the terrain's detail tinted magenta (what counts), lit meadow and forest past it yellow (what does not); its shares in the sidecar.
+    /// </summary>
+    Detail,
 }
 
 /// <summary>A parsed <c>--preview</c> invocation.</summary>
@@ -184,7 +189,7 @@ public sealed record PreviewRequest
 /// <code>
 /// Vista.App --preview --recipe r.json --seed N [--camera c.json] --out p.png
 ///           [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]
-///           [--debug all | albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]
+///           [--debug all | albedo,normal,depth,material,tier,variance,detail] [--loupe x,y,w,h] [--dry-run]
 ///           [--sliders s.json] [--location zermatt | --latitude 46.0] [--season autumn] [--date 2026-10-15]
 ///           [--time dawn | --time 17:30] [--sun-elevation -2] [--altitude 3000] [--temperature 5 | --temperature 41F]
 ///           [--humidity 60] [--snowline 2400] [--visibility 80] [--valley-haze 12 | off]
@@ -194,7 +199,7 @@ public sealed record PreviewRequest
 ///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature blend | bins | redTail | engine]
 ///           [--forest on | off] [--canopy kernels | rough] [--snow on | off] [--pools on | flat]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
-///           [--dither on | off] [--png16] [--auto-camera [--finalists 10]]
+///           [--dither on | off] [--png16] [--auto-camera [--finalists 10] [--detail-budget on | off]]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. <c>--sliders</c> names the slider
@@ -228,7 +233,8 @@ public sealed record PreviewRequest
 /// beauty at 16 bits a channel instead, which need none.
 /// <c>--auto-camera</c> chooses the camera for a mountain set piece instead of reading one (M1.14): the planted shot, a few hundred
 /// candidates scored from their composition buffers, and the best <c>--finalists</c> rendered small for the squint test (0: none, the
-/// buffers' best wins; a dry run renders none). It writes the pick as <c>&lt;preview&gt;.camera.json</c>.
+/// buffers' best wins; a dry run renders none). It writes the pick as <c>&lt;preview&gt;.camera.json</c>. <c>--detail-budget off</c> measures
+/// the detail budget (M1.14's follow-up) without ranking any frame down by it: M1.14's search as it was.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -245,7 +251,7 @@ public static class PreviewCommandLine
     public const string Usage =
         "Usage: Vista.App --preview --recipe <recipe.json> --seed <n> [--camera <camera.json>] --out <preview.png>\n" +
         "                 [--width 320] [--aspect 16:9] [--spp 64] [--bounces 6] [--dispatch-ms 250]\n" +
-        "                 [--debug all|albedo,normal,depth,material,tier,variance] [--loupe x,y,w,h] [--dry-run]\n" +
+        "                 [--debug all|albedo,normal,depth,material,tier,variance,detail] [--loupe x,y,w,h] [--dry-run]\n" +
         "Writes <preview>.png, <preview>.exr, <preview>.json (sidecar) and <preview>.<debug>.png.\n" +
         "--dry-run generates the world and writes the sidecar and <preview>.heightmap.png without a GPU.\n" +
         "--erosion off renders the world un-eroded; --grid SIZExCELL makes it on another grid (another world, for measurements).\n" +
@@ -294,7 +300,8 @@ public static class PreviewCommandLine
         "--png16: write <preview>.png (and <preview>.denoised.png) at 16 bits a channel instead, with no dither.\n" +
         "--auto-camera: choose the camera for the recipe's mountains instead of --camera: candidates around the planted shot scored\n" +
         "  from their composition buffers, the best --finalists <n> (default 10; 0 for none) rendered small for the squint test.\n" +
-        "  Writes the pick as <preview>.camera.json and the scores in the sidecar.";
+        "  Writes the pick as <preview>.camera.json and the scores in the sidecar. --detail-budget on (default) | off: rank down frames\n" +
+        "  whose lit rock and snow the final frame shows finer than the terrain carries (--debug detail shows them), or only measure it.";
 
     /// <summary>The slider-file fields each slider option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> SliderOptionFields { get; } =
@@ -346,7 +353,7 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--valley-haze", "--mist", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists",
+        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists", "--detail-budget",
     };
 
     /// <summary>The options that take no value.</summary>
@@ -446,13 +453,17 @@ public static class PreviewCommandLine
         AutoCameraSettings? autoCamera = null;
         if (flags.Contains("--auto-camera"))
         {
-            autoCamera = AutoCameraSettings.Default with { Finalists = Int(values, "--finalists", AutoCameraSettings.Default.Finalists, 0, 40, problems) };
+            autoCamera = AutoCameraSettings.Default with
+            {
+                Finalists = Int(values, "--finalists", AutoCameraSettings.Default.Finalists, 0, 40, problems),
+                DetailBudget = OnOff(values.GetValueOrDefault("--detail-budget"), "--detail-budget", problems),
+            };
             if (values.ContainsKey("--camera"))
                 problems.Add("--auto-camera chooses the camera: leave out --camera.");
         }
-        else if (values.ContainsKey("--finalists"))
+        else if (values.ContainsKey("--finalists") || values.ContainsKey("--detail-budget"))
         {
-            problems.Add("--finalists needs --auto-camera.");
+            problems.Add("--finalists and --detail-budget need --auto-camera.");
         }
 
         if (problems.Count > before)

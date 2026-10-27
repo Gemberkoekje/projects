@@ -3,6 +3,7 @@ using Vista.Cli;
 using Vista.Composition;
 using Vista.Output;
 using Vista.Recipes;
+using Vista.Rendering;
 using Vista.Scene;
 using Vista.World;
 
@@ -98,6 +99,8 @@ public sealed class AutoCameraTests
         Assert.AreEqual(0.0, sight.GroundAt(0, 0));
         Assert.AreEqual(800.0, sight.GroundAt(5000, 0));
         Assert.IsTrue(double.IsNaN(sight.GroundAt(20000, 0)));
+        Assert.AreEqual(64.0, sight.DetailMetres(0, 0), "the world grid's cell, for the detail budget");
+        Assert.IsTrue(double.IsNaN(sight.DetailMetres(5000, 0)), "the budget does not look at the far field");
         double t = sight.Hit(new WorldPoint(0, 100, 0), new Vector3D(1, 0, 0));
         Assert.IsTrue(t is > 2048 and < 2600, $"the far field's ground meets a level ray just past the world's edge: {t}");
     }
@@ -237,6 +240,10 @@ public sealed class AutoCameraTests
         Assert.IsFalse(PreviewCommandLine.TryParse(Args("--finalists", "3"), out _, out IReadOnlyList<string> alone));
         StringAssert.Contains(alone[0], "--auto-camera");
         Assert.IsFalse(PreviewCommandLine.TryParse(Args("--auto-camera", "--finalists", "99"), out _, out _));
+        Assert.IsTrue(auto.AutoCamera!.DetailBudget, "the detail budget is on by default");
+        Assert.IsTrue(PreviewCommandLine.TryParse(Args("--auto-camera", "--detail-budget", "off"), out PreviewRequest? off, out _));
+        Assert.IsFalse(off!.AutoCamera!.DetailBudget);
+        Assert.IsFalse(PreviewCommandLine.TryParse(Args("--detail-budget", "off"), out _, out _), "without --auto-camera");
     }
 
     [TestMethod]
@@ -274,7 +281,14 @@ public sealed class AutoCameraTests
             Assert.AreEqual(info.Candidates, back.AutoCamera.Candidates);
 
             var renderer = new FakeRenderer();
-            Sidecar rendered = PreviewPipeline.Run(request with { DryRun = false }, renderer);
+            Sidecar rendered = PreviewPipeline.Run(request with { DryRun = false, Debug = new HashSet<DebugOutput> { DebugOutput.Detail } }, renderer);
+            Assert.AreEqual("p.detail.png", rendered.Outputs["detail"]);
+            Assert.IsTrue(File.Exists(Path.Combine(dir, "p.detail.png")));
+            DetailInfo detail = rendered.Detail!;
+            CollectionAssert.AreEqual(DetailInfo.Thresholds.Select(t => t.ToString("00.#", System.Globalization.CultureInfo.InvariantCulture)).ToArray(),
+                detail.ShareByCellPixels.Keys.ToArray());
+            Assert.AreEqual(CompositionLimits.Default.DetailCellPixels, detail.CellPixels);
+            Assert.IsTrue(renderer.Requested!.IsSupersetOf([Aov.Depth, Aov.Normal, Aov.MaterialId]), "the budget reads the depth, normal and material ids");
             Assert.AreEqual(2, rendered.AutoCamera!.Finalists.Count, "the finalists rendered");
             Assert.AreEqual(3, renderer.Scenes.Count, "two finalists, then the pick");
             Assert.IsTrue(rendered.AutoCamera.Finalists.All(f => f.Scores.Squint is not null && f.Scores.Values is not null));

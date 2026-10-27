@@ -13,14 +13,24 @@ public interface IGroundClassifier
     GroundClass At(double x, double z, double height, double normalX, double normalZ);
 }
 
-/// <summary>Whether the sun reaches the ground at a place, for <see cref="CompositionScorer"/>'s light score.</summary>
-public interface ISunlight
+/// <summary>
+/// What <see cref="CompositionScorer"/> asks of the terrain beyond a buffer: whether the sun reaches the ground at a place (the light
+/// score, the detail budget) and how fine the terrain's structure is there (the detail budget).
+/// </summary>
+public interface ITerrainProbe
 {
     /// <summary>
     /// True when the sun, in direction <paramref name="toSun"/> (world axes), lights the ground at world (<paramref name="x"/>,
     /// <paramref name="z"/>) whose unit normal is <paramref name="normal"/>: the ground faces it and nothing stands in the way.
     /// </summary>
     bool Lit(double x, double z, Vector3D normal, Vector3D toSun);
+
+    /// <summary>
+    /// The finest structure the terrain carries at world (<paramref name="x"/>, <paramref name="z"/>), m: the grid its shape comes from
+    /// (the detail below it near the camera is bumps of a metre or two, no stand-in for the ribs, ledges and gullies of 5–50 m a lit
+    /// face shows); NaN where the budget does not look (beyond the world, whose base terrain the haze already softens).
+    /// </summary>
+    double DetailMetres(double x, double z);
 }
 
 /// <summary>
@@ -57,7 +67,7 @@ public sealed record MaterialClassifier(MaterialField Field, MaterialConstants C
 ///
 /// <para>Thread-safe: every method only reads.</para>
 /// </summary>
-public sealed class TerrainSight : ISunlight
+public sealed class TerrainSight : ITerrainProbe
 {
     /// <summary>How far a ray toward the sun looks for the terrain's shadow, m.</summary>
     public const double ShadowReachMetres = 30_000.0;
@@ -198,6 +208,9 @@ public sealed class TerrainSight : ISunlight
             return true;
         return double.IsPositiveInfinity(Hit(new WorldPoint(x, ground + 1.0, z), toSun, ShadowReachMetres, pastTerrainIsGround: false));
     }
+
+    /// <summary><inheritdoc/> Here: the world grid's cell inside the world; NaN beyond it.</summary>
+    public double DetailMetres(double x, double z) => Inside(_world, x, z) ? _world.CellSize : double.NaN;
 
     /// <summary>
     /// True when nothing stands between <paramref name="from"/> and <paramref name="to"/> but the last <paramref name="toleranceMetres"/>

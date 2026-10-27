@@ -195,6 +195,7 @@ public sealed class PreviewSession
         MaterialShares? shares = null;
         IReadOnlyList<SlopeBand>? snowBySlope = null;
         DenoiseInfo? denoised = null;
+        DetailInfo? detail = null;
         if (_renderer is null || request.DryRun)
         {
             (byte[] map, int size) = DebugImages.HeightMap(terrain, camera);
@@ -336,7 +337,22 @@ public sealed class PreviewSession
             foreach (DebugOutput debug in request.Debug.OrderBy(d => d))
             {
                 string role = debug.ToString().ToLowerInvariant();
-                byte[] rgb = DebugImage(debug, output, materials);
+                byte[] rgb;
+                if (debug == DebugOutput.Detail)
+                {
+                    // The auto camera's detail budget over the beauty (M1.14's follow-up); a loupe's pixels are not the frame's buffer.
+                    if (!request.Loupe.IsEmpty)
+                    {
+                        warnings.Add("The detail budget's image is of the whole frame: not written for a loupe.");
+                        continue;
+                    }
+                    (rgb, detail) = DetailImage(output, linear, exposure.AppliedEv, request, camera, almanac.Sun, world.Surface,
+                        air.PlanetRadiusMetres + groundAltitude);
+                }
+                else
+                {
+                    rgb = DebugImage(debug, output, materials);
+                }
                 PngEncoder.Write(Sibling($".{role}.png"), rgb, window.Width, window.Height, PngColor.Rgb);
                 outputs[role] = $"{baseName}.{role}.png";
             }
@@ -389,6 +405,7 @@ public sealed class PreviewSession
             Camera = camera,
             DefaultCamera = request.CameraPath is null && request.CameraOverrides.Count == 0 && request.AutoCamera is null,
             AutoCamera = autoCamera,
+            Detail = detail,
             Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.NameOf(request.Display, request.Look), window)
             {
                 LightSampling = ImageInfo.LightSamplingOf(settings),
@@ -454,7 +471,8 @@ public sealed class PreviewSession
         if (intent == CompositionIntent.None)
             throw new InvalidDataException($"{request.RecipePath}: the auto camera frames the mountain set pieces (snowCappedMountains, alpineRange), and the recipe has neither.");
         CompositionWeights weights = CompositionWeights.Default;
-        CompositionLimits limits = CompositionLimits.Default;
+        // Without the detail budget its share is measured but never breaks the limit (M1.14's search as it was).
+        CompositionLimits limits = auto.DetailBudget ? CompositionLimits.Default : CompositionLimits.Default with { DetailMaxShare = 1.0 };
         var seconds = new SortedDictionary<string, double>(StringComparer.Ordinal);
         var stopwatch = Stopwatch.StartNew();
 
@@ -547,7 +565,7 @@ public sealed class PreviewSession
                 if (!order[k].Feasible)
                     continue;
                 CameraSpec camera = order[k].Candidate.Camera;
-                long triangles = _worlds.CountTriangles(MeshView.For(camera, limits.TriangleFrameWidth, limits.TriangleFrameHeight, radius), meshSettings);
+                long triangles = _worlds.CountTriangles(MeshView.For(camera, limits.FinalFrameWidth, limits.FinalFrameHeight, radius), meshSettings);
                 order[k] = Composition.AutoCamera.Scored(order[k].Candidate, order[k].Scores with { Triangles = triangles }, weights, limits);
                 if (order[k].Feasible)
                     break;
@@ -651,6 +669,49 @@ public sealed class PreviewSession
         {
             throw new InvalidDataException($"{path}: {e.Message}", e);
         }
+    }
+
+    /// <summary>
+    /// The auto camera's detail budget over <paramref name="output"/> (vista-plan §10, M1.14's follow-up; <see cref="CompositionScorer.Detail"/>):
+    /// the beauty as the PNG shows it, the ground that counts against the budget tinted magenta, lit meadow and forest past the same
+    /// threshold yellow; and what it adds up to, the shares at other thresholds and by class too, for the sidecar.
+    /// </summary>
+    private (byte[] Rgb, DetailInfo Info) DetailImage(RenderOutput output, float[] linear, double exposureEv, PreviewRequest request, CameraSpec camera,
+        SunPosition sun, HeightField terrain, double groundRadius)
+    {
+        CompositionLimits limits = CompositionLimits.Default;
+        var probe = new TerrainSight(terrain, request.Mesh.FarField ? _worlds.FarTerrain() : null, groundRadius);
+        CompositionBuffer buffer = CompositionBuffer.FromRender(output, camera, output.Width, output.Height, null, groundRadius);
+        DetailMap map = CompositionScorer.Detail(buffer, camera, sun, limits, probe, DetailInfo.Thresholds.Min());
+        byte[] rgb = DisplayTransform.ToSrgb8(linear, exposureEv, request.Display, request.Look);
+        GroundClass[] others = [GroundClass.Meadow, GroundClass.Forest];
+        for (int p = 0; p < map.CellPixels.Length; p++)
+        {
+            (byte R, byte G, byte B)? tint = map.Counts(p) ? ((byte)255, (byte)0, (byte)170)
+                : map.CellPixels[p] > limits.DetailCellPixels && others.Contains(buffer.Class[p]) ? ((byte)255, (byte)220, (byte)0) : null;
+            if (tint is not { } t)
+                continue;
+            rgb[p * 3] = (byte)((rgb[p * 3] + t.R) / 2);
+            rgb[p * 3 + 1] = (byte)((rgb[p * 3 + 1] + t.G) / 2);
+            rgb[p * 3 + 2] = (byte)((rgb[p * 3 + 2] + t.B) / 2);
+        }
+        var byThreshold = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        foreach (double threshold in DetailInfo.Thresholds)
+            byThreshold[threshold.ToString("00.#", CultureInfo.InvariantCulture)] = map.ShareAt(threshold);
+        var byClass = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        foreach (GroundClass c in (GroundClass[])[GroundClass.Rock, GroundClass.Scree, GroundClass.Snow, GroundClass.Meadow, GroundClass.Forest])
+            byClass[JsonNamingPolicy.CamelCase.ConvertName(c.ToString())] = map.ShareAt(limits.DetailCellPixels, [c]);
+        return (rgb, new DetailInfo
+        {
+            FinalFrameWidth = limits.FinalFrameWidth,
+            FinalFrameHeight = limits.FinalFrameHeight,
+            CellPixels = limits.DetailCellPixels,
+            MaxShare = limits.DetailMaxShare,
+            Share = map.Share,
+            Breaks = map.Share > limits.DetailMaxShare,
+            ShareByCellPixels = byThreshold,
+            ShareByClass = byClass,
+        });
     }
 
     private static byte[] DebugImage(DebugOutput debug, RenderOutput output, IReadOnlyList<VistaMaterial> materials)

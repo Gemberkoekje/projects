@@ -114,7 +114,7 @@ public sealed class PreviewPipelineTests
         foreach (string file in sidecar.Outputs.Values)
             Assert.IsTrue(File.Exists(Path.Combine(_dir, file)), file);
         CollectionAssert.AreEquivalent(
-            new[] { "albedo", "beauty", "beautyExr", "depth", "material", "normal", "sidecar", "tier", "variance" },
+            new[] { "albedo", "beauty", "beautyExr", "depth", "detail", "material", "normal", "sidecar", "tier", "variance" },
             sidecar.Outputs.Keys.ToArray());
         byte[] png = File.ReadAllBytes(Path.Combine(_dir, "p.png"));
         Assert.AreEqual(0x89, png[0]);

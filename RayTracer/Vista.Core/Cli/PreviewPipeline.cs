@@ -19,20 +19,24 @@ public static class PreviewPipeline
         ITerrainEroder? eroder = null, ErosionCache? erosionCache = null) =>
         new PreviewSession(renderer, denoiser, eroder, erosionCache, time).Run(request);
 
-    /// <summary>The renderer outputs <paramref name="debug"/> needs (the tier map is derived from material ids).</summary>
+    /// <summary>
+    /// The renderer outputs <paramref name="debug"/> needs (the tier map is derived from material ids; the detail budget from the depth,
+    /// the normal and the material ids).
+    /// </summary>
     public static IReadOnlySet<Aov> AovsFor(IEnumerable<DebugOutput> debug)
     {
         ArgumentNullException.ThrowIfNull(debug);
         var aovs = new HashSet<Aov>();
         foreach (DebugOutput d in debug)
         {
-            aovs.Add(d switch
+            aovs.UnionWith(d switch
             {
-                DebugOutput.Albedo => Aov.Albedo,
-                DebugOutput.Normal => Aov.Normal,
-                DebugOutput.Depth => Aov.Depth,
-                DebugOutput.Material or DebugOutput.Tier => Aov.MaterialId,
-                DebugOutput.Variance => Aov.Variance,
+                DebugOutput.Albedo => [Aov.Albedo],
+                DebugOutput.Normal => [Aov.Normal],
+                DebugOutput.Depth => [Aov.Depth],
+                DebugOutput.Material or DebugOutput.Tier => [Aov.MaterialId],
+                DebugOutput.Variance => [Aov.Variance],
+                DebugOutput.Detail => (Aov[])[Aov.Depth, Aov.Normal, Aov.MaterialId],
                 _ => throw new ArgumentOutOfRangeException(nameof(debug), d, "Unknown debug output."),
             });
         }

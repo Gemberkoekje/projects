@@ -366,10 +366,13 @@ powershell -ExecutionPolicy Bypass -File vista-views/pools/render.ps1 [-Before .
 each rendered at the cell's size with its total and squint score (`finalists.png`, `-Seed`, `-Recipe`); eight seeds at golden hour,
 the default camera beside the pick for snow-capped mountains (`seeds-peak.png`, `mountains-golden.recipe.json`) and for an alpine
 range (`seeds-range.png`, `autocam/range-golden.recipe.json`), each pick's focal length, near-field share and 4K triangles in its
-label; with `-Paintings` the user's paintings beside two picks (`paintings.png`); and the same pick twice (`repeat`). Every run's
-search (its candidates, the plant, the stages' times, the pick's scores) goes to `autocam.log`. A seed the erosion cache lacks is
-eroded on the first render that asks for it.
+label; with `-Paintings` the user's paintings beside two picks (`paintings.png`); and the same pick twice (`repeat`). M1.14's
+follow-up, the detail budget: one run with `--detail-budget off` (M1.14's search as it was), its finalists each with `--debug detail`
+(lit rock and snow the 4K frame shows finer than the terrain carries, magenta; lit meadow and forest past it, yellow) and its share
+of the frame (`budget.png`); and with `-Before` (an earlier run's `-Out`) the picks this run's seeds changed, before and after
+(`changed.png`). Every run's search (its candidates, the plant, the stages' times, the pick's scores and detail share) goes to
+`autocam.log`. A seed the erosion cache lacks is eroded on the first render that asks for it.
 
 ```
-powershell -File vista-views/autocam/render.ps1 [-Seeds 1,2,3,4,5,6,7,42] [-Seed 42] [-Recipe <recipe>] [-Paintings <a.png,b.png>] [-Sheets finalists,seeds,paintings,repeat] [-Out folder]
+powershell -File vista-views/autocam/render.ps1 [-Seeds 1,2,3,4,5,6,7,42] [-Seed 42] [-Recipe <recipe>] [-Paintings <a.png,b.png>] [-Before <earlier -Out>] [-Sheets finalists,seeds,paintings,repeat,budget,changed] [-Out folder]
 ```

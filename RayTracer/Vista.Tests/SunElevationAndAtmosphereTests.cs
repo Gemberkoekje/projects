@@ -169,7 +169,7 @@ public sealed class SunElevationAndAtmosphereTests
         Assert.AreEqual((320, 180, AutoExposure.MeterSamplesPerPixel), (reading.MeterWidth, reading.MeterHeight, reading.MeterSamplesPerPixel));
         Assert.AreEqual(AtmosphereMode.Luts, sidecar.Atmosphere.Mode);
         Assert.AreEqual(Sidecar.CurrentSchema, sidecar.Schema);
-        Assert.AreEqual(24, Sidecar.CurrentSchema);
+        Assert.AreEqual(25, Sidecar.CurrentSchema);
         Assert.AreEqual(ImageInfo.RadianceUnits, sidecar.Image.Units);
         Assert.IsTrue(sidecar.TimingsSeconds.ContainsKey("exposureMeter"));
     }

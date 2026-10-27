@@ -47,6 +47,12 @@ public sealed record AutoCameraSettings
     /// <summary>The most places on shoulders just above a valley's pool (vista-plan §10 M1.13a's views), when the pools stand.</summary>
     public int Shoulders { get; init; } = 6;
 
+    /// <summary>
+    /// Whether the detail budget (vista-plan §10, M1.14's follow-up) is a limit; off, its share is still measured but never ranks a
+    /// framing down: M1.14's search as it was.
+    /// </summary>
+    public bool DetailBudget { get; init; } = true;
+
     /// <summary>The defaults.</summary>
     public static AutoCameraSettings Default { get; } = new();
 }

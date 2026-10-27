@@ -5,7 +5,12 @@
 #    near-field share and 4K triangles in its label, and its height above the ground and every score in the log;
 #  - paintings.png: the user's own paintings (-Paintings, comma-separated; cropped to 16:9, no metadata) beside the picks that best
 #    match their composition, judged on composition rather than on colour or style;
-#  - repeat: the same auto camera twice (seed 42, peak): the same pick, its camera file byte for byte; the scoring's time in the log.
+#  - repeat: the same auto camera twice (seed 42, peak): the same pick, its camera file byte for byte; the scoring's time in the log;
+#  - budget.png (M1.14's follow-up, the detail budget): one run (-Seed, -Recipe) with --detail-budget off, M1.14's search as it was,
+#    its finalists as it ranked them, each with --debug detail (the ground that counts tinted magenta, lit meadow and forest yellow)
+#    and its share of the frame, those that break the budget marked;
+#  - changed.png (with -Before, an earlier run's -Out holding its seeds): every seed and set piece whose pick this run's seeds changed,
+#    the earlier pick beside this one, both with --debug detail.
 # Every auto-camera sidecar's scores, times and pick go to autocam.log. -Keep reuses the auto-camera renders already in -Out (to
 # re-tile a sheet). Build first: dotnet build Vista.App -c Release (from RayTracer/).
 param(
@@ -17,7 +22,8 @@ param(
     [string]$Seed = '42',
     [string]$Recipe = '',
     [string]$Paintings = '',
-    [string]$Sheets = 'finalists,seeds,paintings,repeat',
+    [string]$Before = '',
+    [string]$Sheets = 'finalists,seeds,paintings,repeat,budget',
     [switch]$Keep
 )
 
@@ -57,11 +63,20 @@ function Line($p) {
     $c = $p.camera; $s = $p.scores
     function Maybe($v) { if ($null -ne $v) { '{0:0.00}' -f $v } else { '-' } }
     $tri = if ($null -ne $s.triangles) { '{0:0.0} M' -f ($s.triangles / 1e6) } else { '-' }
-    '{0} #{1} {2:0} mm at ({3:0}, {4:0}, {5:0}) {22:0} m up, yaw {6:0.0} pitch {7:0.0} | total {8:0.000}: sky {9:0.00} horizon {10:0.00} peak {11:0.00} layers {12:0.00} framing {13:0.00} lower {14:0.00} line {15:0.00} sun {16:0.00} light {23} squint {17} values {18} | near {19:0.0000} triangles {20} {21}' -f `
+    '{0} #{1} {2:0} mm at ({3:0}, {4:0}, {5:0}) {22:0} m up, yaw {6:0.0} pitch {7:0.0} | total {8:0.000}: sky {9:0.00} horizon {10:0.00} peak {11:0.00} layers {12:0.00} framing {13:0.00} lower {14:0.00} line {15:0.00} sun {16:0.00} light {23} squint {17} values {18} | near {19:0.0000} detail {24:0.0000} triangles {20} {21}' -f `
         $p.origin, $p.index, $c.focalLengthMm, $c.position.x, $c.position.y, $c.position.z, $c.yawDegrees, $c.pitchDegrees, $p.total, $s.sky, $s.horizon,
         $s.peak, $s.layers, $s.framing, $s.lowerThird, $s.leadingLine, $s.sun, (Maybe $s.squint), (Maybe $s.values), $s.nearShare, $tri,
-        $(if ($p.breaks) { "breaks $($p.breaks)" } else { '' }), $p.aboveGroundMetres, (Maybe $s.light)
+        $(if ($p.breaks) { "breaks $($p.breaks)" } else { '' }), $p.aboveGroundMetres, (Maybe $s.light), $s.detailShare
 }
+
+# A camera rendered with the detail budget's image (--debug detail); its budget from the sidecar.
+function Detail([string]$recipe, [string]$seed, [string]$camera, [string]$png) {
+    Run @('--preview', '--recipe', $recipe, '--seed', $seed, '--camera', $camera, '--width', "$CellWidth", '--spp', "$Spp", '--debug', 'detail', '--out', $png)
+    (Sidecar $png).detail
+}
+
+# A detail budget's label: its share of the frame and whether it breaks the limit.
+function Budget($d) { '{0:0.0}% past the detail{1}' -f (100 * $d.share), $(if ($d.breaks) { ' · breaks' } else { '' }) }
 
 # An auto-camera run at the cell's size (kept when -Keep and it is there already); its sidecar's search to the log.
 function Auto([string]$recipe, [string]$seed, [string]$png, [string[]]$extra = @()) {
@@ -117,7 +132,8 @@ if ($make -contains 'seeds') {
             $c = $a.pick.camera
             $tri = if ($null -ne $a.pick.scores.triangles) { '{0:0.0} M' -f ($a.pick.scores.triangles / 1e6) } else { '-' }
             $tiles += $default, $png
-            $labels += "seed $s · the default camera", ('seed {0} · auto · {1:0} mm · near {2:0.0}% · 4K {3}' -f $s, $c.focalLengthMm, (100 * $a.pick.scores.nearShare), $tri)
+            $labels += "seed $s · the default camera", ('seed {0} · auto · {1:0} mm · near {2:0.0}% · detail {4:0.0}% · 4K {3}' -f $s, $c.focalLengthMm,
+                (100 * $a.pick.scores.nearShare), $tri, (100 * $a.pick.scores.detailShare))
         }
         Sheet $tiles $labels 4 "M1.14 the auto camera · $($kind[2]) at golden hour · the default camera and the pick, two seeds a row" "seeds-$($kind[0])-$($half[0]).png"
     } }
@@ -158,6 +174,51 @@ if ($Paintings -ne '' -and $make -contains 'paintings') {
         $labels += ('seed {0} · the auto camera''s pick · {1:0} mm · peak score {2:0.00}' -f $s, $a.pick.camera.focalLengthMm, $a.pick.scores.peak)
     }
     Sheet $tiles $labels 2 'M1.14 the user''s paintings beside the auto camera''s picks · judged on composition, not colour or style' 'paintings.png'
+}
+
+# M1.14's finalists as its search ranked them (the detail budget off), each with the budget's image and share.
+if ($make -contains 'budget') {
+    $dir = Join-Path $Out 'budget'
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    $a = Auto $Recipe $Seed (Join-Path $dir 'pick.png') @('--detail-budget', 'off')
+    $tiles = @(); $labels = @()
+    $k = 0
+    foreach ($f in $a.finalists) {
+        $camera = Join-Path $dir "finalist-$k.camera.json"
+        CameraFile $f.camera $camera
+        $png = Join-Path $dir "finalist-$k.png"
+        $d = Detail $Recipe $Seed $camera $png
+        Say ("  finalist {0}: {1}; {2}" -f ($k + 1), (Budget $d), (Line $f))
+        $tiles += [IO.Path]::ChangeExtension($png, '.detail.png')
+        $labels += ('{0}. {1:0} mm · {2}' -f ($k + 1), $f.camera.focalLengthMm, (Budget $d))
+        $k++
+    }
+    Sheet $tiles $labels 3 "M1.14 the detail budget over M1.14's finalists · seed $Seed · magenta: lit rock and snow past the terrain's detail at 4K" 'budget.png'
+}
+
+# The picks this run's seeds changed against an earlier run's, before and after, with the detail budget's image.
+if ($Before -ne '' -and $make -contains 'changed') {
+    $dir = Join-Path $Out 'changed'
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    $tiles = @(); $labels = @()
+    foreach ($kind in @(@('peak', $peak), @('range', $range))) {
+        foreach ($s in $Seeds.Split(',')) {
+            $old = Join-Path $Before "seeds\$($kind[0])-$s.camera.json"
+            $new = Join-Path $Out "seeds\$($kind[0])-$s.camera.json"
+            if (-not (Test-Path $old) -or -not (Test-Path $new)) { continue }
+            if ((Get-Content $old -Raw | ConvertFrom-Json | ConvertTo-Json -Compress) -eq (Get-Content $new -Raw | ConvertFrom-Json | ConvertTo-Json -Compress)) { continue }
+            foreach ($pair in @(@('before', $old), @('after', $new))) {
+                $png = Join-Path $dir "$($kind[0])-$s-$($pair[0]).png"
+                $d = Detail $kind[1] $s $pair[1] $png
+                Say ("changed {0} seed {1} {2}: {3}" -f $kind[0], $s, $pair[0], (Budget $d))
+                $tiles += [IO.Path]::ChangeExtension($png, '.detail.png')
+                $labels += ('{0} seed {1} · {2} · {3}' -f $kind[0], $s, $(if ($pair[0] -eq 'before') { 'M1.14''s pick' } else { 'with the budget' }), (Budget $d))
+            }
+        }
+    }
+    if ($tiles.Count -gt 0) {
+        Sheet $tiles $labels 2 'M1.14 the picks the detail budget changed · before and after · magenta: lit rock and snow past the terrain''s detail at 4K' 'changed.png'
+    }
 }
 
 # The same pick twice.

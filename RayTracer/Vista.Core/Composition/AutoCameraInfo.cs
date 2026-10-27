@@ -46,6 +46,41 @@ public sealed record AutoCameraInfo
     public string? Note { get; init; }
 }
 
+/// <summary>
+/// The auto camera's detail budget over a preview (sidecar schema 25, vista-plan §10, M1.14's follow-up; <c>--debug detail</c>): the
+/// share of the frame lit bare ground covers that the final frame magnifies past the terrain's detail, whether that breaks the limit,
+/// and, to choose the limit by eye, the shares at other thresholds and by the ground's class.
+/// </summary>
+public sealed record DetailInfo
+{
+    /// <summary>The thresholds the shares are read at, final-frame pixels per detail cell.</summary>
+    public static IReadOnlyList<double> Thresholds { get; } = [2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 16.0];
+
+    /// <summary>The final frame's width the budget is measured at, pixels.</summary>
+    public required int FinalFrameWidth { get; init; }
+
+    /// <summary>The final frame's height, pixels.</summary>
+    public required int FinalFrameHeight { get; init; }
+
+    /// <summary>The limit's threshold (<see cref="CompositionLimits.DetailCellPixels"/>).</summary>
+    public required double CellPixels { get; init; }
+
+    /// <summary>The limit's share (<see cref="CompositionLimits.DetailMaxShare"/>).</summary>
+    public required double MaxShare { get; init; }
+
+    /// <summary>The share of the frame that counts against the budget.</summary>
+    public required double Share { get; init; }
+
+    /// <summary>True when <see cref="Share"/> passes <see cref="MaxShare"/>: the auto camera would rank this frame down.</summary>
+    public required bool Breaks { get; init; }
+
+    /// <summary>The share of counted ground at each of <see cref="Thresholds"/> (keyed by it, two digits).</summary>
+    public required SortedDictionary<string, double> ShareByCellPixels { get; init; }
+
+    /// <summary>The share of each class's lit ground past <see cref="CellPixels"/>, counted or not.</summary>
+    public required SortedDictionary<string, double> ShareByClass { get; init; }
+}
+
 /// <summary>One scored framing, as the sidecar records it.</summary>
 /// <param name="Index">Its index among the candidates.</param>
 /// <param name="Origin">How its place was found (<see cref="CameraCandidate.Origin"/>).</param>

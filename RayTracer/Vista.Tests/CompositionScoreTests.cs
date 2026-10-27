@@ -178,10 +178,63 @@ public sealed class CompositionScoreTests
         Assert.AreEqual(1.0 - 0.25 * 0.6, At(180.0, 60.0), 1e-9, "a high sun's direction matters less");
     }
 
-    /// <summary>The sun on the world's west (x &lt; 0) only, and only on ground facing it at all.</summary>
-    private sealed class WestLit : ISunlight
+    /// <summary>The sun on the world's west (x &lt; 0) only, and only on ground facing it at all; no world grid for the detail budget.</summary>
+    private sealed class WestLit : ITerrainProbe
     {
         public bool Lit(double x, double z, Vector3D normal, Vector3D toSun) => x < 0.0 && Vector3D.Dot(normal, toSun) > 0.0;
+
+        public double DetailMetres(double x, double z) => double.NaN;
+    }
+
+    /// <summary>Ground everywhere lit (or everywhere in shade), on a world grid of 8 m cells (or beyond any, NaN).</summary>
+    private sealed record Probe(bool Sunlit, double Detail = 8.0) : ITerrainProbe
+    {
+        public bool Lit(double x, double z, Vector3D normal, Vector3D toSun) => Sunlit;
+
+        public double DetailMetres(double x, double z) => Detail;
+    }
+
+    /// <summary>Sky above row 18, below it one face of <paramref name="kind"/> ground <paramref name="depth"/> m off: half the frame.</summary>
+    private static CompositionBuffer Face(float depth, GroundClass kind = GroundClass.Rock) => Buffer((x, y) => y < 18 ? null : depth, (_, _) => kind);
+
+    private static FramingContext Lens(double focalMm) => Context() with { Camera = Level with { FocalLengthMm = focalMm } };
+
+    [TestMethod]
+    public void DetailBudget_ANearLitFace_RanksDown_InShadeOrUnderAShorterLensNot()
+    {
+        // At 4K and 50 mm a final pixel is 2.2e-4 rad: 2 km off, the 8 m cell spans 18 pixels, past the limit of 12 (24 mm: 8.6).
+        CompositionScores lit = CompositionScorer.Score(Face(2000f), Lens(50.0), CompositionLimits.Default, new Probe(true));
+        Assert.AreEqual(0.5, lit.DetailShare, 1e-9, "the lit face is half the frame");
+        Assert.AreEqual("detail", lit.Breaks(CompositionLimits.Default));
+        CompositionScores shade = CompositionScorer.Score(Face(2000f), Lens(50.0), CompositionLimits.Default, new Probe(false));
+        Assert.AreEqual(0.0, shade.DetailShare, "sky light hides the relief a face lacks");
+        Assert.IsNull(shade.Breaks(CompositionLimits.Default));
+        CompositionScores wide = CompositionScorer.Score(Face(2000f), Lens(24.0), CompositionLimits.Default, new Probe(true));
+        Assert.AreEqual(0.0, wide.DetailShare, "under a 24 mm lens the cell spans 8.6 pixels");
+        CompositionScores far = CompositionScorer.Score(Face(5000f), Lens(50.0), CompositionLimits.Default, new Probe(true));
+        Assert.AreEqual(0.0, far.DetailShare, "5 km off, 7.2 pixels");
+        Assert.AreEqual(0.0, CompositionScorer.Score(Face(2000f), Lens(50.0), CompositionLimits.Default, new Probe(true, double.NaN)).DetailShare,
+            "beyond the world grid the budget does not look");
+        Assert.AreEqual(0.0, Score(Face(2000f)).DetailShare, "no way to trace toward the sun");
+    }
+
+    [TestMethod]
+    public void DetailBudget_An8KFrame_IsStricterThan4K_AndOnlyBareGroundCounts()
+    {
+        // 4 km off at 50 mm the cell spans 9 pixels of a 4K frame and 18 of an 8K one.
+        var eightK = CompositionLimits.Default with { FinalFrameWidth = 7680, FinalFrameHeight = 4320 };
+        Assert.IsNull(CompositionScorer.Score(Face(4000f), Lens(50.0), CompositionLimits.Default, new Probe(true)).Breaks(CompositionLimits.Default));
+        Assert.AreEqual("detail", CompositionScorer.Score(Face(4000f), Lens(50.0), eightK, new Probe(true)).Breaks(eightK));
+        foreach (GroundClass bare in (GroundClass[])[GroundClass.Rock, GroundClass.Scree, GroundClass.Snow])
+            Assert.AreEqual(0.5, CompositionScorer.Score(Face(2000f, bare), Lens(50.0), CompositionLimits.Default, new Probe(true)).DetailShare, 1e-9, $"{bare}");
+        foreach (GroundClass covered in (GroundClass[])[GroundClass.Meadow, GroundClass.Forest])
+            Assert.AreEqual(0.0, CompositionScorer.Score(Face(2000f, covered), Lens(50.0), CompositionLimits.Default, new Probe(true)).DetailShare, $"{covered}");
+        // The map keeps every threshold's share: at 4 pixels the 8 km face (4.5 pixels a cell) of a 4K frame counts too.
+        DetailMap map = CompositionScorer.Detail(Face(8000f), Level, SideSun, CompositionLimits.Default, new Probe(true), 2.0);
+        Assert.AreEqual(0.0, map.Share, 1e-9);
+        Assert.AreEqual(0.5, map.ShareAt(4.0), 1e-9);
+        Assert.AreEqual(0.0, CompositionScorer.Detail(Face(2000f), Level, SideSun with { ElevationDegrees = -3.0 }, CompositionLimits.Default,
+            new Probe(true)).Share, "no sun, no relief shown");
     }
 
     [TestMethod]
