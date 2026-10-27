@@ -40,4 +40,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.13a.md`](M1.13a.md) | Valley haze layer |
 | [`M1.13b.md`](M1.13b.md) | Terrain-following valley mist |
 | [`M1.14.md`](M1.14.md) | Auto camera v1 |
+| [`M1.15.md`](M1.15.md) | Time & VRAM estimate |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |

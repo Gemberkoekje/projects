@@ -10,8 +10,9 @@ perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
-and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M1.13b (terrain-following valley mist) and M1.14
-(auto camera v1, with its detail budget) are done, and M1.15 (time and VRAM estimate) is next. M1's scope is frozen: new findings go to the parked list (§10). It sits
+and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M1.13b (terrain-following valley mist), M1.14
+(auto camera v1, with its detail budget) and M1.15 (the time and VRAM estimate) are done, and M1.16 (the preview and tweak window) is
+next. M1's scope is frozen: new findings go to the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -284,7 +285,7 @@ visibility, keeping the night's whole pool at any hour, as a pinned valley haze 
   position only (seeded noise, local rules), so it is identical whichever camera asks.
 - Detail scales with output resolution (geometry is tessellated to a screen-space error
   in pixels), so a 16K final is denser than the preview. That is expected and is why the
-  estimator measures final-detail crops (§7.2).
+  estimator measures at the final's own resolution and detail (§7.2).
 
 ### 4.2 Shot-first generation
 
@@ -660,16 +661,23 @@ light at its wavelength (importance sampling, exact for the blend), so it reache
 
 ### 7.1 VRAM budget (RTX 3070, 8 GB)
 
-Rough budget for a 4K render with forest — **guesses to verify by measurement in M1/M5**:
+**Measured in M1.15** (`--estimate`'s plan against each render's measured peak, seven views at 3840×2160 with the view-dependent
+mesh at 1 px, 2.6–21.6 M triangles; [`vista-log/M1.15.md`](vista-log/M1.15.md)); the forest and cloud lines are still guesses:
 
-| Item | Budget |
+| Item | At 4K |
 |---|---|
-| Image buffers at 4K (accumulation, variance, albedo, normal) | ~0.8 GB |
-| Terrain, view-dependent mesh | ~1–1.5 GB |
-| Vegetation: ~50 unique plant meshes + millions of instances | ~1–1.5 GB |
-| Cloud / fog density grids | < 0.1 GB |
+| The process before its first render: the device, its pipelines, the air's fixed tables, the driver's build memory | 188 MiB |
+| Image buffers: the colour sums 127 MiB; albedo and normal (denoising) 127 MiB each; variance and first hit (debug) 63 MiB each | 127–570 MiB |
+| Terrain, view-dependent mesh (positions, normals, indices, map normals) | 66–537 MiB |
+| The world's normal maps and material map | 321 MiB |
+| Acceleration structures (2.7× the mesh) | 176–1,444 MiB |
+| Their build's scratch, only while they are built | 53–437 MiB |
+| The air: the valleys' pools 40 MiB; the scattering orders' scratch 248 MiB, only while built | 40–288 MiB |
+| **Peak** (the build beside the structures, or the orders' scratch on small meshes; planned = measured within 1 MiB) | **1.0–2.9 GiB** of a 7.1 GiB budget |
+| Vegetation (M5): ~50 unique plant meshes + millions of instances | ~1–1.5 GB (guess) |
+| Cloud / fog density grids (M4) | < 0.1 GB (guess) |
 | Textures | ~0 (procedural, evaluated in the shader) |
-| OS, desktop, headroom | ~1–1.5 GB |
+| OS, desktop, other programs | outside the budget DXGI gives the process |
 
 Measured in M1.7: the uniform mesh of the 4097² eroded grid takes 0.8 GB plus a 2.3 GB BLAS
 (3.1 GiB for the process at render), twice the terrain line, until M1.9's view-dependent mesh;
@@ -685,18 +693,31 @@ targets (M11).
 
 ### 7.2 Render-time estimate
 
-Like the maze's `PerformanceCalibrator`, but per scene and per view, because cost varies
-too much between views (a forest floor vs. open sky):
+Built in M1.15 (`--estimate`, [`vista-log/M1.15.md`](vista-log/M1.15.md)). Like the maze's `PerformanceCalibrator`, but per
+scene and per view, because cost varies too much between views (open sky at 0.3 ns a sample, near terrain under a low sun at 19):
 
-- **time ≈ pixels × spp × rays per sample ÷ rays per second**, where rays per sample
-  and rays per second are **measured** for this scene and this camera.
-- The preview measures them at preview detail. For the final, the estimator renders a
-  handful of random crops at the **true final resolution and detail level** for a few
-  seconds and extrapolates. It shows a range, not a single number.
-- **Fixed spp** gives a predictable time; a **noise target** gives an estimate from the
-  preview's measured variance.
-- **VRAM estimate** alongside: warn before starting, never crash at 80%.
-- The ETA refines live during the final render as tiles complete.
+- **A 4K final at 64 spp is mostly setup**: the world, the mesh, the shaders and the air's tables take 20–40 s of a 25–62 s run
+  on the 3070 shared at half its time, the trace 0.4–23 s, the files 3 s. So the estimate runs every stage the final repeats, as
+  the final will, and times it: it is a final run without most of its trace.
+- **The trace is projected from the final's own first passes**: a probe at the final's resolution and detail (detail scales with
+  the output, §4.1) traces whole-frame passes exactly as the final will, dispatch for dispatch, past a second of GPU time until
+  the passes reach the size the final's later passes keep, then stops at a pass's end. The trace is the probe's passes plus **the
+  remaining pixel-samples × the last pass's measured GPU ns per pixel-sample × the passes' median wall seconds per GPU second** (a shared
+  GPU's pauses, each submission's overhead); rays per sample and rays per second are recorded beside it. *Not random crops* as first
+  planned: a sample's cost depends on how many samples a pass carries (the snow view's 5.2 ns at one sample a pixel, 6.7 at four, the
+  same rays), and crops cheap enough to save anything are too small to fill the GPU, while one pass over a whole 4K frame costs
+  4–170 ms of GPU. Crops return with M11's tiles.
+- **The preview is no guide to the cost** (its dispatches cannot fill the GPU: the final ran at 0.1–0.7× its cost per sample); it
+  gives the noise.
+- **A range, not a single number**: the setup ±15%, the trace ±20% (or twice the probe's spread), the files ±25%, the denoising
+  ±30% (from a crop), summed end to end.
+- **Fixed spp** gives a predictable time; a **noise target** (`--noise`, in steps of the 8-bit PNG at the 95th percentile of the
+  pixels) the samples it needs from the preview's measured variance through the exposure and the display curve, and their time.
+- **VRAM**: planned from the sizes of the buffers the render will make, by the stage each lives through, before any is allocated,
+  against DXGI's budget: refused over it, warned about over 80% of it ("never crash at 80%"). The plan meets the measured peak to
+  the MiB (§7.1).
+- **The ETA refines live** during the final: after every dispatch, from every row's last measured cost and the samples it still
+  needs; a line every 5 s, and the ETA at 10–90% of the trace beside what was in fact left in the sidecar.
 
 ### 7.3 Batching, tiling, resumability
 
@@ -1896,6 +1917,17 @@ they replace? Log: [`vista-log/M1.14.md`](vista-log/M1.14.md), its last section.
   render time lands inside the estimate's own range, and peak VRAM within its stated margin. CI: the
   estimator's math.
 
+*Status (2026-10-27): done.* `--estimate` runs every stage a final repeats (the world, the mesh, the shaders, the air's tables: 20–40 s
+of a 4K final at 64 spp) and times it, traces the final's own first passes until they settle and projects the rest, times the files on
+the probe's own, and plans the video memory from the sizes of the buffers the render will make, before any is allocated (a render over
+DXGI's budget is refused, one over 80% of it warned about); it writes `<preview>.estimate.json`. On seven views at 4K and 64 spp (the
+sky, the day's terrain, golden hour, dawn, snow, dense mist), a fresh round with the final design: every final's whole run inside its
+range and 1–3% from its middle (27–64 s), every trace inside (−7% to +8% from the middle), every peak planned within 1 MiB (1.0–2.9
+GiB). Not the plan's random crops: a sample costs up to 29% more in passes of several samples a pixel, so the probe traces the final's
+own passes. The preview is no guide to the cost (the final ran at 0.10–0.72× it) but gives the noise, in steps of the 8-bit PNG (for a
+`--noise` target the final needs a third to all of the preview's samples). The live ETA refines after every dispatch (a line every 5 s;
+2–9% off at 10–50% of a trace). §7.1's table is measured. Log: [`vista-log/M1.15.md`](vista-log/M1.15.md).
+
 **M1.16 — Preview & tweak window.**
 - *Goal:* drive all of M1 by hand (§3.1).
 - *Deliverable:* a WinForms window on the watch-mode session: a progressive preview that restarts
@@ -1905,7 +1937,10 @@ they replace? Log: [`vista-log/M1.14.md`](vista-log/M1.14.md), its last section.
   camera nudges in metres, pan / tilt / roll, focal length, focus, aperture and exposure, with
   collision; the auto-camera button; a debug-view picker; the estimate and "render final" (4K EXR +
   PNG + sidecar, live ETA). Recipe, camera and slider files save and load, so the window and the CLI
-  share them.
+  share them. *From M1.15:* the window's estimate runs M1.15's probe on the session's kept stages
+  (the final's mesh, the acceleration structure and the air's tables built once, for the estimate and
+  the final alike), so it counts only what the final will still build; the preview's own cost per
+  sample is no guide to the final's (the final ran at 0.1–0.7× it).
 - *Verify:* 3070: a converged window preview is bit-identical to a CLI preview of the files the
   window saves; the M1 checks walked through in the window, noted in its log.
 
@@ -2109,6 +2144,11 @@ any of them.
   from Sunnegga, about 8 km off, filling much of the frame). Shading and colour detail first (no triangles), geometry only where a
   silhouette needs it, a finer erosion tile if those fall short; judged by the same metres-per-pixel measure, after which M1.14's
   detail budget relaxes. Until then that budget keeps such frames out of the auto camera's picks.
+- **A sample costs more in dispatches of several samples a pixel** (M1.15): the snow view's sample costs 5.2 ns in passes of one
+  sample a pixel and 6.7 in passes of four, the aerial view's 5.0 and 5.65, with the same rays (vista-log/M1.15.md); a cheap view's
+  final is planned as passes of up to 64 samples a pixel. Likely the sample loop's registers lowering the GPU's occupancy; passes of
+  one sample in row bands, or a loop the compiler keeps lean, may win back 10–25%. The estimate is unaffected (its probe traces the final's own
+  dispatches). *Belongs:* M1.17's performance pass, beside the leaner pools integrator.
 
 ---
 
@@ -2156,9 +2196,11 @@ any of them.
   (M5) need trees as instances, not detail.
 - **8 GB VRAM** limits forest density; instancing, procedural materials and measured LOD
   decisions are the levers.
-- **Render times are unknown beyond M0.** Bare M0 terrain costs 0.24–1.4 ns per pixel-sample
-  on the 3070 ([`vista-log/M0.md`](vista-log/M0.md), "M0 batch defaults, measured"); M1–M5 add the expensive parts, and the
-  §7.1 numbers are still guesses.
+- **Render times are measured, not known in advance.** Bare M0 terrain cost 0.24–1.4 ns per pixel-sample on the 3070
+  ([`vista-log/M0.md`](vista-log/M0.md)); M1.14's terrain costs 0.3–21 ns (the cost ledger). Since M1.15 `--estimate` measures
+  each view at the final's own size and detail, and the §7.1 numbers are measured for M1's terrain; M5's forest and M4's clouds
+  will move both, and the estimate measures them as they come. A sample costs more in dispatches of several samples a pixel than
+  in dispatches of one (the parked list).
 - **Moon glitter** and caustic-like paths are noisy; MIS quality decides whether they
   converge in reasonable time.
 - **View-dependent LOD** must stay conservative for shadow and reflection rays that see

@@ -34,6 +34,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.13a | 0.45 | 7.03 | 5.94 | 11.30 |
 | M1.13b | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1.14 | 0.44 | 6.95 | 5.84 | 20.79 |
+| M1.15 | 0.44 | 6.95 | 5.84 | 20.79 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -173,3 +174,9 @@ M1.14 adds the auto camera and changes nothing in the integrator or its host, so
 auto camera's own cost is a search before the render, about 35–45 s a pick: the plant 2.5–3.2 s and the candidates' buffers 0.6–1.5 s
 on the CPU, ten finalists rendered at 192×108 (24–32 s, the GPU at half its share) and the pick's 4K mesh counted (2–7 s)
 (vista-log/M1.14.md).
+M1.15 adds the estimate and changes nothing the integrator traces, so its row is M1.14's: the four ledger views (640 px, 16 spp, the
+down-slope view with every debug output) rendered by `main` (7f87e220) and by this slice are byte-identical, EXR and PNG. A render now
+plans its video memory first (the acceleration structure's size query and the small tables, milliseconds), polls DXGI every 2 ms on a
+thread of its own, and the renderer builds one triangle's acceleration structure when it is made (the driver's own memory, for the
+plan's base). The cost of a sample depends on how many samples a pass carries (vista-log/M1.15.md: the snow view's 5.2 ns at one sample
+a pixel, 6.7 at four, the same rays); the ledger's mean over a 64-spp render's dispatches includes its passes of several samples.
