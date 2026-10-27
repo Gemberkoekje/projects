@@ -10,8 +10,8 @@ perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
-and folded strata), M1.13 (snow and glaciers) and M1.13a (the valley haze layer) are done, and M1.13b (terrain-following valley
-mist) is next. M1's scope is frozen after M1.13b: new findings go to the parked list (§10). It sits
+and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer) and M1.13b (terrain-following valley mist) are done,
+and M1.14 (auto camera v1) is next. M1's scope is frozen: new findings go to the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -130,8 +130,9 @@ or inside a tree.
 For fine-tuning a scene to look like a specific place at a specific time:
 
 - **Place:** location dropdown or custom latitude (§3.5), altitude, date.
-- **Weather:** temperature (°C, with a small °C/°F toggle), humidity, and since M1.13a the valley haze (the visibility under
-  the lid of the haze a cold pool holds in the valleys, §3.6).
+- **Weather:** temperature (°C, with a small °C/°F toggle), humidity, and since M1.13a the valley haze (since M1.13b the
+  visibility at the floor of the densest valley's pool, §3.6) and since M1.13b the mist (the visibility in the scene's valley's
+  mist, or none).
 - **Lens & exposure** details (reusing the engine's `LensOptions`: f-stop, focus, lens
   presets, ISO/shutter once the exposure triangle exists).
 
@@ -250,6 +251,21 @@ four hours after sunrise in April; after the day's high it forms again as the ai
 held (up to twice as much by dawn) and grown by the hour's humidity against the day's; the layer is what that adds. A pinned
 visibility under the lid takes the night's whole pool at any hour; `off` (500 km) adds nothing. Because the auto layer follows the
 hour, the time of day now moves the air's tables (about 1 s more per change in watch mode); a pinned valley haze does not.
+
+*Since M1.13b ([`vista-log/M1.13b.md`](vista-log/M1.13b.md)):* every valley has its own pool. The world's **pool map** (cached
+with it) gives each place the valley floor its air drains to (the first cell downstream draining 1 km², or a closed hollow, filled
+flat to its rim), how well that valley holds the night's pool (by the floor's gradient over the next kilometre, half at 6%: steep
+valleys drain it, flat floors and basins keep it) and the deepest pool its walls allow; the far field's base terrain beyond the world
+has a coarser map of its own. The chain above sets the night's pool over the scene's valley; each valley holds its share of it, its
+cooling and its heat deficit scaled with its depth, so the sun breaks a shallow pool sooner. In a pool the haze is the valley's own
+held and grown by the humidity at each height (the inversion warms upward, the dew point falls), so it is densest at the humid
+floor and thins toward a soft top. The **mist** slider (advanced): where a pool's air is colder than its dew point, from the floor
+up to where they meet, droplets form, more water the colder below its dew point (Kunkel's extinction, at most about 200 m to see:
+fog proper is M4's). Its dew point comes from each place's **humidity normals** (monthly mean vapour pressure, from its station or a
+near one, NASA POWER where none publishes it; carried between altitudes by Hann's formula); the humidity slider and the haze keep
+the day's low as their dew point. The auto mist forms where a climate's dawns saturate (Fiordland, the Highlands, Iceland, Hokkaido's
+autumn, Yellowstone's basins) and not at dry inner-alpine Zermatt. A pinned mist fills 60% of the scene's valley's pool at the pinned
+visibility, keeping the night's whole pool at any hour, as a pinned valley haze does; `off` (0) none.
 
 ---
 
@@ -483,6 +499,19 @@ maze's real-time path):
   more scatterings than the clear air did, and its lid stood at the multiple-scattering tables' first height texel, so the
   tables grew with it: ten orders instead of five, 24 heights instead of 16 and 12 view-to-sun texels instead of 8 (their build
   1.0 → 3.7 s, their memory 2.25×), which took a strong layer's light from 10.5% dark against the reference to 1.1%.
+- *Since M1.13b:* the **valleys' pools in three dimensions**: each valley's pool on its own floor, its haze and its mist a
+  density the aerial march takes along every segment's part below the pools' highest reach, in steps of 150 m through their haze
+  and shorter near a mist (an optical depth of 0.5 of it, at most 50 m), longer far from the camera, on a bounce and toward the sky,
+  jittered so their edges turn into noise, striding over the air above every pool near it (a ceiling map of 1 km blocks, 4 km over
+  the far field); a 3D noise moves the tops into wisps and a 2D one opens patches in the mist, at its edges and in a weak mist
+  only: a strong deck's top over a valley lies flat (the Sunnegga webcam). A **sunlight volume**, built once a
+  render over each level of the pool map in layers that follow its floors up to the pools' highest reach, holds the terrain's
+  shadow and the pools' own depth toward the sun (and the mist above each point): the low air and the mist in a ridge's shadow are
+  lit by the sky alone, the tables' light scattered many times there halved. The mist scatters the sun in
+  octaves (Wrenninge et al. 2013), the light scattered many times weighted by the sun's elevation (a deck catches the sun per unit
+  of its top; fitted to a Monte Carlo of a slab), and the sky's light from the tables; the tables carry the pools' haze as a flat
+  layer, their altitude average, which the march leaves out where it takes the pools. The reference tracks the
+  pools as part of the medium; with the terrain's shadow it shades every event in their reach.
 
 ### 5.3 Fog & clouds
 
@@ -1757,6 +1786,24 @@ Keep the larger tables (3 s more per atmosphere build), or the old speed? Log: [
   slopes and ridges standing clear; so the patches and the thinning upward belong at the edges and in weaker pools,
   not on a strong pool's top. A Zermatt render at the frame's date and time beside it.
 
+*Status (2026-10-27): done.* Each valley holds its own pool: a pool map per world (where its air drains, how well it holds a pool,
+how deep its walls allow), reaching into the far field, so some valleys fill and others stay clear (`m1-13b-maps.png`); its haze
+thins upward from the floor, and where the air cools to the dew point (per-place humidity normals, sourced) mist forms, uniform
+under a sharp top that lies flat over a strong deck and frays at its edges and in weak mist (the webcam). The march takes the pools
+in three dimensions through a sunlight volume over the low air; the mist's light scattered many times is weighted by the sun's
+elevation (fitted to a Monte Carlo of a slab). Peaks rise out of a mist lake at Fiordland's autumn dawn and it breaks up through
+the morning (`m1-13b-dawn.png`, `m1-13b-morning.png`); Zermatt at the webcam's 07:40, the fog pinned, shows a flat, opaque fog sea
+under clear peaks (`m1-13b-webcam.png`). Against the reference: within 2–3% without the terrain's shadow, a sunlit deck about 10%;
+with the shadow +19% over the shadowed reference, the shaded valleys' sky still the open sky's (parked). Views without pools run as
+before; with pools more than 2× (the golden hour's haze pools 1.84× `main`, a strong misty pool 3.1× the flat layer; parked).
+The GPU runs at half its time by default (`VISTA_GPU_SHARE`). Log: [`vista-log/M1.13b.md`](vista-log/M1.13b.md).
+*Judge this:* Zermatt at the webcam's times beside your two frames (`m1-13b-webcam.png`, the frames kept local); peaks out of mist
+(`m1-13b-dawn.png`); the morning's mist lake (`m1-13b-morning.png`); which valleys fill at each place (`m1-13b-places.png`,
+`m1-13b-maps.png`). *Ignore this:* the twilight's brightness and the slopes' colour (M1.17); the 17:00 frame's overcast and fog
+thicker than 200 m to see (M4); a ridge's shadow still a little bright, and the cost over 2× (parked). *Questions:* does the fog
+sea's top read like the webcam's, flat and sharp, and are its edges frayed enough? Should Zermatt's dawns make mist on their own
+more often, or is pinning it when wanted enough? Is the extra time on views with pools acceptable until a later speed pass?
+
 **M1.14 — Auto camera v1.**
 - *Goal:* good compositions for the mountain set pieces without placing a camera by hand (§4.2,
   §4.8).
@@ -1985,6 +2032,23 @@ any of them.
   range so worlds still differ. *Belongs:* M7. *The user's check:* seed 7 beside seed 42: do both read
   as alpine valleys?
 - **Cornices on ridges** (M1.13): not in M7's list of close-up snow. *Belongs:* M7.
+- **Straight lines across flat valley floors** (M1.13b): seen from a shoulder over a filled valley floor (the seed-42 world's
+  southern valley at Fiordland's altitude, `pools/mist-lake`'s neighbour looking west), faint bright lines run straight toward the
+  vanishing point, with or without the pools: in the terrain or its shading, not the air. *Belongs:* M1.14 (its candidate
+  cameras look over such floors), or M1.17 if the hero render shows them.
+- **A leaner pools integrator** (M1.13b): the pools' variant costs a view with pools about 9 ns a sample before it takes a step
+  (the golden-hour down-slope view 1.84× `main`, the misty ridges with a strong pool 3.1× the flat layer, over the plan's 2×):
+  the march's state in fewer registers (its four wavelengths' coefficients and multiple-scattering ends live through every step),
+  one pool and volume lookup a surface instead of one for its sun and one for its sky. *Belongs:* M1.17's performance pass, or M4
+  with the fog proper.
+- **The sky's light in a ridge's shadow** (M1.13b): the sky view and a surface's sky light are a world's without terrain, so a
+  shaded valley's floor and the horizon over shaded valleys stay as bright as in the open; with a low sun the shadowed reference
+  is 19% darker on the misty ridges than the march (vista-log/M1.13b.md). A sky view per shaded column, or the sunlight volume's
+  shadow folded into the sky light's lower half. *Belongs:* M4 (with the clouds' shadows), or M1.17 if the hero render shows it.
+- **The mist deck's light per direction** (M1.13b): the octaves weighted by the sun's elevation and the tables' sky light leave a
+  side-lit deck +10% at a 25° sun and −9% at 6° against the reference, its nearest part −26% and its far part +17%
+  (vista-log/M1.13b.md). A table of the slab's Monte Carlo by sun, view and depth, or a two-stream field with its forward lobe.
+  *Belongs:* M4, with fog proper.
 
 ---
 

@@ -32,6 +32,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.12c | 0.31 | 6.12 | 5.39 | 9.56 |
 | M1.13 | 0.45 | 6.75 | 5.75 | 10.90 |
 | M1.13a | 0.45 | 7.03 | 5.94 | 11.30 |
+| M1.13b | 0.44 | 6.95 | 5.84 | 20.79 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -154,3 +155,15 @@ noon; the golden hour's forming pool), so the 3–4% on terrain is the larger ta
 separated. With a strong layer pinned (6 km under the lid) the same views ran 0.992, 1.054, 1.027 and 1.044 times `main`, at
 1.00, 3.21, 2.59 and 3.45 rays per sample (a hazier valley keeps a few more paths alive): the layer itself costs nothing more. The
 LUT build is not in these numbers: 3.7–4.0 s per atmosphere instead of 1.0.
+M1.13b marches each valley's pool and mist in three dimensions below the pools' highest reach, through a sunlight volume built once
+a render, in an integrator variant compiled with the pools' code (a render without pools runs M1.13a's). Measured as M1.13a was:
+this slice and `main` (c04d2275) rendered alternately, view by view, three rounds, this slice on half the GPU (`VISTA_GPU_SHARE`,
+its GPU times unchanged by it: the aerial view 9.88 ns capped, 9.98 uncapped, before the variant split) and `main` at full speed,
+on a GPU shared with desktop programs: median ratios 0.971, 0.989, 0.983 and 1.840 (0.970–1.002, 0.989–1.002, 0.983–0.983,
+1.837–1.896; the down-slope view measured again, three rounds, once the sunlight volume reached the pools' whole reach), at the same rays per sample (1.00, 3.12, 2.53 and 3.43). The row is M1.13a's times those medians. The sky, aerial and
+default views at their own hours hold no pool and run the plain integrator. The down-slope view's golden hour holds pools of haze
+(no mist) over 20% of the world, up to 165 m deep: 1.84× for the pools' variant, most of it the variant's own registers and
+lookups (with one step a segment it ran 20.1 ns against the flat layer's 10.5). The misty ridges at 07:30 with a strong pool and
+mist pinned (`--valley-haze 6 --mist 0.4`, 1920×1080, 64 samples) ran 3.13× M1.13a's flat layer for the same air (22.5 against
+7.2 ns, 3.10–3.15 again at the end; 2.8× before the march's steps were tuned, 1.98× against the flat layer when it still ran in the heavier shader): over the
+plan's two (vista-log/M1.13b.md).
