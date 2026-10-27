@@ -33,6 +33,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.13 | 0.45 | 6.75 | 5.75 | 10.90 |
 | M1.13a | 0.45 | 7.03 | 5.94 | 11.30 |
 | M1.13b | 0.44 | 6.95 | 5.84 | 20.79 |
+| M1.14 | 0.44 | 6.95 | 5.84 | 20.79 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -167,3 +168,8 @@ lookups (with one step a segment it ran 20.1 ns against the flat layer's 10.5). 
 mist pinned (`--valley-haze 6 --mist 0.4`, 1920×1080, 64 samples) ran 3.13× M1.13a's flat layer for the same air (22.5 against
 7.2 ns, 3.10–3.15 again at the end; 2.8× before the march's steps were tuned, 1.98× against the flat layer when it still ran in the heavier shader): over the
 plan's two (vista-log/M1.13b.md).
+M1.14 adds the auto camera and changes nothing in the integrator or its host, so its row is M1.13b's: the four ledger views (640 px,
+16 spp, the down-slope view with every debug output) rendered by `main` (0cc07311) and by this slice are byte-identical, EXR and PNG. The
+auto camera's own cost is a search before the render, about 35–45 s a pick: the plant 2.5–3.2 s and the candidates' buffers 0.6–1.5 s
+on the CPU, ten finalists rendered at 192×108 (24–32 s, the GPU at half its share) and the pick's 4K mesh counted (2–7 s)
+(vista-log/M1.14.md).

@@ -10,8 +10,8 @@ perspective, sun and sky importance sampling, OIDN denoising, GPU erosion, watch
 measured decision to keep it for the far terrain), M1.10a (exposure and display), M1.11 (linked sliders and the weather chain),
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
-and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer) and M1.13b (terrain-following valley mist) are done,
-and M1.14 (auto camera v1) is next. M1's scope is frozen: new findings go to the parked list (§10). It sits
+and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M1.13b (terrain-following valley mist) and M1.14
+(auto camera v1) are done, and M1.15 (time and VRAM estimate) is next. M1's scope is frozen: new findings go to the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -455,7 +455,9 @@ alongside shot-first generation.
   sun angle (side or back light at golden hour), sky fraction, required features
   visible (the lake really is in frame), no trunk or rock blocking the lens.
 - Scoring uses cheap low-resolution renders plus the G-buffer (depth, normals, material
-  ids).
+  ids). *Since M1.14:* the candidates' buffers (depth, normal, the ground's class, its height above the valley floor) are traced
+  on the CPU over the height field, so a few hundred cameras need no mesh or acceleration structure each and the GPU stays free;
+  the best ten are rendered small for what only light shows (the squint test, the values by layer) and their own buffers rescored.
 - Per aspect ratio once multiple targets exist (M11): the same composition is re-scored
   for 21:9 or 9:19.5 framings, with safe-frame overlays in the tweak viewport.
 
@@ -1841,6 +1843,26 @@ more often, or is pinning it when wanted enough? Is the extra time on views with
   final mesh would pass a recorded margin under 48 M is penalised, so a long lens on a busy view
   cannot reach the ceiling unnoticed.
 
+*Status (2026-10-27): done.* `--auto-camera` frames the mountain set pieces: the shot planted on the world (the main massif and
+peak, the range's axis, a heading by the sun), a few hundred candidates around it (rings, the line to the subject, shoulders over a
+standing pool; at eye height, 40 m and 150 m; the focal lengths that suit the subject there, 24–135 mm; the subject on a third),
+each traced on the CPU over the height field (depth, normal, the ground's class, its height above the valley floor) and scored after
+the paintings and §4.8 (the skyline and the sky, the peak or the range's summits, the layers, a framing mass, low ground, a leading
+line, side or back light, the subject in the sun), the best ten rendered small for the squint test and the values by layer, and
+their 4K mesh counted against the ceiling. Limits rank first: the near field until M5 (2% of the frame, snow excepted), the lens, 15%
+under 48 M triangles (it turned down a 44.8 M finalist). On eight seeds × both set pieces at golden hour every pick beats the default
+camera (`m1-14-seeds-peak-a.png`, `-b`, `m1-14-seeds-range-a.png`, `-b`), its near field 0%, its mesh 14–39 M triangles, in about
+40 s (most of it the finalists' renders). The candidates' buffers on the CPU agree with the renders' (the self-test's new check).
+After the first sheet, whose back-lit picks left their peaks dark, the subject must catch the sun. Most picks stand 40–150 m
+above the ground: the near-field limit keeps the ground near a person's feet out of the frame until M5.
+*Judge this:* the default camera against the pick, seed by seed, for snow-capped mountains and for an alpine range (the four seed
+sheets); the picks beside your paintings, on composition only (`m1-14-paintings.png`); how one run ranked its finalists
+(`m1-14-finalists.png`). *Ignore this:* the shadowed slopes' darkness (the punchy look's shadows, M1.17); the nearest faces' lack of
+detail (parked: your question of 2026-10-27); no trees or water in front (M5, M3); seed 4's smooth snow dome in its near corner and
+the terrain's odd lit facets on a few faces; golden hour everywhere. *Questions:* most picks are taken from 40–150 m up, like a drone:
+do they look right, or should the camera stand on the ground like a person? Which picks would you keep as a wallpaper, and which look
+wrong? Beside your paintings, is anything of their composition missing? Log: [`vista-log/M1.14.md`](vista-log/M1.14.md).
+
 **M1.15 — Time & VRAM estimate.**
 - *Goal:* honest estimates before a final render (pillar 7, §7.2).
 - *Deliverable:* rays per sample and rays per second measured from the preview and from a handful
@@ -2035,7 +2057,8 @@ any of them.
 - **Straight lines across flat valley floors** (M1.13b): seen from a shoulder over a filled valley floor (the seed-42 world's
   southern valley at Fiordland's altitude, `pools/mist-lake`'s neighbour looking west), faint bright lines run straight toward the
   vanishing point, with or without the pools: in the terrain or its shading, not the air. *Belongs:* M1.14 (its candidate
-  cameras look over such floors), or M1.17 if the hero render shows them.
+  cameras look over such floors), or M1.17 if the hero render shows them. *M1.14:* none of its sixteen picks (eight seeds, both set
+  pieces, 320 px) shows them, so they wait for M1.17's hero render.
 - **A leaner pools integrator** (M1.13b): the pools' variant costs a view with pools about 9 ns a sample before it takes a step
   (the golden-hour down-slope view 1.84× `main`, the misty ridges with a strong pool 3.1× the flat layer, over the plan's 2×):
   the march's state in fewer registers (its four wavelengths' coefficients and multiple-scattering ends live through every step),
@@ -2049,6 +2072,15 @@ any of them.
   side-lit deck +10% at a 25° sun and −9% at 6° against the reference, its nearest part −26% and its far part +17%
   (vista-log/M1.13b.md). A table of the slab's Monte Carlo by sun, view and depth, or a two-stream field with its forward lobe.
   *Belongs:* M4, with fog proper.
+- **The nearest faces lack detail** (the user, 2026-10-27, during M1.14): the mountain and hill faces nearest the camera (about
+  100 m to 3 km) read as smooth, and "the brain assumes less detail = far away", so the whole picture loses depth. The world grid's
+  8 m cell is about 37 pixels of a 4K frame at 50 mm a kilometre off (12 at 3 km); the detail below the grid (M1.12) is crests and
+  stones of at most 2 m near the camera, and the shading follows the grid's normals, so the structure real faces show at 5–50 m (rock
+  bands, ribs and gullies down the fall line, ledges, scree streaks, colour) is missing. M5 and M7 take the ground within about 100 m;
+  nothing takes this band. Options: shading and colour detail at those scales (no triangles, most of the perceived detail, smooth
+  silhouettes), geometric detail of 5–50 m by material and slope on the nearest faces (rougher ridgelines, at a cost in triangles
+  against the 48 M ceiling), or a finer erosion tile around the shot. *Belongs:* a slice of its own (the user: "fine to pick up in a
+  separate slice"); before M1.17 if the user promotes it, since the hero render will show it.
 
 ---
 
