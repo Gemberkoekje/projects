@@ -30,3 +30,9 @@ public readonly record struct ContractId(long Value)
 {
     public override string ToString() => "C" + Value.ToString(CultureInfo.InvariantCulture);
 }
+
+/// <summary>Identifies a <see cref="Negotiation"/>.</summary>
+public readonly record struct NegotiationId(long Value)
+{
+    public override string ToString() => "N" + Value.ToString(CultureInfo.InvariantCulture);
+}

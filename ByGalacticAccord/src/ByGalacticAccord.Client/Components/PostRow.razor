@@ -1,0 +1,19 @@
+@* One of the player's posts or haggles: what, where it stands, and a flag when it waits on the player. *@
+<div class="line post-line">
+    <span class="line-label">
+        <button type="button" class="link-text small strong" @onclick="() => OnSelect.InvokeAsync(Line.Contract)">@Line.Head</button>
+        <span class="xsmall muted">@Line.Detail</span>
+    </span>
+    @if (Line.Flag is not null)
+    {
+        <span class="flag xsmall tone-@Line.Tone">@Line.Flag</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public PostLine Line { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
+}

@@ -22,6 +22,12 @@ public sealed record DealOutcome(DealBlock Block, Signing? Signing)
     public bool Signed => Signing == Engine.Simulation.Signing.Signed;
 }
 
+/// <summary>What happened when the player tried to post a contract: blocked, or the contract it posted.</summary>
+public sealed record PostOutcome(PostBlock Block, Contract? Post)
+{
+    public bool Posted => Post is not null;
+}
+
 /// <summary>
 /// One game in progress: the world, the player's actor, and the clock. The clock runs in real time at the
 /// chosen speed (1× is one game hour per second) and advances the simulation to whole ticks; the fraction
@@ -207,11 +213,56 @@ public sealed class GameSession
     /// <summary>Load the player's goods of <paramref name="good"/> from storage where the free ship is docked.</summary>
     public bool Retrieve(GoodType good) => Changed(PlayerActions.Retrieve(Context, Player, PlayerShip, good));
 
+    /// <summary>Post a contract (design §3.6): it reaches the actors that can see it, and their answers come over game time.</summary>
+    public PostOutcome Post(PostDraft draft)
+    {
+        PostBlock block = PlayerActions.CheckPost(Context, Player, draft);
+        Contract? post = block == PostBlock.None ? PlayerActions.Post(Context, Player, draft) : null;
+        Revision++;
+        return new PostOutcome(block, post);
+    }
+
+    /// <summary>
+    /// Make a counter-offer on a contract: on someone else's post to its poster, or on the player's own post in a responder's
+    /// haggle. The reply comes in game time. The block says why it couldn't be sent, or none if it was.
+    /// </summary>
+    public DealBlock Counter(ContractId id, Offer offer, NegotiationId? thread = null)
+    {
+        Contract contract = Context.Contract(id);
+        Negotiation? negotiation = thread is { } t ? Context.Negotiation(t) : null;
+        DealBlock block = PlayerActions.CheckCounter(Context, Player, contract, offer, negotiation);
+        if (block == DealBlock.None)
+        {
+            PlayerActions.Counter(Context, Player, contract, offer, negotiation);
+        }
+
+        Revision++;
+        return block;
+    }
+
+    /// <summary>Accept the other side's latest offer in a haggle: the contract is signed on it.</summary>
+    public Signing AcceptOffer(NegotiationId id)
+    {
+        Signing signed = PlayerActions.AcceptOffer(Context, Player, Context.Negotiation(id));
+        Revision++;
+        return signed;
+    }
+
+    /// <summary>Decline the other side's latest offer, ending that haggle.</summary>
+    public bool Decline(NegotiationId id) => Changed(PlayerActions.Decline(Context, Player, Context.Negotiation(id)));
+
+    /// <summary>Take one of the player's open posts down.</summary>
+    public bool Withdraw(ContractId id) => Changed(PlayerActions.Withdraw(Context, Player, Context.Contract(id)));
+
+    /// <summary>The player's haggles, newest first.</summary>
+    public IEnumerable<Negotiation> PlayerNegotiations =>
+        Context.Negotiations.Values.Where(n => n.Involves(Player.Id)).OrderByDescending(n => n.Id.Value);
+
     /// <summary>The player's contracts that are signed and not yet settled, in the order it joined them.</summary>
     public IEnumerable<Contract> PlayerActiveContracts =>
         Context.LiveContractsOf(Player.Id).Where(c => c.Status == ContractStatus.Active && c is not StorageContract);
 
-    /// <summary>The player's own posts still open: a haul it posted for a carrier to take.</summary>
+    /// <summary>The player's own posts still open: Sales and hauls it posted, waiting for takers.</summary>
     public IEnumerable<Contract> PlayerOpenPosts =>
         Context.LiveContractsOf(Player.Id).Where(c => c.IsOpen && c.PostedBy == Player.Id);
 

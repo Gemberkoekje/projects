@@ -29,12 +29,13 @@ internal static class TestWorld
     /// <summary>
     /// The sector with nobody acting on their own: every heartbeat is pushed far beyond any test's horizon, so a test
     /// drives the market itself and only the events it causes run. The world, its stocks and its money are as generated;
-    /// transit incidents are off unless asked for, so a trip takes exactly its hours.
+    /// transit incidents are off unless asked for, so a trip takes exactly its hours; and the player's posts draw no
+    /// answers unless asked for (<paramref name="answers"/>).
     /// </summary>
-    public static SimulationContext Quiet(bool withPlayer = false, long seed = 42L, bool incidents = false) =>
+    public static SimulationContext Quiet(bool withPlayer = false, long seed = 42L, bool incidents = false, bool answers = false) =>
         WorldGenerator.Generate(
             seed, withPlayer,
-            new SimulationConfig { HeartbeatInterval = 1_000_000_000, IncidentProbabilityScale = incidents ? 0.6m : 0m }).Context;
+            new SimulationConfig { HeartbeatInterval = 1_000_000_000, IncidentProbabilityScale = incidents ? 0.6m : 0m, PostsDrawAnswers = answers }).Context;
 
     /// <summary>A compact fingerprint of world state, used to prove deterministic replay (design §20.1).</summary>
     public static string Signature(SimulationContext context) => StateFingerprint.Of(context);

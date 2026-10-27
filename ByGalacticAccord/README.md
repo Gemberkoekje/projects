@@ -18,8 +18,8 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 
 ## The current build
 
-**S1 (groundwork), S2 (the browser client), S3 (possession, Sale and Haul) and S4 (terms and failure) are
-done; S5 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
+**S1 (groundwork), S2 (the browser client), S3 (possession, Sale and Haul), S4 (terms and failure) and S5
+(posting, responses and haggling) are done; S6 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
 station, or in a ship's hold. Two kinds of contract move them. A **Sale** is goods wanted or for sale, handed
 over at a place; a **Haul** carries a shipper's goods from one place to another. Consumers post the Sales they
 need delivered, producers sell lots and answer what is wanted, and traders fill Sales by buying and carrying,
@@ -29,8 +29,10 @@ break fee, what a short delivery is, a quality warranty below whose floor goods 
 liability for goods lost. When a contract goes wrong its terms settle it, and a decision they hand a party
 (cancel or wait, reject or accept) is made by AI actors by utility and by the player at a pause. The deep Accord
 enforces remedies in full, its edge as far as escrow holds, the frontier not at all. Every event in the log
-records its cause, so any outcome reads back as a chain. Haggling, information and ships change shape in
-S5–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
+records its cause, so any outcome reads back as a chain. A post that waits can be **haggled** over: AI actors
+settle among themselves at once, by the same rules of opening, conceding and walking away that a haggle with the
+player follows over game time, each reply coming 1 to 12 hours later and worded by how close it is to its limit.
+Information and ships change shape in S6–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
 the soak harness) stays.
 
 The **Blazor WebAssembly client** runs that simulation in the browser: the schematic sector map with
@@ -41,7 +43,9 @@ Light Freighter. You can carry a haul, fill a wanted Sale by buying the goods an
 them and posting a haul for someone else to carry), buy a lot for sale and collect it, and store goods at a
 station, all as posted; you can walk away from a contract, cancel one whose counterparty is in default, raise
 an untaken haul, and answer the decisions the terms hand you, and every contract shows its terms as sentences
-and what led to it. Posting your own contracts and haggling arrive in S5.
+and what led to it. You can **post** your own wanted Sale, goods for sale or haul at the price and terms you
+choose; whoever can see it answers over game time, as posted or with a counter, and the haggle reads as a thread
+of offers and replies. You can also counter anyone's post on the board.
 
 ## Running it
 
@@ -58,6 +62,9 @@ dotnet test --filter Category=Soak
 
 # The soak harness: run the world headless, print economy telemetry, assert every invariant.
 dotnet run --project src/ByGalacticAccord.Cli -- soak 1000000 --seed 42
+
+# The bot players (a board taker and a market reader) play the world as its player; invariants asserted.
+dotnet run --project src/ByGalacticAccord.Cli -- bots --seed 42
 
 # The client, at http://localhost:5180 (add ?seed=42 for another world).
 dotnet run --project src/ByGalacticAccord.Client

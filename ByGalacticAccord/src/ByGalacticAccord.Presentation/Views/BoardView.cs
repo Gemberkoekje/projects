@@ -129,6 +129,14 @@ public static class BoardView
             return (Templates.Fill("Board.Note.Late", ("late", Format.Duration(estimate.TicksLate))), Tone.Warn);
         }
 
+        if (contract.Warranty is { RejectBelow: { } floor } warranty && warranty.Rejectable(estimate.ArrivalQuality))
+        {
+            GoodType spoiled = contract is SaleContract s0 ? s0.Good : ((HaulContract)contract).Good;
+            return (Templates.Fill(
+                "Board.Note.Reject", ("good", Templates.Good(spoiled)), ("quality", Format.Percent(estimate.ArrivalQuality)), ("floor", Format.Percent(floor)),
+                ("poster", session.Context.Actor(contract.PostedBy).Name)), Tone.Loss);
+        }
+
         if (estimate.QualityRefund.Amount > 0m)
         {
             GoodType good = contract is SaleContract s ? s.Good : ((HaulContract)contract).Good;

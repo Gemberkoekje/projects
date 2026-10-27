@@ -27,6 +27,9 @@ public sealed class ViewTests
         int stored = 0;
         int brokered = 0;
         int decided = 0;
+        int posted = 0;
+        int agreed = 0;
+        int countered = 0;
         bool boughtLot = false;
         int frame = 0;
         while (session.Now < 2_400)
@@ -78,6 +81,41 @@ public sealed class ViewTests
 
             CheckShips(session);
             LedgerViewModel ledger = CheckLedger(session);
+            PostsViewModel posts = CheckPosts(session);
+            if (frame % 24 == 0)
+            {
+                CheckComposer(session);
+            }
+
+            // Post a wanted Sale of food at Verdant now and then, a little under what it is worth; answer each answer that
+            // waits: accept one within the base value, else counter it once, else decline.
+            if (posted < 3 && frame % 60 == 0 && session.Post(ComposerView.ToPost(session, ComposerView.Default(session, PostKind.Wanted) with
+                { Place = session.Context.Place("Verdant").Id, Price = 330m })).Posted)
+            {
+                posted++;
+            }
+
+            foreach (Negotiation thread in session.PlayerNegotiations.Where(n => n.IsOpen && n.AwaitingFrom == session.Player.Id).ToList())
+            {
+                CheckContract(session, thread.Contract);
+                Offer theirs = thread.Latest.Offer;
+                if (theirs.Price.Amount <= 600m && session.AcceptOffer(thread.Id) == Signing.Signed)
+                {
+                    agreed++;
+                }
+                else if (thread.Rounds < 3 && session.Counter(thread.Contract, theirs with { Price = Credits.Of(System.Math.Round(theirs.Price.Amount * 0.9m, 2)) }, thread.Id) == DealBlock.None)
+                {
+                    countered++;
+                }
+                else
+                {
+                    session.Decline(thread.Id);
+                }
+
+                CheckContract(session, thread.Contract);
+            }
+
+            CheckPosts(session);
 
             // Put anything aboard into storage when the ship is free, so the hold is clear for the next deal.
             if (ledger.Possessions.FirstOrDefault(l => l.Action is { Store: true }) is { Action: { } store } && session.Store(store.Good))
@@ -114,6 +152,8 @@ public sealed class ViewTests
         Assert.True(signed >= 3, $"The player signed {signed} deals.");
         Assert.True(boughtLot && stored > 0, $"Bought a lot: {boughtLot}; stored goods {stored} times.");
         Assert.True(brokered > 0, "The player filled a sale through a carrier.");
+        Assert.True(posted > 0 && session.PlayerNegotiations.Any(), $"The player posted {posted} times and haggled {session.PlayerNegotiations.Count()} times.");
+        Assert.True(agreed + countered > 0, "The player answered a haggle.");
         Assert.Contains(ContractType.Sale, kinds);
         Assert.Contains(ContractType.Haul, kinds);
         Assert.Contains(LogView.Build(session, 400).Lines, l => l.Yours);
@@ -323,10 +363,70 @@ public sealed class ViewTests
 
         Assert.True(c.Why.Count <= ContractView.WhyLines);
         Assert.Equal(c.IsOpen, c.Status is null);
+        AssertFilled(c.ThreadsTitle, c.CounterTitle, c.CounterBlocked ?? string.Empty);
+        foreach (ThreadViewModel thread in c.Threads)
+        {
+            CheckThread(thread);
+        }
+
+        if (c.Counter is { } counter)
+        {
+            CheckForm(counter);
+        }
+
         MapViewModel map = MapView.Build(session, id);
         AssertFilled(map.OverlayTitle ?? string.Empty, map.OverlayEta ?? string.Empty);
         Assert.All(map.Nodes, n => Assert.InRange(n.X, 0, map.Width));
         Assert.All(map.Regions, r => Assert.InRange(r.X + r.Width, 0, map.Width));
+    }
+
+    private static void CheckThread(ThreadViewModel thread)
+    {
+        AssertFilled(thread.Title, thread.Status, thread.AcceptLabel, thread.AcceptNote, thread.DeclineLabel);
+        Assert.NotEmpty(thread.Bids);
+        foreach (BidLine bid in thread.Bids)
+        {
+            AssertFilled(bid.Who, bid.When, bid.Offer, bid.Note ?? string.Empty);
+        }
+
+        Assert.True(thread.Counter is null || thread.YourTurn);
+        if (thread.Counter is { } counter)
+        {
+            CheckForm(counter);
+        }
+    }
+
+    private static void CheckForm(OfferFormModel form)
+    {
+        AssertFilled(form.PriceLabel, form.DeadlineLabel, form.PackageLabel, form.LateFeeLabel, form.SubmitLabel, form.Note);
+        AssertFilled(form.Deadlines.Select(d => d.Label).Concat(form.Packages.Select(p => p.Label)).Concat(form.LateFees.Select(l => l.Label)));
+        Assert.Contains(form.Deadlines, d => d.Value == form.Deadline);
+        Assert.True(form.Price > 0m);
+    }
+
+    private static PostsViewModel CheckPosts(GameSession session)
+    {
+        PostsViewModel posts = PostsView.Build(session);
+        AssertFilled(posts.Title, posts.NewPostLabel, posts.PostsTitle, posts.PostsEmpty, posts.HagglesTitle, posts.HagglesEmpty);
+        foreach (PostLine line in posts.Posts.Concat(posts.Haggles))
+        {
+            AssertFilled(line.Head, line.Detail, line.Flag ?? string.Empty);
+        }
+
+        Assert.Equal(session.PlayerOpenPosts.Count(), posts.Posts.Count);
+        return posts;
+    }
+
+    private static void CheckComposer(GameSession session)
+    {
+        foreach (PostKind kind in System.Enum.GetValues<PostKind>())
+        {
+            ComposerViewModel composer = ComposerView.Build(session, ComposerView.Default(session, kind));
+            AssertFilled(composer.Title, composer.Hint, composer.KindNote, composer.Reference, composer.Stored ?? string.Empty, composer.TermsTitle,
+                composer.Commitment, composer.Blocked ?? string.Empty, composer.PostLabel, composer.CloseLabel);
+            AssertFilled(composer.Terms);
+            Assert.Equal(composer.CanPost, composer.Blocked is null);
+        }
     }
 
     private static LedgerViewModel CheckLedger(GameSession session)

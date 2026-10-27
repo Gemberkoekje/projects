@@ -103,6 +103,37 @@ internal static class Soak
         }
 
         Console.WriteLine();
+        Console.WriteLine("Signed by kind, and how many AI actors haggled in closed form (design §3.6) to a price other than posted:");
+        foreach ((string label, Func<Contract, bool> kind) in new (string, Func<Contract, bool>)[]
+                 {
+                     ("Sale, wanted", c => c is SaleContract { Side: SaleSide.Wanted }),
+                     ("Sale, for sale", c => c is SaleContract { Side: SaleSide.ForSale }),
+                     ("Haul", c => c is HaulContract),
+                 })
+        {
+            int signed = 0;
+            int haggled = 0;
+            decimal ratio = 0m;
+            foreach (Contract c in ctx.Contracts.Values)
+            {
+                if (c.SignedTick is null || !kind(c))
+                {
+                    continue;
+                }
+
+                signed++;
+                if (c.Price != c.OfferedPrice && c.OfferedPrice.Amount > 0m)
+                {
+                    haggled++;
+                    ratio += c.Price.Amount / c.OfferedPrice.Amount;
+                }
+            }
+
+            string average = haggled == 0 ? "—" : (ratio / haggled).ToString("0.00", CultureInfo.InvariantCulture) + "× the posted price";
+            Line("  " + label, $"{signed.ToString("N0", CultureInfo.InvariantCulture)} signed, {haggled.ToString("N0", CultureInfo.InvariantCulture)} haggled ({(signed == 0 ? 0m : (decimal)haggled / signed):P1}), on average {average}");
+        }
+
+        Console.WriteLine();
         Console.WriteLine("Goods (produced = consumed + held + lost):");
         Console.WriteLine($"   {"",-10} {"produced",12} {"consumed",12} {"held",10} {"lost",10}");
         foreach (GoodType good in Goods.All)

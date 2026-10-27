@@ -3,7 +3,7 @@ using System.Globalization;
 using ByGalacticAccord.Cli;
 
 // The soak harness (design §18, §20.3). The game itself is played in the browser client; this
-// console app only runs the world headless, prints telemetry and asserts the invariants.
+// console app runs the world headless, prints telemetry and asserts the invariants, and plays it with bot players.
 string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "soak";
 long seed = ArgValue(args, "--seed", 20260619L, s => long.Parse(s, CultureInfo.InvariantCulture));
 
@@ -14,6 +14,12 @@ switch (mode)
             ? t
             : 200_000L;
         return Soak.Run(seed, ticks);
+
+    case "bots":
+        long botTicks = args.Length > 1 && long.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long b)
+            ? b
+            : 200_000L;
+        return Bots.Run(seed, botTicks);
 
     case "fingerprint":
         long until = args.Length > 1 && long.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long f)
@@ -40,6 +46,7 @@ static void PrintHelp()
     Console.WriteLine();
     Console.WriteLine("Usage:");
     Console.WriteLine("  soak  [ticks] [--seed N]    Run headless, print economy telemetry, assert invariants (default).");
+    Console.WriteLine("  bots  [ticks] [--seed N]    Play the world with each bot as its player, assert invariants, compare them (default 200,000).");
     Console.WriteLine("  fingerprint [ticks] [--seed N]  Print the state fingerprint after a headless run (default 20,000).");
     Console.WriteLine("  help                        Show this help.");
     Console.WriteLine();

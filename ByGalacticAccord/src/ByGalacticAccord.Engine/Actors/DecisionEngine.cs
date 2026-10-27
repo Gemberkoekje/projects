@@ -107,8 +107,9 @@ public static partial class DecisionEngine
     }
 
     /// <summary>
-    /// AI producers at a wanted Sale's place answer it the moment it is posted (design §4.3: an actor re-evaluates
-    /// when a contract it can see appears). S5 makes replies take game time.
+    /// AI producers at an AI's wanted Sale's place answer it the moment it is posted (design §4.3: an actor re-evaluates when
+    /// a contract it can see appears; between AI actors a haggle resolves in closed form, at once). The player's posts are
+    /// answered over game time instead (<see cref="NoticePost"/>).
     /// </summary>
     public static void AnswerAtOnce(SimulationContext context, SaleContract wanted)
     {

@@ -94,4 +94,23 @@ public static class Templates
         : ContractKind(contract.Type);
 
     public static string ShipClass(ShipType type) => Get("ShipClass." + type);
+
+    /// <summary>How a reply read (design §3.6): "readily", "reluctant", "appears to be at its limit".</summary>
+    public static string Tell(Tell tell) => Get("Tell." + tell);
+
+    /// <summary>A late fee as a share of its package's: "half the", "the usual", "double the".</summary>
+    public static string LateFee(decimal scale) => Get(scale < 1m ? "LateFee.Half" : scale > 1m ? "LateFee.Double" : "LateFee.Standard");
+
+    /// <summary>An offer in a line: "₵460, due Day 4 · 06:00, standard", and its late fee where it isn't the package's.</summary>
+    public static string Offer(Offer offer)
+    {
+        var facts = new[]
+        {
+            ("price", Format.Money(offer.Price)),
+            ("deadline", Format.Date(offer.Deadline)),
+            ("package", Package(offer.Package)),
+            ("lateFee", LateFee(offer.LateFeeScale)),
+        };
+        return Fill(offer.LateFeeScale == 1m ? "Offer.Text" : "Offer.Text.LateFee", facts);
+    }
 }

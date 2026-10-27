@@ -35,7 +35,7 @@ public static class LogView
             }
 
             Contract contract = context.Contract(id);
-            bool yours = JournalText.Subject(entry) == session.Player.Id || contract.Involves(session.Player.Id);
+            bool yours = JournalText.Subject(entry) == session.Player.Id || JournalText.Addressee(entry) == session.Player.Id || contract.Involves(session.Player.Id);
             if (!yours && (Routine(entry, contract) || !Visibility.CanSee(context, session.Player, contract)))
             {
                 continue;

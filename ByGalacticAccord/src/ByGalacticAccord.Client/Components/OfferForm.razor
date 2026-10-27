@@ -1,0 +1,79 @@
+@* An offer as a form (design §3.6, §16.5): price, due date, term package and late fee. It keeps what the player typed while
+   the clock runs; it starts afresh from its model only when it is a form for something else (its Key). *@
+<form class="offer-form" @onsubmit="Submit" @onsubmit:preventDefault data-testid="offer-form">
+    <div class="form-grid">
+        <label class="field">
+            <span class="xsmall muted">@Model.PriceLabel</span>
+            <input class="mono" type="number" min="0.01" step="0.01" inputmode="decimal" @bind="_price" @bind:event="oninput" data-field="price" />
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.DeadlineLabel</span>
+            <select @bind="_deadline" data-field="deadline">
+                @foreach (Choice<long> choice in Model.Deadlines)
+                {
+                    <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                }
+            </select>
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.PackageLabel</span>
+            <select @bind="_package" data-field="package">
+                @foreach (Choice<TermPackage> choice in Model.Packages)
+                {
+                    <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                }
+            </select>
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.LateFeeLabel</span>
+            <select @bind="_lateFee" data-field="late-fee">
+                @foreach (Choice<decimal> choice in Model.LateFees)
+                {
+                    <option @key="choice.Value" value="@choice.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)">@choice.Label</option>
+                }
+            </select>
+        </label>
+    </div>
+    <div class="action">
+        <button type="submit" class="button" disabled="@(_price <= 0m)">@Model.SubmitLabel</button>
+        <span class="xsmall muted">@Model.Note</span>
+    </div>
+</form>
+
+@code {
+    private string? _key;
+    private decimal _price;
+    private long _deadline;
+    private TermPackage _package;
+    private string _lateFee = "1";
+
+    [Parameter, EditorRequired]
+    public OfferFormModel Model { get; set; } = default!;
+
+    /// <summary>What the form is for: a new key starts it afresh from the model.</summary>
+    [Parameter, EditorRequired]
+    public string Key { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<Offer> OnSubmit { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (_key == Key)
+        {
+            return;
+        }
+
+        _key = Key;
+        _price = Model.Price;
+        _deadline = Model.Deadline;
+        _package = Model.Package;
+        _lateFee = Model.LateFeeScale.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private Task Submit()
+    {
+        decimal scale = decimal.Parse(_lateFee, System.Globalization.CultureInfo.InvariantCulture);
+        return OnSubmit.InvokeAsync(new Offer(Credits.Of(Math.Round(_price, 2)), _deadline, _package, scale));
+    }
+}

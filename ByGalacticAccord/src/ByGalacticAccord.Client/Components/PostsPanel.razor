@@ -1,0 +1,50 @@
+@* "My posts" with their answers, and the player's haggles over others' posts (design §11.3). Each line opens its contract,
+   where its threads are. The button opens the post composer. *@
+<section class="panel posts-panel" data-testid="posts">
+    <div class="panel-head">
+        <h2 class="caps">@Model.Title</h2>
+        <button type="button" class="button small" data-testid="new-post" @onclick="OnNewPost">@Model.NewPostLabel</button>
+    </div>
+    <div class="block">
+        <h3 class="block-title">@Model.PostsTitle</h3>
+        @if (Model.Posts.Count == 0)
+        {
+            <p class="empty small muted">@Model.PostsEmpty</p>
+        }
+        @foreach (PostLine line in Model.Posts)
+        {
+            <PostRow Line="line" OnSelect="OnSelect" />
+        }
+    </div>
+    <div class="block" data-testid="haggles">
+        <h3 class="block-title">@Model.HagglesTitle</h3>
+        @if (Model.Haggles.Count == 0)
+        {
+            <p class="empty small muted">@Model.HagglesEmpty</p>
+        }
+        @foreach (PostLine line in Model.Haggles)
+        {
+            <PostRow Line="line" OnSelect="OnSelect" />
+        }
+    </div>
+</section>
+
+@code {
+    private PostsViewModel? _rendered;
+
+    [Parameter, EditorRequired]
+    public PostsViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback OnNewPost { get; set; }
+
+    protected override bool ShouldRender()
+    {
+        bool changed = !ReferenceEquals(_rendered, Model);
+        _rendered = Model;
+        return changed;
+    }
+}

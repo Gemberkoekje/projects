@@ -28,6 +28,9 @@ public enum ContractCommand
 
     /// <summary>Post a haul again for a Sale whose goods wait with nothing moving them.</summary>
     HaulAgain,
+
+    /// <summary>Take one of the player's own open posts down.</summary>
+    Withdraw,
 }
 
 /// <summary>One of those commands as a button: its label, what it does, and whether it can be done now.</summary>
@@ -37,8 +40,10 @@ public sealed record ContractAction(ContractCommand Command, string Label, strin
 /// The contract as a document (design §11.3): parties, obligation, schedule, what it is worth to the player (or, for a
 /// lot, what it costs) line by line, what can't be known for sure, and the terms as plain sentences. For a contract
 /// that is no longer open, the status says what became of it and the estimate is left out. <see cref="Actions"/> are
-/// what else the player can do with it (fill it through a carrier, walk away, cancel for default); <see cref="Why"/>
-/// is its record read back through its causes (design §11.2: "why did this happen?"), newest first.
+/// what else the player can do with it (fill it through a carrier, walk away, cancel for default, withdraw its own post);
+/// <see cref="Threads"/> are its haggles with the player (design §11.3, "Negotiations"), and <see cref="Counter"/> the
+/// counter-offer the player can make on someone else's post now; <see cref="Why"/> is its record read back through its
+/// causes (design §11.2: "why did this happen?"), newest first.
 /// </summary>
 public sealed record ContractViewModel(
     ContractId Id,
@@ -67,7 +72,12 @@ public sealed record ContractViewModel(
     IReadOnlyList<ContractAction> Actions,
     string WhyTitle,
     IReadOnlyList<LogLine> Why,
-    string? WhyEnd);
+    string? WhyEnd,
+    string ThreadsTitle,
+    IReadOnlyList<ThreadViewModel> Threads,
+    string CounterTitle,
+    OfferFormModel? Counter,
+    string? CounterBlocked);
 
 /// <summary>Builds the contract panel and words the outcomes of the player's commands.</summary>
 public static class ContractView
@@ -95,7 +105,17 @@ public static class ContractView
         string? blocked = null;
 
         var actions = new List<ContractAction>();
-        if (contract.IsOpen && contract.PostedBy != session.Player.Id)
+        var threads = new List<ThreadViewModel>();
+        OfferFormModel? counter = null;
+        string? counterBlocked = null;
+        if (contract.IsOpen && contract.PostedBy == session.Player.Id)
+        {
+            // The player's own post: its answers, each a thread to accept, counter or decline; and it can take the post down.
+            (status, statusTone) = Status(session, contract);
+            threads.AddRange(Threads(session, contract));
+            actions.Add(new ContractAction(ContractCommand.Withdraw, Templates.Get("Action.Withdraw"), Templates.Get("Action.Withdraw.Note"), true));
+        }
+        else if (contract.IsOpen)
         {
             DealBlock block = Check(session, contract);
             canAccept = block == DealBlock.None;
@@ -110,6 +130,19 @@ public static class ContractView
             {
                 actions.Add(BrokerAction(session, wanted));
             }
+
+            // A haggle with its poster: the thread, if one was started, and a counter-offer while it is the player's turn.
+            threads.AddRange(Threads(session, contract));
+            Negotiation? open = context.NegotiationWith(contract.Id, session.Player.Id);
+            if (open is null)
+            {
+                Offer posted = Offer.Of(contract);
+                DealBlock counterBlock = PlayerActions.CheckCounter(context, session.Player, contract, posted);
+                counter = counterBlock == DealBlock.None
+                    ? NegotiationView.Form(session, posted, Templates.Get("Thread.Counter.Send"), Templates.Get("Thread.Counter.Note"))
+                    : null;
+                counterBlocked = counterBlock == DealBlock.None ? null : BlockText(session, contract, counterBlock);
+            }
         }
         else
         {
@@ -119,6 +152,8 @@ public static class ContractView
                 YourSchedule(session, contract, schedule);
                 YourActions(session, contract, actions);
             }
+
+            threads.AddRange(Threads(session, contract)); // how its haggles went
         }
 
         (List<LogLine> why, string? whyEnd) = Why(session, contract);
@@ -126,10 +161,24 @@ public static class ContractView
             id, kindLine, Head(context, contract), sub, status, statusTone,
             Templates.Get(buying ? "Contract.Cost" : "Contract.Certain"), lines, Templates.Get(buying ? "Cost" : "TakeHome"), takeHome, takeTone, takeHomeNote,
             schedule, Templates.Get("Contract.Uncertain"), uncertain,
-            Templates.Fill("Contract.Terms.Package", ("package", Templates.Package(contract.Terms.Package))), Terms(session, contract), poster.Name, partyRole,
+            Templates.Fill("Contract.Terms.Package", ("package", Templates.Package(contract.Terms.Package))), TermsOf(session, contract), poster.Name, partyRole,
             contract.IsOpen && contract.PostedBy != session.Player.Id, canAccept, Templates.Get(AcceptKey(contract)), blocked,
-            actions, Templates.Get("Contract.Why"), why, whyEnd);
+            actions, Templates.Get("Contract.Why"), why, whyEnd,
+            Templates.Get(contract.PostedBy == session.Player.Id ? "Contract.Answers" : "Contract.Haggle"), threads,
+            Templates.Get("Contract.Counter"), counter, counterBlocked);
     }
+
+    /// <summary>
+    /// The player's haggles over a contract, as threads: on its own post every answer it drew, open ones first; on someone
+    /// else's, its haggle with the poster, the latest first. Once the contract is no longer open they stay, as its history.
+    /// </summary>
+    private static IEnumerable<ThreadViewModel> Threads(GameSession session, Contract contract) =>
+        session.PlayerNegotiations
+            .Where(n => n.Contract == contract.Id)
+            .OrderByDescending(n => n.IsOpen)
+            .ThenByDescending(n => n.Id.Value)
+            .Take(contract.PostedBy == session.Player.Id ? int.MaxValue : 1)
+            .Select(n => NegotiationView.Thread(session, n));
 
     /// <summary>The most a "why" chain reads back.</summary>
     public const int WhyLines = 6;
@@ -152,7 +201,7 @@ public static class ContractView
 
             ContractId? about = JournalText.ContractOf(entry);
             Contract? other = about is { } a ? context.Contract(a) : null;
-            bool yours = JournalText.Subject(entry) == session.Player.Id || other?.Involves(session.Player.Id) == true;
+            bool yours = JournalText.Subject(entry) == session.Player.Id || JournalText.Addressee(entry) == session.Player.Id || other?.Involves(session.Player.Id) == true;
             if (!yours && other is not null && !Engine.Economy.Visibility.CanSee(context, session.Player, other))
             {
                 return (lines, Templates.Get("Why.Hidden"));
@@ -222,6 +271,7 @@ public static class ContractView
             ContractCommand.HaulAgain => Templates.Fill(
                 "Outcome.HaulAgain",
                 ("fee", Format.Money(session.Context.Contracts.Values.OfType<HaulContract>().Last(h => h.Serves == contract.Id).OfferedPrice))),
+            ContractCommand.Withdraw => Templates.Get("Outcome.Withdrawn"),
             _ => string.Empty,
         };
     }
@@ -248,26 +298,10 @@ public static class ContractView
     }
 
     /// <summary>Whether the player could take <paramref name="contract"/> now, and if not, why.</summary>
-    public static DealBlock Check(GameSession session, Contract contract) => contract switch
-    {
-        HaulContract haul => PlayerActions.CheckHaul(session.Context, session.Player, haul).Block,
-        SaleContract { Side: SaleSide.Wanted } wanted => PlayerActions.CheckFill(session.Context, session.Player, wanted).Block,
-        SaleContract lot => PlayerActions.CheckBuy(session.Context, session.Player, lot).Block,
-        _ => DealBlock.NotOpen,
-    };
+    public static DealBlock Check(GameSession session, Contract contract) => PlayerActions.Check(session.Context, session.Player, contract);
 
     /// <summary>What the contract is, in a line: the goods, and where.</summary>
-    public static string Head(SimulationContext context, Contract contract) => contract switch
-    {
-        HaulContract haul => Templates.Fill(
-            "Contract.Head.Haul", ("quantity", Format.Quantity(haul.Quantity)), ("good", Templates.Good(haul.Good)),
-            ("origin", context.Location(haul.Origin).Name), ("destination", context.Location(haul.Destination).Name)),
-        SaleContract sale => Templates.Fill(
-            "Contract.Head.Sale." + sale.Side, ("quantity", Format.Quantity(sale.Quantity)), ("good", Templates.Good(sale.Good)),
-            ("place", context.Location(sale.Place).Name)),
-        StorageContract storage => Templates.Fill("Contract.Head.Storage", ("place", context.Location(storage.Location).Name)),
-        _ => contract.Id.ToString(),
-    };
+    public static string Head(SimulationContext context, Contract contract) => JournalText.Head(context, contract);
 
     /// <summary>Why the player can't take <paramref name="contract"/>, in words.</summary>
     public static string BlockText(GameSession session, Contract contract, DealBlock block)
@@ -306,6 +340,12 @@ public static class ContractView
 
             case DealBlock.TooLate:
                 return Templates.Get("Block.TooLate");
+            case DealBlock.BadOffer:
+                return Templates.Get("Block.BadOffer");
+            case DealBlock.NotYourTurn:
+                return Templates.Get("Block.NotYourTurn");
+            case DealBlock.RoundsRanOut:
+                return Templates.Get("Block.RoundsRanOut");
             case DealBlock.NotOpen:
             default:
                 return Templates.Get("Block.NotOpen");
@@ -593,7 +633,8 @@ public static class ContractView
 
         return contract.Status switch
         {
-            ContractStatus.Open or ContractStatus.Negotiating => (Templates.Fill("Status.Posted", facts), Tone.Yours),
+            ContractStatus.Open when contract.PostedBy == player => (Templates.Fill("Status.Posted", facts), Tone.Yours),
+            ContractStatus.Open => (Templates.Fill("Status.Open", facts), Tone.Muted),
             ContractStatus.Active when contract.Involves(player) && contract.InDefault(session.Now) =>
                 (Templates.Fill(contract.Performer == player ? "Status.InDefault.You" : "Status.InDefault.ToYou", facts), Tone.Warn),
             ContractStatus.Active when contract is HaulContract && contract.Payer == player => (Templates.Fill("Status.Yours.Haul.Shipper", facts), Tone.Yours),
@@ -612,26 +653,34 @@ public static class ContractView
         };
     }
 
-    // The terms as sentences (design §3.4, §11.3), from the player's side: as the performer it would be (or is), or as the
-    // payer, for a lot it would buy or a haul it posted.
-    private static IReadOnlyList<string> Terms(GameSession session, Contract contract)
+    /// <summary>
+    /// The terms as sentences (design §3.4, §11.3), from the player's side: as the performer it would be (or is), or as the
+    /// payer, for a lot it would buy or a haul or wanted Sale it posted; or as the seller of its own lot.
+    /// </summary>
+    public static IReadOnlyList<string> TermsOf(GameSession session, Contract contract)
     {
         SimulationContext context = session.Context;
         ActorId player = session.Player.Id;
         string poster = context.Actor(contract.PostedBy).Name;
-        bool buying = contract is SaleContract { Side: SaleSide.ForSale };
-        bool youPerform = contract.Performer is { } p ? p == player : contract.PostedBy != player && !buying;
-        string performer = contract.Performer is { } q ? context.Actor(q).Name : youPerform || buying ? poster : Templates.Get("Party.Taker");
-        string payer = contract.Payer is { } r ? context.Actor(r).Name : poster;
+        bool lot = contract is SaleContract { Side: SaleSide.ForSale };
+        bool ownLot = lot && contract.PostedBy == player;
+        bool buying = lot && !ownLot;
+        bool youPerform = contract.Performer is { } p ? p == player : ownLot || (contract.PostedBy != player && !lot);
+        bool youPay = contract.Payer is { } y ? y == player : !lot && contract.PostedBy == player;
+        string taker = Templates.Get("Party.Taker");
+        string performer = contract.Performer is { } q ? context.Actor(q).Name : youPerform || buying ? poster : taker;
+        string payer = contract.Payer is { } r ? context.Actor(r).Name : ownLot ? taker : poster;
         (LocationId from, LocationId to, GoodType good, decimal quantity) = Shape(contract);
-        decimal bond = contract.Status == ContractStatus.Open
-            ? System.Math.Min(contract.PerformanceBond.Amount, System.Math.Max(0m, session.Player.Credits.Amount))
-            : contract.LockedBond.Amount;
+        decimal bond = contract.Status != ContractStatus.Open
+            ? contract.LockedBond.Amount
+            : youPerform ? System.Math.Min(contract.PerformanceBond.Amount, System.Math.Max(0m, session.Player.Credits.Amount)) : contract.PerformanceBond.Amount;
         var facts = new List<(string Name, string Value)>
         {
             ("poster", poster),
             ("performer", performer),
             ("payer", payer),
+            ("Performer", performer == taker ? Templates.Get("Party.Taker.Start") : performer),
+            ("Payer", payer == taker ? Templates.Get("Party.Taker.Start") : payer),
             ("quantity", Format.Quantity(quantity)),
             ("good", Templates.Good(good)),
             ("origin", context.Location(from).Name),
@@ -653,8 +702,17 @@ public static class ContractView
         string kind = JournalText.Kind(contract);
         string them = youPerform ? string.Empty : ".Them";
         string frontier = contract.UsesEscrow ? string.Empty : ".Frontier";
-        var terms = new List<string> { Fill(contract is HaulContract && !youPerform ? "Term.Haul.Them" : "Term." + kind) };
-        if (!buying)
+
+        // Whose side the first and the escrow sentences take: a payer's own haul or wanted Sale, a seller's own lot.
+        string side = contract switch
+        {
+            HaulContract => them,
+            SaleContract { Side: SaleSide.Wanted } when youPay && !youPerform => ".Them",
+            _ when ownLot => ".Seller",
+            _ => string.Empty,
+        };
+        var terms = new List<string> { Fill("Term." + kind + side) };
+        if (!lot)
         {
             if (contract.Terms.GraceHours > 0)
             {
@@ -671,7 +729,7 @@ public static class ContractView
         }
 
         terms.Add(Fill("Term.BreakFee"));
-        if (!buying)
+        if (!lot)
         {
             terms.Add(Fill(contract.Terms.Partial == PartialDelivery.ProRata ? "Term.Partial" : "Term.Partial.Failure"));
         }
@@ -684,7 +742,7 @@ public static class ContractView
                 ("maxRefund", Format.Percent(warranty.MaxRefundFraction)),
                 ("floor", Format.Percent(warranty.RejectBelow ?? 0m)),
             };
-            string key = buying ? "Term.Warranty.Collect" : contract is HaulContract ? "Term.Warranty.Haul" : "Term.Warranty";
+            string key = lot ? "Term.Warranty.Collect" + (ownLot ? ".Seller" : string.Empty) : contract is HaulContract ? "Term.Warranty.Haul" : "Term.Warranty";
             terms.Add(Fill(key, w));
             if (warranty.RejectBelow is not null)
             {
@@ -697,7 +755,7 @@ public static class ContractView
             terms.Add(Fill("Term.Liability" + them, ("perUnit", Format.MoneyCents(liability.PerUnit)), ("cap", Format.Money(liability.Cap))));
         }
 
-        terms.Add(Fill((contract.UsesEscrow ? "Term.Escrow." : "Term.Frontier.") + kind + (contract is HaulContract ? them : string.Empty)));
+        terms.Add(Fill((contract.UsesEscrow ? "Term.Escrow." : "Term.Frontier.") + kind + side));
         if (contract.UsesEscrow)
         {
             terms.Add(Templates.Get(contract.Arbitrated ? "Term.Courts.DeepAccord" : "Term.Courts.AccordEdge"));

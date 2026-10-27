@@ -2,7 +2,7 @@ namespace ByGalacticAccord.Engine.Domain;
 
 /// <summary>
 /// The three ready-made sets of terms (design §3.4): strict terms protect the payer and cost more, lenient ones are
-/// cheaper and riskier. A poster picks one; haggling (S5) can move single terms.
+/// cheaper and riskier. A poster picks one; a haggle can move the package, the late fee and the deadline (design §16.5).
 /// </summary>
 public enum TermPackage
 {
@@ -88,6 +88,7 @@ public sealed record CargoLiability(Credits PerUnit, Credits Cap)
 /// A contract's terms (design §3.4): what happens when it goes wrong. They are part of the contract, visible before
 /// signing: the grace after the deadline before the payer may cancel for default, the late fee and its cap (the bond),
 /// the break fee for walking away, what a short delivery is, the quality warranty, and a haul's cargo liability.
+/// <see cref="LateFeeScale"/> is the late fee per hour as a multiple of its package's, where a haggle moved it (design §16.5).
 /// </summary>
 public sealed record ContractTerms(
     TermPackage Package,
@@ -96,7 +97,8 @@ public sealed record ContractTerms(
     Credits BreakFee,
     PartialDelivery Partial,
     QualityWarranty? Warranty,
-    CargoLiability? Liability)
+    CargoLiability? Liability,
+    decimal LateFeeScale = 1m)
 {
     /// <summary>Terms with no remedies: a station's storage, which runs until it is emptied.</summary>
     public static ContractTerms None { get; } = new(TermPackage.Standard, 0, null, Credits.Zero, PartialDelivery.ProRata, null, null);

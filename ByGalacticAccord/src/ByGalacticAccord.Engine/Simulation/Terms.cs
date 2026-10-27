@@ -20,7 +20,8 @@ namespace ByGalacticAccord.Engine.Simulation;
 ///   cargo liability cap           —         —         —            100%       50%         —
 /// </code>
 /// The warranty applies to perishables. A lot of goods already past fresh is warranted as seen: no more than the
-/// quality they will still have at its deadline.
+/// quality they will still have at its deadline. A haggle may move the package and scale the late fee per hour
+/// (<see cref="For(Contract, Offer)"/>); the figures then follow the agreed price.
 /// </summary>
 public static class Terms
 {
@@ -40,9 +41,10 @@ public static class Terms
 
     /// <summary>
     /// The terms of a Sale at <paramref name="price"/>. <paramref name="stored"/> is the quality now of a lot that waits in
-    /// storage, where it keeps decaying, and <paramref name="hours"/> how long it is on offer.
+    /// storage, where it keeps decaying, and <paramref name="hours"/> how long it is on offer. <paramref name="lateFeeScale"/>
+    /// scales the late fee per hour (a haggled term); its cap, the bond, stays the package's.
     /// </summary>
-    public static ContractTerms ForSale(TermPackage package, GoodType good, Credits price, decimal? stored = null, long hours = 0)
+    public static ContractTerms ForSale(TermPackage package, GoodType good, Credits price, decimal? stored = null, long hours = 0, decimal lateFeeScale = 1m)
     {
         Package p = SalePackages[(int)package];
         QualityWarranty? warranty = null;
@@ -56,11 +58,12 @@ public static class Terms
         }
 
         return new ContractTerms(
-            package, p.GraceHours, LateFee(price, p), Credits.Of(Math.Round(price.Amount * p.BreakFee, 2)), p.Partial, warranty, null);
+            package, p.GraceHours, LateFee(price, p, lateFeeScale), Credits.Of(Math.Round(price.Amount * p.BreakFee, 2)), p.Partial, warranty, null,
+            lateFeeScale);
     }
 
     /// <summary>The terms of a Haul at <paramref name="fee"/>, of goods declared at <paramref name="unitValue"/> a unit.</summary>
-    public static ContractTerms ForHaul(TermPackage package, GoodType good, Credits fee, decimal quantity, Credits unitValue)
+    public static ContractTerms ForHaul(TermPackage package, GoodType good, Credits fee, decimal quantity, Credits unitValue, decimal lateFeeScale = 1m)
     {
         Package p = HaulPackages[(int)package];
         QualityWarranty? warranty = Goods.Info(good).Perishable ? new QualityWarranty(p.MinQuality, p.MaxRefund, p.RejectBelow) : null;
@@ -68,8 +71,21 @@ public static class Terms
             ? new CargoLiability(Credits.Of(Math.Round(unitValue.Amount, 2)), Credits.Of(Math.Round(unitValue.Amount * quantity * p.LiabilityCap, 2)))
             : null;
         return new ContractTerms(
-            package, p.GraceHours, LateFee(fee, p), Credits.Of(Math.Round(fee.Amount * p.BreakFee, 2)), p.Partial, warranty, liability);
+            package, p.GraceHours, LateFee(fee, p, lateFeeScale), Credits.Of(Math.Round(fee.Amount * p.BreakFee, 2)), p.Partial, warranty, liability,
+            lateFeeScale);
     }
+
+    /// <summary>
+    /// The terms <paramref name="contract"/> would have on <paramref name="offer"/>: its kind's terms rebuilt from the offer's
+    /// price, package and late fee, so an agreed counter re-scales every figure (design §16.5). A lot in storage stays
+    /// warranted as seen, to its new deadline.
+    /// </summary>
+    public static ContractTerms For(Contract contract, Offer offer) => contract switch
+    {
+        SaleContract sale => ForSale(offer.Package, sale.Good, offer.Price, sale.SeenQuality, offer.Deadline - sale.PostedTick, offer.LateFeeScale),
+        HaulContract haul => ForHaul(offer.Package, haul.Good, offer.Price, haul.Quantity, haul.DeclaredUnitValue, offer.LateFeeScale),
+        _ => contract.Terms,
+    };
 
     /// <summary>
     /// The package a buyer of perishables posts when goods carried in a standard hold would arrive at
@@ -99,7 +115,7 @@ public static class Terms
 
     /// <summary>
     /// The package an actor posts with, by personality (design §4.2): a quality-minded, risk-averse actor insists on strict
-    /// terms, a careless or risk-hungry one is lenient. The player's posts are standard until S5's composer lets it choose.
+    /// terms, a careless or risk-hungry one is lenient. The player's default is standard; its composer chooses.
     /// </summary>
     public static TermPackage PackageFor(Actors.ActorState actor)
     {
@@ -116,8 +132,8 @@ public static class Terms
     public static decimal TaxRate(SimulationContext context, AccordReach reach) =>
         reach is AccordReach.DeepAccord or AccordReach.AccordEdge ? context.Config.TaxRate : 0m;
 
-    private static PenaltyOnLateDelivery LateFee(Credits price, Package p) =>
-        new(PenaltyPerTickLate: Math.Max(0.1m, Math.Round(price.Amount * p.LatePerHour, 2)), MaxPenalty: Credits.Of(Math.Round(price.Amount * p.LateCap, 2)));
+    private static PenaltyOnLateDelivery LateFee(Credits price, Package p, decimal scale) =>
+        new(PenaltyPerTickLate: Math.Max(0.1m, Math.Round(price.Amount * p.LatePerHour * scale, 2)), MaxPenalty: Credits.Of(Math.Round(price.Amount * p.LateCap, 2)));
 
     private sealed record Package(
         long GraceHours,

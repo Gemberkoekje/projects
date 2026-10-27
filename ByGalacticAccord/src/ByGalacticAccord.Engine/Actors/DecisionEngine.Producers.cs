@@ -62,7 +62,11 @@ public static partial class DecisionEngine
         context.Produce(producer, profile.Good, output);
     }
 
-    /// <summary>A producer answers a wanted Sale at its location as posted, if it has the goods free and the price meets its ask.</summary>
+    /// <summary>
+    /// A producer answers a wanted Sale at its location, if it has the goods free: as posted when the price meets its ask,
+    /// else, for an AI buyer that would pay that much, in closed form (design §3.6). The player's price is all it would pay,
+    /// so with the player it is as posted or a counter over game time (<see cref="Respond"/>).
+    /// </summary>
     private static bool TryAnswer(SimulationContext context, ActorState producer, SaleContract wanted)
     {
         if (!wanted.IsOpen || wanted.PostedBy == producer.Id || producer.Producer is not { } profile || profile.Good != wanted.Good
@@ -71,13 +75,22 @@ public static partial class DecisionEngine
             return false;
         }
 
-        Credits ask = Ask(producer);
-        if (wanted.OfferedPrice.Amount < ask.Amount * wanted.Quantity * 0.999m)
+        decimal floor = Ask(producer).Amount * wanted.Quantity * 0.999m;
+        Offer offer = Offer.Of(wanted);
+        if (wanted.OfferedPrice.Amount < floor)
         {
-            return false;
+            if (Market.HagglesInGameTime(context.Actor(wanted.PostedBy))
+                || ClosedForm(context, wanted, PosterReservation(context, wanted), producer, floor) is not { } agreed)
+            {
+                return false;
+            }
+
+            offer = offer with { Price = Credits.Of(agreed) };
         }
 
-        return Market.Supply(context, producer, wanted, wanted.OfferedPrice, Holding.StockAt(producer.Home)) == Signing.Signed;
+        Signing signed = Market.SignAgreed(wanted, offer, () => Market.Supply(context, producer, wanted, offer.Price, Holding.StockAt(producer.Home)));
+        NoteHaggled(context, wanted, signed);
+        return signed == Signing.Signed;
     }
 
     /// <summary>
@@ -100,6 +113,7 @@ public static partial class DecisionEngine
 
         Credits ask = Ask(producer);
         SaleContract? best = null;
+        Offer? bestOffer = null;
         Credits bestFee = Credits.Zero;
         decimal bestMargin = 0m;
         foreach (SaleContract wanted in Visible<SaleContract>(context, producer))
@@ -118,23 +132,38 @@ public static partial class DecisionEngine
                 continue;
             }
 
-            // As posted (S5 brings haggling): the price must cover its ask and a carrier's fee with room to spare.
+            // The price must cover its ask and a carrier's fee with room to spare: as posted, or in closed form with an AI buyer
+            // that would pay that much (design §3.6). The player's wanted Sales it answers over game time (Respond).
             Credits fee = HaulFeeEstimate(context, producer.Home, wanted.Place);
-            decimal margin = wanted.OfferedPrice.Amount - (ask.Amount * wanted.Quantity) - (fee.Amount * 1.3m);
-            if (margin > bestMargin && Market.CanFund(wanted, context.Actor(wanted.PostedBy), wanted.OfferedPrice))
+            decimal floor = (ask.Amount * wanted.Quantity) + (fee.Amount * 1.3m);
+            Offer deal = Offer.Of(wanted);
+            if (deal.Price.Amount <= floor)
+            {
+                if (Market.HagglesInGameTime(context.Actor(wanted.PostedBy))
+                    || ClosedForm(context, wanted, PosterReservation(context, wanted), producer, floor + 1m) is not { } agreed)
+                {
+                    continue;
+                }
+
+                deal = deal with { Price = Credits.Of(agreed) };
+            }
+
+            decimal margin = deal.Price.Amount - floor;
+            if (margin > bestMargin && Market.CanFund(wanted, context.Actor(wanted.PostedBy), deal.Price))
             {
                 best = wanted;
+                bestOffer = deal;
                 bestFee = fee;
                 bestMargin = margin;
             }
         }
 
-        if (best is null)
+        if (best is null || bestOffer is null)
         {
             return;
         }
 
-        decimal budget = best.OfferedPrice.Amount - (ask.Amount * best.Quantity);
+        decimal budget = bestOffer.Price.Amount - (ask.Amount * best.Quantity);
         if (!HaulAffordable(bestFee, budget))
         {
             return;
@@ -146,8 +175,11 @@ public static partial class DecisionEngine
             return; // it must be able to pay the carrier
         }
 
-        if (Market.FillViaHaul(context, producer, best, best.OfferedPrice, FillSource.FromStock(producer), offer, reservation, out HaulContract? haul) == Signing.Signed
-            && haul is not null)
+        HaulContract? haul = null;
+        Signing signed = Market.SignAgreed(
+            best, bestOffer, () => Market.FillViaHaul(context, producer, best, bestOffer.Price, FillSource.FromStock(producer), offer, reservation, out haul));
+        NoteHaggled(context, best, signed);
+        if (signed == Signing.Signed && haul is not null)
         {
             producer.Prices(new PriceKey(PriceKind.Haul, profile.Good), UsualHaulMarkup).Posted(haul.Id);
         }

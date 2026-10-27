@@ -1,0 +1,53 @@
+@* A haggle as a thread (design §11.3, "Negotiations"): each offer with who made it, when, and for a reply how long it took
+   and how it read; where it stands; and, when it is the player's turn, accept, counter or decline. *@
+<div class="thread" data-testid="thread" data-your-turn="@(Model.YourTurn ? "true" : "false")">
+    <div class="thread-head">
+        <span class="small strong">@Model.Title</span>
+        <span class="xsmall tone-@Model.StatusTone thread-status">@Model.Status</span>
+    </div>
+    <ol class="bids">
+        @foreach (BidLine bid in Model.Bids)
+        {
+            <li class="bid @(bid.Yours ? "yours" : null)">
+                <span class="when mono xsmall muted">@bid.When</span>
+                <span class="bid-body">
+                    <span class="small"><span class="strong">@bid.Who</span> · <span class="mono">@bid.Offer</span></span>
+                    @if (bid.Note is not null)
+                    {
+                        <span class="xsmall muted bid-tell">@bid.Note</span>
+                    }
+                </span>
+            </li>
+        }
+    </ol>
+    @if (Model.YourTurn)
+    {
+        <div class="thread-actions">
+            <div class="action">
+                <button type="button" class="button primary" data-thread-command="Accept" @onclick="() => OnAccept.InvokeAsync(Model.Id)">@Model.AcceptLabel</button>
+                <span class="xsmall muted">@Model.AcceptNote</span>
+            </div>
+            <div class="action">
+                <button type="button" class="button" data-thread-command="Decline" @onclick="() => OnDecline.InvokeAsync(Model.Id)">@Model.DeclineLabel</button>
+            </div>
+            @if (Model.Counter is { } counter)
+            {
+                <OfferForm Model="counter" Key="@($"{Model.Id}:{Model.Bids.Count}")" OnSubmit="offer => OnCounter.InvokeAsync((Model.Id, offer))" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ThreadViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<NegotiationId> OnAccept { get; set; }
+
+    [Parameter]
+    public EventCallback<NegotiationId> OnDecline { get; set; }
+
+    [Parameter]
+    public EventCallback<(NegotiationId Thread, Offer Offer)> OnCounter { get; set; }
+}

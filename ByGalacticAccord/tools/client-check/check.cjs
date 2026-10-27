@@ -202,6 +202,9 @@ async function main() {
         check(terms.length >= 6 && terms.some(t => t.includes('grace')) && terms.some(t => t.includes('break fee')),
             `the terms read as sentences: ${termsTitle}, ${terms.length} of them`);
         check(await page.locator('.contract-panel [data-testid="why"] .why-line').count() >= 1, 'the contract reads back what led to it');
+        const counterForm = page.locator('.contract-panel [data-testid="counter"] [data-testid="offer-form"]');
+        check(await counterForm.count() === 1 && await counterForm.locator('[data-field="price"]').count() === 1,
+            'an open post offers a counter-offer: price, due date, terms and late fee');
         await page.screenshot({ path: path.join(shots, '02-contract.png'), fullPage: true });
 
         // 3. Accepting it signs it through the engine, while paused, and the ledger lists it.
@@ -242,6 +245,24 @@ async function main() {
             await page.locator('.contract-panel').screenshot({ path: path.join(shots, '07-broker.png') });
         }
 
+        // 3c. Still paused, post a wanted Sale of its own (design §3.6): food at Verdant, below what anyone there asks.
+        await page.click('[data-testid="new-post"]');
+        await page.waitForSelector('[data-testid="composer"]');
+        const verdant = await page.locator('[data-testid="composer"] [data-field="place"] option', { hasText: 'Verdant' }).getAttribute('value');
+        await page.selectOption('[data-testid="composer"] [data-field="place"]', verdant);
+        await page.fill('[data-testid="composer"] [data-field="price"]', '300');
+        await page.locator('[data-testid="composer"] [data-field="price"]').dispatchEvent('change');
+        await page.waitForTimeout(200);
+        const composerTerms = await page.locator('[data-testid="composer-terms"] .term').count();
+        const reference = (await page.textContent('[data-testid="composer-reference"]')).trim();
+        check(composerTerms >= 6 && reference.includes('base value'), `the composer reads its terms (${composerTerms}) and the figures to price by ("${reference.slice(0, 70)}…")`);
+        await page.locator('[data-testid="composer"]').screenshot({ path: path.join(shots, '09-composer.png') });
+        await page.click('[data-testid="post"]');
+        const posted = (await page.textContent('.contract-panel .outcome')).trim();
+        check(posted.startsWith('Posted:') && posted.includes('Verdant'), `posting it puts it up ("${posted}")`);
+        check(await page.locator('[data-testid="posts"] .post-line').filter({ hasText: 'wanted at Verdant' }).count() === 1, 'your posts list it');
+        check(await page.locator('[data-testid="composer"]').count() === 0, 'the composer closes once it is posted');
+
         // 4. The clock runs at 16×; ships move.
         const before = await tick(page);
         const shipBefore = await page.getAttribute('.ship.yours circle', 'cx');
@@ -254,6 +275,47 @@ async function main() {
         const shipAfter = await page.getAttribute('.ship.yours circle', 'cx');
         check(shipBefore !== shipAfter, `your ship moved (x ${shipBefore} → ${shipAfter})`);
         await page.screenshot({ path: path.join(shots, '03-running.png'), fullPage: true });
+
+        // 4b. Answers to the post came while the clock ran: open it, read the threads, and counter the first that waits for you.
+        await page.click('button[data-speed="Paused"]');
+        await page.waitForTimeout(200);
+        await page.locator('[data-testid="posts"] .post-line .link-text').first().click();
+        const threads = page.locator('.contract-panel [data-testid="thread"]');
+        const threadCount = await threads.count();
+        check(threadCount >= 1, `the post drew answers as threads (${threadCount})`);
+        const waiting = page.locator('.contract-panel [data-testid="thread"][data-your-turn="true"]');
+        let countered = false;
+        if (await waiting.count() > 0) {
+            // The producer's answer, if it gave one (design §13: haggle Verdant's food down); else the first that waits.
+            const farm = waiting.filter({ hasText: 'Verdant Agricombine' });
+            const answer = await farm.count() > 0 ? farm.first() : waiting.first();
+            const tell = (await answer.locator('.bid-tell').last().textContent()).trim();
+            check(/^Replied in \d/.test(tell), `a reply says how long it took and how it read ("${tell}")`);
+            await page.locator('.contract-panel').screenshot({ path: path.join(shots, '10-answers.png') });
+            const theirs = Number((await answer.locator('[data-field="price"]').inputValue()));
+            await answer.locator('[data-field="price"]').fill(String(Math.round((theirs + 300) / 2)));
+            await answer.locator('button[type="submit"]').click();
+            const sent = (await page.textContent('.contract-panel .outcome')).trim();
+            countered = sent.startsWith('Counter-offer sent');
+            check(countered, `a counter-offer goes to the answer ("${sent}")`);
+        }
+
+        // 4c. Its reply comes within twelve game hours of the counter, and only while the clock runs.
+        if (countered) {
+            const counteredAt = await tick(page);
+            await page.waitForTimeout(300);
+            check(await tick(page) === counteredAt, 'paused, no time passes and no reply comes');
+            await page.click('button[data-speed="X4"]');
+            await runUntil(page, counteredAt + 13, 30000);
+            await page.click('button[data-speed="Paused"]');
+            await page.waitForTimeout(200);
+            const bids = await page.locator('.contract-panel [data-testid="thread"] .bid').count();
+            const status = (await page.locator('.contract-panel [data-testid="thread"] .thread-status').first().textContent()).trim();
+            check(bids >= 4 || /Agreed|walked away|no longer/.test(status), `the reply came: "${status}" (${bids} offers in the thread)`);
+            await page.locator('.contract-panel').screenshot({ path: path.join(shots, '11-haggle.png') });
+            const haggleLog = (await page.locator('.log-line .link-text').allTextContents()).filter(t => /counter|accepts|walks away|no longer/.test(t));
+            check(haggleLog.length >= 2, `the log words the haggle (${haggleLog.length} lines; "${(haggleLog[0] ?? '').trim().slice(0, 80)}…")`);
+        }
 
         // 5. Paused, the ledger shows what you own and where: the goods bought for the sale, aboard.
         await page.click('button[data-speed="Paused"]');
@@ -270,6 +332,7 @@ async function main() {
         results.push(decisions.length > 0
             ? `info  ${decisions.length} decision(s) stopped the clock; the first: "${decisions[0].slice(0, 90)}…"`
             : 'info  no decision landed on the player in this run');
+
 
         // 7. The light theme uses the same layout from the other token set.
         await page.selectOption('.theme select', 'light');

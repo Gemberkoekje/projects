@@ -20,7 +20,8 @@ public enum ContractType
 }
 
 /// <summary>
-/// Contract lifecycle states (design §16.2). <see cref="Active"/> is signed and being performed. It ends
+/// Contract lifecycle states (design §16.2). <see cref="Open"/> is posted and collecting responses: it stays open to
+/// everyone while any of them haggles over it (design §3.6). <see cref="Active"/> is signed and being performed. It ends
 /// <see cref="Fulfilled"/> (on time or late), <see cref="PartlyFulfilled"/> (a short delivery paid pro rata),
 /// <see cref="Breached"/> (the performer failed by the terms: the goods lost, a short delivery treated as a failure,
 /// goods rejected on inspection), <see cref="Cancelled"/> (at will, or for default), or <see cref="Defaulted"/> (the
@@ -29,7 +30,6 @@ public enum ContractType
 public enum ContractStatus
 {
     Open,
-    Negotiating,
     Active,
     Fulfilled,
     PartlyFulfilled,
@@ -96,6 +96,7 @@ public abstract class Contract
         Reservation = reservation;
         TaxRate = taxRate;
         DeadlineTick = deadlineTick;
+        PostedDeadline = deadlineTick;
         Jurisdiction = jurisdiction;
         Region = region;
         Terms = terms;
@@ -118,9 +119,13 @@ public abstract class Contract
     /// <summary>The price as posted: the goods' price for a Sale, the fee for a Haul, the daily rate per unit for Storage.</summary>
     public Credits OfferedPrice { get; }
 
+    /// <summary>The deadline as posted; a haggle may have agreed another (<see cref="DeadlineTick"/>).</summary>
+    public long PostedDeadline { get; private set; }
+
     /// <summary>
-    /// The poster's hidden walk-away price (design §3.6). Never shown and never used to set terms; AI-to-AI
-    /// deals settle against it in closed form.
+    /// The poster's hidden walk-away price (design §3.6). Never shown and never used to set terms; AI-to-AI deals settle
+    /// against it in closed form, and an AI poster haggling with the player concedes toward it. The player's own posts
+    /// carry their price here: the player has no hidden number for the engine to use.
     /// </summary>
     public Credits Reservation { get; }
 
@@ -139,8 +144,8 @@ public abstract class Contract
 
     public ContractStatus Status { get; private set; }
 
-    /// <summary>What happens when it goes wrong (design §3.4).</summary>
-    public ContractTerms Terms { get; }
+    /// <summary>What happens when it goes wrong (design §3.4): as posted, or as agreed in a haggle.</summary>
+    public ContractTerms Terms { get; private set; }
 
     public Credits EscrowHeld { get; private set; }
 
@@ -181,7 +186,7 @@ public abstract class Contract
     /// </summary>
     public long? LastEntry { get; internal set; }
 
-    public bool IsOpen => Status is ContractStatus.Open or ContractStatus.Negotiating;
+    public bool IsOpen => Status == ContractStatus.Open;
 
     /// <summary>Open, or signed and not yet settled.</summary>
     public bool IsLive => IsOpen || Status == ContractStatus.Active;
@@ -203,6 +208,13 @@ public abstract class Contract
 
     /// <summary>Signed, not performed, and past its grace: the payer may cancel for default (design §3.4).</summary>
     public bool InDefault(long now) => Status == ContractStatus.Active && now >= GraceEndsTick;
+
+    /// <summary>A haggle agreed other terms than posted: the deadline and the terms rebuilt from the agreed offer. Before signing.</summary>
+    internal void Amend(long deadline, ContractTerms terms)
+    {
+        DeadlineTick = deadline;
+        Terms = terms;
+    }
 
     internal void Sign(ActorId counterparty, Credits price, long tick)
     {
@@ -305,6 +317,9 @@ public sealed class SaleContract : Contract
     /// <summary>Goods actually handed over (less than the quantity after a loss on the way).</summary>
     public decimal Delivered { get; private set; }
 
+    /// <summary>For a lot posted from storage, its quality when posted: it is warranted as seen (<see cref="Simulation.Terms"/>).</summary>
+    public decimal? SeenQuality { get; private set; }
+
     public Credits UnitPrice => Credits.Of(Quantity <= 0m ? 0m : Price.Amount / Quantity);
 
     internal void SetReceipt(Holding receipt) => Receipt = receipt;
@@ -312,6 +327,8 @@ public sealed class SaleContract : Contract
     internal void SetReserved(Holding? reserved) => Reserved = reserved;
 
     internal void NoteDelivered(decimal quantity) => Delivered = quantity;
+
+    internal void SetSeen(decimal? quality) => SeenQuality = quality;
 }
 
 /// <summary>
@@ -348,6 +365,7 @@ public sealed class HaulContract : Contract
         Destination = destination;
         PickupFrom = pickupFrom;
         Serves = serves;
+        DeclaredUnitValue = Credits.Of(Goods.Info(good).BaseValue);
     }
 
     public override ContractType Type => ContractType.Haul;
@@ -365,6 +383,9 @@ public sealed class HaulContract : Contract
 
     /// <summary>The Sale whose handover this haul's arrival is, if the shipper sold the goods delivered.</summary>
     public ContractId? Serves { get; }
+
+    /// <summary>What the goods are declared at, a unit, for the carrier's liability: the Sale it serves' unit price, else their base value.</summary>
+    public Credits DeclaredUnitValue { get; private set; }
 
     public ActorId Shipper => PostedBy;
 
@@ -393,6 +414,8 @@ public sealed class HaulContract : Contract
     public override IReadOnlyList<LocationId> Places => _places ??= new[] { Origin, Destination };
 
     internal void Assign(ShipId ship) => AssignedShip = ship;
+
+    internal void Declare(Credits unitValue) => DeclaredUnitValue = unitValue;
 
     internal void MarkPickedUp(decimal quality)
     {

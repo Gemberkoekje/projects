@@ -46,6 +46,11 @@ public sealed class SimulationContext
     private readonly Dictionary<GoodType, decimal> _consumed = new();
     private readonly Dictionary<GoodType, decimal> _lost = new();
 
+    // Haggles (design §3.6), by id, and the open ones per contract in the order they began.
+    private readonly Dictionary<NegotiationId, Negotiation> _negotiations = new();
+    private readonly Dictionary<ContractId, List<Negotiation>> _negotiationsOn = new();
+    private readonly Dictionary<NegotiationId, long> _negotiationLastEntry = new();
+
     private readonly List<JournalEntry> _playerAlerts = new();
     private readonly List<PlayerDecision> _playerDecisions = new();
 
@@ -66,6 +71,7 @@ public sealed class SimulationContext
     private long _nextShipId = 1;
     private long _nextLocationId = 1;
     private long _nextContractId = 1;
+    private long _nextNegotiationId = 1;
 
     public SimulationContext(long seed, SimulationConfig? config = null)
     {
@@ -125,6 +131,14 @@ public sealed class SimulationContext
     /// <summary>Goods handed over under Sales, all goods together.</summary>
     public decimal GoodsSold { get; private set; }
 
+    /// <summary>Contracts AI actors signed between them in closed form, at a price other than posted (design §3.6).</summary>
+    public long DealsHaggled { get; private set; }
+
+    /// <summary>Haggles with the player that began, and that ended in a deal.</summary>
+    public long NegotiationsOpened { get; private set; }
+
+    public long NegotiationsAgreed { get; private set; }
+
     public IReadOnlyDictionary<ActorId, ActorState> Actors => _actors;
 
     public IReadOnlyDictionary<ShipId, Ship> Ships => _ships;
@@ -143,6 +157,8 @@ public sealed class SimulationContext
     public LocationId NextLocationId() => new(_nextLocationId++);
 
     public ContractId NextContractId() => new(_nextContractId++);
+
+    public NegotiationId NextNegotiationId() => new(_nextNegotiationId++);
 
     // ---- registration ----
     public void Add(ActorState actor)
@@ -195,6 +211,64 @@ public sealed class SimulationContext
             _openCandidates.Insert(index + 1, contract);
         }
     }
+
+    /// <summary>Register a haggle; it is open on its contract until it ends.</summary>
+    public void Add(Negotiation negotiation)
+    {
+        _negotiations[negotiation.Id] = negotiation;
+        if (!_negotiationsOn.TryGetValue(negotiation.Contract, out List<Negotiation>? list))
+        {
+            list = new List<Negotiation>();
+            _negotiationsOn[negotiation.Contract] = list;
+        }
+
+        list.Add(negotiation);
+        NegotiationsOpened++;
+    }
+
+    public IReadOnlyDictionary<NegotiationId, Negotiation> Negotiations => _negotiations;
+
+    public Negotiation Negotiation(NegotiationId id) => _negotiations[id];
+
+    /// <summary>The open haggles over a contract, in the order they began.</summary>
+    public IReadOnlyList<Negotiation> NegotiationsOn(ContractId contract)
+    {
+        if (!_negotiationsOn.TryGetValue(contract, out List<Negotiation>? list))
+        {
+            return Array.Empty<Negotiation>();
+        }
+
+        list.RemoveAll(n => !n.IsOpen);
+        return list.ToArray();
+    }
+
+    /// <summary>The open haggle between a contract's poster and <paramref name="responder"/>, if there is one.</summary>
+    public Negotiation? NegotiationWith(ContractId contract, ActorId responder) =>
+        NegotiationsOn(contract).FirstOrDefault(n => n.Responder == responder);
+
+    /// <summary>
+    /// A contract left the open board: every haggle still open over it ends. One with the actor that signed it ends agreed,
+    /// whatever it last offered (it signed after all); the rest end because the post closed.
+    /// </summary>
+    internal void CloseNegotiationsOn(Contract contract)
+    {
+        foreach (Negotiation negotiation in NegotiationsOn(contract.Id))
+        {
+            if (contract.CounterpartyId == negotiation.Responder)
+            {
+                negotiation.Agree(negotiation.Responder, CurrentTick);
+                NegotiationsAgreed++;
+            }
+            else
+            {
+                negotiation.Close(NegotiationEnd.PostClosed, null, CurrentTick);
+            }
+        }
+    }
+
+    internal void NoteAgreed() => NegotiationsAgreed++;
+
+    public void NoteHaggled() => DealsHaggled++;
 
     public ActorState Actor(ActorId id) => _actors[id];
 
@@ -263,6 +337,21 @@ public sealed class SimulationContext
     public JournalEntry Record(JournalEntry entry)
     {
         Contract? about = entry is IContractEntry e && _contracts.TryGetValue(e.Contract, out Contract? c) ? c : null;
+        if (entry is INegotiationEntry haggle)
+        {
+            // A haggle's entries chain among themselves, from the post. Only an accepted offer becomes the contract's latest:
+            // the signing follows from it. A haggle that came to nothing leaves the contract's own record as it was.
+            long? previous = _negotiationLastEntry.TryGetValue(haggle.Negotiation, out long seq) ? seq : about?.LastEntry;
+            JournalEntry kept = Journal.Record(entry.Cause is null && previous is { } p ? entry with { Cause = p } : entry);
+            _negotiationLastEntry[haggle.Negotiation] = kept.Seq;
+            if (entry is OfferAcceptedEntry && about is not null)
+            {
+                about.LastEntry = kept.Seq;
+            }
+
+            return kept;
+        }
+
         if (entry.Cause is null && about?.LastEntry is { } last)
         {
             entry = entry with { Cause = last };

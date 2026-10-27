@@ -1,5 +1,6 @@
 @* The contract as a document (design §11.3): beside the map, never a modal, so the world stays in view. Its terms read
-   as sentences; below them, what led to it, newest first (design §11.2: "why did this happen?"). *@
+   as sentences; below them, what led to it, newest first (design §11.2: "why did this happen?"); then its haggles with the
+   player as threads, and a counter-offer the player can make on someone else's post (design §3.6). *@
 <section class="panel contract-panel" data-testid="contract">
     @if (Model is null)
     {
@@ -114,6 +115,17 @@
             </span>
         </div>
 
+        @if (Model.Threads.Count > 0)
+        {
+            <div class="block" data-testid="threads">
+                <h3 class="block-title">@Model.ThreadsTitle</h3>
+                @foreach (ThreadViewModel thread in Model.Threads)
+                {
+                    <ThreadView @key="thread.Id" Model="thread" OnAccept="OnAcceptOffer" OnDecline="OnDecline" OnCounter="args => OnCounter.InvokeAsync((args.Thread, args.Offer))" />
+                }
+            </div>
+        }
+
         @if (Outcome is not null)
         {
             <p class="outcome small" role="status">@Outcome</p>
@@ -135,6 +147,20 @@
                 <div class="action" data-command="@action.Command">
                     <button type="button" class="button" disabled="@(!action.Enabled)" @onclick="() => OnCommand.InvokeAsync(action.Command)">@action.Label</button>
                     <span class="xsmall muted">@action.Note</span>
+                </div>
+            }
+            @if (Model.Counter is { } counter)
+            {
+                <div class="block counter" data-testid="counter">
+                    <h3 class="block-title">@Model.CounterTitle</h3>
+                    <OfferForm Model="counter" Key="@($"post:{Model.Id}")" OnSubmit="offer => OnCounter.InvokeAsync((null, offer))" />
+                </div>
+            }
+            else if (Model.CounterBlocked is not null && Model.IsOpen)
+            {
+                <div class="block counter">
+                    <h3 class="block-title">@Model.CounterTitle</h3>
+                    <p class="xsmall muted">@Model.CounterBlocked</p>
                 </div>
             }
         }
@@ -163,6 +189,15 @@
 
     [Parameter]
     public EventCallback<ContractId> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback<NegotiationId> OnAcceptOffer { get; set; }
+
+    [Parameter]
+    public EventCallback<NegotiationId> OnDecline { get; set; }
+
+    [Parameter]
+    public EventCallback<(NegotiationId? Thread, Offer Offer)> OnCounter { get; set; }
 
     protected override bool ShouldRender()
     {

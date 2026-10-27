@@ -35,6 +35,9 @@ public static class JournalText
         StorageClosedEntry e => Templates.Fill(
             Key("StorageClosed", context, e.Renter), Facts(context, e.Contract, ("renter", Name(context, e.Renter)), ("rent", Format.Money(e.RentPaid)))),
         IncidentEntry e => Incident(context, e),
+        OfferMadeEntry e => Haggle("OfferMade", context, e.Contract, e.By, e.To, e.Offer, e.ReplyHours, e.Tell),
+        OfferAcceptedEntry e => Haggle("OfferAccepted", context, e.Contract, e.By, e.To, e.Offer, e.ReplyHours, e.Tell),
+        NegotiationEndedEntry e => Haggle("NegotiationEnded." + e.End, context, e.Contract, e.By, e.To, null, e.ReplyHours, Tell.None),
         FaucetAdjustedEntry e => Templates.Fill("FaucetAdjusted", ("drift", Format.Percent(e.Drift)), ("multiplier", e.Multiplier.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))),
         _ => throw new ArgumentOutOfRangeException(nameof(entry), entry, "No template for this journal entry."),
     };
@@ -53,7 +56,32 @@ public static class JournalText
         StorageOpenedEntry e => e.Renter,
         StorageClosedEntry e => e.Renter,
         IncidentEntry e => e.Hauler,
+        OfferMadeEntry e => e.By,
+        OfferAcceptedEntry e => e.By,
+        NegotiationEndedEntry e => e.By,
         _ => null,
+    };
+
+    /// <summary>The other party an entry names, where it names one besides its subject: the side an offer or a haggle's end is addressed to.</summary>
+    public static ActorId? Addressee(JournalEntry entry) => entry switch
+    {
+        OfferMadeEntry e => e.To,
+        OfferAcceptedEntry e => e.To,
+        NegotiationEndedEntry e => e.To,
+        _ => null,
+    };
+
+    /// <summary>What a contract is, in a line: the goods, and where.</summary>
+    public static string Head(SimulationContext context, Contract contract) => contract switch
+    {
+        HaulContract haul => Templates.Fill(
+            "Contract.Head.Haul", ("quantity", Format.Quantity(haul.Quantity)), ("good", Templates.Good(haul.Good)),
+            ("origin", context.Location(haul.Origin).Name), ("destination", context.Location(haul.Destination).Name)),
+        SaleContract sale => Templates.Fill(
+            "Contract.Head.Sale." + sale.Side, ("quantity", Format.Quantity(sale.Quantity)), ("good", Templates.Good(sale.Good)),
+            ("place", context.Location(sale.Place).Name)),
+        StorageContract storage => Templates.Fill("Contract.Head.Storage", ("place", context.Location(storage.Location).Name)),
+        _ => contract.Id.ToString(),
     };
 
     /// <summary>The contract an entry concerns, if any.</summary>
@@ -139,6 +167,32 @@ public static class JournalText
                 ("by", Name(context, e.By)),
                 ("other", other is { } o ? Name(context, o) : string.Empty),
                 ("paid", Format.Money(e.Paid))));
+    }
+
+    // An offer, an acceptance or a haggle's end, from the side of whoever reads it; an answer says how long it took and how it read.
+    private static string Haggle(string key, SimulationContext context, ContractId id, ActorId by, ActorId to, Offer? offer, long? hours, Tell tell)
+    {
+        var facts = new List<(string Name, string Value)>
+        {
+            ("by", Name(context, by)),
+            ("to", Name(context, to)),
+            ("head", Head(context, context.Contract(id))),
+        };
+        if (offer is not null)
+        {
+            facts.Add(("offer", Templates.Offer(offer)));
+        }
+
+        string sentence = Templates.Fill(Key(key, context, by, to), facts.ToArray());
+        if (hours is not { } h)
+        {
+            return sentence;
+        }
+
+        string reply = tell == Tell.None
+            ? Templates.Fill("Reply.Plain", ("hours", Format.Duration(h)))
+            : Templates.Fill("Reply.Tell", ("hours", Format.Duration(h)), ("tell", Templates.Tell(tell)));
+        return sentence + " " + reply;
     }
 
     private static string Incident(SimulationContext context, IncidentEntry e)

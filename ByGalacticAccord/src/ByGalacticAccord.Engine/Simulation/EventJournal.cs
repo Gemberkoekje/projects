@@ -117,6 +117,30 @@ public sealed record ContractExpiredEntry(long Tick, ContractId Contract)
 public sealed record ContractWithdrawnEntry(long Tick, ContractId Contract)
     : JournalEntry(Tick), IContractEntry;
 
+/// <summary>An entry about a haggle (design §3.6). Its default cause is the haggle's previous entry, not the contract's.</summary>
+public interface INegotiationEntry : IContractEntry
+{
+    NegotiationId Negotiation { get; }
+}
+
+/// <summary>
+/// A side made a counter-offer in a haggle: its terms and its round. A reply carries how long it took and how it read
+/// (<see cref="ReplyHours"/>, <see cref="Tell"/>): both are tells (design §3.6). The player's own offers carry neither.
+/// </summary>
+public sealed record OfferMadeEntry(
+    long Tick, ContractId Contract, NegotiationId Negotiation, ActorId By, ActorId To, Offer Offer, int Round, long? ReplyHours = null, Tell Tell = Tell.None)
+    : JournalEntry(Tick), INegotiationEntry;
+
+/// <summary>A side accepted the other's offer in a haggle; the contract is signed on it next.</summary>
+public sealed record OfferAcceptedEntry(
+    long Tick, ContractId Contract, NegotiationId Negotiation, ActorId By, ActorId To, Offer Offer, long? ReplyHours = null, Tell Tell = Tell.None)
+    : JournalEntry(Tick), INegotiationEntry;
+
+/// <summary>A haggle ended without a deal: a side walked away, the rounds ran out, a side declined, or the performer no longer could.</summary>
+public sealed record NegotiationEndedEntry(
+    long Tick, ContractId Contract, NegotiationId Negotiation, ActorId By, ActorId To, NegotiationEnd End, long? ReplyHours = null)
+    : JournalEntry(Tick), INegotiationEntry;
+
 /// <summary>Someone rented storage from a station operator.</summary>
 public sealed record StorageOpenedEntry(long Tick, ContractId Contract, ActorId Renter)
     : JournalEntry(Tick), IContractEntry;

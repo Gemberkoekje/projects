@@ -37,7 +37,13 @@ else if (_session is not null)
             </div>
             <div class="column-side">
                 <BoardPanel Model="_board" Selected="_selected" OnSelect="Select" />
-                <ContractPanel Model="_contract" Outcome="@_outcome" NoneText="@Templates.Get("Contract.None")" OnAccept="Accept" OnCommand="Command" OnSelect="Select" />
+                <PostsPanel Model="_posts" OnSelect="Select" OnNewPost="NewPost" />
+                @if (_composer is not null && _draft is not null)
+                {
+                    <ComposerPanel Model="_composer" Draft="_draft" Outcome="@_composerOutcome" OnChange="ChangeDraft" OnPost="Post" OnClose="CloseComposer" />
+                }
+                <ContractPanel Model="_contract" Outcome="@_outcome" NoneText="@Templates.Get("Contract.None")" OnAccept="Accept" OnCommand="Command" OnSelect="Select"
+                               OnAcceptOffer="AcceptOffer" OnDecline="Decline" OnCounter="args => Counter(args.Thread, args.Offer)" />
                 <LedgerPanel Model="_ledger" OnSelect="Select" OnAction="Act" />
             </div>
         </div>
@@ -67,6 +73,12 @@ else if (_session is not null)
     private MapViewModel _map = default!;
     private LogViewModel _log = default!;
     private LedgerViewModel _ledger = default!;
+    private PostsViewModel _posts = default!;
+
+    // The post composer, while it is open: the player's draft and the view built from it.
+    private ComposerDraft? _draft;
+    private ComposerViewModel? _composer;
+    private string? _composerOutcome;
     private ContractViewModel? _contract;
     private IReadOnlyList<DecisionPrompt> _decisions = Array.Empty<DecisionPrompt>();
     private IReadOnlyList<MapShip> _ships = Array.Empty<MapShip>();
@@ -146,6 +158,8 @@ else if (_session is not null)
             _map = MapView.Build(_session, _selected);
             _log = LogView.Build(_session);
             _ledger = LedgerView.Build(_session);
+            _posts = PostsView.Build(_session);
+            _composer = _draft is { } draft ? ComposerView.Build(_session, draft) : null;
             _decisions = DecisionView.Build(_session);
             _contract = _selected is { } id ? ContractView.Build(_session, id) : null;
             _builtRevision = _session.Revision;
@@ -155,9 +169,15 @@ else if (_session is not null)
         _ships = MapView.Ships(_session, _session.Clock);
     }
 
+    // Once the clock runs, the last command's outcome is history: the panels say where things stand now.
     private void SetSpeed(ClockSpeed speed)
     {
         _session?.SetSpeed(speed);
+        if (speed != ClockSpeed.Paused)
+        {
+            _outcome = null;
+        }
+
         Rebuild();
     }
 
@@ -205,8 +225,105 @@ else if (_session is not null)
             ContractCommand.CancelAtWill => ContractView.CommandText(_session, contract, command, _session.CancelAtWill(id)),
             ContractCommand.CancelForDefault => ContractView.CommandText(_session, contract, command, _session.CancelForDefault(id)),
             ContractCommand.HaulAgain => ContractView.CommandText(_session, contract, command, _session.HaulAgain(id)),
+            ContractCommand.Withdraw => ContractView.CommandText(_session, contract, command, _session.Withdraw(id)),
             _ => null,
         };
+        Rebuild();
+    }
+
+    // ---- posting and haggling (design §3.6) ----
+
+    private void NewPost()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _draft = ComposerView.Default(_session, PostKind.Wanted);
+        _composerOutcome = null;
+        _builtRevision = -1;
+        Rebuild();
+    }
+
+    // A new kind starts from that kind's first draft; any other change keeps the rest of what the player typed.
+    private void ChangeDraft(ComposerDraft draft)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _draft = _draft is { } before && before.Kind != draft.Kind ? ComposerView.Default(_session, draft.Kind) : draft;
+        _composerOutcome = null;
+        _builtRevision = -1;
+        Rebuild();
+    }
+
+    private void Post()
+    {
+        if (_session is null || _draft is not { } draft)
+        {
+            return;
+        }
+
+        PostDraft post = ComposerView.ToPost(_session, draft);
+        PostOutcome outcome = _session.Post(post);
+        if (outcome.Post is { } posted)
+        {
+            _draft = null;
+            _selected = posted.Id;
+            _outcome = ComposerView.OutcomeText(_session, outcome, post);
+        }
+        else
+        {
+            _composerOutcome = ComposerView.OutcomeText(_session, outcome, post);
+        }
+
+        Rebuild();
+    }
+
+    private void CloseComposer()
+    {
+        _draft = null;
+        _composerOutcome = null;
+        _builtRevision = -1;
+        Rebuild();
+    }
+
+    private void Counter(NegotiationId? thread, Offer offer)
+    {
+        if (_session is null || _selected is not { } id)
+        {
+            return;
+        }
+
+        DealBlock block = _session.Counter(id, offer, thread);
+        _outcome = NegotiationView.CounterText(
+            _session, _session.Context.Contract(id), block, thread is { } t ? _session.Context.Negotiation(t) : _session.Context.NegotiationWith(id, _session.Player.Id));
+        Rebuild();
+    }
+
+    private void AcceptOffer(NegotiationId id)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        Negotiation thread = _session.Context.Negotiation(id);
+        _outcome = NegotiationView.AcceptText(_session, thread, _session.AcceptOffer(id));
+        Rebuild();
+    }
+
+    private void Decline(NegotiationId id)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _outcome = NegotiationView.DeclineText(_session, _session.Context.Negotiation(id), _session.Decline(id));
         Rebuild();
     }
 

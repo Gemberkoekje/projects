@@ -21,8 +21,8 @@ public static partial class DecisionEngine
         Fill,
     }
 
-    /// <summary>One thing a free ship could do, scored: take a haul, or fill a delivered Sale from a source.</summary>
-    private readonly record struct TraderOption(OptionKind Kind, Contract Contract, Credits Price, FillSource? Source, decimal Utility);
+    /// <summary>One thing a free ship could do, scored: take a haul, or fill a delivered Sale from a source, on an offer.</summary>
+    private readonly record struct TraderOption(OptionKind Kind, Contract Contract, Offer Offer, FillSource? Source, decimal Utility);
 
     /// <summary>
     /// Trader heartbeat (design §4.1): each free ship takes the best of the hauls and delivered Sales it can see; goods
@@ -116,6 +116,35 @@ public static partial class DecisionEngine
 
     private static TraderOption? ScoreHaul(SimulationContext context, ActorState trader, Ship ship, HaulContract haul)
     {
+        Offer posted = Offer.Of(haul);
+        if (Price(context, trader, haul, posted, p => HaulTake(context, trader, ship, haul, posted with { Price = Credits.Of(p) })) is not { } deal
+            || !Market.CanFund(haul, context.Actor(haul.Shipper), deal.Offer.Price))
+        {
+            return null;
+        }
+
+        return new TraderOption(OptionKind.Haul, haul, deal.Offer, null, deal.Utility);
+    }
+
+    private static TraderOption? ScoreFill(SimulationContext context, ActorState trader, Ship ship, SaleContract wanted, FillSource source)
+    {
+        Offer posted = Offer.Of(wanted);
+        if (Price(context, trader, wanted, posted, p => FillTake(context, trader, ship, wanted, source, posted with { Price = Credits.Of(p) })) is not { } deal
+            || !Market.CanFund(wanted, context.Actor(wanted.PostedBy), deal.Offer.Price))
+        {
+            return null;
+        }
+
+        return new TraderOption(OptionKind.Fill, wanted, deal.Offer, source, deal.Utility);
+    }
+
+    /// <summary>
+    /// What a ship taking a haul on <paramref name="offer"/> is worth to the trader (design §4.3), and the least fee its costs
+    /// allow; null if it can't do it on those terms: no room, no route, arriving past the grace, or goods the shipper would
+    /// refuse. The terms are the offer's, rebuilt from its price as an agreed counter would be.
+    /// </summary>
+    private static Take? HaulTake(SimulationContext context, ActorState trader, Ship ship, HaulContract haul, Offer offer)
+    {
         if (haul.Quantity > ship.FreeSpace || context.FindPath(haul.Origin, haul.Destination) is not { } laden
             || context.FindPath(ship.Location, haul.Origin) is not { } repo)
         {
@@ -126,18 +155,11 @@ public static partial class DecisionEngine
         long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.SpeedMultiplier);
         long ladenTicks = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.SpeedMultiplier));
         decimal running = cls.RunningCostPerTick.Amount * (repoTicks + ladenTicks);
-        Credits pilotMin = Credits.Of(PriceModel.PilotMinimumFee(cls, laden.DistanceTicks, laden.MaxDanger, trader.Personality).Amount
-                                      + (cls.RunningCostPerTick.Amount * repoTicks));
-
-        // Taken as posted (S5 brings haggling), if the fee meets the carrier's floor.
-        Credits fee = haul.OfferedPrice;
-        if (fee < pilotMin || !Market.CanFund(haul, context.Actor(haul.Shipper), fee))
-        {
-            return null;
-        }
-
+        decimal pilotMin = PriceModel.PilotMinimumFee(cls, laden.DistanceTicks, laden.MaxDanger, trader.Personality).Amount
+                           + (cls.RunningCostPerTick.Amount * repoTicks);
+        ContractTerms terms = TermsOn(haul, offer);
         long arrival = context.CurrentTick + repoTicks + ladenTicks;
-        if (arrival > haul.GraceEndsTick)
+        if (arrival > offer.Deadline + terms.GraceHours)
         {
             return null; // it would be in default before it got there
         }
@@ -145,7 +167,7 @@ public static partial class DecisionEngine
         // What the hold does to perishables on the laden leg, as the warranty judges it: against their quality when loaded
         // (fresh from stock, or as they will stand in storage when the ship comes).
         decimal quality = 1m;
-        if (haul.Warranty is { } warranty)
+        if (terms.Warranty is { } warranty)
         {
             decimal loaded = haul.PickupFrom.Kind == HoldingKind.Storage
                 ? context.StorageOf(haul.Shipper, haul.Origin)?.Peek(haul.Good, context.CurrentTick)?.Decayed(repoTicks, 0m).Quality ?? 1m
@@ -158,15 +180,20 @@ public static partial class DecisionEngine
             }
         }
 
-        long late = Math.Max(0, arrival - haul.DeadlineTick);
-        decimal lateFee = haul.LatePenalty?.PenaltyFor(late).Amount ?? 0m;
-        decimal refund = fee.Amount * (haul.Warranty?.RefundFraction(quality) ?? 0m);
-        decimal profit = fee.Amount - running - context.Config.DockingFee.Amount - lateFee - refund - TermsRisk(context, trader, haul, ship, laden);
-        decimal utility = Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks);
-        return utility < Threshold(trader) ? null : new TraderOption(OptionKind.Haul, haul, fee, null, utility);
+        decimal fee = offer.Price.Amount;
+        long late = Math.Max(0, arrival - offer.Deadline);
+        decimal lateFee = terms.LateFee?.PenaltyFor(late).Amount ?? 0m;
+        decimal refund = fee * (terms.Warranty?.RefundFraction(quality) ?? 0m);
+        decimal profit = fee - running - context.Config.DockingFee.Amount - lateFee - refund - TermsRisk(context, trader, haul.UsesEscrow, terms, fee, ship, laden);
+        return new Take(Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks), pilotMin, arrival);
     }
 
-    private static TraderOption? ScoreFill(SimulationContext context, ActorState trader, Ship ship, SaleContract wanted, FillSource source)
+    /// <summary>
+    /// What a ship filling a delivered wanted Sale from a source on <paramref name="offer"/> is worth to the trader, and the
+    /// least price its costs allow: the goods, a carrier's margin on the trip, and what the terms will certainly take back.
+    /// Null if it can't on those terms: no room, no route, too dear for its purse, past the grace, or goods the buyer would reject.
+    /// </summary>
+    private static Take? FillTake(SimulationContext context, ActorState trader, Ship ship, SaleContract wanted, FillSource source, Offer offer)
     {
         LocationId pickup = source.Kind == FillSourceKind.Aboard ? ship.Location : source.At;
         if (context.FindPath(pickup, wanted.Place) is not { } laden || context.FindPath(ship.Location, pickup) is not { } repo)
@@ -181,10 +208,11 @@ public static partial class DecisionEngine
         }
 
         ShipClassInfo cls = ship.Class;
+        ContractTerms terms = TermsOn(wanted, offer);
         long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.SpeedMultiplier);
         long ladenTicks = pickup == wanted.Place ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.SpeedMultiplier));
         long arrival = context.CurrentTick + repoTicks + ladenTicks;
-        if (arrival > wanted.GraceEndsTick)
+        if (arrival > offer.Deadline + terms.GraceHours)
         {
             return null; // it would be in default before the goods arrived
         }
@@ -198,32 +226,26 @@ public static partial class DecisionEngine
 
         // The goods' quality now, decayed over the laden leg in this hold.
         decimal quality = new Cargo(wanted.Good, 1m, SourceQuality(context, trader, ship, wanted.Good, source)).Decayed(ladenTicks, cls.Preservation).Quality;
+        if (terms.Warranty?.Rejectable(quality) == true)
+        {
+            return null; // the buyer would reject them
+        }
+
+        decimal price = offer.Price.Amount;
         decimal running = cls.RunningCostPerTick.Amount * (repoTicks + ladenTicks);
         decimal docking = ladenTicks > 0 ? context.Config.DockingFee.Amount : 0m;
         decimal transportMin = ladenTicks > 0
             ? PriceModel.PilotMinimumFee(cls, laden.DistanceTicks, laden.MaxDanger, trader.Personality).Amount + (cls.RunningCostPerTick.Amount * repoTicks)
             : cls.RunningCostPerTick.Amount * repoTicks;
-        if (wanted.Warranty?.Rejectable(quality) == true)
-        {
-            return null; // the buyer would reject them
-        }
-
-        decimal refundShare = wanted.Warranty?.RefundFraction(quality) ?? 0m;
-        long late = Math.Max(0, arrival - wanted.DeadlineTick);
-        decimal lateFee = wanted.LatePenalty?.PenaltyFor(late).Amount ?? 0m;
+        decimal refundShare = terms.Warranty?.RefundFraction(quality) ?? 0m;
+        long late = Math.Max(0, arrival - offer.Deadline);
+        decimal lateFee = terms.LateFee?.PenaltyFor(late).Amount ?? 0m;
 
         // The trader's floor covers the goods, a carrier's margin on the trip, and what the terms will certainly take back.
         decimal floor = ((purchase + purchaseTax + transportMin + docking + lateFee) / Math.Max(0.01m, 1m - refundShare)) + 1m;
-        Credits price = wanted.OfferedPrice;
-        if (price.Amount < floor || !Market.CanFund(wanted, context.Actor(wanted.PostedBy), price))
-        {
-            return null; // taken as posted (S5 brings haggling), if the price meets the trader's floor
-        }
-
-        decimal risk = ladenTicks > 0 ? TermsRisk(context, trader, wanted, ship, laden) : 0m;
-        decimal profit = price.Amount - purchase - purchaseTax - running - docking - lateFee - (price.Amount * refundShare) - risk;
-        decimal utility = Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks);
-        return utility < Threshold(trader) ? null : new TraderOption(OptionKind.Fill, wanted, price, source, utility);
+        decimal risk = ladenTicks > 0 ? TermsRisk(context, trader, wanted.UsesEscrow, terms, price, ship, laden) : 0m;
+        decimal profit = price - purchase - purchaseTax - running - docking - lateFee - (price * refundShare) - risk;
+        return new Take(Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks), floor, arrival);
     }
 
     private static decimal SourceQuality(SimulationContext context, ActorState trader, Ship ship, GoodType good, FillSource source) => source.Kind switch
@@ -239,15 +261,14 @@ public static partial class DecisionEngine
     /// fails a strict contract outright and otherwise costs its share and any cargo liability; a delay can push it past
     /// a short grace. Weighted by the incident odds and by how much the trader minds risk.
     /// </summary>
-    private static decimal TermsRisk(SimulationContext context, ActorState trader, Contract contract, Ship ship, RoutePlan laden)
+    private static decimal TermsRisk(SimulationContext context, ActorState trader, bool usesEscrow, ContractTerms terms, decimal price, Ship ship, RoutePlan laden)
     {
         decimal odds = Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Class.IncidentChanceModifier, 0m, 1m);
-        decimal price = contract.OfferedPrice.Amount;
-        decimal bond = contract.UsesEscrow ? Math.Min(contract.PerformanceBond.Amount, Math.Max(0m, trader.Credits.Amount)) : 0m;
-        decimal partial = contract.Terms.Partial == PartialDelivery.Failure
+        decimal bond = usesEscrow ? Math.Min(terms.Bond.Amount, Math.Max(0m, trader.Credits.Amount)) : 0m;
+        decimal partial = terms.Partial == PartialDelivery.Failure
             ? price + bond
-            : (price * 0.2m) + ((contract.Terms.Liability?.Cap.Amount ?? 0m) * 0.2m);
-        decimal delay = contract.Terms.GraceHours < 18 ? bond * 0.5m : 0m;
+            : (price * 0.2m) + ((terms.Liability?.Cap.Amount ?? 0m) * 0.2m);
+        decimal delay = terms.GraceHours < 18 ? bond * 0.5m : 0m;
         decimal expected = odds * ((IncidentResolver.Share(TransitIncidentKind.PartialLoss) * partial)
                                    + (IncidentResolver.Share(TransitIncidentKind.TotalLoss) * (price + bond))
                                    + (IncidentResolver.Share(TransitIncidentKind.MinorDelay) * delay));
@@ -267,14 +288,11 @@ public static partial class DecisionEngine
 
     private static void Commit(SimulationContext context, ActorState trader, Ship ship, TraderOption option)
     {
-        if (option.Kind == OptionKind.Haul)
-        {
-            Market.TakeHaul(context, trader, (HaulContract)option.Contract, ship, option.Price);
-        }
-        else
-        {
-            Market.FillWithShip(context, trader, (SaleContract)option.Contract, option.Price, ship, option.Source!);
-        }
+        Offer offer = option.Offer;
+        Signing signed = option.Kind == OptionKind.Haul
+            ? Market.SignAgreed(option.Contract, offer, () => Market.TakeHaul(context, trader, (HaulContract)option.Contract, ship, offer.Price))
+            : Market.SignAgreed(option.Contract, offer, () => Market.FillWithShip(context, trader, (SaleContract)option.Contract, offer.Price, ship, option.Source!));
+        NoteHaggled(context, option.Contract, signed);
     }
 
     /// <summary>A free ship with the trader's own goods aboard and nothing better to do puts them into storage where it is.</summary>
@@ -302,7 +320,7 @@ public static partial class DecisionEngine
 
         SaleContract? best = null;
         FillSource? bestSource = null;
-        Credits bestPrice = Credits.Zero;
+        Offer? bestOffer = null;
         Credits bestFee = Credits.Zero;
         decimal bestBudget = 0m;
         decimal bestUtility = Threshold(trader);
@@ -339,35 +357,43 @@ public static partial class DecisionEngine
 
                 decimal refundShare = wanted.Warranty?.RefundFraction(quality) ?? 0m;
                 decimal costs = purchase + purchaseTax + storage + (fee.Amount * 1.4m);
+
+                // Its floor covers the goods, storage and a carrier's fee with room to raise it, before what the warranty takes back.
                 decimal floor = (costs / Math.Max(0.01m, 1m - refundShare)) + 5m;
-                Credits price = wanted.OfferedPrice;
-                if (price.Amount < floor || !Market.CanFund(wanted, context.Actor(wanted.PostedBy), price))
+                Offer posted = Offer.Of(wanted);
+                Take? TakeAt(decimal p) =>
+                    new Take(Utility(trader, p - purchase - purchaseTax - storage - (p * refundShare) - (fee.Amount * 1.4m), laden.MaxDanger, laden.DistanceTicks / 2), floor, 0);
+                if (Price(context, trader, wanted, posted, TakeAt) is not { } deal || !Market.CanFund(wanted, context.Actor(wanted.PostedBy), deal.Offer.Price))
                 {
                     continue;
                 }
 
-                decimal budget = price.Amount - purchase - purchaseTax - storage - (price.Amount * refundShare);
-                decimal utility = Utility(trader, budget - (fee.Amount * 1.4m), laden.MaxDanger, laden.DistanceTicks / 2);
+                decimal price = deal.Offer.Price.Amount;
+                decimal budget = price - purchase - purchaseTax - storage - (price * refundShare);
                 bool affordable = trader.Credits.Amount >= purchase + purchaseTax + (fee.Amount * 3m) + 300m;
-                if (affordable && HaulAffordable(fee, budget) && utility > bestUtility)
+                if (affordable && HaulAffordable(fee, budget) && deal.Utility > bestUtility)
                 {
                     best = wanted;
                     bestSource = source;
-                    bestPrice = price;
+                    bestOffer = deal.Offer;
                     bestFee = fee;
                     bestBudget = budget;
-                    bestUtility = utility;
+                    bestUtility = deal.Utility;
                 }
             }
         }
 
-        if (best is null || bestSource is null)
+        if (best is null || bestSource is null || bestOffer is null)
         {
             return;
         }
 
         (Credits offer, Credits reservation) = HaulTerms(context, trader, best.Good, bestFee, bestBudget);
-        if (Market.FillViaHaul(context, trader, best, bestPrice, bestSource, offer, reservation, out HaulContract? haul) == Signing.Signed && haul is not null)
+        HaulContract? haul = null;
+        Signing signed = Market.SignAgreed(
+            best, bestOffer, () => Market.FillViaHaul(context, trader, best, bestOffer.Price, bestSource, offer, reservation, out haul));
+        NoteHaggled(context, best, signed);
+        if (signed == Signing.Signed && haul is not null)
         {
             trader.Prices(new PriceKey(PriceKind.Haul, best.Good), UsualHaulMarkup).Posted(haul.Id);
         }

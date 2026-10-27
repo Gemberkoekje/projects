@@ -61,6 +61,18 @@ public sealed class TemplateTests
         Assert.All(Enum.GetValues<SaleSide>(), s => Assert.False(string.IsNullOrEmpty(Templates.Side(s))));
         Assert.All(Enum.GetValues<ShipType>(), s => Assert.False(string.IsNullOrEmpty(Templates.ShipClass(s))));
         Assert.All(Enum.GetValues<TermPackage>(), p => Assert.False(string.IsNullOrEmpty(Templates.Package(p))));
+        Assert.All(new[] { Tell.Readily, Tell.Reluctant, Tell.AtLimit }, t => Assert.False(string.IsNullOrEmpty(Templates.Tell(t))));
+        Assert.All(Offer.LateFeeScales, s => Assert.False(string.IsNullOrEmpty(Templates.LateFee(s))));
+        Assert.All(Enum.GetValues<PostKind>(), k => Assert.False(string.IsNullOrEmpty(Templates.Get("Composer.Kind." + k))));
+    }
+
+    [Fact]
+    public void An_offer_reads_its_price_due_date_package_and_any_late_fee_but_the_usual()
+    {
+        Assert.Equal("₵460, due Day 4 · 06:00, standard", Templates.Offer(new Offer(Credits.Of(460m), GameTime.At(4, 6), TermPackage.Standard)));
+        Assert.Equal(
+            "₵460, due Day 4 · 06:00, lenient, double the late fee",
+            Templates.Offer(new Offer(Credits.Of(460m), GameTime.At(4, 6), TermPackage.Lenient, 2m)));
     }
 
     [Fact]
@@ -116,6 +128,30 @@ public sealed class TemplateTests
             foreach (TransitIncidentKind kind in Enum.GetValues<TransitIncidentKind>())
             {
                 entries.Add(new IncidentEntry(9, id, performer, new TransitIncident(kind, 6, 0.14m, 0.2m, Credits.Of(75m), "unused")));
+            }
+
+            // A haggle over it, each way: offers with and without a reply's tell, an acceptance, and every way one ends.
+            var haggle = new NegotiationId(id.Value);
+            ActorId responder = contract.CounterpartyId!.Value;
+            foreach ((ActorId by, ActorId to) in new[] { (contract.PostedBy, responder), (responder, contract.PostedBy) })
+            {
+                foreach (decimal scale in Offer.LateFeeScales)
+                {
+                    entries.Add(new OfferMadeEntry(4, id, haggle, by, to, new Offer(Credits.Of(130m), 300, TermPackage.Lenient, scale), 1));
+                }
+
+                foreach (Tell tell in new[] { Tell.Readily, Tell.Reluctant, Tell.AtLimit })
+                {
+                    entries.Add(new OfferMadeEntry(4, id, haggle, by, to, new Offer(Credits.Of(130m), 300, TermPackage.Strict), 2, 5, tell));
+                }
+
+                entries.Add(new OfferAcceptedEntry(5, id, haggle, by, to, new Offer(Credits.Of(125m), 300, TermPackage.Standard), 3, Tell.Reluctant));
+                entries.Add(new OfferAcceptedEntry(5, id, haggle, by, to, new Offer(Credits.Of(125m), 300, TermPackage.Standard)));
+                foreach (NegotiationEnd end in Enum.GetValues<NegotiationEnd>())
+                {
+                    entries.Add(new NegotiationEndedEntry(6, id, haggle, by, to, end, 4));
+                    entries.Add(new NegotiationEndedEntry(6, id, haggle, by, to, end));
+                }
             }
         }
 

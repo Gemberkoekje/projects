@@ -14,6 +14,9 @@ public enum Signing
     NotOpen,
     PayerCannotFund,
     SupplierDeclined,
+
+    /// <summary>An offer was accepted, but the side that would perform it could no longer do what it offered.</summary>
+    CannotPerform,
 }
 
 /// <summary>Where a seller gets the goods to fill a Sale.</summary>
@@ -51,29 +54,37 @@ public sealed record FillSource(FillSourceKind Kind, LocationId At, ActorId? Pro
 /// chooses. Signing locks escrow and bonds in Accord space (design §16.4) and, for a contract someone waits on,
 /// schedules the end of its grace; goods move only at handovers, pickups and arrivals, through <see cref="Settlement"/>.
 /// </summary>
-public static class Market
+public static partial class Market
 {
     // ---- posting ----
 
     /// <summary>
     /// Post a Sale. For a wanted Sale <paramref name="holding"/> is where the buyer will take the goods at the place;
     /// for one for sale it is where the seller's goods are, and they are set aside. The terms are the poster's package
-    /// (its habit, unless <paramref name="package"/> says otherwise); a lot waiting in storage is warranted as seen. AI
-    /// producers at the place answer a wanted Sale at once (design §4.3: an actor re-evaluates when a contract it can
-    /// see appears).
+    /// (its habit, unless <paramref name="package"/> says otherwise), with its late fee scaled by
+    /// <paramref name="lateFeeScale"/>; a lot waiting in storage is warranted as seen. AI producers at the place answer
+    /// an AI's wanted Sale at once (design §4.3: an actor re-evaluates when a contract it can see appears); the player's
+    /// posts reach the actors that can see them over game time, and their answers follow (<see cref="DecisionEngine.NoticePost"/>).
     /// </summary>
     public static SaleContract PostSale(
         SimulationContext context, ActorState poster, SaleSide side, GoodType good, decimal quantity, LocationId place,
-        Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package = null)
+        Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package = null, decimal lateFeeScale = 1m) =>
+        PostSale(context, poster, side, good, quantity, place, price, reservation, deadline, holding, package, lateFeeScale, atTheDoor: false);
+
+    // A wanted Sale posted at the door (atTheDoor) is an order at a producer's asking price there, answered at once whoever posts it.
+    private static SaleContract PostSale(
+        SimulationContext context, ActorState poster, SaleSide side, GoodType good, decimal quantity, LocationId place,
+        Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package, decimal lateFeeScale, bool atTheDoor)
     {
         Location location = context.Location(place);
         decimal? stored = side == SaleSide.ForSale && holding.Kind == HoldingKind.Storage
             ? context.StorageOf(poster.Id, holding.Location)?.Peek(good, context.CurrentTick)?.Quality
             : null;
-        ContractTerms terms = Terms.ForSale(package ?? Terms.PackageFor(poster), good, price, stored, deadline - context.CurrentTick);
+        ContractTerms terms = Terms.ForSale(package ?? Terms.PackageFor(poster), good, price, stored, deadline - context.CurrentTick, lateFeeScale);
         var sale = new SaleContract(
             context.NextContractId(), poster.Id, context.CurrentTick, side, good, quantity, place, price, reservation,
             Terms.TaxRate(context, location.Reach), deadline, location.Reach, location.Region, terms);
+        sale.SetSeen(stored);
         if (side == SaleSide.Wanted)
         {
             sale.SetReceipt(holding);
@@ -87,13 +98,23 @@ public static class Market
         context.Add(sale);
         context.Schedule(new ContractExpiryCheck(deadline, sale.Id));
         context.Record(new ContractPostedEntry(context.CurrentTick, sale.Id, poster.Id));
-        if (side == SaleSide.Wanted)
+        if (side == SaleSide.Wanted && (atTheDoor || !HagglesInGameTime(poster)))
         {
             DecisionEngine.AnswerAtOnce(context, sale);
+        }
+        else if (HagglesInGameTime(poster))
+        {
+            DecisionEngine.NoticePost(context, sale);
         }
 
         return sale;
     }
+
+    /// <summary>
+    /// Whether an actor's offers go back and forth over game time (design §3.6). AI actors haggle among themselves in
+    /// closed form, at once; the player, a human, reads replies as they come and answers them.
+    /// </summary>
+    public static bool HagglesInGameTime(ActorState actor) => actor.IsPlayer;
 
     /// <summary>
     /// Post a Haul of the shipper's goods from where they wait to <paramref name="destination"/>, on the shipper's package
@@ -103,7 +124,7 @@ public static class Market
     /// </summary>
     public static HaulContract PostHaul(
         SimulationContext context, ActorState shipper, GoodType good, decimal quantity, Holding pickupFrom, LocationId destination,
-        Credits fee, Credits reservation, long deadline, ContractId? serves, TermPackage? package = null, long? cause = null)
+        Credits fee, Credits reservation, long deadline, ContractId? serves, TermPackage? package = null, long? cause = null, decimal lateFeeScale = 1m)
     {
         Location to = context.Location(destination);
         SaleContract? served = serves is { } id ? context.Contract(id) as SaleContract : null;
@@ -111,7 +132,8 @@ public static class Market
         var haul = new HaulContract(
             context.NextContractId(), shipper.Id, context.CurrentTick, good, quantity, pickupFrom.Location, destination, pickupFrom, serves,
             fee, reservation, Terms.TaxRate(context, to.Reach), deadline, to.Reach, to.Region,
-            Terms.ForHaul(package ?? Terms.PackageFor(shipper), good, fee, quantity, unitValue));
+            Terms.ForHaul(package ?? Terms.PackageFor(shipper), good, fee, quantity, unitValue, lateFeeScale));
+        haul.Declare(unitValue);
         if (serves is null)
         {
             Reserve(context, shipper, pickupFrom, good, quantity);
@@ -120,6 +142,11 @@ public static class Market
         context.Add(haul);
         context.Schedule(new ContractExpiryCheck(deadline, haul.Id));
         context.Record(new ContractPostedEntry(context.CurrentTick, haul.Id, shipper.Id) { Cause = cause ?? served?.LastEntry });
+        if (HagglesInGameTime(shipper))
+        {
+            DecisionEngine.NoticePost(context, haul);
+        }
+
         return haul;
     }
 
@@ -133,6 +160,7 @@ public static class Market
 
         ReleaseOpen(context, contract);
         contract.MarkWithdrawn();
+        context.CloseNegotiationsOn(contract);
         context.Record(new ContractWithdrawnEntry(context.CurrentTick, contract.Id) { Cause = cause });
     }
 
@@ -146,6 +174,7 @@ public static class Market
 
         ReleaseOpen(context, contract);
         contract.MarkExpired();
+        context.CloseNegotiationsOn(contract);
         context.NoteFailure(FailureKind.Expired);
         context.Record(new ContractExpiredEntry(context.CurrentTick, contract.Id));
     }
@@ -274,14 +303,14 @@ public static class Market
     }
 
     /// <summary>
-    /// Buy goods at a producer's location by posting a wanted Sale there at <paramref name="price"/>, which an AI
-    /// producer there answers at once. Null, with the post withdrawn, if none did (or, outside the Accord, if the
-    /// buyer then couldn't pay).
+    /// Buy goods at a producer's location by posting a wanted Sale there at <paramref name="price"/>: an order at the door,
+    /// which an AI producer there answers at once, for the player as for anyone. Null, with the post withdrawn, if none did
+    /// (or, outside the Accord, if the buyer then couldn't pay).
     /// </summary>
     public static SaleContract? BuyAtSource(
         SimulationContext context, ActorState buyer, GoodType good, decimal quantity, LocationId source, Credits price, Holding receipt, long deadline)
     {
-        SaleContract post = PostSale(context, buyer, SaleSide.Wanted, good, quantity, source, price, price, deadline, receipt);
+        SaleContract post = PostSale(context, buyer, SaleSide.Wanted, good, quantity, source, price, price, deadline, receipt, null, 1m, atTheDoor: true);
         if (post.Status is ContractStatus.Active or ContractStatus.Fulfilled)
         {
             return post;
@@ -555,6 +584,7 @@ public static class Market
             contract.SetLockedBond(bond);
         }
 
+        context.CloseNegotiationsOn(contract);
         context.Record(new ContractSignedEntry(context.CurrentTick, contract.Id, taker.Id, price));
         return Signing.Signed;
     }

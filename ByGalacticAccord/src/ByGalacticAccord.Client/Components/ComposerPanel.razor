@@ -1,0 +1,146 @@
+@* The post composer (design §3.6, §11.3): what to post, where, and its first offer; the figures the player has to price it
+   by; its terms as sentences; what posting it commits; and why it can't be posted yet, if it can't. The draft lives in the
+   shell, so a running clock never loses what the player typed. *@
+<section class="panel composer-panel" data-testid="composer">
+    <div class="panel-head">
+        <h2 class="caps">@Model.Title</h2>
+        <button type="button" class="button small" @onclick="OnClose">@Model.CloseLabel</button>
+    </div>
+    <p class="muted small">@Model.Hint</p>
+    <div class="form-grid">
+        <label class="field">
+            <span class="xsmall muted">@Model.KindLabel</span>
+            <select value="@Draft.Kind" @onchange="e => Change(Draft with { Kind = Enum.Parse<PostKind>((string)e.Value!) })" data-field="kind">
+                @foreach (Choice<PostKind> choice in Model.Kinds)
+                {
+                    <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                }
+            </select>
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.GoodLabel</span>
+            <select value="@Draft.Good" @onchange="e => Change(Draft with { Good = Enum.Parse<GoodType>((string)e.Value!) })" data-field="good">
+                @foreach (Choice<GoodType> choice in Model.Goods)
+                {
+                    <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                }
+            </select>
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.QuantityLabel</span>
+            <input class="mono" type="number" min="1" step="1" inputmode="numeric" value="@Number(Draft.Quantity)"
+                   @onchange="e => Change(Draft with { Quantity = Parse(e.Value) })" data-field="quantity" />
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.PlaceLabel</span>
+            <select value="@Draft.Place.Value" @onchange="e => Change(Draft with { Place = new LocationId(long.Parse((string)e.Value!, System.Globalization.CultureInfo.InvariantCulture)) })" data-field="place">
+                @foreach (Choice<LocationId> choice in Model.Places)
+                {
+                    <option @key="choice.Value" value="@choice.Value.Value">@choice.Label</option>
+                }
+            </select>
+        </label>
+        @if (Model.HasDestination)
+        {
+            <label class="field">
+                <span class="xsmall muted">@Model.DestinationLabel</span>
+                <select value="@Draft.Destination.Value" @onchange="e => Change(Draft with { Destination = new LocationId(long.Parse((string)e.Value!, System.Globalization.CultureInfo.InvariantCulture)) })" data-field="destination">
+                    @foreach (Choice<LocationId> choice in Model.Places)
+                    {
+                        <option @key="choice.Value" value="@choice.Value.Value">@choice.Label</option>
+                    }
+                </select>
+            </label>
+        }
+        <label class="field">
+            <span class="xsmall muted">@Model.PriceLabel</span>
+            <input class="mono" type="number" min="0.01" step="0.01" inputmode="decimal" value="@Number(Draft.Price)"
+                   @onchange="e => Change(Draft with { Price = Parse(e.Value) })" data-field="price" />
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.DurationLabel</span>
+            <select value="@Draft.Hours" @onchange="e => Change(Draft with { Hours = long.Parse((string)e.Value!, System.Globalization.CultureInfo.InvariantCulture) })" data-field="duration">
+                @foreach (Choice<long> choice in Model.Durations)
+                {
+                    <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                }
+            </select>
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.PackageLabel</span>
+            <select value="@Draft.Package" @onchange="e => Change(Draft with { Package = Enum.Parse<TermPackage>((string)e.Value!) })" data-field="package">
+                @foreach (Choice<TermPackage> choice in Model.Packages)
+                {
+                    <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                }
+            </select>
+        </label>
+        <label class="field">
+            <span class="xsmall muted">@Model.LateFeeLabel</span>
+            <select value="@Number(Draft.LateFeeScale)" @onchange="e => Change(Draft with { LateFeeScale = Parse(e.Value) })" data-field="late-fee">
+                @foreach (Choice<decimal> choice in Model.LateFees)
+                {
+                    <option @key="choice.Value" value="@Number(choice.Value)">@choice.Label</option>
+                }
+            </select>
+        </label>
+    </div>
+
+    <p class="small">@Model.KindNote</p>
+    <p class="small muted" data-testid="composer-reference">@Model.Reference</p>
+    @if (Model.Stored is not null)
+    {
+        <p class="small muted">@Model.Stored</p>
+    }
+
+    @if (Model.Terms.Count > 0)
+    {
+        <div class="block" data-testid="composer-terms">
+            <h3 class="block-title">@Model.TermsTitle</h3>
+            @foreach (string term in Model.Terms)
+            {
+                <p class="term small">@term</p>
+            }
+        </div>
+    }
+
+    <p class="small muted">@Model.Commitment</p>
+    @if (Outcome is not null)
+    {
+        <p class="outcome small" role="status">@Outcome</p>
+    }
+    @if (Model.Blocked is not null)
+    {
+        <p class="blocked small tone-Warn" data-testid="composer-blocked">@Model.Blocked</p>
+    }
+    <div class="actions">
+        <button type="button" class="button primary" disabled="@(!Model.CanPost)" data-testid="post" @onclick="OnPost">@Model.PostLabel</button>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public ComposerViewModel Model { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public ComposerDraft Draft { get; set; } = default!;
+
+    [Parameter]
+    public string? Outcome { get; set; }
+
+    [Parameter]
+    public EventCallback<ComposerDraft> OnChange { get; set; }
+
+    [Parameter]
+    public EventCallback OnPost { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private Task Change(ComposerDraft draft) => OnChange.InvokeAsync(draft);
+
+    private static string Number(decimal value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static decimal Parse(object? value) =>
+        decimal.TryParse(value as string, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal d) ? d : 0m;
+}

@@ -1316,12 +1316,441 @@
     <value>{role} {party} · in default since {when}</value>
   </data>
   <data name="Ledger.Post" xml:space="preserve">
-    <value>your post · waiting for a carrier · until {when}</value>
+    <value>your post · open until {when}</value>
   </data>
   <data name="SpeedNote.Decision" xml:space="preserve">
     <value>waiting for your decision</value>
   </data>
   <data name="Party.Taker" xml:space="preserve">
     <value>whoever takes it</value>
+  </data>
+  <data name="OfferMade" xml:space="preserve">
+    <value>{by} counters {to} on {head}: {offer}.</value>
+  </data>
+  <data name="OfferMade.You" xml:space="preserve">
+    <value>You counter {to} on {head}: {offer}.</value>
+  </data>
+  <data name="OfferMade.ToYou" xml:space="preserve">
+    <value>{by} counters on {head}: {offer}.</value>
+  </data>
+  <data name="OfferAccepted" xml:space="preserve">
+    <value>{by} accepts {to}'s offer on {head}: {offer}.</value>
+  </data>
+  <data name="OfferAccepted.You" xml:space="preserve">
+    <value>You accept {to}'s offer on {head}: {offer}.</value>
+  </data>
+  <data name="OfferAccepted.ToYou" xml:space="preserve">
+    <value>{by} accepts your offer on {head}: {offer}.</value>
+  </data>
+  <data name="NegotiationEnded.WalkedAway" xml:space="preserve">
+    <value>{by} walks away from {to}'s offer on {head}.</value>
+  </data>
+  <data name="NegotiationEnded.WalkedAway.You" xml:space="preserve">
+    <value>You walk away from {to}'s offer on {head}.</value>
+  </data>
+  <data name="NegotiationEnded.WalkedAway.ToYou" xml:space="preserve">
+    <value>{by} walks away from your offer on {head}.</value>
+  </data>
+  <data name="NegotiationEnded.RoundsRanOut" xml:space="preserve">
+    <value>{by} walks away from {head} after six rounds with {to}.</value>
+  </data>
+  <data name="NegotiationEnded.RoundsRanOut.You" xml:space="preserve">
+    <value>You walk away from {head} after six rounds with {to}.</value>
+  </data>
+  <data name="NegotiationEnded.RoundsRanOut.ToYou" xml:space="preserve">
+    <value>{by} walks away from {head} after six rounds with you.</value>
+  </data>
+  <data name="NegotiationEnded.Declined" xml:space="preserve">
+    <value>{by} declines {to}'s offer on {head}.</value>
+  </data>
+  <data name="NegotiationEnded.Declined.You" xml:space="preserve">
+    <value>You decline {to}'s offer on {head}.</value>
+  </data>
+  <data name="NegotiationEnded.Declined.ToYou" xml:space="preserve">
+    <value>{by} declines your offer on {head}.</value>
+  </data>
+  <data name="NegotiationEnded.PostClosed" xml:space="preserve">
+    <value>{head} closed while {by} and {to} haggled.</value>
+  </data>
+  <data name="NegotiationEnded.PostClosed.You" xml:space="preserve">
+    <value>{head} closed while you haggled with {to}.</value>
+  </data>
+  <data name="NegotiationEnded.PostClosed.ToYou" xml:space="preserve">
+    <value>{head} closed while you haggled with {by}.</value>
+  </data>
+  <data name="NegotiationEnded.CannotPerform" xml:space="preserve">
+    <value>{by} could no longer do what it offered on {head}, so nothing was signed.</value>
+  </data>
+  <data name="NegotiationEnded.CannotPerform.You" xml:space="preserve">
+    <value>You could no longer do what you offered on {head}, so nothing was signed.</value>
+  </data>
+  <data name="NegotiationEnded.CannotPerform.ToYou" xml:space="preserve">
+    <value>{by} could no longer do what it offered on {head}, so nothing was signed.</value>
+  </data>
+  <data name="Reply.Tell" xml:space="preserve">
+    <value>Replied in {hours}; {tell}.</value>
+  </data>
+  <data name="Reply.Plain" xml:space="preserve">
+    <value>Replied in {hours}.</value>
+  </data>
+  <data name="Tell.Readily" xml:space="preserve">
+    <value>readily</value>
+  </data>
+  <data name="Tell.Reluctant" xml:space="preserve">
+    <value>reluctant</value>
+  </data>
+  <data name="Tell.AtLimit" xml:space="preserve">
+    <value>appears to be at its limit</value>
+  </data>
+  <data name="Offer.Text" xml:space="preserve">
+    <value>{price}, due {deadline}, {package}</value>
+  </data>
+  <data name="Offer.Text.LateFee" xml:space="preserve">
+    <value>{price}, due {deadline}, {package}, {lateFee} late fee</value>
+  </data>
+  <data name="LateFee.Half" xml:space="preserve">
+    <value>half the</value>
+  </data>
+  <data name="LateFee.Standard" xml:space="preserve">
+    <value>the usual</value>
+  </data>
+  <data name="LateFee.Double" xml:space="preserve">
+    <value>double the</value>
+  </data>
+  <data name="Thread.Posted" xml:space="preserve">
+    <value>{party}'s post</value>
+  </data>
+  <data name="Thread.Posted.You" xml:space="preserve">
+    <value>Your post</value>
+  </data>
+  <data name="Thread.You" xml:space="preserve">
+    <value>You</value>
+  </data>
+  <data name="Thread.Title" xml:space="preserve">
+    <value>With {party} · round {round} of {max}</value>
+  </data>
+  <data name="Thread.Counter.Send" xml:space="preserve">
+    <value>Send counter-offer</value>
+  </data>
+  <data name="Thread.Counter.Note" xml:space="preserve">
+    <value>The reply comes in game time, while the clock runs: 1 to 12 hours. The post stays open to others meanwhile.</value>
+  </data>
+  <data name="Thread.Accept" xml:space="preserve">
+    <value>Accept · {price}</value>
+  </data>
+  <data name="Thread.Accept.Note.Posted" xml:space="preserve">
+    <value>Signs it on these terms, at the posted price.</value>
+  </data>
+  <data name="Thread.Accept.Note.More" xml:space="preserve">
+    <value>Signs it on these terms: {difference} more than posted.</value>
+  </data>
+  <data name="Thread.Accept.Note.Less" xml:space="preserve">
+    <value>Signs it on these terms: {difference} less than posted.</value>
+  </data>
+  <data name="Thread.Decline" xml:space="preserve">
+    <value>Decline</value>
+  </data>
+  <data name="Thread.YourTurn" xml:space="preserve">
+    <value>{party} waits for your answer: accept, counter or decline.</value>
+  </data>
+  <data name="Thread.YourTurn.Last" xml:space="preserve">
+    <value>Six rounds are up: accept {party}'s offer or decline it.</value>
+  </data>
+  <data name="Thread.Waiting" xml:space="preserve">
+    <value>Your offer is with {party}. Replies take {fastest} to {slowest} of game time: by {latest} at the latest.</value>
+  </data>
+  <data name="Thread.Agreed" xml:space="preserve">
+    <value>Agreed, and signed at {price}.</value>
+  </data>
+  <data name="Thread.Ended.WalkedAway" xml:space="preserve">
+    <value>{party} walked away.</value>
+  </data>
+  <data name="Thread.Ended.WalkedAway.You" xml:space="preserve">
+    <value>You walked away.</value>
+  </data>
+  <data name="Thread.Ended.RoundsRanOut" xml:space="preserve">
+    <value>Six rounds and no deal: {party} walked away.</value>
+  </data>
+  <data name="Thread.Ended.RoundsRanOut.You" xml:space="preserve">
+    <value>Six rounds and no deal: you walked away.</value>
+  </data>
+  <data name="Thread.Ended.Declined" xml:space="preserve">
+    <value>{party} declined.</value>
+  </data>
+  <data name="Thread.Ended.Declined.You" xml:space="preserve">
+    <value>You declined {party}'s offer.</value>
+  </data>
+  <data name="Thread.Ended.PostClosed" xml:space="preserve">
+    <value>The post closed while you haggled.</value>
+  </data>
+  <data name="Thread.Ended.PostClosed.You" xml:space="preserve">
+    <value>The post closed while you haggled.</value>
+  </data>
+  <data name="Thread.Ended.CannotPerform" xml:space="preserve">
+    <value>{party} could no longer do what it offered; nothing was signed.</value>
+  </data>
+  <data name="Thread.Ended.CannotPerform.You" xml:space="preserve">
+    <value>You could no longer do what you offered; nothing was signed.</value>
+  </data>
+  <data name="Form.Price" xml:space="preserve">
+    <value>Price</value>
+  </data>
+  <data name="Form.Deadline.Label" xml:space="preserve">
+    <value>Due</value>
+  </data>
+  <data name="Form.Deadline" xml:space="preserve">
+    <value>{date} ({when})</value>
+  </data>
+  <data name="Form.Deadline.Same" xml:space="preserve">
+    <value>{date} ({when}), as offered</value>
+  </data>
+  <data name="Form.Package" xml:space="preserve">
+    <value>Terms</value>
+  </data>
+  <data name="Form.LateFee.Label" xml:space="preserve">
+    <value>Late fee</value>
+  </data>
+  <data name="Form.LateFee" xml:space="preserve">
+    <value>{share} late fee</value>
+  </data>
+  <data name="Outcome.Countered" xml:space="preserve">
+    <value>Counter-offer sent to {party}. Its reply comes while the clock runs.</value>
+  </data>
+  <data name="Outcome.OfferAccepted" xml:space="preserve">
+    <value>Accepted {party}'s offer: signed at {price}.</value>
+  </data>
+  <data name="Outcome.CannotPerform" xml:space="preserve">
+    <value>{party} could no longer do what it offered, so nothing was signed.</value>
+  </data>
+  <data name="Outcome.CannotPerform.You" xml:space="preserve">
+    <value>You could no longer do what you offered, so nothing was signed.</value>
+  </data>
+  <data name="Outcome.Declined" xml:space="preserve">
+    <value>You declined {party}'s offer.</value>
+  </data>
+  <data name="Outcome.Withdrawn" xml:space="preserve">
+    <value>Withdrawn. Every haggle over it ends, and anything it set aside is free again.</value>
+  </data>
+  <data name="Outcome.Posted" xml:space="preserve">
+    <value>Posted: {head}, open until {deadline}. Answers come while the clock runs.</value>
+  </data>
+  <data name="Block.BadOffer" xml:space="preserve">
+    <value>An offer needs a price, and a deadline still to come.</value>
+  </data>
+  <data name="Block.NotYourTurn" xml:space="preserve">
+    <value>Your offer is with them: wait for the reply.</value>
+  </data>
+  <data name="Block.RoundsRanOut" xml:space="preserve">
+    <value>Six rounds are up: accept or decline.</value>
+  </data>
+  <data name="Action.Withdraw" xml:space="preserve">
+    <value>Withdraw</value>
+  </data>
+  <data name="Action.Withdraw.Note" xml:space="preserve">
+    <value>Take the post down: every haggle over it ends, and anything it set aside is free again.</value>
+  </data>
+  <data name="Contract.Answers" xml:space="preserve">
+    <value>Answers</value>
+  </data>
+  <data name="Contract.Haggle" xml:space="preserve">
+    <value>Haggle</value>
+  </data>
+  <data name="Contract.Counter" xml:space="preserve">
+    <value>Counter-offer</value>
+  </data>
+  <data name="Status.Open" xml:space="preserve">
+    <value>Open until {deadline}.</value>
+  </data>
+  <data name="Posts.Title" xml:space="preserve">
+    <value>Your posts and haggles</value>
+  </data>
+  <data name="Posts.New" xml:space="preserve">
+    <value>New post</value>
+  </data>
+  <data name="Posts.Yours" xml:space="preserve">
+    <value>Your posts</value>
+  </data>
+  <data name="Posts.Empty" xml:space="preserve">
+    <value>Nothing posted. Post what you want, goods for sale or a haul: whoever can see it answers over game time.</value>
+  </data>
+  <data name="Posts.Detail" xml:space="preserve">
+    <value>{kind} · {price} · until {deadline}</value>
+  </data>
+  <data name="Posts.Answers.None" xml:space="preserve">
+    <value>no answers yet</value>
+  </data>
+  <data name="Posts.Answers" xml:space="preserve">
+    <value>{count} answered</value>
+  </data>
+  <data name="Posts.Waiting" xml:space="preserve">
+    <value>{count} waiting for you</value>
+  </data>
+  <data name="Haggles.Title" xml:space="preserve">
+    <value>Your haggles</value>
+  </data>
+  <data name="Haggles.Detail" xml:space="preserve">
+    <value>with {party} · {offer}</value>
+  </data>
+  <data name="Haggles.YourTurn" xml:space="preserve">
+    <value>your turn</value>
+  </data>
+  <data name="Haggles.Empty" xml:space="preserve">
+    <value>No haggles. Counter a post on the board to start one.</value>
+  </data>
+  <data name="Composer.Title" xml:space="preserve">
+    <value>New post</value>
+  </data>
+  <data name="Composer.Hint" xml:space="preserve">
+    <value>Whoever can see it answers over game time: it takes it as posted, or counters.</value>
+  </data>
+  <data name="Composer.Kind.Wanted" xml:space="preserve">
+    <value>Sale · wanted</value>
+  </data>
+  <data name="Composer.Kind.Lot" xml:space="preserve">
+    <value>Sale · for sale</value>
+  </data>
+  <data name="Composer.Kind.Haul" xml:space="preserve">
+    <value>Haul</value>
+  </data>
+  <data name="Composer.Field.Kind" xml:space="preserve">
+    <value>Kind</value>
+  </data>
+  <data name="Composer.Field.Good" xml:space="preserve">
+    <value>Goods</value>
+  </data>
+  <data name="Composer.Field.Quantity" xml:space="preserve">
+    <value>Quantity</value>
+  </data>
+  <data name="Composer.Field.Place" xml:space="preserve">
+    <value>At</value>
+  </data>
+  <data name="Composer.Field.Origin" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Composer.Field.Destination" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Composer.Field.Price" xml:space="preserve">
+    <value>Price</value>
+  </data>
+  <data name="Composer.Field.Fee" xml:space="preserve">
+    <value>Fee</value>
+  </data>
+  <data name="Composer.Field.Duration" xml:space="preserve">
+    <value>Open for</value>
+  </data>
+  <data name="Composer.Duration" xml:space="preserve">
+    <value>{hours} (until {date})</value>
+  </data>
+  <data name="Composer.Note.Wanted" xml:space="preserve">
+    <value>Wanted at {place}: the seller hands {quantity} {good} over there, into your storage.</value>
+  </data>
+  <data name="Composer.Note.Lot" xml:space="preserve">
+    <value>For sale at {place}: {quantity} {good} from your storage there, collected by the buyer.</value>
+  </data>
+  <data name="Composer.Note.Haul" xml:space="preserve">
+    <value>A haul of your {quantity} {good} from your storage at {place}: the carrier delivers them.</value>
+  </data>
+  <data name="Composer.Reference.Base" xml:space="preserve">
+    <value>{good}'s base value: {unit} a unit.</value>
+  </data>
+  <data name="Composer.Reference.ForSale" xml:space="preserve">
+    <value>On your board, for sale at {low} to {high} a unit ({count}).</value>
+  </data>
+  <data name="Composer.Reference.ForSale.None" xml:space="preserve">
+    <value>None for sale on your board.</value>
+  </data>
+  <data name="Composer.Reference.Wanted" xml:space="preserve">
+    <value>Wanted at {low} to {high} a unit ({count}).</value>
+  </data>
+  <data name="Composer.Reference.Wanted.None" xml:space="preserve">
+    <value>None wanted on your board.</value>
+  </data>
+  <data name="Composer.Reference.Haul" xml:space="preserve">
+    <value>The usual fee for {origin} → {destination}: {fee}.</value>
+  </data>
+  <data name="Composer.Reference.NoTrip" xml:space="preserve">
+    <value>Pick a destination a route reaches.</value>
+  </data>
+  <data name="Composer.Stored" xml:space="preserve">
+    <value>You have {free} {good} free in storage at {place}.</value>
+  </data>
+  <data name="Composer.Stored.None" xml:space="preserve">
+    <value>You have no {good} free in storage at {place}.</value>
+  </data>
+  <data name="Composer.Commits.Wanted" xml:space="preserve">
+    <value>When someone takes it you lock {price} and the {tax} tax in escrow; the goods come into your storage at {place}.</value>
+  </data>
+  <data name="Composer.Commits.Wanted.Frontier" xml:space="preserve">
+    <value>Outside the Accord nothing is locked: you pay {price} when the goods are handed over at {place}.</value>
+  </data>
+  <data name="Composer.Commits.Lot" xml:space="preserve">
+    <value>Your {quantity} {good} at {place} stay set aside while it is up.</value>
+  </data>
+  <data name="Composer.Commits.Haul" xml:space="preserve">
+    <value>Your {quantity} {good} at {place} stay set aside while it is up; when a carrier takes it you lock {price} and the {tax} tax in escrow.</value>
+  </data>
+  <data name="Composer.Commits.Haul.Frontier" xml:space="preserve">
+    <value>Your {quantity} {good} at {place} stay set aside while it is up; you pay {price} when they are delivered.</value>
+  </data>
+  <data name="Composer.Commits.Answers" xml:space="preserve">
+    <value>Answers come while the clock runs.</value>
+  </data>
+  <data name="Composer.Post" xml:space="preserve">
+    <value>Post</value>
+  </data>
+  <data name="Composer.Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="PostBlock.BadQuantity" xml:space="preserve">
+    <value>Post at least one unit.</value>
+  </data>
+  <data name="PostBlock.BadPrice" xml:space="preserve">
+    <value>Name a price.</value>
+  </data>
+  <data name="PostBlock.BadDeadline" xml:space="preserve">
+    <value>A post runs from half a day to thirty days.</value>
+  </data>
+  <data name="PostBlock.NoStation" xml:space="preserve">
+    <value>{place} has no station to hold the goods.</value>
+  </data>
+  <data name="PostBlock.NoGoods" xml:space="preserve">
+    <value>You have no {quantity} {good} free in storage at {place}.</value>
+  </data>
+  <data name="PostBlock.SamePlace" xml:space="preserve">
+    <value>A haul needs a destination other than {place}.</value>
+  </data>
+  <data name="PostBlock.NoRoute" xml:space="preserve">
+    <value>No route connects {origin} and {destination}.</value>
+  </data>
+  <data name="PostBlock.CannotAfford" xml:space="preserve">
+    <value>It would lock {cost} with its tax, and you have {credits}.</value>
+  </data>
+  <data name="Term.Sale.Wanted.Them" xml:space="preserve">
+    <value>{Performer} hands you {quantity} {good} at {place} by {deadline}, into your storage there.</value>
+  </data>
+  <data name="Term.Escrow.Sale.Wanted.Them" xml:space="preserve">
+    <value>On signing, you lock the price and the {tax} tax in Accord escrow, and {performer} locks a bond of {bond}. It is paid at handover.</value>
+  </data>
+  <data name="Term.Frontier.Sale.Wanted.Them" xml:space="preserve">
+    <value>Outside the Accord there is no escrow: you pay at handover.</value>
+  </data>
+  <data name="Term.Sale.ForSale.Seller" xml:space="preserve">
+    <value>{Payer} collects your {quantity} {good} at {place} by {deadline}; they are its once handed over.</value>
+  </data>
+  <data name="Term.Escrow.Sale.ForSale.Seller" xml:space="preserve">
+    <value>On signing, {payer} locks the price and the {tax} tax in Accord escrow; you are paid at handover.</value>
+  </data>
+  <data name="Term.Frontier.Sale.ForSale.Seller" xml:space="preserve">
+    <value>Outside the Accord there is no escrow: {payer} pays you at handover, if it pays.</value>
+  </data>
+  <data name="Term.Warranty.Collect.Seller" xml:space="preserve">
+    <value>{good} must be at least {min} fresh when handed over, or up to {maxRefund} of the price goes back to {payer}.</value>
+  </data>
+  <data name="Party.Taker.Start" xml:space="preserve">
+    <value>Whoever takes it</value>
+  </data>
+  <data name="Board.Note.Reject" xml:space="preserve">
+    <value>{good} arrives {quality} fresh, below {floor}: {poster} may reject it</value>
   </data>
 </root>

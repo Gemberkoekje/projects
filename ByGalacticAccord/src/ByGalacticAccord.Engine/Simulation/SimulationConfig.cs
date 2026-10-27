@@ -30,7 +30,14 @@ public sealed record SimulationConfig
 
     public Credits DockingFee { get; init; } = Credits.Of(3m);
 
+    /// <summary>The most counter-offers a haggle runs to before the side that would make the next walks away (design §16.5).</summary>
     public int NegotiationMaxRounds { get; init; } = 6;
+
+    /// <summary>
+    /// Whether the player's posts reach the AI actors that can see them, who answer over game time (design §3.6). Tests of
+    /// other rules turn it off, as they turn off heartbeats, so only the actors they drive act.
+    /// </summary>
+    public bool PostsDrawAnswers { get; init; } = true;
 
     /// <summary>Scales route danger into a per-haul incident probability (§6.3).</summary>
     public decimal IncidentProbabilityScale { get; init; } = 0.6m;

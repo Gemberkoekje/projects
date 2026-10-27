@@ -131,6 +131,7 @@ public static partial class DecisionEngine
     private static bool TryBuyLot(SimulationContext context, ActorState consumer, ConsumerDemand demand, decimal deficit)
     {
         SaleContract? best = null;
+        Offer? bestOffer = null;
         decimal bestCost = decimal.MaxValue;
         foreach (SaleContract lot in Visible<SaleContract>(context, consumer))
         {
@@ -139,7 +140,7 @@ public static partial class DecisionEngine
                 continue;
             }
 
-            decimal cost = lot.Price.Amount * (1m + lot.TaxRate);
+            decimal extra = 0m;
             if (lot.Place != consumer.Home)
             {
                 Credits estimate = HaulFeeEstimate(context, lot.Place, consumer.Home);
@@ -149,25 +150,43 @@ public static partial class DecisionEngine
                     continue;
                 }
 
-                cost += (estimate.Amount * 1.3m) + (station.Station!.StorageRatePerUnitDay.Amount * lot.Quantity * 2m);
+                extra = (estimate.Amount * 1.3m) + (station.Station!.StorageRatePerUnitDay.Amount * lot.Quantity * 2m);
             }
 
+            // As posted if it costs well under what the goods are worth to it; else in closed form (design §3.6) with an AI seller
+            // that would take less. The player's lots it answers over game time (Respond).
             decimal value = Willingness(consumer, demand.Good, demand.TargetStock).Amount * lot.Quantity;
+            decimal ceiling = ((value * 0.85m) - extra) / (1m + lot.TaxRate);
+            Offer offer = Offer.Of(lot);
+            if (offer.Price.Amount > ceiling)
+            {
+                if (Market.HagglesInGameTime(context.Actor(lot.PostedBy)) || ClosedForm(context, lot, PosterReservation(context, lot), consumer, ceiling) is not { } agreed)
+                {
+                    continue;
+                }
+
+                offer = offer with { Price = Credits.Of(agreed) };
+            }
+
+            decimal cost = (offer.Price.Amount * (1m + lot.TaxRate)) + extra;
             decimal perUnit = cost / lot.Quantity;
-            if (cost <= value * 0.85m && perUnit < bestCost && consumer.Credits.Amount >= cost)
+            if (perUnit < bestCost && consumer.Credits.Amount >= cost)
             {
                 best = lot;
+                bestOffer = offer;
                 bestCost = perUnit;
             }
         }
 
-        if (best is null)
+        if (best is null || bestOffer is null)
         {
             return false;
         }
 
         Holding receipt = best.Place == consumer.Home ? Holding.StockAt(consumer.Home) : Holding.StorageAt(best.Place);
-        if (Market.BuyLot(context, consumer, best, best.Price, receipt) != Signing.Signed)
+        Signing signed = Market.SignAgreed(best, bestOffer, () => Market.BuyLot(context, consumer, best, bestOffer.Price, receipt));
+        NoteHaggled(context, best, signed);
+        if (signed != Signing.Signed)
         {
             return false;
         }
