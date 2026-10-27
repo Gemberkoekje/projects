@@ -57,12 +57,12 @@ namespace Vista.Output;
 /// extinction and the haze's unit. Schema 23 (M1.13b) added the mist's slider in <see cref="SlidersInfo.Values"/> and, in
 /// <see cref="SlidersInfo.Weather"/>, the valleys' pools (<see cref="PoolsInfo"/>): how they were rendered, what the weather told them,
 /// what they added up to and the flat layer the tables carried in their place; the valley haze's layer is now the scene's own
-/// valley's pool.</para>
+/// valley's pool. Schema 24 (M1.14) added <see cref="AutoCamera"/>: how the auto camera chose the camera, when it did.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 23;
+    public const int CurrentSchema = 24;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -87,6 +87,9 @@ public sealed record Sidecar
 
     /// <summary>True when <see cref="Camera"/> is the default camera rather than one the caller supplied.</summary>
     public bool DefaultCamera { get; init; }
+
+    /// <summary>How the auto camera chose <see cref="Camera"/> (schema 24, vista-plan §10 M1.14); absent when it did not.</summary>
+    public Composition.AutoCameraInfo? AutoCamera { get; init; }
 
     /// <summary>Image size and quality settings.</summary>
     public required ImageInfo Image { get; init; }

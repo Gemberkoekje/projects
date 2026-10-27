@@ -133,6 +133,7 @@ internal static partial class GpuSelfTest
         pass &= Check(log, "0.05 ms budget is bit-identical", Same(reference, split, compareAovs: true));
         pass &= Check(log, "debug outputs never change the beauty", Same(reference, bare, compareAovs: false));
         pass &= MaterialChecks(renderer, recipe, seed, eroded, materials, hierarchy, scene, reference, log);
+        pass &= AutoCameraChecks(recipe, seed, eroded, materials, scene, reference, log);
 
         // The loupe: off the 8-pixel thread-group grid, with the skyline in it (since M1.13's pose the range's skyline crosses it
         // near row 175, half of it sky).

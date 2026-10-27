@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using Vista.Astronomy;
 using Vista.Atmosphere;
+using Vista.Composition;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
@@ -113,12 +114,13 @@ public sealed class PreviewSession
         HeightField terrain = world.Surface;
         timings["worldGen"] = Lap(stopwatch);
 
+        // The auto camera (M1.14) chooses its camera below, once the sun, the pools and the ground are known.
         CameraSpec camera = request.CameraPath is null
             ? DefaultCamera.For(terrain)
             : ReadInput(request.CameraPath, VistaJson.ParseCamera);
-        if (request.CameraOverrides.Count > 0)
+        if (request.CameraOverrides.Count > 0 && request.AutoCamera is null)
             camera = VistaJson.ParseCamera(JsonOverrides.Apply(VistaJson.Serialize(camera), request.CameraOverrides));
-        if (DefaultCamera.GroundWarning(camera, terrain) is { } groundWarning)
+        if (request.AutoCamera is null && DefaultCamera.GroundWarning(camera, terrain) is { } groundWarning)
             warnings.Add(groundWarning);
 
         // The linked sliders (vista-plan §10 M1.11): the pins, resolved with the set pieces into the place, the sun and the weather.
@@ -145,6 +147,24 @@ public sealed class PreviewSession
         };
         string altitudeFrom = sliders.Readings[Slider.Altitude].From;
 
+        string directory = Path.GetDirectoryName(Path.GetFullPath(request.OutPath))!;
+        string baseName = Path.GetFileNameWithoutExtension(request.OutPath);
+        Directory.CreateDirectory(directory);
+        string Sibling(string suffix) => Path.Combine(directory, baseName + suffix);
+
+        // The auto camera (vista-plan §10 M1.14): candidates around the set piece's planted shot, scored from their composition buffers,
+        // the best finalists rendered small; the pick is written beside the preview, and the camera options apply on top of it.
+        AutoCameraInfo? autoCamera = null;
+        if (request.AutoCamera is { } auto)
+        {
+            (camera, autoCamera) = ChooseCamera(request, auto, recipe, world, sliders, ground, groundAltitude, air, pools, lowAir, materials, warnings);
+            File.WriteAllText(Sibling(".camera.json"), VistaJson.Serialize(camera));
+            outputs["autoCamera"] = baseName + ".camera.json";
+            if (request.CameraOverrides.Count > 0)
+                camera = VistaJson.ParseCamera(JsonOverrides.Apply(VistaJson.Serialize(camera), request.CameraOverrides));
+            timings["autoCamera"] = Lap(stopwatch);
+        }
+
         // The mesh follows the camera's position and the frame (vista-plan §10 M1.9), never the loupe: a loupe is a crop of the
         // frame's own render; and the forest's crowns follow the place's tree line and the altitude of the world (M1.12b).
         var meshView = MeshView.For(camera, request.Width, request.Height, air.PlanetRadiusMetres + groundAltitude);
@@ -169,11 +189,6 @@ public sealed class PreviewSession
         PixelWindow window = settings.Rendered;
         if (!window.FitsIn(settings.Width, settings.Height))
             throw new ArgumentException($"Loupe {window} does not fit the {settings.Width}×{settings.Height} frame.", nameof(request));
-
-        string directory = Path.GetDirectoryName(Path.GetFullPath(request.OutPath))!;
-        string baseName = Path.GetFileNameWithoutExtension(request.OutPath);
-        Directory.CreateDirectory(directory);
-        string Sibling(string suffix) => Path.Combine(directory, baseName + suffix);
 
         RenderInfo? renderInfo = null;
         ExposureInfo? exposure = null;
@@ -372,7 +387,8 @@ public sealed class PreviewSession
             Recipe = recipe,
             Seed = request.Seed,
             Camera = camera,
-            DefaultCamera = request.CameraPath is null && request.CameraOverrides.Count == 0,
+            DefaultCamera = request.CameraPath is null && request.CameraOverrides.Count == 0 && request.AutoCamera is null,
+            AutoCamera = autoCamera,
             Image = new ImageInfo(settings.Width, settings.Height, settings.SamplesPerPixel, settings.MaxBounces, DisplayTransform.NameOf(request.Display, request.Look), window)
             {
                 LightSampling = ImageInfo.LightSamplingOf(settings),
@@ -420,6 +436,146 @@ public sealed class PreviewSession
         };
         File.WriteAllText(Sibling(".json"), VistaJson.Serialize(sidecar));
         return sidecar;
+    }
+
+    /// <summary>
+    /// The auto camera's pick for <paramref name="request"/> (vista-plan §10 M1.14, <see cref="Composition.AutoCamera"/>): the set piece's
+    /// shot planted on the world, its candidates scored from composition buffers traced on the CPU, and the best
+    /// <see cref="AutoCameraSettings.Finalists"/> rendered at <see cref="AutoCameraSettings.FinalistWidth"/> for the squint test and the
+    /// values by layer (exposed by the incident meter and display-encoded as the preview is), their own buffers rescored, and their 4K
+    /// meshes' triangles counted; the best finalist that keeps every limit is the pick. Without a renderer (a dry run) or with no
+    /// finalists asked for, the best candidate by its buffer is.
+    /// </summary>
+    private (CameraSpec Camera, AutoCameraInfo Info) ChooseCamera(PreviewRequest request, AutoCameraSettings auto, Recipe recipe, TerrainWorld world,
+        SliderState sliders, GroundCover ground, double groundAltitude, AtmosphereModel air, ValleyPools pools, LowAir? lowAir,
+        IReadOnlyList<VistaMaterial> materials, List<string> warnings)
+    {
+        CompositionIntent intent = Composition.AutoCamera.IntentOf(recipe);
+        if (intent == CompositionIntent.None)
+            throw new InvalidDataException($"{request.RecipePath}: the auto camera frames the mountain set pieces (snowCappedMountains, alpineRange), and the recipe has neither.");
+        CompositionWeights weights = CompositionWeights.Default;
+        CompositionLimits limits = CompositionLimits.Default;
+        var seconds = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        var stopwatch = Stopwatch.StartNew();
+
+        double radius = air.PlanetRadiusMetres + groundAltitude;
+        ForestPlacement forest = ForestOf(ground, groundAltitude);
+        IGroundClassifier? classes = null;
+        if (request.Mesh.Materials)
+        {
+            MaterialField field = _worlds.Materials(forest);
+            classes = new MaterialClassifier(field, MaterialConstantsOf(field, ground), (float)groundAltitude);
+        }
+        PoolMap floors = _worlds.Pools();
+        var sight = new TerrainSight(world.Surface, request.Mesh.FarField ? _worlds.FarTerrain() : null, radius, classes, floors);
+        double aspect = (double)request.Width / request.Height;
+        SunPosition sun = sliders.Almanac.Sun;
+        PlantedShot shot = ShotPlanter.Plant(sight, sun, intent, weights, limits, aspect);
+        seconds["plant"] = Lap(stopwatch);
+
+        IReadOnlyList<WorldPoint> shoulders = Composition.AutoCamera.Shoulders(pools, groundAltitude, sight, shot.Viewpoint, 0.5 * shot.DistanceMetres, auto.Shoulders);
+        IReadOnlyList<CameraCandidate> candidates = Composition.AutoCamera.Candidates(sight, shot, aspect, auto, shoulders);
+        if (candidates.Count == 0)
+            throw new InvalidDataException("The auto camera found no place that sees the main peak.");
+        ScoredCandidate[] ranked = Composition.AutoCamera.Rank(Composition.AutoCamera.Score(sight, candidates, sun, shot, aspect, auto, weights, limits));
+        seconds["buffers"] = Lap(stopwatch);
+
+        ScoredCandidate[] finalists = Composition.AutoCamera.Finalists(ranked, auto);
+        string? note = null;
+        var rendered = new List<ScoredCandidate>();
+        if (_renderer is null || request.DryRun)
+            note = "dry run: no finalist rendered, the best candidate by its buffer is the pick";
+        else if (auto.Finalists == 0)
+            note = "no finalists asked for: the best candidate by its buffer is the pick";
+        else if (finalists.Length == 0)
+            note = "no candidate's buffer kept the limits: none rendered";
+        else
+        {
+            int fw = auto.FinalistWidth, fh = Math.Max(4, (int)Math.Round(fw / aspect));
+            MeshSettings meshSettings = request.Mesh with { Forest = forest };
+            foreach (ScoredCandidate finalist in finalists)
+            {
+                CameraSpec camera = finalist.Candidate.Camera;
+                TerrainMesh mesh = _worlds.Mesh(MeshView.For(camera, fw, fh, radius), meshSettings);
+                var scene = new VistaScene(recipe, request.Seed, camera, world.Surface, mesh, sun, materials, air, groundAltitude)
+                {
+                    Ground = ground,
+                    Quadrature = request.Quadrature,
+                    LowAir = lowAir,
+                };
+                var settings = new RenderSettings
+                {
+                    Width = fw,
+                    Height = fh,
+                    SamplesPerPixel = auto.FinalistSamples,
+                    MaxBounces = request.MaxBounces,
+                    Batching = new BatchPlannerOptions { DispatchBudgetMs = request.DispatchBudgetMs },
+                    LightSampling = request.LightSampling,
+                    RussianRouletteStart = request.RussianRouletteStart,
+                    Diffuse = request.Diffuse,
+                    Canopy = request.Canopy,
+                };
+                RenderOutput output = _renderer.Render(scene, settings, new HashSet<Aov> { Aov.Depth, Aov.Normal, Aov.MaterialId },
+                    new BatchPlanner(fw, fh, settings.SamplesPerPixel, settings.Batching));
+                IncidentLight light = _renderer.MeasureIncidentLight(scene);
+                ExposureInfo exposure = IncidentMeter.Measure(light, scene.AirFrame(), Tables(materials, scene.Wavelengths()),
+                    camera.ExposureEv + (request.MeterCompensationEv ?? IncidentMeter.DefaultCompensationEv));
+                byte[] srgb = DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(output.Xyz), exposure.AppliedEv, request.Display, request.Look);
+                var values = new float[fw * fh];
+                for (int p = 0; p < values.Length; p++)
+                    values[p] = (0.2126f * srgb[p * 3] + 0.7152f * srgb[p * 3 + 1] + 0.0722f * srgb[p * 3 + 2]) / 255f;
+                CompositionBuffer buffer = CompositionBuffer.FromRender(output, camera, fw, fh, floors, radius);
+                CompositionScores scores = CompositionScorer.Score(buffer, Composition.AutoCamera.Context(camera, sun, shot), limits, sight);
+                (double squint, double separation, double spread) = ValueStructure.Squint(values, fw, fh);
+                (double layered, double[] means) = ValueStructure.Layers(values, buffer);
+                scores = scores with
+                {
+                    Squint = squint,
+                    SquintSeparation = separation,
+                    SquintSpread = spread,
+                    Values = layered,
+                    LayerValues = means.All(double.IsFinite) ? means : null,
+                };
+                rendered.Add(Composition.AutoCamera.Scored(finalist.Candidate, scores, weights, limits));
+            }
+            seconds["finalists"] = Lap(stopwatch);
+            // The final frame's mesh counted against the acceleration structure's ceiling (vista-plan §10 M1.9), best first, until one
+            // keeps it: a count takes seconds at 4K, and the best usually does.
+            ScoredCandidate[] order = Composition.AutoCamera.Rank(rendered);
+            for (int k = 0; k < order.Length; k++)
+            {
+                if (!order[k].Feasible)
+                    continue;
+                CameraSpec camera = order[k].Candidate.Camera;
+                long triangles = _worlds.CountTriangles(MeshView.For(camera, limits.TriangleFrameWidth, limits.TriangleFrameHeight, radius), meshSettings);
+                order[k] = Composition.AutoCamera.Scored(order[k].Candidate, order[k].Scores with { Triangles = triangles }, weights, limits);
+                if (order[k].Feasible)
+                    break;
+            }
+            rendered = [.. order];
+            seconds["meshes"] = Lap(stopwatch);
+        }
+
+        ScoredCandidate[] final = Composition.AutoCamera.Rank(rendered);
+        ScoredCandidate pick = final.Length > 0 ? final[0] : ranked[0];
+        if (!pick.Feasible)
+            warnings.Add($"The auto camera's pick breaks a limit ({pick.Breaks}): no candidate kept them all.");
+        var info = new AutoCameraInfo
+        {
+            Planted = shot,
+            Settings = auto,
+            Weights = weights,
+            Limits = limits,
+            Candidates = candidates.Count,
+            Feasible = ranked.Count(s => s.Feasible),
+            Shoulders = shoulders.Count,
+            Pick = AutoCameraPick.Of(pick),
+            Finalists = [.. final.Select(AutoCameraPick.Of)],
+            Best = [.. ranked.Take(10).Select(AutoCameraPick.Of)],
+            Seconds = seconds,
+            Note = note,
+        };
+        return (pick.Candidate.Camera, info);
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Vista.Astronomy;
+using Vista.Composition;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.Rendering;
@@ -170,6 +171,12 @@ public sealed record PreviewRequest
     /// (the default since M1.13), <c>bins</c> (M1.12a's), <c>redTail</c> or <c>engine</c>.
     /// </summary>
     public Quadrature Quadrature { get; init; } = WavelengthTable.DefaultQuadrature;
+
+    /// <summary>
+    /// The auto camera (vista-plan §10 M1.14, <c>--auto-camera</c>): the camera is chosen by scoring candidates around the set piece's
+    /// planted shot instead of read from a file; null to use the camera file (or the default camera).
+    /// </summary>
+    public AutoCameraSettings? AutoCamera { get; init; }
 }
 
 /// <summary>
@@ -187,7 +194,7 @@ public sealed record PreviewRequest
 ///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature blend | bins | redTail | engine]
 ///           [--forest on | off] [--canopy kernels | rough] [--snow on | off] [--pools on | flat]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
-///           [--dither on | off] [--png16]
+///           [--dither on | off] [--png16] [--auto-camera [--finalists 10]]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
 /// ratio (320×180 for 16:9). <c>--loupe</c> renders one window of that frame at full detail. <c>--sliders</c> names the slider
@@ -219,6 +226,9 @@ public sealed record PreviewRequest
 /// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
 /// <c>--dither off</c> rounds the 8-bit PNG's values without M1.11c's dither, and <c>--png16</c> writes the beauty and the denoised
 /// beauty at 16 bits a channel instead, which need none.
+/// <c>--auto-camera</c> chooses the camera for a mountain set piece instead of reading one (M1.14): the planted shot, a few hundred
+/// candidates scored from their composition buffers, and the best <c>--finalists</c> rendered small for the squint test (0: none, the
+/// buffers' best wins; a dry run renders none). It writes the pick as <c>&lt;preview&gt;.camera.json</c>.
 /// </summary>
 public static class PreviewCommandLine
 {
@@ -281,7 +291,10 @@ public static class PreviewCommandLine
         "  (the ACES fit has none). --compensation <EV>: the stops the meter adds on its own, beside the camera's EV (default: the\n" +
         "  incident meter's +1 EV, the average meter's 0). None of them changes the EXR.\n" +
         "--dither on (default) | off: a triangular dither of ±1 step before the 8-bit PNG is rounded, against banding in smooth skies.\n" +
-        "--png16: write <preview>.png (and <preview>.denoised.png) at 16 bits a channel instead, with no dither.";
+        "--png16: write <preview>.png (and <preview>.denoised.png) at 16 bits a channel instead, with no dither.\n" +
+        "--auto-camera: choose the camera for the recipe's mountains instead of --camera: candidates around the planted shot scored\n" +
+        "  from their composition buffers, the best --finalists <n> (default 10; 0 for none) rendered small for the squint test.\n" +
+        "  Writes the pick as <preview>.camera.json and the scores in the sidecar.";
 
     /// <summary>The slider-file fields each slider option decides, so a contact sheet cannot vary them as well.</summary>
     internal static IReadOnlyDictionary<string, IReadOnlyList<string>> SliderOptionFields { get; } =
@@ -333,11 +346,11 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--valley-haze", "--mist", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools",
+        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists",
     };
 
     /// <summary>The options that take no value.</summary>
-    internal static IReadOnlySet<string> FlagOptions { get; } = new HashSet<string>(StringComparer.Ordinal) { "--dry-run", "--denoise", "--png16" };
+    internal static IReadOnlySet<string> FlagOptions { get; } = new HashSet<string>(StringComparer.Ordinal) { "--dry-run", "--denoise", "--png16", "--auto-camera" };
 
     /// <summary>
     /// Splits <paramref name="args"/> from <paramref name="start"/> into <c>--option value</c> pairs and the flags
@@ -430,6 +443,17 @@ public static class PreviewCommandLine
             "flat" => false,
             string other => Problem(problems, $"--pools must be on or flat, got '{other}'."),
         };
+        AutoCameraSettings? autoCamera = null;
+        if (flags.Contains("--auto-camera"))
+        {
+            autoCamera = AutoCameraSettings.Default with { Finalists = Int(values, "--finalists", AutoCameraSettings.Default.Finalists, 0, 40, problems) };
+            if (values.ContainsKey("--camera"))
+                problems.Add("--auto-camera chooses the camera: leave out --camera.");
+        }
+        else if (values.ContainsKey("--finalists"))
+        {
+            problems.Add("--finalists needs --auto-camera.");
+        }
 
         if (problems.Count > before)
             return null;
@@ -468,6 +492,7 @@ public static class PreviewCommandLine
             Canopy = canopy,
             Snow = snow,
             Pools = pools,
+            AutoCamera = autoCamera,
         };
     }
 

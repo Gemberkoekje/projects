@@ -21,6 +21,7 @@ public sealed class WorldCache
     private MaterialField? _materials;
     private MaterialField? _forested;
     private PoolMap? _pools;
+    private HeightField? _far;
     private TerrainHierarchy? _hierarchy;
     private (bool Detail, bool Materials, ForestPlacement Forest)? _hierarchyKey;
     private (MeshView View, MeshSettings Settings)? _meshKey;
@@ -44,7 +45,7 @@ public sealed class WorldCache
         {
             _world = WorldBuilder.Build(recipe, seed, grid, eroder, cache, erode);
             (_key, _recipe) = (key, recipe);
-            (_materials, _forested, _hierarchy, _hierarchyKey, _meshKey, _mesh, _pools) = (null, null, null, null, null, null, null);
+            (_materials, _forested, _hierarchy, _hierarchyKey, _meshKey, _mesh, _pools, _far) = (null, null, null, null, null, null, null, null);
         }
         return _world!;
     }
@@ -102,9 +103,38 @@ public sealed class WorldCache
         {
             (_, ulong seed, WorldGrid grid, _, _) = _key.Value;
             DrainageMap drainage = _world.Erosion?.Drainage ?? DrainageMap.Of(_world.Surface);
-            _pools = PoolMap.For(_world.Surface, drainage, PoolMap.FarTerrain(_recipe, seed, grid));
+            _pools = PoolMap.For(_world.Surface, drainage, FarTerrain());
         }
         return _pools;
+    }
+
+    /// <summary>
+    /// The cached world's far field (<see cref="PoolMap.FarTerrain"/>: its base terrain around it on a 128 m grid), built the first time
+    /// the pools or the auto camera (vista-plan §10 M1.14) ask for it.
+    /// </summary>
+    public HeightField FarTerrain()
+    {
+        if (_world is null || _key is null || _recipe is null)
+            throw new InvalidOperationException("Ask for the world before its far field.");
+        if (_far is null)
+        {
+            (_, ulong seed, WorldGrid grid, _, _) = _key.Value;
+            _far = PoolMap.FarTerrain(_recipe, seed, grid);
+        }
+        return _far;
+    }
+
+    /// <summary>
+    /// How many triangles the cached world's mesh for <paramref name="view"/> under <paramref name="settings"/> would take
+    /// (<see cref="ViewMesher.CountTriangles"/>), without building it or replacing the kept mesh.
+    /// </summary>
+    public long CountTriangles(MeshView view, MeshSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (_world is null || _key is null)
+            throw new InvalidOperationException("Ask for the world before its mesh.");
+        double seconds = 0.0;
+        return ViewMesher.CountTriangles(Hierarchy(settings, ref seconds), view, settings);
     }
 
     /// <summary>

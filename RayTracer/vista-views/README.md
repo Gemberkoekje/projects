@@ -359,3 +359,17 @@ against (`python vista-views/pools/mist-slab.py`, numpy, about two minutes).
 ```
 powershell -ExecutionPolicy Bypass -File vista-views/pools/render.ps1 [-Before ..\main\Vista.App.dll] [-Sheets check,dawn,morning,noise,places,maps,cost] [-Out folder]
 ```
+
+## Auto camera checks (M1.14)
+
+`autocam/render.ps1` makes the M1.14 sheets and checks, every run through `--auto-camera`: one run's finalists as it ranked them,
+each rendered at the cell's size with its total and squint score (`finalists.png`, `-Seed`, `-Recipe`); eight seeds at golden hour,
+the default camera beside the pick for snow-capped mountains (`seeds-peak.png`, `mountains-golden.recipe.json`) and for an alpine
+range (`seeds-range.png`, `autocam/range-golden.recipe.json`), each pick's focal length, near-field share and 4K triangles in its
+label; with `-Paintings` the user's paintings beside two picks (`paintings.png`); and the same pick twice (`repeat`). Every run's
+search (its candidates, the plant, the stages' times, the pick's scores) goes to `autocam.log`. A seed the erosion cache lacks is
+eroded on the first render that asks for it.
+
+```
+powershell -File vista-views/autocam/render.ps1 [-Seeds 1,2,3,4,5,6,7,42] [-Seed 42] [-Recipe <recipe>] [-Paintings <a.png,b.png>] [-Sheets finalists,seeds,paintings,repeat] [-Out folder]
+```

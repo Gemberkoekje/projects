@@ -287,6 +287,19 @@ public static class ViewMesher
         return mesh;
     }
 
+    /// <summary>
+    /// How many triangles <see cref="Build"/> would make for <paramref name="view"/>: the refinement alone, without placing a vertex
+    /// (vista-plan §10 M1.14: the auto camera's check of a pick's 4K mesh against the acceleration structure's ceiling).
+    /// </summary>
+    public static long CountTriangles(TerrainHierarchy hierarchy, MeshView view, MeshSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(hierarchy);
+        ArgumentNullException.ThrowIfNull(settings);
+        var refiner = new Refiner(hierarchy, view, settings) { CountOnly = true };
+        refiner.Run();
+        return refiner.TriangleCount;
+    }
+
     /// <summary>The farthest corner of the world grid from <paramref name="camera"/>, horizontally, m.</summary>
     private static double FarthestCorner(HeightField surface, WorldPoint camera)
     {
@@ -451,6 +464,14 @@ public static class ViewMesher
 
         public uint[] Indices() => [.. _indices];
 
+        /// <summary>The triangles emitted.</summary>
+        public long TriangleCount => _triangles;
+
+        /// <summary>Emit no vertices or indices, only count the triangles (<see cref="ViewMesher.CountTriangles"/>).</summary>
+        public bool CountOnly { get; init; }
+
+        private long _triangles;
+
         public void Run()
         {
             int n = _h.RootSize;
@@ -558,9 +579,13 @@ public static class ViewMesher
 
         private void Emit(V a, V l, V r)
         {
-            _indices.Add(IndexOf(a));
-            _indices.Add(IndexOf(l));
-            _indices.Add(IndexOf(r));
+            _triangles++;
+            if (!CountOnly)
+            {
+                _indices.Add(IndexOf(a));
+                _indices.Add(IndexOf(l));
+                _indices.Add(IndexOf(r));
+            }
             if (((a.I | a.J | l.I | l.J | r.I | r.J) & _subMask) != 0)
                 DetailTriangles++;
             long ci = (long)a.I + l.I + r.I, cj = (long)a.J + l.J + r.J; // three times the centroid

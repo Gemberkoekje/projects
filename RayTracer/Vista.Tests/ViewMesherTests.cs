@@ -72,6 +72,16 @@ public sealed class ViewMesherTests
     }
 
     [TestMethod]
+    public void CountTriangles_IsTheMeshsCount()
+    {
+        foreach ((string name, CameraSpec camera) in Cameras())
+        {
+            foreach ((int w, int ht) in new[] { (320, 180), (1920, 1080) })
+                Assert.AreEqual(Build(camera, null, w, ht).TriangleCount, ViewMesher.CountTriangles(World.Value.Hierarchy, View(camera, w, ht), new MeshSettings()), $"{name}, {w}×{ht}");
+        }
+    }
+
+    [TestMethod]
     public void EveryTriangle_FacesUp()
     {
         foreach ((string name, CameraSpec camera) in Cameras())

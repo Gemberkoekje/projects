@@ -1,0 +1,11 @@
+{
+  "schema": 2,
+  "name": "alpine range, golden hour",
+  "setPieces": [
+    "alpineRange"
+  ],
+  "time": "goldenHour",
+  "season": "summer",
+  "location": "zermatt",
+  "date": "2026-07-15"
+}
