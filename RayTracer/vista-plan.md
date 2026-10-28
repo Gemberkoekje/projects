@@ -979,7 +979,8 @@ differences in light: in a Pro-mode bracket of one sky (the 28-10 series below),
 5.5× and 5× measured 7.4×, so a measured ratio is about the true one to the power 1.23 (true ≈
 measured^0.8), at least in the mid-tones; near black it is shakier. The phone's automatic mode also
 merges several frames (HDR) and lifts the shadows, so an automatic shot compares with a Pro-mode one only
-roughly. The phone records whether the white balance was automatic or manual, not its value.
+roughly. The phone records the white balance: automatic or manual in the standard photo data, and in Pro
+mode the manual value too, in Samsung's own data at the end of the file ("4400K").
 
 *Dusk under a grey cloud layer, 27-10-2026* (a phone, through a window and a cat net, over flat land
 facing the sunset; sunset between 17:13 and 17:25 depending on the town, so until it is asked the sun's
@@ -1001,13 +1002,15 @@ version gave the naive figures as measurements and took 16:58 for the same fixed
 | 17:43 | Automatic; the zoom lens, f/2.4, 1/33 s, ISO 1250 (low light, several frames merged) | A cat on the balcony rail: the phone made dusk look like the afternoon, at the cost of smeared detail and a pale sky | M1.17 (the exposure question) |
 
 *Sunset under a clear sky with high streaks, 28-10-2026* (the same view; the main lens at 1.0× in Pro
-mode throughout; sunset between 17:11 and 17:23 depending on the town). Three of the five share one
+mode throughout; sunset between 17:11 and 17:23 depending on the town). Three of the six share one
 exposure, 1/12000 s, ISO 640, f/1.8, so their brightness compares directly. White balance automatic at
-17:12 and 17:21, manual from 17:27:57 on (4400 K, the value automatic showed when the user switched; the
-phone records only that it was manual), so 17:21 and 17:27:57 differ in colour by the setting as well as
-the sky. 17:12 is through the closed window, whose dirty glass adds glare around the sun; the rest are
+17:12 and 17:21, manual at 4400 K from 17:27:57 on (recorded by the phone), so 17:21 and 17:27:57 differ
+in colour by the setting as well as the sky. 17:12 is through the closed window, whose dirty glass adds glare around the sun; the rest are
 with it open. Measured on the blue sky and corrected for the stretch (rough): about 2× darker from 17:12
-to 17:21 (the glass's glare makes it look more) and about 2× again to 17:27:57.
+to 17:21 (the glass's glare makes it look more) and about 2× again to 17:27:57. At 17:46:48 the camera
+took 83× the shared exposure's light and the upper sky measured about as bright as at 17:27:57, so it
+had grown very roughly 80× darker in those 19 minutes (cloud had moved over much of it by then, and
+unlit cloud is darker than clear sky).
 
 | Photo (CET) | Camera | What it shows | Judges |
 |---|---|---|---|
@@ -1015,6 +1018,7 @@ to 17:21 (the glass's glare makes it look more) and about 2× again to 17:27:57.
 | 17:21 | The shared exposure; automatic white balance | Around or just after sunset: the high clouds peach, gold and orange; the contrail, the highest, still white; the low bank dark grey with a red-orange fringe along its bottom near the sunset (lit from the gap's side, as on 27-10); the sky in bands: deep blue overhead, a pale greenish-blue band, orange only at the horizon | M4 (high clouds lit after sunset, the highest the whitest); M1.17 (the greenish band) |
 | 17:27:57 | The shared exposure; manual white balance | The contrail and the high cloud pink; the gold gone from the middle clouds; the low bank dark with a deep red fringe at the bottom; the sky blue-violet (partly the real violet above the glow a few minutes after sunset, partly the 4400 K setting) | M4 (the colours deepening, the low clouds losing the light first); M1.17 (the violet) |
 | 17:28:21, 17:28:39 | Manual white balance; 1/3000 s, ISO 640 (4× the light); 1/12000 s, ISO 3200 (5×, grainy) | The same sky as 17:27:57, brighter: the darkest of the three reads as night, the brighter ones as early twilight | M1.17 (the exposure question: one sky's mood set by exposure alone); the stretch above |
+| 17:46:48 | 1/90 s, ISO 400 (83× the shared exposure's light); manual white balance, 4400 K | The blue hour, the sun about 5° down: everything blue; a cloud layer over most of the sky, its thick parts darker than its thin parts and gaps (the reverse of the sunlit clouds earlier); the last colour a thin pink line on the horizon; the town's lights on | M1.17 (the blue hour's colour; the exposure question: the user raised the exposure 83× to keep the picture about as bright, which is what the meter does); M4 (clouds without sun darker than the sky) |
 
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
@@ -2052,7 +2056,7 @@ default to 960 px (about twice the time)? Log: [`vista-log/M1.16.md`](vista-log/
   *Added 2026-10-28:* the user's sunset series of 28-10-2026. Its bracket at 17:28 shows one sky reading as night or as early
   twilight by exposure alone (for the same pick), and its clear sky is M1's to match: the bands just after sunset (deep blue
   overhead, a pale greenish-blue band, orange only at the horizon; 17:21) and the violet above the glow a few minutes later
-  (17:27:57, at a manual 4400 K, so that render is balanced to 4400 K too).
+  (17:27:57, at a manual 4400 K, so that render is balanced to 4400 K too), then the blue hour (17:46:48, also at 4400 K).
 - *Verify:* alpenglow at dawn and dusk with no special-casing; bare steep faces; the estimate inside
   its own range on the test views; goldens added and passing; `--phase6-selftest` 700/700 and
   `--phase6-regress` 19/19 (maze unmoved).
