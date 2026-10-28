@@ -6,8 +6,8 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-10-27):** S1–S5 done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
-[S4 log](log/S4.md), [S5 log](log/S5.md)); S6 is next. The UI mockup
+**Status (2026-10-28):** S1–S6 done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
+[S4 log](log/S4.md), [S5 log](log/S5.md), [S6 log](log/S6.md)); S7 is next. The UI mockup
 is at <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
@@ -40,17 +40,18 @@ foundation is sound; most of the game logic on top of it changes shape.
 | Charges stop at ₵0, so nobody can go broke; a broke player still takes escrow jobs with a ₵0 bond | S8 |
 | `AcceptHaul` doesn't check the contract is still open | S2 (fixed: the client calls it) |
 | Food decays below its warranty on even the shortest run | S3 (fixed: the §15.3 keep-times) |
-| Visibility is effectively omniscient (keyed on a fixed home; home region covers 5 of 7 locations) | S6 |
+| Visibility is effectively omniscient (keyed on a fixed home; home region covers 5 of 7 locations) | S6 (fixed: presence, the here, near and far tiers, and a knowledge store per actor) |
 | Incident outcomes don't shift with danger, despite the comment saying they do | S8 |
 | The test suite is slow: the board query walks and sorts every contract ever posted, and `FindPath` runs Dijkstra per contract, per ship, per heartbeat | S1 |
 | *Found in S2:* outside the Accord the pilot pays the producer for the goods at pickup and is paid only the fee at handover, so nearly every frontier haul loses money (and AI haulers take them, since their scoring ignores the goods) | S3 (fixed: a delivered Sale pays for the goods) |
 | *Found in S2:* consumers post hauls from a producer at their own location (Helios Prime), a one-hour trip to nowhere | S3 (fixed: a Sale handed over where it is posted) |
 | *Found in S3:* AI actors pay out whatever they hold above a working capital, a sink standing in for spending, growth and failure; without it savers soak up the money supply | S7, S8 (growth and insolvency replace it) |
-| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (in part: such a Sale now ends by its terms, the producer walking away for its break fee or its buyer cancelling for the bond). S5's haggling didn't fix it (walking away rose by 40–85%): carriers' time near the goods binds, not the fee. S6 (what carriers can see), S7 (fleets that grow) |
-| *Found in S4:* filling a Sale through a carrier pays only if the player watches its haul: at the usual offer about one in seven goes untaken and the Sale is cancelled for the bond, and the player can raise an offer only by reposting it | S5 (in part: the player posts a haul at its own price and terms, and haggles with the carriers that answer), S6 (what carriers can see) |
+| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (in part: such a Sale now ends by its terms, the producer walking away for its break fee or its buyer cancelling for the bond). S5's haggling didn't fix it (walking away rose by 40–85%): carriers' time near the goods binds, not the fee. S6's limited sight lowered walking away by 16–28%, but carriers' hours still bind. S7 (fleets that grow) |
+| *Found in S4:* filling a Sale through a carrier pays only if the player watches its haul: at the usual offer about one in seven goes untaken and the Sale is cancelled for the bond, and the player can raise an offer only by reposting it | S5 (in part: the player posts a haul at its own price and terms, and haggles with the carriers that answer). S6: a post reaches only the carriers that can see it or read of it in the news; I didn't measure the untaken share again |
 | *Found in S4:* decisions rarely reach the player, which is a payer only of the hauls it posts and the lots it buys | S5 (in part: the player can post wanted Sales and is then asked about defaults and inspections, but neither bot met a decision in 8,333 game days) |
-| *Found in S5:* the market reader rarely finds a spread worth posting for (2–7 posts in 8,333 game days) and doesn't reliably beat the board taker | S6 (ageing information gives a reader an edge; S6's verify) |
-| *Found in S5:* the share of signed contracts that fail or are cancelled rose from 4.3–4.8% to 6.6–7.5%, and payer default from 41–239 to 474–601 a million ticks, as haggling signs marginal deals | Open: see the questions in [`log/S5.md`](log/S5.md) |
+| *Found in S5:* the market reader rarely finds a spread worth posting for (2–7 posts in 8,333 game days) and doesn't reliably beat the board taker | S6 (fixed: the reader judges each deal's risk and the next leg, and wins 9 of 10 seeds at 1.16× the taker; buying into a spread still loses money, so that part is off) |
+| *Found in S5:* the share of signed contracts that fail or are cancelled rose from 4.3–4.8% to 6.6–7.5%, and payer default from 41–239 to 474–601 a million ticks, as haggling signs marginal deals | Open (S6: 6.3–6.5%, payer default 691–804): see the questions in [`log/S5.md`](log/S5.md) |
+| *Found in S6:* a consumer doesn't see lots two jumps away, so Helios Prime, which bought its machinery as lots from Tycho, gets 66–72% of it (S5: 98–99%) | Open: see the questions in [`log/S6.md`](log/S6.md); S7's part factories sell lots too |
 | *Found in S3:* Dust Runner Kael's armoured freighter costs more to run than it earns in this sector, and an actor can't change its fleet | S7 |
 
 ## 2. How we work
@@ -201,7 +202,14 @@ foundation is sound; most of the game logic on top of it changes shape.
   - Tier tests.
   - In a soak, the frontier still gets supplied (see risk R1).
   - The market reader beats the board taker.
-- **Status:** not started.
+- **Status (2026-10-28):** done. Every actor sees by its presence (home, ships, storage): here live, near a jump away
+  (contracts after 4 hours, a daily price bulletin), far as last seen. It keeps a knowledge store of what it last read
+  of each producer and decides on it. The Daily Accord reports three of yesterday's contracts a day, weighted by size,
+  novelty, failure and the frontier. Accord contracts leave a public record. Over a million ticks invariants hold and
+  the frontier is still supplied (Edge Station 51–56% of its food, 82–86% of its machinery); 2–5% fewer contracts are
+  fulfilled than in S5 and 6.3–6.5% fail or are cancelled. The market reader wins 9 of 10 seeds at 1.16× the board
+  taker. The client fades what the player knows by age, marks the tiers, and shows The Daily Accord, the signals and
+  each party's public record. See [`log/S6.md`](log/S6.md).
 
 ### S7 — Ships from parts
 

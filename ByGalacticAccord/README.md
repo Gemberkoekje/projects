@@ -18,8 +18,8 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 
 ## The current build
 
-**S1 (groundwork), S2 (the browser client), S3 (possession, Sale and Haul), S4 (terms and failure) and S5
-(posting, responses and haggling) are done; S6 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
+**S1 (groundwork), S2 (the browser client), S3 (possession, Sale and Haul), S4 (terms and failure), S5
+(posting, responses and haggling) and S6 (information and the news) are done; S7 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
 station, or in a ship's hold. Two kinds of contract move them. A **Sale** is goods wanted or for sale, handed
 over at a place; a **Haul** carries a shipper's goods from one place to another. Consumers post the Sales they
 need delivered, producers sell lots and answer what is wanted, and traders fill Sales by buying and carrying,
@@ -32,7 +32,10 @@ enforces remedies in full, its edge as far as escrow holds, the frontier not at 
 records its cause, so any outcome reads back as a chain. A post that waits can be **haggled** over: AI actors
 settle among themselves at once, by the same rules of opening, conceding and walking away that a haggle with the
 player follows over game time, each reply coming 1 to 12 hours later and worded by how close it is to its limit.
-Information and ships change shape in S6–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
+What an actor knows depends on where it is present (its home, its ships, its storage): live where it is, a daily
+bulletin of prices one jump away, and beyond that only what it last saw and what **The Daily Accord**, a daily
+digest of a few of yesterday's contracts, reports. Every actor decides on what it knows, and trusts what it last saw.
+Accord contracts leave a public record. Ships change shape in S7–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
 the soak harness) stays.
 
 The **Blazor WebAssembly client** runs that simulation in the browser: the schematic sector map with
@@ -45,7 +48,10 @@ station, all as posted; you can walk away from a contract, cancel one whose coun
 an untaken haul, and answer the decisions the terms hand you, and every contract shows its terms as sentences
 and what led to it. You can **post** your own wanted Sale, goods for sale or haul at the price and terms you
 choose; whoever can see it answers over game time, as posted or with a counter, and the haggle reads as a thread
-of offers and replies. You can also counter anyone's post on the board.
+of offers and replies. You can also counter anyone's post on the board. The map marks each place here, near or far
+from you and fades what you know of it with age ("live", "daily …", "as of …"); The Daily Accord and the signals
+(an idle producer, a consumer running short, a price off your readings) sit beside the log, a contract you know
+only from the news says it may have been taken, and every party shows its public record.
 
 ## Running it
 
@@ -57,7 +63,8 @@ dotnet build
 # Fast tests (the default): unit tests plus short world runs. A few seconds.
 dotnet test
 
-# Soak-length tests: million-tick invariant runs, every failure path, money supply, monopoly checks. About a minute.
+# Soak-length tests: million-tick invariant runs, every failure path, money supply, monopoly checks, the frontier's
+# supply, the bots over ten seeds. About three minutes.
 dotnet test --filter Category=Soak
 
 # The soak harness: run the world headless, print economy telemetry, assert every invariant.

@@ -13,3 +13,4 @@ line that links here. Section references (§n) in a log are to the design,
 | [`S3.md`](S3.md) | Possession, Sale and Haul (screenshots in [`S3/`](S3/)) |
 | [`S4.md`](S4.md) | Terms and failure (screenshots in [`S4/`](S4/)) |
 | [`S5.md`](S5.md) | Posting, responses and haggling (screenshots in [`S5/`](S5/)) |
+| [`S6.md`](S6.md) | Information and the news (screenshots in [`S6/`](S6/)) |
