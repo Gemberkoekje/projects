@@ -1,6 +1,7 @@
 global using Kluskat.application.Kiezen;
 global using Kluskat.application.Ports;
 global using Kluskat.application.ReadModels;
+global using Kluskat.application.Spel;
 global using Kluskat.core.Enums;
 global using Kluskat.core.Models;
 global using Microsoft.Extensions.Logging;

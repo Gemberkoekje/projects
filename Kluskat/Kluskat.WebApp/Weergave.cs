@@ -71,6 +71,32 @@ internal static class Weergave
     /// <returns>The count with the right noun.</returns>
     internal static string Klusjes(int aantal) => aantal == 1 ? "1 klusje" : $"{aantal} klusjes";
 
+    /// <summary>The Dutch name of an accessory.</summary>
+    /// <param name="accessoire">The accessory.</param>
+    /// <returns>E.g. "feestmuts".</returns>
+    internal static string AccessoireNaam(Accessoire accessoire) => accessoire switch
+    {
+        Accessoire.Feestmuts => "feestmuts",
+        Accessoire.Strikje => "strikje",
+        Accessoire.Bril => "bril",
+        Accessoire.Bloem => "bloemetje",
+        Accessoire.Sjaal => "sjaal",
+        Accessoire.Koksmuts => "koksmuts",
+        Accessoire.Kroon => "kroon",
+        _ => "niets",
+    };
+
+    /// <summary>A 0–1 fraction as a CSS percentage.</summary>
+    /// <param name="fractie">The fraction.</param>
+    /// <returns>E.g. "42.5%".</returns>
+    internal static string Procent(double fractie)
+        => (Math.Clamp(fractie, 0, 1) * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    /// <summary>"1 week" or "4 weken".</summary>
+    /// <param name="aantal">How many.</param>
+    /// <returns>The count with the right noun.</returns>
+    internal static string Weken(int aantal) => aantal == 1 ? "1 week" : $"{aantal} weken";
+
     /// <summary>A UTC instant as a local date, for the beheer pages.</summary>
     /// <param name="utc">The instant.</param>
     /// <returns>E.g. "28-10-2026".</returns>

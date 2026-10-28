@@ -41,14 +41,9 @@ public sealed class MartenVoltooiingStore(IDocumentStore store) : IVoltooiingSto
     }
 
     /// <inheritdoc />
-    public async Task<int> AantalSindsAsync(DateTime sinds, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Voltooiing>> AlleAsync(CancellationToken cancellationToken = default)
     {
-        // Marten compares a DateTime inside the JSON as `timestamp without time zone`, and Npgsql
-        // refuses a UTC-kind parameter for that. Every stored Op is UTC, so dropping the kind keeps
-        // the comparison exact.
-        var grens = DateTime.SpecifyKind(sinds, DateTimeKind.Unspecified);
-
         using var session = store.QuerySession();
-        return await session.Query<Voltooiing>().CountAsync(v => v.Op >= grens, cancellationToken);
+        return await session.Query<Voltooiing>().ToListAsync(cancellationToken);
     }
 }

@@ -48,7 +48,8 @@ then `Kluskat.WebApp/Pages/Index.cshtml(.cs)`. [DEPLOY.md](DEPLOY.md) has the cl
   the instance you called it on is unchanged. Always continue with `result.Value`.
 - **Marten compares JSON `DateTime` as `timestamp without time zone`**; Npgsql refuses a UTC-kind
   parameter for it (500 on the win screen). Pass `DateTime.SpecifyKind(x, Unspecified)` — every
-  stored value is UTC anyway (`MartenVoltooiingStore.AantalSindsAsync`).
+  stored value is UTC anyway. (Since phase 2 nothing queries by date any more; the log is loaded
+  whole and scored in memory.)
 - **Marten 9 has no sync `SaveChanges`**; `IXmlRepository` is sync by contract, so the key ring
   blocks on the async call with a justified `S4462` suppression.
 - **StyleCop 1.1.118 doesn't know target-typed `new()`** (SA1000) — write the type out.
@@ -77,9 +78,52 @@ then `Kluskat.WebApp/Pages/Index.cshtml(.cs)`. [DEPLOY.md](DEPLOY.md) has the cl
 | `Kluskat.WebApp/wwwroot/` | `site.css` (tokens + dark mode), `feest.js` (confetti), manifest, icons |
 | `../.github/workflows/kluskat-build-and-push.yml` | CI: build + test, then publish + image to GHCR |
 
-### Next (phase 2)
+## Phase 2 — gamification (2026-10-28)
 
-XP & levels (S 10 / M 25 / L 50, +50% bravery bonus for a klus skipped in the last 3 days, +5 for
-the first of the day), the cat growing and unlocking accessories, ~20 achievements (incl.
-**Comeback**), the forgiving weekly streak with freezes, and a profile page. Everything can be
-computed from the streams + `Voltooiing` log already being written.
+_Start with `Kluskat.application/Spel/Spelregels.cs` (every rule), then `Pages/Gedaan.cshtml` (the
+celebration) and `Pages/Profiel.cshtml`._
+
+### What shipped
+
+- **XP**: klein 10 / middel 25 / groot 50; **+50% "dapper"** for a klus skipped in the 3 days
+  before; **+5** for the first klus of a (local) day. Itemised on the win screen.
+- **Levels**: level *n* takes `60 + 20·(n−1)` XP. Badge "Lv N" with a mini XP bar top-left on the
+  klus screen (links to the profile), plus the streak flame top-right once there is a streak.
+- **The cat grows**: kitten (lv 1–4, 3×3 eyes, 5 px/pixel) → cat (5–14, 6 px) → majesty (15+,
+  lynx ear tufts, a cream ruff, twinkling sparkles, 7 px).
+- **Wardrobe**: feestmuts (lv 2), strikje (4), bril (6), bloemetje (8), sjaal (10), koksmuts
+  (12), kroon (15) — pixel layers on the sprite; chosen on the profile ("De kast"), worn on every
+  screen.
+- **22 achievements** (`Trofeeen.Alle`), incl. **Welkom terug** for coming back after 14 days.
+- **Forgiving weekly streak**: a Monday–Sunday week counts with ≥ 3 klussen; every 4 counted weeks
+  earn a freeze (max 2) that a short week spends instead of breaking the streak. The running week
+  never breaks it. "Deze week telt mee voor je reeks!" on the win screen when it tips over.
+- **Win screen**: +XP with bonus chips, an XP bar that animates from before to after, a level-up
+  card (with the cat's growth and the unlocked accessory), a card per new trophy.
+- **Profile** (`/Profiel`): level + XP, klussen / deze week / reeks / bevriezingen, the wardrobe,
+  the trophy shelf (earned in colour, the rest greyed).
+- **Dev gallery** `/Dev/Katten` (Development only, 404 elsewhere): every form × pose × accessory.
+- 79 specs (35 new). Verified in the browser: XP + bonuses, Eerste klus/Dapper/Nachtbraker
+  unlocks, streak tipping at the 3rd klus, level 2 + feestmuts unlock, dressing the cat, dark mode.
+
+### Decisions
+
+- **Everything is computed** from the `Voltooiing` log (`Spelregels.Bereken`) on each request —
+  no player aggregate, no stored XP. A rule change re-scores history; undo just removes the entry.
+  Only the *choice* of accessory is stored (`Profiel` document).
+- `Voltooiing` now snapshots `IntervalDagen`, `Dapper` and `KeerOvergeslagen` at completion time,
+  taken from the klus **before** the Gedaan (the aggregate counts skips since the last Gedaan).
+- The win screen scores the log with and without the latest completion of that klus, so a refresh
+  celebrates the same thing again instead of showing nothing.
+- An accessory the cat can no longer wear (an undo dropped the level) is silently taken off.
+- No loot drops, no reward shop, nothing that ever goes down except the streak (as agreed).
+
+### Gotchas
+
+- Sprite layering order matters: base → form → pose face → accessory. Glass (`~`) only tints fur
+  (`a b c s k`), so closed eyes and outlines show through the bril.
+- Static assets are served from the build manifest: a CSS change needs a rebuild/restart of the
+  dev server to show up.
+- Old local `Voltooiing` docs (from before phase 2) lack the new fields; they read as 0/false.
+  Production has no data yet, so no migration was needed.
+- Positional public records trip Qowaiv `QW0016`; use `required` init properties.

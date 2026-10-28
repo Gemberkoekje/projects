@@ -13,6 +13,7 @@ public sealed class Klusscherm_specs
     private readonly InMemoryKlusOverzichtStore overzichten = new InMemoryKlusOverzichtStore();
     private readonly InMemorySessieStore sessies = new InMemorySessieStore();
     private readonly InMemoryVoltooiingStore voltooiingen = new InMemoryVoltooiingStore();
+    private readonly InMemoryProfielStore profielen = new InMemoryProfielStore();
 
     private IKlusRepository Repository => new InMemoryKlusRepository(events, overzichten);
 
@@ -26,8 +27,8 @@ public sealed class Klusscherm_specs
             .HandleAsync(new KlusGedaanMelden { KlusId = id });
 
         result.IsValid.Should().BeTrue();
-        var winst = await new OverwinningOphalenHandler(overzichten, voltooiingen).HandleAsync(new OverwinningOphalen { KlusId = id });
-        winst.Value.AantalDezeWeek.Should().Be(1);
+        var winst = await new OverwinningOphalenHandler(overzichten, voltooiingen, profielen).HandleAsync(new OverwinningOphalen { KlusId = id });
+        winst.Value.Beloning.Na.DezeWeek.Should().Be(1);
         winst.Value.Klus.KanTerugdraaien.Should().BeTrue();
     }
 

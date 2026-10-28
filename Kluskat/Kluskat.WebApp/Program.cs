@@ -71,6 +71,7 @@ builder.Services.AddMarten(options =>
     options.Schema.For<KlusOverzicht>().Identity(x => x.Id);
     options.Schema.For<Voltooiing>().Identity(x => x.Id);
     options.Schema.For<Sessie>().Identity(x => x.Id);
+    options.Schema.For<Profiel>().Identity(x => x.Id);
     options.Schema.For<DataProtectionSleutel>().Identity(x => x.Id);
 });
 
@@ -123,6 +124,8 @@ builder.Services.AddScoped<MartenSessieStore>();
 builder.Services.AddScoped<ISessieStore>(sp => sp.GetRequiredService<MartenSessieStore>());
 builder.Services.AddScoped<MartenVoltooiingStore>();
 builder.Services.AddScoped<IVoltooiingStore>(sp => sp.GetRequiredService<MartenVoltooiingStore>());
+builder.Services.AddScoped<MartenProfielStore>();
+builder.Services.AddScoped<IProfielStore>(sp => sp.GetRequiredService<MartenProfielStore>());
 
 // Command handlers.
 builder.Services.AddScoped<KlusGedaanMeldenHandler>();
@@ -134,12 +137,14 @@ builder.Services.AddScoped<KlusAanpassenHandler>();
 builder.Services.AddScoped<KlusSchrappenHandler>();
 builder.Services.AddScoped<KlusGedaanOpHandler>();
 builder.Services.AddScoped<StartvullingToepassenHandler>();
+builder.Services.AddScoped<AccessoireKiezenHandler>();
 
 // Query handlers.
 builder.Services.AddScoped<VolgendeKlusOphalenHandler>();
 builder.Services.AddScoped<OverwinningOphalenHandler>();
 builder.Services.AddScoped<KlussenOphalenHandler>();
 builder.Services.AddScoped<KlusOphalenHandler>();
+builder.Services.AddScoped<ProfielOphalenHandler>();
 
 builder.Services.AddScoped<StartvullingService>();
 

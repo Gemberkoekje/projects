@@ -1,0 +1,74 @@
+@page
+@model ProfielModel
+@{
+    ViewData["Title"] = "De kat · Kluskat";
+    var stand = Model.Profiel.Spelstand;
+    var vorm = Model.Profiel.Vorm;
+    var behaald = Model.AlleTrofeeen.Count(Model.Behaald);
+}
+
+<header class="kop">
+    <a class="tekstknop" asp-page="/Index">← terug naar je klus</a>
+</header>
+
+@if (!string.IsNullOrEmpty(Model.Melding))
+{
+    <p class="melding" role="status">@Model.Melding</p>
+}
+
+<div class="kat-plek">
+    @KatSprite.Html(KatHouding.Zit, vorm, Model.Profiel.Accessoire)
+</div>
+
+<section class="kaart profiel-kaart">
+    <h1>Level @stand.Level</h1>
+    <div class="xp-balk groot" role="progressbar" aria-valuemin="0" aria-valuemax="@stand.XpVoorLevel" aria-valuenow="@stand.XpInLevel">
+        <span style="width: @Weergave.Procent(stand.Voortgang)"></span>
+    </div>
+    <p class="hint">@stand.XpInLevel / @stand.XpVoorLevel XP · @stand.Xp XP in totaal</p>
+
+    <dl class="cijfers">
+        <div><dt>Klussen gedaan</dt><dd>@stand.AantalKlussen</dd></div>
+        <div><dt>Deze week</dt><dd>@stand.DezeWeek</dd></div>
+        <div><dt>Reeks</dt><dd>@Pictogram.Vlam @Weergave.Weken(stand.Reeks)</dd></div>
+        <div><dt>Bevriezingen</dt><dd>@Pictogram.Bevriezing @stand.Bevriezingen</dd></div>
+    </dl>
+    <p class="hint">
+        Een week telt mee als je er minstens 3 klussen doet. Elke 4 weken op rij verdien je een
+        bevriezing, die een mindere week opvangt. Je langste reeks: @Weergave.Weken(stand.LangsteReeks).
+    </p>
+</section>
+
+<section class="kaart">
+    <h2>De kast</h2>
+    <div class="kast">
+        @foreach (var (level, accessoire) in Model.Kast)
+        {
+            var open = level <= stand.Level;
+            var gekozen = accessoire == Model.Profiel.Accessoire;
+            <form method="post" asp-page-handler="Aantrekken" class="kast-vak @(open ? "" : "dicht") @(gekozen ? "gekozen" : "")">
+                <input type="hidden" name="accessoire" value="@accessoire" />
+                <button type="submit" disabled="@(!open || gekozen)" aria-pressed="@(gekozen ? "true" : "false")">
+                    @KatSprite.Html(KatHouding.Zit, vorm, accessoire)
+                    <span>@(open ? Weergave.AccessoireNaam(accessoire) : $"level {level}")</span>
+                </button>
+            </form>
+        }
+    </div>
+</section>
+
+<section class="kaart">
+    <h2>Trofeeën <small>@behaald van @Model.AlleTrofeeen.Count</small></h2>
+    <ul class="trofeeen">
+        @foreach (var trofee in Model.AlleTrofeeen)
+        {
+            <li class="@(Model.Behaald(trofee) ? "" : "dicht")">
+                @Pictogram.Medaille
+                <div>
+                    <strong>@trofee.Naam</strong>
+                    <span>@trofee.Omschrijving</span>
+                </div>
+            </li>
+        }
+    </ul>
+</section>

@@ -3,19 +3,86 @@
 @{
     ViewData["Title"] = "Gedaan! · Kluskat";
     var klus = Model.Overwinning.Klus;
+    var beloning = Model.Overwinning.Beloning;
+    var na = beloning.Na;
+    var voor = beloning.Voor;
 }
 
 <div class="kat-plek" data-feest>
     <p class="tekstballon">@Model.Juich</p>
-    @KatSprite.Html(KatHouding.Blij)
+    @KatSprite.Html(KatHouding.Blij, na.Vorm, Model.Overwinning.Accessoire)
 </div>
 
 <section class="kaart winst">
     <p class="vinkje" aria-hidden="true"></p>
     <h1 class="klusnaam">@klus.Naam</h1>
     <p class="ruimte">@klus.Ruimte</p>
-    <p class="week">Deze week: <strong>@Weergave.Klusjes(Model.Overwinning.AantalDezeWeek)</strong></p>
+
+    <p class="xp-erbij">+@beloning.Xp.Totaal XP</p>
+    @if (beloning.Xp.Dapper > 0 || beloning.Xp.EersteVanDeDag > 0)
+    {
+        <p class="chips">
+            @if (beloning.Xp.Dapper > 0)
+            {
+                <span class="chip chip-bonus">dapper +@beloning.Xp.Dapper</span>
+            }
+            @if (beloning.Xp.EersteVanDeDag > 0)
+            {
+                <span class="chip chip-bonus">eerste van vandaag +@beloning.Xp.EersteVanDeDag</span>
+            }
+        </p>
+    }
+
+    <div class="niveau-regel">
+        <span class="niveau-getal">Lv @na.Level</span>
+        <span class="xp-balk"
+              data-van="@Weergave.Procent(beloning.LevelOmhoog ? 0 : voor.Voortgang)"
+              data-naar="@Weergave.Procent(na.Voortgang)">
+            <span style="width: @Weergave.Procent(na.Voortgang)"></span>
+        </span>
+    </div>
+
+    <p class="week">
+        Deze week: <strong>@Weergave.Klusjes(na.DezeWeek)</strong>
+        @if (na.Reeks > 0)
+        {
+            <span class="reeks">@Pictogram.Vlam @Weergave.Weken(na.Reeks)</span>
+        }
+    </p>
+    @if (beloning.WeekTeltNu)
+    {
+        <p class="hint">Deze week telt mee voor je reeks!</p>
+    }
 </section>
+
+@if (beloning.LevelOmhoog)
+{
+    <section class="kaart feest-kaart">
+        <h2>Level @na.Level!</h2>
+        @if (beloning.Gegroeid)
+        {
+            <p>@(na.Vorm == KatVorm.Majesteit ? "De kat is nu een echte majesteit." : "De kat is groot geworden!")</p>
+        }
+        @foreach (var nieuw in beloning.NieuweAccessoires)
+        {
+            <div class="nieuw-accessoire">
+                @KatSprite.Html(KatHouding.Zit, na.Vorm, nieuw)
+                <p>Nieuw in de kast: <strong>@Weergave.AccessoireNaam(nieuw)</strong>. <a asp-page="/Profiel">Aantrekken?</a></p>
+            </div>
+        }
+    </section>
+}
+
+@foreach (var trofee in beloning.NieuweTrofeeen)
+{
+    <section class="kaart trofee-kaart">
+        @Pictogram.Medaille
+        <div>
+            <h2>@trofee.Naam</h2>
+            <p>@trofee.Omschrijving</p>
+        </div>
+    </section>
+}
 
 <div class="knoppen">
     <a class="knop knop-hoofd" asp-page="/Index">Nog eentje</a>

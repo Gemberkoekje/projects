@@ -3,6 +3,7 @@ namespace Kluskat.WebApp.Pages;
 /// <summary>The klus screen: one klus, three buttons, nothing else.</summary>
 public sealed class IndexModel(
     VolgendeKlusOphalenHandler volgende,
+    ProfielOphalenHandler profiel,
     KlusGedaanMeldenHandler gedaan,
     KlusOverslaanHandler overslaan,
     OvergeslagenVrijgevenHandler vrijgeven,
@@ -10,6 +11,9 @@ public sealed class IndexModel(
 {
     /// <summary>What to show.</summary>
     public Keuze Keuze { get; private set; } = new Keuze();
+
+    /// <summary>The level badge and the cat's look.</summary>
+    public Profieloverzicht Profiel { get; private set; } = new Profieloverzicht();
 
     /// <summary>What the cat says.</summary>
     public string Aanmoediging { get; } = Weergave.Aanmoediging();
@@ -29,6 +33,13 @@ public sealed class IndexModel(
         if (result.IsValid)
         {
             Keuze = result.Value;
+        }
+
+        var stand = await profiel.HandleAsync(new ProfielOphalen(), cancellationToken);
+
+        if (stand.IsValid)
+        {
+            Profiel = stand.Value;
         }
     }
 

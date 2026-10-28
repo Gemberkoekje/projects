@@ -39,7 +39,10 @@ dotnet test Kluskat.slnx
 - Qowaiv.DomainModel aggregates are immutable: continue with `result.Value`, never with the
   instance you called the mutation on.
 - Events are frozen by `KlusEvent_schema_guard_specs`: add a new event, never change one.
-- The cat is `Kluskat.WebApp/Kat/KatSprite.cs`; after changing the sprite, regenerate the icons
-  in `wwwroot/img` from it (any SVG-to-PNG with nearest-neighbour scaling, e.g. ImageMagick
-  `-filter point`).
+- The cat is `Kluskat.WebApp/Kat/KatSprite.cs` (base grid + form/pose/accessory layers). Draw
+  against `/Dev/Katten` (Development only) — it renders every combination. After changing the
+  *base* sprite, regenerate the icons in `wwwroot/img` from it (any SVG-to-PNG with
+  nearest-neighbour scaling, e.g. ImageMagick `-filter point`).
+- The game is a pure function of the completion log (`Spelregels.Bereken`): change a rule there,
+  and history re-scores itself. Never store XP or levels.
 - Every phase ends with a written summary appended to `NOTES.md`.

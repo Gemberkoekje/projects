@@ -3,7 +3,21 @@
 @{
     ViewData["Title"] = "Kluskat";
     var keuze = Model.Keuze;
+    var stand = Model.Profiel.Spelstand;
+    var vorm = Model.Profiel.Vorm;
+    var accessoire = Model.Profiel.Accessoire;
 }
+
+<header class="balk">
+    <a class="niveau" asp-page="/Profiel" aria-label="Je profiel: level @stand.Level">
+        <span class="niveau-getal">Lv @stand.Level</span>
+        <span class="xp-balk klein" aria-hidden="true"><span style="width: @Weergave.Procent(stand.Voortgang)"></span></span>
+    </a>
+    @if (stand.Reeks > 0)
+    {
+        <a class="reeks" asp-page="/Profiel" aria-label="Reeks: @Weergave.Weken(stand.Reeks)">@Pictogram.Vlam @stand.Reeks</a>
+    }
+</header>
 
 @if (!string.IsNullOrEmpty(Model.Melding))
 {
@@ -16,7 +30,7 @@
 
     <div class="kat-plek">
         <p class="tekstballon">@Model.Aanmoediging</p>
-        @KatSprite.Html(KatHouding.Zit)
+        @KatSprite.Html(KatHouding.Zit, vorm, accessoire)
     </div>
 
     <section class="kaart klus">
@@ -53,7 +67,7 @@ else if (keuze.Uitkomst == KeuzeUitkomst.AllesOvergeslagen)
 {
     <div class="kat-plek">
         <p class="tekstballon">Ook goed.</p>
-        @KatSprite.Html(KatHouding.Zit)
+        @KatSprite.Html(KatHouding.Zit, vorm, accessoire)
     </div>
 
     <section class="kaart leeg">
@@ -72,7 +86,7 @@ else
 {
     <div class="kat-plek">
         <span class="zzz" aria-hidden="true">z<span>z</span><span>z</span></span>
-        @KatSprite.Html(KatHouding.Slaap)
+        @KatSprite.Html(KatHouding.Slaap, vorm, accessoire)
     </div>
 
     <section class="kaart leeg">

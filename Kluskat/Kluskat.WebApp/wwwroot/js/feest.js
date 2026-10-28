@@ -1,12 +1,29 @@
-// A little burst of square confetti on the win screen. Square on purpose: it matches the pixel cat.
+// The win screen's celebration: a burst of square confetti (square on purpose: it matches the
+// pixel cat), and the XP bar filling up from where it was.
 (function () {
     'use strict';
 
-    if (!document.querySelector('[data-feest]')) {
-        return;
-    }
+    var stil = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('.xp-balk[data-van]').forEach(function (balk) {
+        var vulling = balk.querySelector('span');
+        if (!vulling || stil) {
+            return;
+        }
+
+        vulling.style.transition = 'none';
+        vulling.style.width = balk.dataset.van;
+
+        // Two frames later, so the browser has painted the start width before it animates.
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                vulling.style.transition = '';
+                vulling.style.width = balk.dataset.naar;
+            });
+        });
+    });
+
+    if (!document.querySelector('[data-feest]') || stil) {
         return;
     }
 

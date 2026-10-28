@@ -1,8 +1,8 @@
 namespace Kluskat.application.Ports;
 
 /// <summary>
-/// The log of klussen ticked off on the klus screen: what the win screen counts, and what phase 2
-/// computes XP and the weekly streak from. It only ever counts what was done, never what is left.
+/// The log of klussen ticked off on the klus screen: what XP, levels, the streak and the
+/// achievements are computed from. It only ever counts what was done, never what is left.
 /// </summary>
 public interface IVoltooiingStore
 {
@@ -18,9 +18,8 @@ public interface IVoltooiingStore
     /// <returns>A task that completes once removed.</returns>
     Task LaatsteVerwijderenAsync(KlusId id, CancellationToken cancellationToken = default);
 
-    /// <summary>How many completions were logged since a moment.</summary>
-    /// <param name="sinds">The start (UTC), inclusive.</param>
+    /// <summary>The whole log. A few thousand small documents at most, so the rules score it in memory.</summary>
     /// <param name="cancellationToken">Cancels the query.</param>
-    /// <returns>The count.</returns>
-    Task<int> AantalSindsAsync(DateTime sinds, CancellationToken cancellationToken = default);
+    /// <returns>Every completion, in no particular order.</returns>
+    Task<IReadOnlyList<Voltooiing>> AlleAsync(CancellationToken cancellationToken = default);
 }

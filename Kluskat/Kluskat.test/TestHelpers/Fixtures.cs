@@ -20,6 +20,31 @@ internal static class Fixtures
             LaatstGedaan = Nu.AddDays(-dagenGeleden),
         };
 
+    /// <summary>A completion at a moment, for game-rule specs.</summary>
+    public static Voltooiing Voltooid(
+        DateTime op,
+        Grootte grootte = Grootte.Klein,
+        string ruimte = "Keuken",
+        bool dapper = false,
+        int keerOvergeslagen = 0,
+        int intervalDagen = 7)
+        => new Voltooiing
+        {
+            Id = Guid.NewGuid(),
+            KlusId = Guid.NewGuid(),
+            Ruimte = ruimte,
+            Naam = "Iets",
+            Grootte = grootte,
+            Op = op,
+            Dapper = dapper,
+            KeerOvergeslagen = keerOvergeslagen,
+            IntervalDagen = intervalDagen,
+        };
+
+    /// <summary>A number of completions in the week of a Monday, at noon on different days.</summary>
+    public static IEnumerable<Voltooiing> Week(DateOnly maandag, int aantal)
+        => Enumerable.Range(0, aantal).Select(i => Voltooid(Kalender.Middag(maandag.AddDays(i % 7))));
+
     public static Klus NieuweKlus(Klus.Data data, DateTime laatstGedaan)
     {
         var result = core.Models.Klus.Toevoegen(data, laatstGedaan);

@@ -12,8 +12,7 @@ public static class Kalender
     /// <summary>The local calendar date of an instant.</summary>
     /// <param name="utc">The instant (UTC).</param>
     /// <returns>The date on a wall calendar in Amsterdam.</returns>
-    public static DateOnly Datum(DateTime utc)
-        => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(Utc(utc), Zone));
+    public static DateOnly Datum(DateTime utc) => DateOnly.FromDateTime(Lokaal(utc));
 
     /// <summary>The instant a local date starts.</summary>
     /// <param name="datum">The local date.</param>
@@ -21,15 +20,25 @@ public static class Kalender
     public static DateTime Middernacht(DateOnly datum)
         => TimeZoneInfo.ConvertTimeToUtc(datum.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), Zone);
 
-    /// <summary>The instant the local week (Monday to Sunday) containing <paramref name="utc"/> starts.</summary>
+    /// <summary>The wall-clock time in Amsterdam of an instant.</summary>
+    /// <param name="utc">The instant (UTC).</param>
+    /// <returns>The local date and time.</returns>
+    public static DateTime Lokaal(DateTime utc) => TimeZoneInfo.ConvertTimeFromUtc(Utc(utc), Zone);
+
+    /// <summary>The local Monday of the week (Monday to Sunday) containing <paramref name="utc"/>.</summary>
     /// <param name="utc">An instant in the week.</param>
-    /// <returns>Local Monday 00:00 of that week, as UTC.</returns>
-    public static DateTime BeginVanDeWeek(DateTime utc)
+    /// <returns>That Monday's date; it identifies the week.</returns>
+    public static DateOnly Maandag(DateTime utc)
     {
         var datum = Datum(utc);
         var dagenSindsMaandag = ((int)datum.DayOfWeek + 6) % 7;
-        return Middernacht(datum.AddDays(-dagenSindsMaandag));
+        return datum.AddDays(-dagenSindsMaandag);
     }
+
+    /// <summary>The instant the local week (Monday to Sunday) containing <paramref name="utc"/> starts.</summary>
+    /// <param name="utc">An instant in the week.</param>
+    /// <returns>Local Monday 00:00 of that week, as UTC.</returns>
+    public static DateTime BeginVanDeWeek(DateTime utc) => Middernacht(Maandag(utc));
 
     /// <summary>Middle of a local day, as UTC: a safe stand-in when only a date is known.</summary>
     /// <param name="datum">The local date.</param>

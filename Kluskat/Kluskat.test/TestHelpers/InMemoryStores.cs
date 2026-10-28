@@ -106,6 +106,19 @@ internal sealed class InMemoryVoltooiingStore : IVoltooiingStore
         return Task.CompletedTask;
     }
 
-    public Task<int> AantalSindsAsync(DateTime sinds, CancellationToken cancellationToken = default)
-        => Task.FromResult(log.Count(v => v.Op >= sinds));
+    public Task<IReadOnlyList<Voltooiing>> AlleAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Voltooiing>>([.. log]);
+}
+
+internal sealed class InMemoryProfielStore : IProfielStore
+{
+    public Profiel Profiel { get; private set; } = new Profiel();
+
+    public Task<Profiel> LadenAsync(CancellationToken cancellationToken = default) => Task.FromResult(Profiel);
+
+    public Task OpslaanAsync(Profiel profiel, CancellationToken cancellationToken = default)
+    {
+        Profiel = profiel;
+        return Task.CompletedTask;
+    }
 }

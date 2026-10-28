@@ -1,0 +1,46 @@
+@page
+@model Kluskat.WebApp.Pages.Dev.KattenModel
+@{
+    ViewData["Title"] = "Kattengalerij";
+    ViewData["SchermKlasse"] = "breed galerij";
+    var vormen = new[] { KatVorm.Kitten, KatVorm.Kat, KatVorm.Majesteit };
+    var houdingen = new[] { KatHouding.Zit, KatHouding.Blij, KatHouding.Slaap };
+    var accessoires = Enum.GetValues<Accessoire>();
+}
+
+<h1>Kattengalerij</h1>
+
+<h2>Vormen × houdingen</h2>
+<div class="galerij-rij">
+    @foreach (var vorm in vormen)
+    {
+        @foreach (var houding in houdingen)
+        {
+            <figure>@KatSprite.Html(houding, vorm)<figcaption>@vorm · @houding</figcaption></figure>
+        }
+    }
+</div>
+
+<h2>Accessoires (kat, zit)</h2>
+<div class="galerij-rij">
+    @foreach (var accessoire in accessoires)
+    {
+        <figure>@KatSprite.Html(KatHouding.Zit, KatVorm.Kat, accessoire)<figcaption>@accessoire</figcaption></figure>
+    }
+</div>
+
+<h2>Accessoires (kitten, blij)</h2>
+<div class="galerij-rij">
+    @foreach (var accessoire in accessoires)
+    {
+        <figure>@KatSprite.Html(KatHouding.Blij, KatVorm.Kitten, accessoire)<figcaption>@accessoire</figcaption></figure>
+    }
+</div>
+
+<h2>Accessoires (majesteit, slaap)</h2>
+<div class="galerij-rij">
+    @foreach (var accessoire in accessoires)
+    {
+        <figure>@KatSprite.Html(KatHouding.Slaap, KatVorm.Majesteit, accessoire)<figcaption>@accessoire</figcaption></figure>
+    }
+</div>

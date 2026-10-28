@@ -5,7 +5,7 @@ how many chores are waiting. A pixel cat cheers you on, levels up and collects h
 
 _To understand this, read this file first, then [NOTES.md](NOTES.md) for what was built and what is next._
 
-Status: design agreed 2026-10-28; chore list approved ("I'll tell you when a chore doesn't work and we refine"). Phase 1 built.
+Status: design agreed 2026-10-28; chore list approved ("I'll tell you when a chore doesn't work and we refine"). Phases 1 and 2 built.
 
 ## 1. Decisions so far
 
@@ -92,6 +92,9 @@ cat's wardrobe (pick an accessory). Totals count only what you did.
   - Streak 4 / 12 / 52 weeks.
   - **Comeback**: a chore after 14+ days away. Coming back is rewarded, never shamed.
 - **Nothing ever goes down** except the streak, and freezes cushion that.
+- As built (phase 2): levels take `60 + 20·(n−1)` XP; accessories unlock at levels 2 (feestmuts),
+  4 (strikje), 6 (bril), 8 (bloemetje), 10 (sjaal), 12 (koksmuts) and 15 (kroon, with the
+  majesty form); 22 achievements, listed in `Kluskat.application/Spel/Trofee.cs`.
 
 ## 5. Tech
 

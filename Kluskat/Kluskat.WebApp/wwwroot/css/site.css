@@ -29,6 +29,11 @@
     --melding-tekst: #1f6a4b;
     --fout: #c4543d;
     --rond: 18px;
+    --xp: #8f86e8;
+    --xp-spoor: #ece4f7;
+    --chip-bonus: #fdeccc;
+    --chip-bonus-tekst: #8a5a10;
+    --podium: transparent;
     color-scheme: light;
 }
 
@@ -58,6 +63,11 @@
         --melding: #1d3a2d;
         --melding-tekst: #9fe0bf;
         --fout: #f08f7b;
+        --xp: #a59df0;
+        --xp-spoor: #2f2840;
+        --chip-bonus: #3d3016;
+        --chip-bonus-tekst: #f3cf86;
+        --podium: #3b3027;
         color-scheme: dark;
     }
 }
@@ -86,6 +96,7 @@ body {
 }
 
 .scherm {
+    position: relative;
     width: 100%;
     max-width: 420px;
     min-height: calc(100dvh - 32px);
@@ -119,13 +130,34 @@ a {
     flex-direction: column;
     align-items: center;
     gap: 6px;
+    /* In dark mode a soft stage behind the cat, so its dark outline does not vanish. */
+    background: radial-gradient(closest-side, var(--podium), transparent);
 }
 
+/* Whole pixels only: 5, 6 and 7 screen pixels per sprite pixel. The cat grows with its level. */
 .kat {
     width: 156px;
     height: auto;
     display: block;
     image-rendering: pixelated;
+}
+
+.kat.kat-kitten {
+    width: 130px;
+}
+
+.kat.kat-majesteit {
+    width: 182px;
+}
+
+.kat-glans {
+    animation: twinkel 2.4s steps(1, end) infinite;
+}
+
+@keyframes twinkel {
+    0%, 60% { opacity: 1; }
+    61%, 80% { opacity: 0.25; }
+    81%, 100% { opacity: 1; }
 }
 
 .kat-schaduw {
@@ -536,8 +568,310 @@ select {
     to { transform: translate(var(--drift, 0), 105vh) rotate(var(--draai, 360deg)); }
 }
 
+/* ---- Game: level badge, XP, streak ------------------------------------------------------ */
+
+.balk {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.niveau,
+.reeks {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--kaart);
+    border: 2px solid var(--rand);
+    font-weight: 900;
+    font-size: 15px;
+    text-decoration: none;
+}
+
+.niveau-getal {
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.xp-balk {
+    display: block;
+    flex: 1;
+    height: 12px;
+    border-radius: 6px;
+    background: var(--xp-spoor);
+    overflow: hidden;
+}
+
+.xp-balk > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--xp);
+    border-radius: 6px;
+    transition: width 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 300ms;
+}
+
+.xp-balk.klein {
+    width: 56px;
+    flex: none;
+    height: 8px;
+}
+
+.xp-balk.groot {
+    height: 16px;
+    margin: 10px 0 6px;
+}
+
+.pictogram {
+    width: 14px;
+    height: auto;
+    image-rendering: pixelated;
+    vertical-align: -2px;
+}
+
+.reeks .pictogram {
+    width: 14px;
+}
+
+.week .reeks {
+    margin-left: 6px;
+    padding: 2px 10px;
+    font-size: 14px;
+}
+
+.xp-erbij {
+    margin: 14px 0 6px;
+    font-size: 30px;
+    font-weight: 900;
+    color: var(--xp);
+}
+
+.chip-bonus {
+    background: var(--chip-bonus);
+    color: var(--chip-bonus-tekst);
+}
+
+.niveau-regel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.feest-kaart,
+.trofee-kaart {
+    text-align: center;
+    border-color: var(--xp);
+    box-shadow: 0 4px 0 var(--xp);
+}
+
+.feest-kaart h2 {
+    font-size: 26px;
+    font-weight: 900;
+}
+
+.feest-kaart p {
+    margin: 6px 0 0;
+}
+
+.nieuw-accessoire {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.trofee-kaart {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-align: left;
+}
+
+.trofee-kaart .pictogram {
+    width: 42px;
+    flex: none;
+}
+
+.trofee-kaart h2 {
+    font-size: 19px;
+}
+
+.trofee-kaart p {
+    margin: 2px 0 0;
+    color: var(--zacht);
+}
+
+/* Small cats (wardrobe, unlocks): three screen pixels per sprite pixel, and no blinking choir. */
+.kast-vak .kat.kat-kitten,
+.kast-vak .kat.kat-volwassen,
+.kast-vak .kat.kat-majesteit,
+.nieuw-accessoire .kat.kat-kitten,
+.nieuw-accessoire .kat.kat-volwassen,
+.nieuw-accessoire .kat.kat-majesteit {
+    width: 78px;
+}
+
+.kast-vak .kat-knipper,
+.kast-vak .kat-glans,
+.nieuw-accessoire .kat-knipper {
+    display: none;
+}
+
+/* ---- Profile ----------------------------------------------------------------------------- */
+
+.profiel-kaart h1 {
+    font-size: 26px;
+    font-weight: 900;
+}
+
+.cijfers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.cijfers div {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--bg);
+}
+
+.cijfers dt {
+    font-size: 13px;
+    color: var(--zacht);
+}
+
+.cijfers dd {
+    margin: 2px 0 0;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.cijfers .pictogram {
+    width: 16px;
+}
+
+.kaart h2 small {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--zacht);
+}
+
+.kast {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.kast-vak {
+    margin: 0;
+}
+
+.kast-vak button {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    border: 2px solid var(--rand);
+    border-radius: 14px;
+    background: var(--bg);
+    color: var(--tekst);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.kast-vak.gekozen button {
+    border-color: var(--hoofd);
+    box-shadow: 0 0 0 2px var(--hoofd);
+    cursor: default;
+}
+
+.kast-vak.dicht button {
+    cursor: default;
+    color: var(--zacht);
+}
+
+.kast-vak.dicht .kat,
+.trofeeen .dicht .pictogram {
+    filter: grayscale(1);
+    opacity: 0.35;
+}
+
+.trofeeen {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.trofeeen li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: var(--bg);
+}
+
+.trofeeen .pictogram {
+    width: 28px;
+    flex: none;
+}
+
+.trofeeen div {
+    display: flex;
+    flex-direction: column;
+}
+
+.trofeeen span {
+    font-size: 14px;
+    color: var(--zacht);
+}
+
+.trofeeen .dicht strong {
+    color: var(--zacht);
+}
+
+/* ---- Development gallery ------------------------------------------------------------- */
+
+.galerij-rij {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.galerij-rij figure {
+    margin: 0;
+    padding: 8px;
+    background: var(--kaart);
+    border: 2px solid var(--rand);
+    border-radius: 12px;
+    text-align: center;
+    font-size: 12px;
+}
+
+.scherm.galerij {
+    max-width: 1200px;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .kat-knipper,
+    .kat-glans,
     .kat-lijf,
     .zzz {
         animation: none !important;

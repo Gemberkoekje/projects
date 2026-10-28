@@ -33,8 +33,11 @@ public sealed class Klus(KlusId aggregateId) : Aggregate<Klus, KlusId>(aggregate
     /// <summary>Whether the latest completion can still be taken back.</summary>
     public bool KanTerugdraaien { get; private set; }
 
-    /// <summary>When the klus was last skipped (UTC); phase 2 reads it for the bravery bonus.</summary>
+    /// <summary>When the klus was last skipped (UTC); the bravery bonus reads it.</summary>
     public DateTime LaatstOvergeslagen { get; private set; }
+
+    /// <summary>How often the klus was skipped since it was last done; the "Overwinnaar" badge reads it.</summary>
+    public int KeerOvergeslagen { get; private set; }
 
     /// <summary>Whether the klus left the list for good.</summary>
     public bool Geschrapt { get; private set; }
@@ -184,6 +187,7 @@ public sealed class Klus(KlusId aggregateId) : Aggregate<Klus, KlusId>(aggregate
         VorigeLaatstGedaan = LaatstGedaan;
         LaatstGedaan = @event.GedaanOp;
         KanTerugdraaien = true;
+        KeerOvergeslagen = 0;
     }
 
     internal void When(KlusGedaanTeruggedraaid @event)
@@ -196,6 +200,7 @@ public sealed class Klus(KlusId aggregateId) : Aggregate<Klus, KlusId>(aggregate
     {
         // The skip window itself lives in the Sessie document; this is history.
         LaatstOvergeslagen = @event.When;
+        KeerOvergeslagen++;
     }
 
     internal void When(KlusGeschrapt @event)

@@ -26,7 +26,19 @@ public sealed class KlusGedaanMeldenHandler(
     private async Task<Result> MeldenAsync(KlusGedaanMelden command, CancellationToken cancellationToken)
     {
         var nu = Clock.UtcNow();
-        var result = await KlusMutatie.UitvoerenAsync(repository, command.KlusId, klus => klus.Gedaan(nu, viaBeheer: false), cancellationToken);
+
+        // Aggregates are immutable, so the instance handed to the mutation is the klus as it was
+        // before: its skip history feeds the bravery bonus and the Overwinnaar badge.
+        var voor = new Klus();
+        var result = await KlusMutatie.UitvoerenAsync(
+            repository,
+            command.KlusId,
+            klus =>
+            {
+                voor = klus;
+                return klus.Gedaan(nu, viaBeheer: false);
+            },
+            cancellationToken);
 
         if (!result.IsValid)
         {
@@ -34,7 +46,7 @@ public sealed class KlusGedaanMeldenHandler(
             return result;
         }
 
-        await voltooiingen.ToevoegenAsync(Voltooiing.Van(result.Value, nu), cancellationToken);
+        await voltooiingen.ToevoegenAsync(Voltooiing.Van(voor, nu), cancellationToken);
 
         var sessie = (await sessies.LadenAsync(cancellationToken)).Actueel(nu);
         await sessies.OpslaanAsync(sessie.NaGedaan((Guid)(Uuid)command.KlusId, nu), cancellationToken);
