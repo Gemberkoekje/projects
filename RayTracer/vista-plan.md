@@ -2106,6 +2106,34 @@ at dawn and dusk from the spectral air alone, with no special-casing (the golden
 snowcaps with bare steep faces (the golden `april-slopes`; M1.13's measure: in April 75% or more of the flats white, at most 35% of the
 faces over 40°); the estimate inside its own stated range on the test views (M1.17's run above); goldens added (`--golden-check`, ten of
 ten). Its summary, carried-forward items and hand-off: [`vista-log/M1.17.md`](vista-log/M1.17.md), "M1 sign-off".
+*Next (the user's call, 2026-10-28):* M1a, the ground's surface, then M2.
+
+**M1a — The ground's surface.** *(Added 2026-10-28, the user's call after the M1 hero; it comes before M2. A milestone of its own,
+not a slice of M1, whose sign-off stands.)*
+- *Goal:* rock and ground that read as a photo at arm's length, on the hero's own frame: the lit middle range (about 1–10 km) and the
+  nearest faces (100 m – 3 km), where M1's hero reads as a model.
+- *Why (the review of `m1-17-hero.png`, 2026-10-28):* the light and the layering hold, and the far range reads best; the surfaces give
+  it away, biggest first. (1) **Folded paper:** smooth flat planes, and long straight grooves down every steep slope, all parallel, as
+  if combed, across the lit middle range that is the picture's subject; it looks like the parallel fluting M1.11a set out to fix, back
+  on the steep faces. (2) **Rows of dots** on a few slopes, in shade and in sun: a regular pattern, not nature; perhaps the meadow's
+  banding (parked) seen from farther, its cause unknown. (3) **Marble** in the shaded foreground: light and dark bands that swirl like
+  marble or wood grain, probably the folded strata's colour, reading as liquid rather than rock. (4) **Felt:** meadow patches on the
+  crests with hard cut-out edges and flat colour. M2's measured spectra change the colours and none of these, and water, clouds and
+  trees will all be judged on top of this ground.
+- *Takes from the parked list:* "The nearest faces lack detail", with its options and order (shading and colour detail at 5–50 m
+  first, geometry only where an outline needs it, a finer erosion tile if those fall short), its metres-per-pixel measure, and after it
+  M1.14's detail budget relaxed, its limit re-chosen by the user's eye; "The meadow's regular banding", if it is the dots; "Steeper,
+  more alike slopes since the folded strata", if it bears on the grooves.
+- *Deliverable:* first a map of each of the four on the hero's frame (which material, and which field or texture, makes it), so each
+  fix aims at its cause; then the fixes, the grooves and planes first: gullies that branch and wander, ribs, buttresses, ledges and
+  cliff bands from the rock's hardness, scree in the gullies, at the scales the hero shows; the dots gone; the beds broken and
+  weathered so they read as rock layers; meadow edges ragged and graded, with texture. Its slices are planned first ("Every slice"),
+  in the order the hero shows the four.
+- *Verify:* the hero re-rendered (the same recipe, seed and camera, `vista-views/signoff/hero.camera.json`) beside M1's, with loupes
+  on the lit middle range, the shaded foreground and a meadow's edge, for the user's yes or no: at arm's length, does it read as a
+  photo? Beside the webcam's lit rock (`23-08-2026-2010`, `12-10-2026-1820`) for texture, not shape. The detail budget's measure on
+  M1.14's finalists before and after; the triangle ceiling (48 M) and the cost ledger; the goldens re-baselined deliberately; the maze
+  unmoved.
 
 **M2 — Measured spectra.**
 Goal: "it is spectral" backed by measured data. Deliverable: verify access routes and
@@ -2209,8 +2237,8 @@ perspective camera stretches the edges of a multi-monitor span, and of Hamlet's 
 (3840×120: even a 5° vertical field of view is about 110° across, the edges stretched about
 3×); the lens models, the loupe's frame-keyed pixels and the auto camera learn it, and the
 sidecar records it so a client can turn depth back into positions. It is independent of the
-tiling and can be pulled forward as its own slice if Hamlet's H4 comes first. **Needs the
-mid-distance rock detail first** (the parked "nearest faces lack detail"): at 8K and 16K a pixel
+tiling and can be pulled forward as its own slice if Hamlet's H4 comes first. **Needs M1a's
+rock detail first** (the ground's surface, from the parked "nearest faces lack detail"): at 8K and 16K a pixel
 covers half or a quarter of the ground it does at 4K, and M1.14's detail budget would reject most
 frames otherwise. Verify: a 16K
 render completes within the VRAM budget and resumes after an interruption; a span and a 32:1
@@ -2239,7 +2267,8 @@ any of them.
 - **Clouds lit from below at sunset** (the webcam, `07-05-2026-2040`; both stock photos): the classic
   wallpaper sky. *Belongs:* M4.
 - **The meadow's regular banding** (M1.12's close-ups): wavy bands that look like a single-frequency
-  pattern. *Belongs:* M5 (grass), checked when grass geometry lands.
+  pattern. *Belongs:* M5 (grass), checked when grass geometry lands. *2026-10-28:* M1a checks first whether it is the hero's
+  rows of dots.
 - **Folds without faults** (M1.12c): the beds bend but never break, as a height field's beds must.
   *Belongs:* unscheduled; faults and overhangs need more than a height field.
 - **Steeper, more alike slopes since the folded strata** (M1.12c): the facet measure rose from
@@ -2285,7 +2314,8 @@ any of them.
   M11, whose 8K and 16K halve the metres per pixel and need it; the iconic shot needs it too (a lit face like the Matterhorn's
   from Sunnegga, about 8 km off, filling much of the frame). Shading and colour detail first (no triangles), geometry only where a
   silhouette needs it, a finer erosion tile if those fall short; judged by the same metres-per-pixel measure, after which M1.14's
-  detail budget relaxes. Until then that budget keeps such frames out of the auto camera's picks.
+  detail budget relaxes. Until then that budget keeps such frames out of the auto camera's picks. *Moved 2026-10-28 (the user's
+  call, after the M1 hero):* into M1a, ahead of M2.
 - **A sample costs more in dispatches of several samples a pixel** (M1.15): the snow view's sample costs 5.2 ns in passes of one
   sample a pixel and 6.7 in passes of four, the aerial view's 5.0 and 5.65, with the same rays (vista-log/M1.15.md); a cheap view's
   final is planned as passes of up to 64 samples a pixel. Likely the sample loop's registers lowering the GPU's occupancy; passes of
