@@ -1,0 +1,860 @@
+{
+  "schema": 27,
+  "kind": "preview",
+  "createdUtc": "2026-10-28T20:08:41.0776072Z",
+  "engine": {
+    "vistaVersion": "1.0.0+fed2310124452e79b75743eb6f4ff316ecead610",
+    "runtime": ".NET 10.0.12",
+    "device": "NVIDIA GeForce RTX 3070"
+  },
+  "recipe": {
+    "schema": 2,
+    "name": "alpine range, golden hour",
+    "setPieces": [
+      "alpineRange"
+    ],
+    "time": "goldenHour",
+    "season": "summer",
+    "location": "zermatt",
+    "latitude": null,
+    "date": "2026-07-15",
+    "solarTime": null,
+    "sunElevation": null,
+    "altitude": null
+  },
+  "seed": 42,
+  "camera": {
+    "schema": 1,
+    "position": {
+      "x": -6366.396697069575,
+      "y": 1742.9589622837402,
+      "z": 10026.025947088627
+    },
+    "yawDegrees": 147.55977011843527,
+    "pitchDegrees": -5.444132973945289,
+    "rollDegrees": 0,
+    "focalLengthMm": 35,
+    "sensorHeightMm": 24,
+    "fStop": 0,
+    "focusDistanceMetres": 1000,
+    "exposureEv": 0
+  },
+  "defaultCamera": false,
+  "autoCamera": null,
+  "detail": null,
+  "image": {
+    "width": 3840,
+    "height": 2160,
+    "samplesPerPixel": 256,
+    "maxBounces": 6,
+    "displayTransform": "exposure + AgX punchy (three.js r169's AgX, Filament's punchy look after the sigmoid: power 1.35, saturation 1.4 held back where a channel would clip) + sRGB",
+    "window": {
+      "x": 0,
+      "y": 0,
+      "width": 3840,
+      "height": 2160
+    },
+    "units": "W·m⁻²·sr⁻¹·nm⁻¹: Y is the ȳ-weighted mean spectral radiance; × 72 985 gives cd/m²",
+    "display": "agx",
+    "look": "punchy",
+    "dither": "triangular",
+    "bitDepth": 8,
+    "whiteBalanceKelvin": 5500,
+    "skyMargin": 0.03,
+    "lightSampling": "mis",
+    "russianRouletteStart": 2,
+    "diffuse": "orenNayar",
+    "canopy": "kernels",
+    "quadrature": "blend",
+    "wavelengths": {
+      "count": 50,
+      "firstNm": 416,
+      "lastNm": 701
+    }
+  },
+  "world": {
+    "terrainProfile": "mountains",
+    "gridSize": 4097,
+    "cellSizeMetres": 8,
+    "heightFieldHash": "a4b757024c5b5e7e",
+    "minHeightMetres": 391.8214416503906,
+    "maxHeightMetres": 2386.678466796875,
+    "triangles": 27142471,
+    "meshBytes": 705729516,
+    "erosion": {
+      "source": "cache",
+      "settings": {
+        "iterations": 1500,
+        "timeStep": 0.25,
+        "pipeArea": 20,
+        "fluxDamping": 0.8,
+        "rainPerStep": 0.002,
+        "evaporation": 0.01,
+        "capacity": 2,
+        "dischargeExponent": 1,
+        "minSlope": 0.05,
+        "dissolve": 0.1,
+        "rockErodibility": 0.1,
+        "deposition": 0.1,
+        "looseTalusDegrees": 35,
+        "rockTalusDegrees": 40,
+        "rockTalusHardDegrees": 65,
+        "thermalRate": 0.25,
+        "averageFrom": 750,
+        "incisionSteps": 300,
+        "incisionCell": 64,
+        "incisionRate": 0.03,
+        "channelAreaKm2": 0.1,
+        "incisionTalusDegrees": 35,
+        "incisionTalusHardDegrees": 60,
+        "incisionUplift": 8,
+        "upliftOctaves": 1,
+        "upliftContrast": 1.5,
+        "hardErodibility": 0.3,
+        "strataThickness": 60,
+        "strataDipDegrees": 8,
+        "hardnessMottle": 0.08,
+        "strataRegionalDipDegrees": 40,
+        "strataRegionMetres": 10000,
+        "strataFoldMetres": 600,
+        "strataFoldWavelengthMetres": 5000,
+        "strataFormationMetres": 300,
+        "strataMassiveShare": 0.3,
+        "glacialSteps": 60,
+        "glacialElaMetres": 1200,
+        "glacialElaSwingMetres": 300,
+        "glacialCycleSteps": 20,
+        "glacialBalanceGradient": 0.007,
+        "glacialAccumulationMetres": 2,
+        "glacialAblationMetres": 10,
+        "glacialErosionMetres": 12,
+        "glacierElaMetres": 1800,
+        "presentClimate": {
+          "elaMetres": 1800,
+          "balanceGradient": 0.007000000216066837,
+          "accumulationMetres": 2,
+          "ablationMetres": 10
+        },
+        "incisionLakeFill": 0.05,
+        "poolFillMetres": 100
+      },
+      "settingsHash": "6b28e2bc4c316d19",
+      "baseHeightFieldHash": "9c00a463cc60eebe",
+      "device": "NVIDIA GeForce RTX 3070",
+      "driver": "32.0.16.1664",
+      "erodedUtc": "2026-10-25T11:58:36.4188823Z",
+      "cacheFile": "%LOCALAPPDATA%\\Vista\\worlds\\mountains-42-4097x8-a2b698a9d5e6c110.vworld",
+      "stats": null,
+      "drainage": {
+        "channelAreaKm2": 1,
+        "lakeDepthMetres": 1,
+        "basinDepthMetres": 10,
+        "channelShare": 0.004508737320609822,
+        "longestChannelKm": 33.565169962937986,
+        "longestOpenChannelKm": 39.32853388042311,
+        "longestRouteKm": 39.32853388042311,
+        "drainsToChannels": 0.956533379675169,
+        "lakeShare": 0.00030931626390515713,
+        "basinShare": 1.1915110319921308E-06,
+        "largestBasinShare": 0.30501586228849115,
+        "streams": [
+          331,
+          79,
+          20,
+          6,
+          1
+        ],
+        "maxOrder": 5,
+        "bifurcationRatio": 4.265372832316098
+      },
+      "strata": {
+        "low": 388.8425598144531,
+        "bottom": 591.7880249023438,
+        "scale": 0.720329802223769,
+        "upliftSteps": 300
+      }
+    },
+    "mesh": {
+      "kind": "view",
+      "errorPixels": 1,
+      "pixelsPerRadian": 3150.0000000000005,
+      "detail": true,
+      "materials": true,
+      "farField": true,
+      "triangles": 27142471,
+      "detailTriangles": 17671326,
+      "farTriangles": 4453870,
+      "vertices": 13572138,
+      "bytes": 705729516,
+      "reachMetres": 339690.67086923437,
+      "groundRadiusMetres": 6360956.919128418,
+      "minHeightMetres": 207.7704356689453,
+      "maxHeightMetres": 2395.713771484375,
+      "refineSeconds": 6.0716098,
+      "vertexSeconds": 2.1171247,
+      "hierarchySeconds": 5.8335564
+    },
+    "footing": {
+      "percentile": 5,
+      "heightMetres": 651.0808715820312,
+      "lowestMetres": 391.8214416503906,
+      "crestMetres": 1784.58984375,
+      "reliefMetres": 1133.5089721679688
+    },
+    "glaciers": {
+      "elaMetres": 1800,
+      "share": 0.07920927038477286,
+      "volumeKm3": 3.416507948820198,
+      "maxThicknessMetres": 296.5
+    }
+  },
+  "place": {
+    "place": "zermatt",
+    "name": "Zermatt",
+    "spot": "Zermatt village",
+    "latitudeDegrees": 46.02,
+    "valleyAltitudeMetres": 1608
+  },
+  "sliders": {
+    "file": null,
+    "pinsFrom": "recipe",
+    "pins": {
+      "schema": 1,
+      "location": "zermatt",
+      "latitude": null,
+      "altitude": null,
+      "season": null,
+      "date": "2026-07-15",
+      "time": "goldenHour",
+      "solarTime": null,
+      "sunElevation": null,
+      "temperature": null,
+      "temperatureUnit": "celsius",
+      "humidity": null,
+      "snowline": null,
+      "visibility": null,
+      "valleyHaze": null,
+      "mist": null
+    },
+    "values": {
+      "altitude": {
+        "value": "956.9 m",
+        "pinned": false,
+        "from": "auto: the valley floor of Zermatt (Zermatt village), where the world's lowest valleys stand (its 5th percentile, 651 m above its height 0)",
+        "number": 956.9191284179688,
+        "unit": "m"
+      },
+      "date": {
+        "value": "2026-07-15",
+        "pinned": true,
+        "from": "pinned",
+        "number": null,
+        "unit": null
+      },
+      "haze": {
+        "value": "84.3 km",
+        "pinned": false,
+        "from": "auto: haze grown by the day's 67.9% humidity (at 14.3 °C), optical depth 0.119 at 550 nm",
+        "number": 84.25564233274864,
+        "unit": "km"
+      },
+      "humidity": {
+        "value": "58.9%",
+        "pinned": false,
+        "from": "auto: 16.5 °C air with its dew point at the day's low, 8.4 °C",
+        "number": 58.92184150002945,
+        "unit": "%"
+      },
+      "location": {
+        "value": "zermatt",
+        "pinned": true,
+        "from": "pinned",
+        "number": null,
+        "unit": null
+      },
+      "mist": {
+        "value": "none",
+        "pinned": false,
+        "from": "auto: the scene's valley's floor at 1608 m in its pool's air, with a dew point of 6.7 °C from the humidity normals (Zermatt (MeteoSwiss ZER, WMO 06748), MeteoSwiss climate normals 1991–2020, vapour pressure (the WMO normals agree))",
+        "number": 0,
+        "unit": "km"
+      },
+      "season": {
+        "value": "summer",
+        "pinned": false,
+        "from": "auto: the pinned date's, in the northern hemisphere",
+        "number": null,
+        "unit": null
+      },
+      "snow": {
+        "value": "3042 m",
+        "pinned": false,
+        "from": "auto: the season's snow cover from the Zermatt (MeteoSwiss ZER, WMO 06748) normals, 3042 m",
+        "number": 3041.942596435547,
+        "unit": "m"
+      },
+      "solarTime": {
+        "value": "19:22:35",
+        "pinned": false,
+        "from": "auto: goldenHour: sun at +2°, setting",
+        "number": 19.37634068550257,
+        "unit": "h"
+      },
+      "temperature": {
+        "value": "16.5 °C",
+        "pinned": false,
+        "from": "auto: Zermatt (MeteoSwiss ZER, WMO 06748) normals (1991–2020) for 2026-07-15, low 8.2 / high 19.9 °C at 1638 m, at 1608 m on the daily curve at 19:22:35",
+        "number": 16.498970955817835,
+        "unit": "°C"
+      },
+      "time": {
+        "value": "goldenHour",
+        "pinned": true,
+        "from": "pinned",
+        "number": null,
+        "unit": null
+      },
+      "valleyHaze": {
+        "value": "77.6 km at the floor, its top at 1773 m",
+        "pinned": false,
+        "from": "auto: a cold pool 531 m deep at dawn from the night's 8.8 °C of cooling (0.75 of the day's 11.7 °C range), 31% of it formed at 19:22:35 as the air cools after the day's high; at the floor of the scene's valley the haze adds 0.003/km at 550 nm to the valley's 0.026, 0.002/km at the pool's top, 1773 m; each valley's pool on its own floor, scaled by its shape",
+        "number": 77.6195984437365,
+        "unit": "km"
+      }
+    },
+    "weather": {
+      "station": "Zermatt (MeteoSwiss ZER, WMO 06748)",
+      "stationAltitudeMetres": 1638,
+      "period": "1991–2020",
+      "source": "MeteoSwiss, WMO climatological standard normals 1991–2020 (NOAA NCEI archive)",
+      "stationLowCelsius": 8.244262295081967,
+      "stationHighCelsius": 19.927868852459017,
+      "lowCelsius": 8.439262295081967,
+      "highCelsius": 20.122868852459018,
+      "climateTemperatureCelsius": 16.498970955817835,
+      "dewPointCelsius": 8.439262295081967,
+      "freezingLevelMetres": 4146.303223971974,
+      "climateSnowlineMetres": 3041.942596435547,
+      "hazeHumidityPercent": 67.92935709068783,
+      "aerosolOpticalDepth550": 0.11943866355766929,
+      "models": "monthly normals interpolated from mid-month; lapse rate 6.5 °C/km; daily curve: two half cosines, low at sunrise, high at 14:00 solar; dew point = the day's low (FAO-56) for the humidity and the haze, the humidity normals' carried by Hann's formula (vapour ×10 per 6300 m) for the mist; Magnus (Alduchov & Eskridge 1996); snow: degree-day pack, the place's monthly precipitation (else 3 mm/day) rising 2.5%/100 m to 2×, snowfall ×1.2 for the gauges' undercatch, snow at ≤ 1 °C, 4 mm/°C/day melt, cover over 10 mm, nudged by 0.5 of the freezing level's move; haze: the day's humidity (at its mean temperature), (1 − RH)^−0.4 growth, optical depth 0.1 at 50% RH, capped at 95%; visibility ln 20/β at 550 nm (the WMO's meteorological optical range); valley haze: a cold pool cooled 0.75 of the day's range below the free air, its top where the inversion's 10 °C/km rise and the lapse rate close it (at most 0.5 of the relief), broken up by clear-sky sun (Meinel 1976) × 0.3 sensible × 2 valley amplification × the floor's absorption (albedo 0.2, snow 0.8) against its heat deficit, forming again on the daily curve after the high; its haze the valley's, held up to ×2 by dawn and grown by the hour's humidity; a logistic lid 30 m soft; each valley's pool (M1.13b): the night's depth × its hold (1/(1 + (g/0.06)²) on the floor's gradient over 1000 m) at most its cap (its surroundings over σ 1500 m above its floor), on the floor its air drains to (≥ 1 km²), left 1 − q/r² by the sun; its haze grown by the humidity at each height in it (the inversion 10 °C/km, the dew point −1.8 °C/km); mist where it is colder than its dew point, 0.06 g/m³ of water per °C below it up to 0.075, Kunkel's (1984) β = 0.1447·LWC^0.88; a pinned mist fills 60% of the scene's valley's pool",
+      "valleyFloorMetres": 1608,
+      "footingMetres": 651.0808715820312,
+      "valleyHaze": {
+        "topMetres": 1772.7226316655083,
+        "depthMetres": 164.72263166550826,
+        "extinction550": 2.3568376942888664E-06,
+        "visibilityKm": 77.6195984437365,
+        "poolShare": 0.310169456566735,
+        "dawnDepthMetres": 531.0730253353205,
+        "coolingCelsius": 8.762704918032789,
+        "any": true
+      },
+      "pools": {
+        "mode": "pools",
+        "weather": {
+          "floorMetres": 1608,
+          "dawnDepthMetres": 531.0730253353205,
+          "heatRatio": 3.7991336365906476,
+          "morning": false,
+          "cooled": 0.310169456566735,
+          "wholePool": false,
+          "pinnedExtinction550": null,
+          "temperatureCelsius": 16.498970955817835,
+          "dewPointCelsius": 6.656828056030573,
+          "hazeExtinction550": 2.606208059466544E-05,
+          "dayHumidityPercent": 67.92935709068783,
+          "aerosolScaleHeightMetres": 1200,
+          "mistVisibilityKm": null,
+          "mistOff": false,
+          "any": true
+        },
+        "stats": {
+          "pooledShare": 0.195425753033222,
+          "mistShare": 0,
+          "deepestMetres": 164.72263166550826,
+          "deepestMistMetres": 0,
+          "lowestTopMetres": 1364.9384411221965,
+          "highestTopMetres": 2748.7639863842587,
+          "thinnestMistKm": 0
+        },
+        "layerTopMetres": 2159.37066575757,
+        "layerExtinction550": 1.3312024792421905E-07
+      }
+    },
+    "implausible": []
+  },
+  "sun": {
+    "source": "NOAA solar calculator (Meeus), local solar time",
+    "date": "2026-07-15",
+    "dateFrom": "pinned date",
+    "season": "summer",
+    "solarTime": "19:22:35",
+    "solarTimeFrom": "goldenHour: sun at +2°, setting",
+    "daylight": "risesAndSets",
+    "sunrise": "04:17:50",
+    "sunset": "19:41:37",
+    "azimuthDegrees": 299.34738347651296,
+    "elevationDegrees": 2.2836822222222386,
+    "trueElevationDegrees": 2.0000000000000178,
+    "declinationDegrees": 21.422177446788233,
+    "direction": {
+      "x": 0.8709719777107239,
+      "y": -0.03984722122550011,
+      "z": -0.48971423506736755
+    },
+    "spectrum": "blackbody 5778 K, disk radius 0.2666°, physical units (vista-plan §10 M1.3)",
+    "inEarthShadowAtCamera": false,
+    "transmittanceToCamera": {
+      "at450Nm": 0.043232922526670485,
+      "at550Nm": 0.16726313621739466,
+      "at650Nm": 0.3460532106237781
+    }
+  },
+  "atmosphere": {
+    "mode": "luts",
+    "model": {
+      "planetRadiusMetres": 6360000,
+      "topAltitudeMetres": 100000,
+      "rayleighScaleHeightMetres": 8434.660310663656,
+      "aerosolOpticalDepth550": 0.11943866355766929,
+      "angstromExponent": 1.3,
+      "aerosolSingleScatteringAlbedo": 0.9,
+      "aerosolAsymmetry": 0.8,
+      "aerosolScaleHeightMetres": 1200,
+      "ozoneDobsonUnits": 300,
+      "ozonePeakAltitudeMetres": 25000,
+      "ozoneHalfWidthMetres": 15000,
+      "groundAlbedo": 0.2,
+      "valleyHazeTopMetres": 2159.37066575757,
+      "valleyHazeSoftnessMetres": 30,
+      "valleyHazeExtinction550": 1.3312024792421905E-07,
+      "topRadiusMetres": 6460000,
+      "hazeUnitOpticalDepth": 0.11943866355766929,
+      "hazeScale": 1,
+      "valleyHazeDensity": 0.0013374588491768629,
+      "ozonePeakNumberDensity": 5.374E+18
+    },
+    "groundAltitudeMetres": 956.9191284179688,
+    "groundAltitudeFrom": "auto: the valley floor of Zermatt (Zermatt village), where the world's lowest valleys stand (its 5th percentile, 651 m above its height 0)",
+    "cameraAltitudeMetres": 2699.878090701709,
+    "zenithFromSeaLevel": {
+      "rayleigh550": 0.09688833451241705,
+      "aerosol550": 0.11972611951605522,
+      "ozone602": 0.03968913959999999
+    },
+    "zenithFromGround": {
+      "rayleigh550": 0.08649680286842704,
+      "aerosol550": 0.053965283567840125,
+      "ozone602": 0.03968913959999999
+    },
+    "aerialPerspective": "march: 2 steps + 1 per 1000 m, at most 8; scattering orders read at both ends (once when the segment spans under 250 m of height); the world bent onto the Earth around the camera; no mountain shadows in the air",
+    "sources": "Rayleigh: Peck & Reeder 1972 refractive index, Bates 1984 King factor, US Standard Atmosphere column; ozone: Serdyuchenko et al. 2014 (233 K) in 10 nm bins via Bruneton 2017; haze: Ångström law, Henyey–Greenstein; LUTs after Hillaire 2020, multiple scattering after Bruneton 2017; built-in tier 5"
+  },
+  "exposure": {
+    "meter": "incident",
+    "method": "incident: an 18% grey card at the camera's altitude, facing the sun (never below the horizontal), lit by the sun through the air and by the sky view over its hemisphere, to 18% grey, plus the camera's EV; the terrain is not in its way",
+    "compensationEv": 0,
+    "meteredEv": 3.0260078477524135,
+    "ev100": 13.45883956421469,
+    "appliedEv": 4.526007847752414,
+    "meterCompensationEv": 1.5,
+    "adaptation": 0.5,
+    "adaptationEv": 0,
+    "average": null,
+    "incident": {
+      "cardElevationDegrees": 2.283682190742984,
+      "altitudeMetres": 2699.878090701709,
+      "illuminanceY": 0.385683219173441,
+      "illuminanceLux": 28148.446046080793,
+      "sunLux": 22383.769936411773,
+      "skyLux": 5764.67610966902
+    }
+  },
+  "denoise": {
+    "settings": {
+      "device": "cuda",
+      "quality": "high",
+      "auxiliary": "clean",
+      "inputScale": "metered"
+    },
+    "run": {
+      "library": "Intel Open Image Denoise",
+      "version": "2.5.1",
+      "device": "CUDA: NVIDIA GeForce RTX 3070",
+      "filter": "RT: hdr, quality high, cleanAux, inputScale 8.14553",
+      "inputScale": 8.145525932312012,
+      "commitSeconds": 0.6228121,
+      "executeSeconds": 0.3016997
+    },
+    "problem": null,
+    "clampedValues": 0,
+    "inputs": "color: the EXR's linear Rec.709, negatives as 0; albedo and normal: the first hit's, averaged over the pixel's samples (0 for sky)"
+  },
+  "dataTiers": {
+    "firn": "builtIn",
+    "forest": "builtIn",
+    "grass": "builtIn",
+    "ice": "builtIn",
+    "rock.hard": "builtIn",
+    "rock.soft": "builtIn",
+    "scree": "builtIn",
+    "snow": "builtIn",
+    "snow.wet": "builtIn",
+    "soil": "builtIn"
+  },
+  "materials": {
+    "byRule": true,
+    "table": [
+      {
+        "key": "rock.hard",
+        "tier": "builtIn",
+        "roughness": 0.6,
+        "albedo": [
+          0.23658669,
+          0.17993884,
+          0.16199635
+        ]
+      },
+      {
+        "key": "rock.soft",
+        "tier": "builtIn",
+        "roughness": 0.6,
+        "albedo": [
+          0.105011284,
+          0.07740824,
+          0.06827404
+        ]
+      },
+      {
+        "key": "scree",
+        "tier": "builtIn",
+        "roughness": 0.75,
+        "albedo": [
+          0.2911469,
+          0.21728902,
+          0.19055405
+        ]
+      },
+      {
+        "key": "soil",
+        "tier": "builtIn",
+        "roughness": 0.5,
+        "albedo": [
+          0.13737628,
+          0.07218644,
+          0.042235572
+        ]
+      },
+      {
+        "key": "grass",
+        "tier": "builtIn",
+        "roughness": 0.4,
+        "albedo": [
+          0.07235617,
+          0.10451515,
+          0.030310431
+        ]
+      },
+      {
+        "key": "forest",
+        "tier": "builtIn",
+        "roughness": 1,
+        "albedo": [
+          0.034492053,
+          0.037860524,
+          0.017518472
+        ]
+      },
+      {
+        "key": "snow",
+        "tier": "builtIn",
+        "roughness": 0,
+        "albedo": [
+          1.1771795,
+          0.93464535,
+          0.89844465
+        ]
+      },
+      {
+        "key": "ice",
+        "tier": "builtIn",
+        "roughness": 0.1,
+        "albedo": [
+          0.6461606,
+          0.49296466,
+          0.42767388
+        ]
+      },
+      {
+        "key": "firn",
+        "tier": "builtIn",
+        "roughness": 0.05,
+        "albedo": [
+          1.0322369,
+          0.7969405,
+          0.7203178
+        ]
+      },
+      {
+        "key": "snow.wet",
+        "tier": "builtIn",
+        "roughness": 0,
+        "albedo": [
+          1.0955951,
+          0.8596785,
+          0.80008656
+        ]
+      }
+    ],
+    "rules": {
+      "rockSlopeDegrees": 40,
+      "rockSlopeWidthDegrees": 5,
+      "hardnessSlopeShiftDegrees": 12,
+      "rockNoiseDegrees": 4,
+      "coverFromMetres": 0.15,
+      "coverToMetres": 0.8,
+      "coverOnSteep": 0.6,
+      "outcropSlopeFromDegrees": 24,
+      "outcropSlopeToDegrees": 36,
+      "outcropHardFrom": 0.55,
+      "outcropHardTo": 0.9,
+      "slopeNoiseDegrees": 4,
+      "screeSlopeFromDegrees": 24,
+      "screeSlopeToDegrees": 30,
+      "channelAreaFromSquareMetres": 100000,
+      "channelAreaToSquareMetres": 1000000,
+      "wetDepthFromMetres": 0.5,
+      "wetDepthToMetres": 1.5,
+      "grassBandMetres": 120,
+      "aspectShiftMetres": 200,
+      "grassNoiseMetres": 90,
+      "grassSlopeFromDegrees": 36,
+      "grassSlopeToDegrees": 46,
+      "treeBandMetres": 80,
+      "treeAspectShiftMetres": 100,
+      "treeNoiseMetres": 80,
+      "treeEdgeMetres": 30,
+      "treeSlopeFromDegrees": 38,
+      "treeSlopeToDegrees": 48,
+      "forestBreakupWavelengthMetres": 250,
+      "clearingFrom": -0.5,
+      "clearingTo": -0.35,
+      "moistAreaFromSquareMetres": 100,
+      "moistAreaToSquareMetres": 10000,
+      "moistShift": 0.2,
+      "bareFrom": -0.35,
+      "bareTo": -0.75,
+      "wetDarkening": 0.45,
+      "hardColourMid": 0.5,
+      "hardColourWidth": 0.3,
+      "bedBrightness": 0.25,
+      "bedWarmth": 0.15,
+      "laminaContrast": 0.12,
+      "stepStrength": 0.6,
+      "laminaePerMetre": 0.5,
+      "bumpFinestMetres": 0.1,
+      "bumpOctaves": 5,
+      "roughRock": 0.12,
+      "roughScree": 0.08,
+      "roughCanopy": 0.3,
+      "canopyVolume": 0.5,
+      "canopyGeometric": 0.25,
+      "canopyAlbedoScale": 1.333002,
+      "roughSoil": 0.03,
+      "roughGrass": 0.2,
+      "stoneTilt": 0.55,
+      "stoneGap": 0.12,
+      "snowBandMetres": 60,
+      "snowAspectShiftMetres": 250,
+      "snowNoiseMetres": 120,
+      "snowEdgeMetres": 40,
+      "snowPatchShare": 2,
+      "snowSlopeFromDegrees": 35,
+      "snowSlopeToDegrees": 45,
+      "snowGullyDegrees": 8,
+      "hollowMetres": 6,
+      "snowHollowShiftMetres": 150,
+      "snowRidgeScour": 0.6,
+      "snowWindShiftMetres": 100,
+      "snowWetBandMetres": 300,
+      "forestDusting": 0.15,
+      "iceFromMetres": 0.5,
+      "iceToMetres": 4,
+      "firnBandMetres": 40,
+      "firnNoiseMetres": 60,
+      "debrisMetres": 60,
+      "roughSnow": 0.02,
+      "breakupWavelengthMetres": 60,
+      "fineBreakupWavelengthMetres": 11
+    },
+    "grassLineMetres": 2891.8461538461543,
+    "grassLineFrom": "where Zermatt (MeteoSwiss ZER, WMO 06748)'s warmest month averages 6 °C along the lapse rate",
+    "poleward": 1,
+    "forest": true,
+    "treeLineMetres": 2276.4615384615386,
+    "treeLineFrom": "where Zermatt (MeteoSwiss ZER, WMO 06748)'s warmest month averages 10 °C along the lapse rate",
+    "detail": {
+      "rockAmplitudeMetres": 1.13232,
+      "screeAmplitudeMetres": 0.7718816000000001,
+      "smoothAmplitudeMetres": 1.26,
+      "rockGradientPerMetre": 0.03822900903597106,
+      "screeGradientPerMetre": 0.03396885517464787,
+      "smoothGradientPerMetre": 0.04541925248979805,
+      "canopyAmplitudeMetres": 1.4229999999999998,
+      "canopyGradientPerMetre": 0.03396885517464787
+    },
+    "snow": true,
+    "snowlineMetres": 3041.942596435547,
+    "freezingLevelMetres": 4146.303223971974,
+    "glacierLineMetres": 2756.9191284179688,
+    "snowBySlope": null,
+    "shares": null
+  },
+  "render": {
+    "stats": {
+      "raysTraced": 6194763658,
+      "pixelSamples": 2123366400,
+      "dispatches": 138,
+      "traceSeconds": 30.114754559999998,
+      "longestDispatchSeconds": 0.246238208,
+      "maxCostNsPerPixelSample": 19.022222222222222,
+      "stageSeconds": {
+        "accelBuild": 0.2875082,
+        "atmosphereLuts": 8.4029435,
+        "atmosphereTablesGpu": 0.001248256,
+        "deviceInit": 0.3336401,
+        "lowAirShaderCompile": 5.9279464,
+        "meshUpload": 0.6618204,
+        "readback": 0.2889254,
+        "scatteringOrdersGpu": 3.5446589440000005,
+        "setup": 0.0168699,
+        "shaderCompile": 1.4190758,
+        "skyDistribution": 0.0301578,
+        "skyDistributionGpu": 0.006904832,
+        "skyViewGpu": 0.038726656,
+        "sunlightVolume": 0.3020987,
+        "sunlightVolumeGpu": 0.029432832,
+        "trace": 65.8896036
+      },
+      "accelerationStructureBytes": 1898490752,
+      "videoMemoryBytes": 3580293120,
+      "peakVideoMemoryBytes": 3713474560,
+      "videoMemoryBudgetBytes": 7602176000
+    },
+    "raysPerSample": 2.917425677452558,
+    "raysPerSecond": 205705268.0159715,
+    "dispatchBudgetMs": 250,
+    "memory": {
+      "baseBytes": 196870144,
+      "budgetBytes": 7602176000,
+      "plannedPeakBytes": 3711762432,
+      "peakStage": "acceleration",
+      "plannedBytes": {
+        "albedo": 65536,
+        "atmosphereCoefficients": 65536,
+        "atmosphereSun": 65536,
+        "bedTable": 262144,
+        "blas": 1898512384,
+        "blasScratch": 574291968,
+        "cie": 65536,
+        "imageAlbedo": 132710400,
+        "imageNormal": 132710400,
+        "imageXyz": 132710400,
+        "lowAir": 42270720,
+        "materialMap": 201457664,
+        "meshIndices": 325713920,
+        "meshMapNormals": 54329344,
+        "meshNormals": 162922496,
+        "meshPositions": 162922496,
+        "normalMaps": 134348800,
+        "ordersDensity": 103809024,
+        "ordersIrradiance": 65536,
+        "ordersRadiance": 51904512,
+        "ordersSingle": 103809024,
+        "reflectance": 65536,
+        "skyDistribution": 65536,
+        "skyLuminance": 393216,
+        "tlas": 65536,
+        "tlasScratch": 65536
+      },
+      "fits": true,
+      "tight": false,
+      "measuredPeakBytes": 3713474560,
+      "planError": -0.00046105822790394987
+    },
+    "trace": {
+      "wallSeconds": 65.8868868,
+      "gpuSeconds": 30.114747599999998,
+      "passes": 131,
+      "checkpoints": [
+        {
+          "progress": 0.1,
+          "elapsedSeconds": 7.122329,
+          "remainingSeconds": 62.345745538284795,
+          "actualRemainingSeconds": 58.7645578
+        },
+        {
+          "progress": 0.25,
+          "elapsedSeconds": 16.927793,
+          "remainingSeconds": 51.87081702428995,
+          "actualRemainingSeconds": 48.9590938
+        },
+        {
+          "progress": 0.5,
+          "elapsedSeconds": 33.3422524,
+          "remainingSeconds": 33.942764652715525,
+          "actualRemainingSeconds": 32.5446344
+        },
+        {
+          "progress": 0.75,
+          "elapsedSeconds": 49.8906287,
+          "remainingSeconds": 16.643307520927674,
+          "actualRemainingSeconds": 15.996258099999999
+        },
+        {
+          "progress": 0.9,
+          "elapsedSeconds": 59.6193899,
+          "remainingSeconds": 6.624214214344721,
+          "actualRemainingSeconds": 6.267496899999998
+        }
+      ]
+    },
+    "noiseSteps": null
+  },
+  "estimate": null,
+  "stages": {
+    "built": [
+      "device",
+      "world",
+      "mesh",
+      "accelerationStructure",
+      "atmosphereTables",
+      "scatteringOrders",
+      "skyView",
+      "skyDistribution",
+      "render",
+      "exposureMeter",
+      "denoise"
+    ],
+    "reused": []
+  },
+  "watch": null,
+  "timingsSeconds": {
+    "denoise": 4.8489533,
+    "exposureMeter": 0.0081496,
+    "mesh": 14.0300086,
+    "pools": 1.4223672,
+    "render": 81.8455943,
+    "worldGen": 2.5659437,
+    "write": 3.7146843
+  },
+  "outputs": {
+    "beauty": "hero-4k.png",
+    "beautyExr": "hero-4k.exr",
+    "denoised": "hero-4k.denoised.png",
+    "denoisedExr": "hero-4k.denoised.exr",
+    "sidecar": "hero-4k.json"
+  },
+  "warnings": []
+}

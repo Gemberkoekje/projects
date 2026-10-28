@@ -11,9 +11,9 @@ measured decision to keep it for the far terrain), M1.10a (exposure and display)
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
 and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M1.13b (terrain-following valley mist), M1.14
-(auto camera v1, with its detail budget), M1.15 (the time and VRAM estimate) and M1.16 (the preview and tweak window) are done, and
-M1.17 (the sign-off) is under way: its first stop is done and waits for the user's picks. M1's scope is frozen: new findings go to the
-parked list (§10). It sits
+(auto camera v1, with its detail budget), M1.15 (the time and VRAM estimate), M1.16 (the preview and tweak window) and
+M1.17 (the sign-off) are done: **M1 is done** (2026-10-28), its goldens committed and passing and its hero rendered. M2 (measured
+spectra) is next, its slices planned first; what M1 found and did not need is in the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -572,6 +572,14 @@ maze's real-time path):
   where the camera stands, facing the sun (never below the horizontal), lit by the sun through the air and the camera's
   sky view, at middle grey — so the light of the place and hour sets the exposure, not the framing. The frame's
   log-average (M1.3) stays as `--meter average`; the camera's EV is a compensation on top of either.
+- **Vista's camera** (M1.17, the user's picks of 2026-10-28 beside the user's own photos; `Vista.Core/Output/CameraSettings.cs`): the
+  settings a photographer would set, applied to the PNG unless told otherwise, and printed after every render as `camera: …`. A white
+  balance of 5500 K, a camera's daylight setting (a Planckian light of that temperature adapted to the display's white by Bradford's
+  transform; `--white-balance`); the incident meter plus 1.5 EV (`--compensation`); an exposure that follows dusk's fall in light half
+  way in stops below the card's light with the sun about 2° up (`--adaptation`), so twilight darkens as it does to the eye and not as
+  it does to a phone in its low-light mode (none) or to a camera set at golden hour (all); AgX's punchy look kept 0.03 of each colour's
+  luminance short of the gamut's edge (`--sky-margin`). The EXR is the light itself, unbalanced and unexposed. A camera the user wields
+  (ISO, shutter time, aperture, white balance) is parked for later (§10).
 - **Filters as camera settings** (pillar 2): spectral sensor response curves and film
   stocks instead of LUTs; real white balance as chromatic adaptation against the scene
   illuminant; lens chromatic aberration from the dispersion IOR.
@@ -2082,6 +2090,23 @@ beside the photos. *Ignore this:* the mountains' shapes against the Matterhorn's
 what you saw? Grey rock grey at noon, or warm as today? The deep sky with the margin or without? The shaded slopes lighter? Log:
 [`vista-log/M1.17.md`](vista-log/M1.17.md).
 
+*Stop 2 status (2026-10-28): done.* The user's picks (half of dusk's fall, 5500 K, +1.5 EV, the 0.03 margin) are **Vista's camera**,
+named as the camera's settings in one place (`CameraSettings`, §5.6) and printed after every render; `m1-17-before-after.png` shows
+them against M1.16's look (golden hour's shaded slopes lighter, dusk a twilight, noon's rock grey). The **goldens** are committed
+(`vista-views/goldens/`, ten, 3.1 MB) and pass ten of ten. The **hero**, "alpine range at golden hour" at 3840×2160, 256 spp, denoised
+(`m1-17-hero.png`; sidecar `vista-views/signoff/hero-4k.json`): 30.1 GPU s of trace, 3.7 GB of video memory as planned. The estimate
+lands inside its own ranges on all seven test views (`estimate/check.ps1`); the maze is unmoved (`--phase6-selftest` PASS,
+`--phase6-regress` 19 of 19). The auto camera's pick on the hero scene is unchanged. Stop 1's "passes of several samples" closure was
+wrong (the parked item is open again). *Judge this:* `m1-17-hero.png`, `m1-17-before-after.png`. *Ignore this:* the near faces'
+smoothness (parked), clouds (M4), trees (M5). *Questions:* does the hero read as an alpine range at golden hour you would put on your
+desktop? Does dusk now darken the way you saw it? Log: [`vista-log/M1.17.md`](vista-log/M1.17.md).
+
+**M1 status (2026-10-28): done.** Twenty-seven slices built "alpine range at golden hour" at 3840×2160, and its verify holds: alpenglow
+at dawn and dusk from the spectral air alone, with no special-casing (the goldens `alpenglow-dawn`, `alpenglow-dusk`; M1.13's sweep);
+snowcaps with bare steep faces (the golden `april-slopes`; M1.13's measure: in April 75% or more of the flats white, at most 35% of the
+faces over 40°); the estimate inside its own stated range on the test views (M1.17's run above); goldens added (`--golden-check`, ten of
+ten). Its summary, carried-forward items and hand-off: [`vista-log/M1.17.md`](vista-log/M1.17.md), "M1 sign-off".
+
 **M2 — Measured spectra.**
 Goal: "it is spectral" backed by measured data. Deliverable: verify access routes and
 terms for every source (§6.3); manifest + cache + download + manual import; resampling
@@ -2265,9 +2290,10 @@ any of them.
   sample a pixel and 6.7 in passes of four, the aerial view's 5.0 and 5.65, with the same rays (vista-log/M1.15.md); a cheap view's
   final is planned as passes of up to 64 samples a pixel. Likely the sample loop's registers lowering the GPU's occupancy; passes of
   one sample in row bands, or a loop the compiler keeps lean, may win back 10–25%. The estimate is unaffected (its probe traces the final's own
-  dispatches). *Belongs:* M1.17's performance pass, beside the leaner pools integrator. *Closed (M1.17):* under the GPU cap (since
-  M1.13b) a 4K final already traces passes of one sample a pixel (one sample over the frame is 41 ms, over the 30 ms budget), so only
-  previews trace passes of several, where more dispatches would cost more than they save.
+  dispatches). *Belongs:* M1.17's performance pass, beside the leaner pools integrator. *M1.17:* still open. The planner plans passes
+  against its own 250 ms budget, and under the GPU cap the renderer splits a pass into dispatches of fewer rows but the same samples a
+  pixel, so a final still traces passes of several: the hero's 4K final at 256 spp ran 131 passes, about two samples each, and a cheap
+  view runs more. Not taken in M1.17 (its checks do not need it); *belongs now:* the next slice that works on the trace's cost.
 - **A change of the air costs about 9.5 s in the window** (M1.16): the time of day, the date, the temperature, the humidity or the
   haze rebuilds the air's tables and scattering orders, 8.7 s of a 9.5 s step at half the GPU's time (vista-log/M1.16.md), where
   §3.4 puts the time of day with the camera as a change that only restarts the preview (0.1–1.7 s). Since M1.13a the auto valley haze
@@ -2277,13 +2303,18 @@ any of them.
   performance pass. *M1.17 stop 1:* the tables' dispatches sized to about 20 ms each (200 instead of 1400): 11.0 → 9.5 s of wall time
   a change, no table changed. The rest is the GPU's 3.9 s (the scattering orders' gather of 1024 directions a texel, nine times) doubled
   by the cap's pauses; the levers left are the cap off while the window waits (about 4–5 s), or a density integral factored by height
-  and sun (fewer lookups, a small change to the sky, checked against the reference). The user's call (asked with stop 1's picks).
+  and sun (fewer lookups, a small change to the sky, checked against the reference). The user's call (asked at M1.17's end).
 - **The purple light** (M1.17's sunset sheet, `m1-17-sunset.png`, against the user's 28-10 photos): with the sun 1.7° down Vista's sky
   toward the sunset is a yellow-to-orange band under deep blue, where the photo at 17:27:57 shows violet and pink above the glow;
   balanced to the photo's own 4400 K, Vista's sky comes out bluer, not violet, so the violet is the sky's and not the setting's. The
   purple light is mostly sunlight reddened on its long path, scattered down by the aerosol of the stratosphere (some 20 km up) and
   mixed with the blue; Vista's aerosol lies in the lowest kilometres (a 1.2 km scale height) and has no stratospheric layer.
   *Belongs:* M4 (beside the seasonal aerosol load) or M6 (twilight and night).
+- **A camera you wield** (the user, 2026-10-28, picking M1.17's look: "In the future, I'd like it if we can set the ISO, shutter time,
+  white balance etcetera as if I'm wielding a real camera"): Vista's camera (§5.6) is a set of display settings with a meter; a real
+  camera's controls instead, ISO, shutter time and aperture (the exposure triangle of §5.6, the engine's `plan.md` §4) with the meter as
+  a guide, the white balance in Kelvin as now, and the window's controls laid out as a camera's. *Belongs:* later, beside "Ongoing:
+  camera filters"; feature creep the user asked to keep out of M1.
 
 ---
 

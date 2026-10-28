@@ -419,10 +419,11 @@ the white balance (`balance.png`, `photo.png` beside the user's April photo), th
 the punchy look's shadows (`shadows.png`) and Zermatt at the Sunnegga webcam frames' dates and times (`webcam.png`). `hero.camera.json`
 is the auto camera's pick on M1's hero scene (`autocam/range-golden.recipe.json`, seed 42). With `-Photos` (a local folder of the
 user's dusk photos as `DD-MM-YYYY-HHMMSS.jpg`) it also writes `dusk-photos.png` and `sunset-photos.png` with the photos beside the
-renders: those stay local, never committed.
+renders: those stay local, never committed. With `-Before` (a build from before stop 2) it writes `before-after.png`, that build's look
+against Vista's camera (stop 2: 5500 K, +1.5 EV, half of dusk's fall, a 0.03 margin), one render each.
 
 ```
-powershell -File vista-views/signoff/render.ps1 [-Sheets dusk,sunset,balance,photo,sky,shadows,webcam] [-Photo vista-views/sheets/m1-13-photo.png] [-Photos folder] [-CellWidth 320] [-Spp 64] [-Out folder]
+powershell -File vista-views/signoff/render.ps1 [-Sheets dusk,sunset,balance,photo,sky,shadows,webcam,before-after] [-Photo vista-views/sheets/m1-13-photo.png] [-Photos folder] [-Before <Vista.App.dll>] [-CellWidth 320] [-Spp 64] [-Out folder]
 ```
 
 ## The golden suite (M1.17)
@@ -431,7 +432,7 @@ powershell -File vista-views/signoff/render.ps1 [-Sheets dusk,sunset,balance,pho
 beside it. `--golden-check` renders every case through one session, as `--preview` would, and compares each with its golden: identical,
 within the suite's tolerance (the image's mean and its 16-pixel blocks' luminance, not pixel by pixel, so a driver that re-rolls a
 path's noise still passes), different or missing. `--update` writes the renders over the goldens, deliberately, when a slice means to
-move them; its log line says what each moved by.
+move them; its log line says what each moved by. The goldens were taken at M1.17's stop 2, under Vista's camera.
 
 ```
 dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --golden-check [--suite vista-views/goldens/suite.json] [--only hero,sky] [--update] [--out folder]
