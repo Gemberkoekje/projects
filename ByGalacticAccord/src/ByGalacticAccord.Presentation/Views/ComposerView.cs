@@ -186,7 +186,7 @@ public static class ComposerView
         string reference = Templates.Fill("Composer.Reference.Base", ("good", Templates.Good(draft.Good)), ("unit", Format.MoneyCents(unit)));
         var forSale = new List<decimal>();
         var wanted = new List<decimal>();
-        foreach (Contract contract in Visibility.OpenContractsVisibleTo(context, session.Player))
+        foreach (Contract contract in session.KnownOpen())
         {
             if (contract is SaleContract sale && sale.Good == draft.Good && sale.PostedBy != session.Player.Id && sale.Quantity > 0m)
             {

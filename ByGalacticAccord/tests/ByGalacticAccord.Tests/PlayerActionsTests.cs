@@ -67,6 +67,7 @@ public sealed class PlayerActionsTests
         SimulationContext context = TestWorld.Quiet(withPlayer: true);
         ActorState player = context.Player();
         ActorState camp = context.Actor("Rust Belt Camp");
+        context.PresentAt(player, "Rust Belt");
         SaleContract wanted = context.PostWanted(camp, GoodType.Food, 60m, 1400m, hours: 400);
 
         PlayerActions.FillFeasibility check = PlayerActions.CheckFill(context, player, wanted);
@@ -94,7 +95,11 @@ public sealed class PlayerActionsTests
         context.ApplySink(player, player.Credits);
         Assert.Equal(DealBlock.CannotAfford, PlayerActions.CheckFill(context, player, wanted).Block);
 
-        context.Consume(farm, GoodType.Food, farm.Stock(GoodType.Food)); // the farm has nothing to sell
+        // The farm sells out. From Meridian the player can't see its warehouse (design §7.1: a jump away, no internal state), so it
+        // still counts on the stock it last saw; with its ship docked at Verdant it sees there is none.
+        context.Consume(farm, GoodType.Food, farm.Stock(GoodType.Food));
+        Assert.Equal(DealBlock.CannotAfford, PlayerActions.CheckFill(context, player, wanted).Block);
+        context.ShipOf(player).Arrive(context.CurrentTick, farm.Home);
         Assert.Equal(DealBlock.NoSource, PlayerActions.CheckFill(context, player, wanted).Block);
     }
 

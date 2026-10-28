@@ -12,8 +12,8 @@
         @foreach (BoardRow row in Model.Rows)
         {
             bool on = Selected == row.Id;
-            <button type="button" class="board-row @(on ? "on" : null) @(row.Blocked ? "blocked" : null)" aria-pressed="@(on ? "true" : "false")"
-                    @key="row.Id" @onclick="() => OnSelect.InvokeAsync(row.Id)">
+            <button type="button" class="board-row age-@row.Age @(on ? "on" : null) @(row.Blocked ? "blocked" : null)" aria-pressed="@(on ? "true" : "false")"
+                    data-seen="@(row.Seen is null ? "live" : "news")" @key="row.Id" @onclick="() => OnSelect.InvokeAsync(row.Id)">
                 <span class="row-line">
                     <span class="kind caps mono">@row.Kind</span>
                     <span class="take mono tone-@row.TakeHomeTone">@row.TakeHome</span>
@@ -32,6 +32,10 @@
                 @if (row.Note is not null)
                 {
                     <span class="row-note small tone-@row.NoteTone">@row.Note</span>
+                }
+                @if (row.Seen is not null)
+                {
+                    <span class="row-seen xsmall muted">@row.Seen</span>
                 }
             </button>
         }

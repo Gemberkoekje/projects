@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
@@ -44,25 +46,14 @@ public abstract class Bot
 
     /// <summary>
     /// The best deal its free ship could take as posted: of the hauls and wanted Sales on its board, the one with the most
-    /// take-home a day by the board's own estimate; none if nothing pays. A deal it would deliver past the grace it leaves (it
-    /// would be in default, and the payer could cancel and keep its bond), and goods the buyer could reject. <paramref name="spare"/>
-    /// is time it wants in hand.
+    /// take-home a day by the board's own estimate; none if nothing pays.
     /// </summary>
-    protected static (Contract Contract, DealEstimate Estimate)? BestDeal(GameSession session, long spare = 0)
+    protected static (Contract Contract, DealEstimate Estimate)? BestDeal(GameSession session)
     {
-        SimulationContext context = session.Context;
         (Contract, DealEstimate)? best = null;
         decimal bestRate = 0m;
-        foreach (Contract contract in Visibility.OpenContractsVisibleTo(context, session.Player))
+        foreach ((Contract contract, DealEstimate estimate) in Takeable(session))
         {
-            if (contract.PostedBy == session.Player.Id || contract is not (HaulContract or SaleContract { Side: SaleSide.Wanted })
-                || PlayerActions.Check(context, session.Player, contract) != DealBlock.None
-                || DealEstimate.For(context, session.Player, session.PlayerShip, contract) is not { } estimate || estimate.TakeHome.Amount <= 0m
-                || estimate.ArrivalTick + spare > contract.GraceEndsTick || contract.Warranty?.Rejectable(estimate.ArrivalQuality) == true)
-            {
-                continue;
-            }
-
             decimal rate = estimate.PerDay(session.Now).Amount;
             if (rate > bestRate)
             {
@@ -72,6 +63,88 @@ public abstract class Bot
         }
 
         return best;
+    }
+
+    /// <summary>How much a reader trusts that a deal it sees now from where a first one ends will still be there when it arrives.</summary>
+    public const decimal NextLegWeight = 0.5m;
+
+    /// <summary>
+    /// The deal a reader of the market judges best (design §11.2: the uncertain inputs beside the take-home are for the player to
+    /// weigh; D17: judging whether a contract is worth signing is the skill). It takes off each take-home what could go wrong,
+    /// priced (<see cref="Risk"/>), and ranks each deal by what it and the best deal from where it ends would make a day together,
+    /// the second counted at <see cref="NextLegWeight"/> (it may be gone by then). None if nothing pays after its risk.
+    /// </summary>
+    protected static (Contract Contract, DealEstimate Estimate)? ReadDeal(GameSession session)
+    {
+        SimulationContext context = session.Context;
+        Ship ship = session.PlayerShip;
+        decimal running = ship.Class.RunningCostPerTick.Amount;
+        var deals = Takeable(session).Select(d => (d.Contract, d.Estimate, Net: d.Estimate.TakeHome.Amount - Risk(d.Contract, d.Estimate))).Where(d => d.Net > 0m).ToList();
+        (Contract, DealEstimate)? best = null;
+        decimal bestScore = 0m;
+        foreach ((Contract contract, DealEstimate estimate, decimal net) in deals)
+        {
+            decimal hours = Math.Max(1, estimate.TiedUpTicks(session.Now));
+            LocationId end = contract is HaulContract haul ? haul.Destination : ((SaleContract)contract).Place;
+            decimal score = net / hours;
+            foreach ((Contract next, DealEstimate later, decimal laterNet) in deals)
+            {
+                if (ReferenceEquals(next, contract) || next.DeadlineTick < estimate.ArrivalTick)
+                {
+                    continue;
+                }
+
+                // The next deal as it would be from where this one ends: its empty leg from there instead of from here.
+                long fromEnd = end == later.Pickup ? 0
+                    : context.FindPath(end, later.Pickup) is { } leg ? PriceModel.TravelTicks(leg.DistanceTicks, ship.Class.SpeedMultiplier) : long.MaxValue / 4;
+                decimal secondNet = laterNet + (running * (later.RepoTicks - fromEnd));
+                if (secondNet <= 0m)
+                {
+                    continue;
+                }
+
+                decimal both = (net + (secondNet * NextLegWeight)) / (hours + (Math.Max(1, later.LadenTicks + fromEnd) * NextLegWeight));
+                score = Math.Max(score, both);
+            }
+
+            if (score > bestScore)
+            {
+                best = (contract, estimate);
+                bestScore = score;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// What could go wrong on a deal, priced (first-pass weights): an incident on the laden leg puts a fifth of what is at stake at
+    /// risk (the price, the goods bought for it, the bond); outside the Accord a payer may not pay, a tenth of the price.
+    /// </summary>
+    public static decimal Risk(Contract contract, DealEstimate estimate) =>
+        (estimate.IncidentOdds * 0.2m * (estimate.Income.Amount + estimate.Goods.Amount + estimate.Bond.Amount))
+        + (contract.UsesEscrow ? 0m : 0.1m * estimate.Income.Amount);
+
+    /// <summary>
+    /// The deals its free ship could take as posted, with their estimates: the hauls and wanted Sales on its board that pay
+    /// something. One it would deliver past the grace it leaves (it would be in default, and the payer could cancel and keep its
+    /// bond), and goods the buyer could reject.
+    /// </summary>
+    protected static IEnumerable<(Contract Contract, DealEstimate Estimate)> Takeable(GameSession session)
+    {
+        SimulationContext context = session.Context;
+        foreach (Contract contract in session.KnownOpen())
+        {
+            if (contract.PostedBy == session.Player.Id || contract is not (HaulContract or SaleContract { Side: SaleSide.Wanted })
+                || PlayerActions.Check(context, session.Player, contract) != DealBlock.None
+                || DealEstimate.For(context, session.Player, session.PlayerShip, contract) is not { } estimate || estimate.TakeHome.Amount <= 0m
+                || estimate.ArrivalTick > contract.GraceEndsTick || contract.Warranty?.Rejectable(estimate.ArrivalQuality) == true)
+            {
+                continue;
+            }
+
+            yield return (contract, estimate);
+        }
     }
 
     /// <summary>Take a contract as posted, counting it if it signed.</summary>

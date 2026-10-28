@@ -11,11 +11,14 @@ using ByGalacticAccord.Presentation.Views;
 namespace ByGalacticAccord.Presentation.Bots;
 
 /// <summary>
-/// The market reader (design §12, §13's second beat, §20.3), a first cut: it reads the market for a spread and posts its own
-/// wanted Sale to buy into it. When a delivered wanted Sale on its board pays well over what the goods cost at a producer's
-/// door (by the lots on its board, or else their base value), it posts a wanted Sale at that door, haggles the answers down
-/// to its budget, and once the goods are in its storage there, fills the Sale with its ship. Otherwise it takes the board's
-/// best deal, but counters a post that has waited a while before it takes it as posted.
+/// The market reader (design §12, §13's second beat, §20.3): it judges contracts rather than taking the best-paying one, and
+/// can read the market for a spread to post into (<see cref="PlansPurchases"/>, off unless asked). Where the board taker ranks deals by take-home a day, the reader prices in what
+/// the estimate leaves uncertain (the incident odds on the laden leg; outside the Accord, a payer who may not pay) and where
+/// the deal leaves its ship: what the board offers from there next (<see cref="Bot.ReadDeal"/>). When a delivered wanted Sale
+/// on its board pays well over what the goods cost at a producer's door (by the asks it knows), it posts a wanted Sale at that
+/// door below the ask it knows, haggles the answers down to no more than that ask, and once the goods are in its storage there,
+/// fills the Sale with its ship.
+/// Otherwise it takes the deal it judges best, but counters a post that has waited a while before it takes it as posted.
 /// </summary>
 public sealed class MarketReader : Bot
 {
@@ -37,11 +40,22 @@ public sealed class MarketReader : Bot
     // Goods it bought and couldn't place yet: what, where, and since when; and the least it takes for them as a lot.
     private Leftover? _leftover;
 
+
     private sealed record Plan(ContractId Post, ContractId Target, GoodType Good, LocationId Source, decimal Budget);
 
     private sealed record Leftover(GoodType Good, LocationId At, long Since, decimal Floor);
 
     public override string Name => "market reader";
+
+    /// <summary>
+    /// Whether it posts its own wanted Sales at producers' doors to buy into a spread (design §13's second beat). Off unless asked:
+    /// measured over ten seeds in S6 it earned 0.86–0.87× the board taker with it and 1.15–1.16× without, since its ship waits
+    /// on the producers' answers while the haggle saves less than a deal would have made.
+    /// </summary>
+    public bool PlansPurchases { get; init; }
+
+    /// <summary>Whether it counters a post that has waited before taking it as posted (design §3.6).</summary>
+    public bool Haggles { get; init; } = true;
 
     public override void Act(GameSession session)
     {
@@ -52,7 +66,7 @@ public sealed class MarketReader : Bot
         }
 
         ClearHold(session);
-        if (CarryOut(session) || Waiting(session) || (_leftover is null && PlanPurchase(session)))
+        if (CarryOut(session) || Waiting(session) || (PlansPurchases && _leftover is null && PlanPurchase(session)))
         {
             return;
         }
@@ -175,7 +189,7 @@ public sealed class MarketReader : Bot
     {
         SimulationContext context = session.Context;
         IEnumerable<Contract> targets = (target is null ? Enumerable.Empty<Contract>() : new[] { target })
-            .Concat(Visibility.OpenContractsVisibleTo(context, session.Player).Where(c => c is SaleContract { Side: SaleSide.Wanted } s && s.Good == good && s.PostedBy != session.Player.Id));
+            .Concat(session.KnownOpen().Where(c => c is SaleContract { Side: SaleSide.Wanted } s && s.Good == good && s.PostedBy != session.Player.Id));
         foreach (Contract candidate in targets)
         {
             if (candidate.IsOpen && PlayerActions.CheckFill(context, session.Player, (SaleContract)candidate) is { Ok: true, Source: { Kind: FillSourceKind.Storage } source } && source.At == at
@@ -216,7 +230,7 @@ public sealed class MarketReader : Bot
         Plan? best = null;
         decimal bestMargin = 0m;
         decimal offer = 0m;
-        foreach (Contract contract in Visibility.OpenContractsVisibleTo(context, session.Player))
+        foreach (Contract contract in session.KnownOpen())
         {
             if (contract is not SaleContract { Side: SaleSide.Wanted } wanted || wanted.PostedBy == session.Player.Id || wanted.Quantity > ship.FreeSpace
                 || wanted.DeadlineTick < session.Now + 72)
@@ -224,14 +238,16 @@ public sealed class MarketReader : Bot
                 continue;
             }
 
-            decimal unit = DoorPrice(session, wanted.Good);
             foreach (ActorState producer in context.ProducersOf(wanted.Good))
             {
                 if (context.StationOperatorAt(producer.Home) is null || context.FindPath(ship.Location, producer.Home) is not { } repo
-                    || context.FindPath(producer.Home, wanted.Place) is not { } laden || producer.Home == wanted.Place)
+                    || context.FindPath(producer.Home, wanted.Place) is not { } laden || producer.Home == wanted.Place
+                    || Knowledge.KnownAsk(context, session.Player, producer, wanted.Quantity, session.Sight) is not { } ask)
                 {
                     continue;
                 }
+
+                decimal unit = ask.Amount; // what an order at its door would pay, as far as it knows: the post must beat it
 
                 long hours = PriceModel.TravelTicks(repo.DistanceTicks + laden.DistanceTicks, ship.Class.SpeedMultiplier) + 24;
                 if (session.Now + hours > wanted.DeadlineTick)
@@ -241,13 +257,13 @@ public sealed class MarketReader : Bot
 
                 decimal tax = Terms.TaxRate(context, context.Location(producer.Home).Reach);
                 decimal trip = (ship.Class.RunningCostPerTick.Amount * hours) + context.Config.DockingFee.Amount;
-                decimal budget = ((wanted.OfferedPrice.Amount * (1m - Margin)) - trip) / (1m + tax);
-                decimal margin = budget - (unit * wanted.Quantity);
+                decimal budget = Math.Min(((wanted.OfferedPrice.Amount * (1m - Margin)) - trip) / (1m + tax), unit * wanted.Quantity);
+                decimal margin = ((wanted.OfferedPrice.Amount * (1m - Margin)) - trip) / (1m + tax) - (unit * wanted.Quantity);
                 if (margin > bestMargin && margin > unit * wanted.Quantity * 0.1m && session.Player.Credits.Amount > budget * (1m + tax) * 1.5m)
                 {
                     best = new Plan(new ContractId(0), wanted.Id, wanted.Good, producer.Home, Math.Round(budget, 2));
                     bestMargin = margin;
-                    offer = unit * wanted.Quantity * 0.9m;
+                    offer = unit * wanted.Quantity * 0.85m;
                 }
             }
         }
@@ -270,26 +286,10 @@ public sealed class MarketReader : Bot
         return true;
     }
 
-    // What it reckons goods cost at a producer's door: the cheapest lot a producer of them has on its board, else their base value.
-    private static decimal DoorPrice(GameSession session, GoodType good)
-    {
-        SimulationContext context = session.Context;
-        decimal unit = Goods.Info(good).BaseValue;
-        foreach (Contract contract in Visibility.OpenContractsVisibleTo(context, session.Player))
-        {
-            if (contract is SaleContract { Side: SaleSide.ForSale } lot && lot.Good == good && lot.Quantity > 0m && context.Actor(lot.PostedBy).Producer?.Good == good)
-            {
-                unit = Math.Min(unit, lot.OfferedPrice.Amount / lot.Quantity);
-            }
-        }
-
-        return unit;
-    }
-
-    // The board's best deal: countered first if its post has waited a while and there is time for a reply, else taken as posted.
+    // The deal it judges best: countered first if its post has waited a while and there is time for a reply, else taken as posted.
     private void HaggleOrTake(GameSession session)
     {
-        if (BestDeal(session) is not { } best)
+        if (ReadDeal(session) is not { } best)
         {
             return;
         }
@@ -298,7 +298,7 @@ public sealed class MarketReader : Bot
         SimulationContext context = session.Context;
         bool haggled = session.PlayerNegotiations.Any(n => n.Contract == contract.Id);
         bool time = best.Estimate.ArrivalTick + Haggling.SlowestReply <= contract.DeadlineTick;
-        if (!haggled && time && session.Now - contract.PostedTick >= HaggleAfterHours
+        if (Haggles && !haggled && time && session.Now - contract.PostedTick >= HaggleAfterHours
             && session.Counter(contract.Id, Offer.Of(contract) with { Price = Credits.Of(Math.Round(contract.OfferedPrice.Amount * Ask, 2)) }) == DealBlock.None)
         {
             Counters++;

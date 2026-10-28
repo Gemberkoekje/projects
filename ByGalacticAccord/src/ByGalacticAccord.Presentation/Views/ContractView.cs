@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
 using ByGalacticAccord.Presentation.Session;
 using ByGalacticAccord.Presentation.Text;
@@ -43,7 +44,8 @@ public sealed record ContractAction(ContractCommand Command, string Label, strin
 /// what else the player can do with it (fill it through a carrier, walk away, cancel for default, withdraw its own post);
 /// <see cref="Threads"/> are its haggles with the player (design §11.3, "Negotiations"), and <see cref="Counter"/> the
 /// counter-offer the player can make on someone else's post now; <see cref="Why"/> is its record read back through its
-/// causes (design §11.2: "why did this happen?"), newest first.
+/// causes (design §11.2: "why did this happen?"), newest first. <see cref="Record"/> is the party's public record and the
+/// player's own dealings with it (design §7.3); <see cref="Known"/> says when the player knows of it only from the news.
 /// </summary>
 public sealed record ContractViewModel(
     ContractId Id,
@@ -65,6 +67,8 @@ public sealed record ContractViewModel(
     IReadOnlyList<string> Terms,
     string Party,
     string PartyRole,
+    IReadOnlyList<string> Record,
+    string? Known,
     bool IsOpen,
     bool CanAccept,
     string AcceptLabel,
@@ -157,15 +161,43 @@ public static class ContractView
         }
 
         (List<LogLine> why, string? whyEnd) = Why(session, contract);
+        string? known = null;
+        if (contract.IsOpen || PlayerActions.Believed(context, session.Player, contract))
+        {
+            (known, _) = BoardView.Seen(session, contract, session.Sight);
+        }
+
         return new ContractViewModel(
             id, kindLine, Head(context, contract), sub, status, statusTone,
             Templates.Get(buying ? "Contract.Cost" : "Contract.Certain"), lines, Templates.Get(buying ? "Cost" : "TakeHome"), takeHome, takeTone, takeHomeNote,
             schedule, Templates.Get("Contract.Uncertain"), uncertain,
             Templates.Fill("Contract.Terms.Package", ("package", Templates.Package(contract.Terms.Package))), TermsOf(session, contract), poster.Name, partyRole,
+            Record(session, contract, poster), known,
             contract.IsOpen && contract.PostedBy != session.Player.Id, canAccept, Templates.Get(AcceptKey(contract)), blocked,
             actions, Templates.Get("Contract.Why"), why, whyEnd,
             Templates.Get(contract.PostedBy == session.Player.Id ? "Contract.Answers" : "Contract.Haggle"), threads,
             Templates.Get("Contract.Counter"), counter, counterBlocked);
+    }
+
+    /// <summary>
+    /// The party's public record (design §7.3: anyone can look it up), with a word that the frontier keeps none, and the
+    /// player's own dealings with it. None for the player's own post.
+    /// </summary>
+    private static IReadOnlyList<string> Record(GameSession session, Contract contract, ActorState party)
+    {
+        if (party.Id == session.Player.Id)
+        {
+            return System.Array.Empty<string>();
+        }
+
+        var lines = new List<string> { InfoText.PublicRecord(session.Context.Records.PublicRecordOf(party.Id)) };
+        if (!contract.UsesEscrow)
+        {
+            lines.Add(Templates.Get("Record.Frontier"));
+        }
+
+        lines.Add(InfoText.Dealings(session.Context.Records.DealingsWith(session.Player.Id, party.Id), party.Name));
+        return lines;
     }
 
     /// <summary>
@@ -437,12 +469,19 @@ public static class ContractView
                     Format.MoneyCents(e.Income), Tone.Gain));
                 if (e.Goods.Amount > 0m && e.Source?.Producer is { } supplier)
                 {
+                    ActorState maker = context.Actor(supplier);
+                    PriceReading? reading = Knowledge.ReadingOf(context, session.Player, maker, session.Sight);
                     lines.Add(new MoneyLine(
                         Templates.Fill("Line.Goods", ("source", pickup)),
                         Templates.Fill(
                             "Line.Goods.Note", ("quantity", Format.Quantity(quantity)), ("good", Templates.Good(good)),
-                            ("supplier", context.Actor(supplier).Name), ("unit", Format.MoneyCents(e.Goods.Amount / quantity))),
+                            ("supplier", maker.Name), ("unit", Format.MoneyCents(e.Goods.Amount / quantity)),
+                            ("age", reading is { } known ? InfoText.ReadingAge(known) : Templates.Get("Age.Live"))),
                         Format.MoneyCents(-e.Goods.Amount), Tone.Loss));
+                    if (reading is { IsLive: false } remembered)
+                    {
+                        uncertain.Add(AskWhenSigning(session, maker, remembered, e.Goods, quantity));
+                    }
                 }
                 else
                 {
@@ -551,6 +590,14 @@ public static class ContractView
                 Format.Percent(e.IncidentOdds), Tone.Plain));
         }
 
+        if (!session.Sight.CanSee(contract) && context.News.ReportedOpenAt(contract.Id) is { } reported)
+        {
+            uncertain.Add(new InfoLine(
+                Templates.Get("Uncertain.StillOpen"),
+                Templates.Fill("Uncertain.StillOpen.Note", ("date", Format.Date(reported)), ("place", context.Location(contract.Places[0]).Name)),
+                Templates.Get("Uncertain.Unknown"), Tone.Warn));
+        }
+
         if (contract.UsesEscrow)
         {
             uncertain.Add(new InfoLine(Templates.Get("Uncertain.Bond"), Templates.Get("Uncertain.Bond.Note"), Format.Money(e.Bond), Tone.Plain));
@@ -559,6 +606,21 @@ public static class ContractView
         {
             uncertain.Add(new InfoLine(Templates.Get("Uncertain.Payment"), Templates.Get("Uncertain.Payment.Note"), Templates.Get("Uncertain.Unknown"), Tone.Warn));
         }
+    }
+
+    // A producer's ask the player doesn't see live: what an order at its door will pay (its ask as it stands, up to the limit),
+    // and the range of the player's own readings of it.
+    private static InfoLine AskWhenSigning(GameSession session, ActorState maker, PriceReading reading, Credits goods, decimal quantity)
+    {
+        string range = InfoText.Range(session.Player.Knowledge.History(maker.Id)) is { } r && r.Low != r.High
+            ? Templates.Fill("Uncertain.Ask.Range", ("since", Format.Date(r.Since)), ("low", Format.MoneyCents(r.Low)), ("high", Format.MoneyCents(r.High)))
+            : string.Empty;
+        return new InfoLine(
+            Templates.Fill("Uncertain.Ask", ("source", session.Context.Location(maker.Home).Name)),
+            Templates.Fill(
+                "Uncertain.Ask.Note", ("age", InfoText.ReadingAge(reading)), ("limit", Format.Money(Market.DoorLimit(goods))),
+                ("tolerance", Format.Percent(Market.DoorTolerance)), ("range", range)),
+            Templates.Fill("PerUnit", ("amount", Format.MoneyCents(goods.Amount / quantity))), Tone.Warn);
     }
 
     // The bottom line: take-home and its rate for a haul or a fill; the cost, and the cost per unit, for a lot.

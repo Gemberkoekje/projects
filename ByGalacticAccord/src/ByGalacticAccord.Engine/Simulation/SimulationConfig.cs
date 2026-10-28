@@ -48,8 +48,11 @@ public sealed record SimulationConfig
     /// <summary>Reputation lost for a flagrant breach, before value/lateness scaling.</summary>
     public decimal ReputationLossBase { get; init; } = 0.18m;
 
-    /// <summary>How long a scouted location's intel stays fresh (§4.6).</summary>
-    public long ScoutFreshnessTicks { get; init; } = 1200;
+    /// <summary>How many contracts The Daily Accord reports a day (design §7.4; first-pass, an open question in design A.2). Zero prints no news.</summary>
+    public int NewsItemsPerDay { get; init; } = 3;
+
+    /// <summary>How much likelier a contract with a place outside the Accord is to make the news (plan risk R1: the frontier must hear of it).</summary>
+    public decimal NewsFrontierWeight { get; init; } = 3m;
 
     /// <summary>The most a consumer keeps in hand, in days of income; the rest goes on things outside the sector (a sink).</summary>
     public decimal ConsumerSavingsDays { get; init; } = 90m;

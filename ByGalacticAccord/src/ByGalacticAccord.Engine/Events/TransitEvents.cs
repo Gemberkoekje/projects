@@ -37,6 +37,7 @@ public sealed class ShipDeparted : ISimEvent
         }
 
         ship.ReachPickup(Job.Pickup);
+        Knowledge.LookAt(context, context.Actor(ship.Owner), Job.Pickup);
         decimal loaded = Settlement.Load(context, ship, Job);
         if (Job.Purchase is { } purchase && context.PlayerDecisionFor(purchase) is not null)
         {
@@ -223,8 +224,8 @@ public sealed class ShipArrived : ISimEvent
 
         ship.Arrive(Tick, destination);
         context.ApplySink(context.Actor(ship.Owner), context.Config.DockingFee);
-        context.Scout(ship.Owner, destination);
         Settlement.Unload(context, ship, Job);
         ship.FinishJob(Tick);
+        Knowledge.LookAt(context, context.Actor(ship.Owner), destination);
     }
 }

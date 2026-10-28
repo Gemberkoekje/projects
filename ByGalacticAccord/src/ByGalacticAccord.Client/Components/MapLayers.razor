@@ -29,16 +29,21 @@
     </g>
     @foreach (MapNode node in Model.Nodes)
     {
-        <g class="node @(node.Here ? "here" : null)">
+        <g class="node tier-@node.Tier age-@node.Age @(node.Here ? "here" : null)" data-tier="@node.Tier">
             <title>@node.Tip</title>
             @if (node.Here)
             {
                 <circle class="here-ring" cx="@node.X" cy="@node.Y" r="@(node.Radius + 7)" />
             }
             <circle class="node-dot" cx="@node.X" cy="@node.Y" r="@node.Radius" />
+            @if (node.Badge is not null)
+            {
+                <g><text class="node-badge" x="@node.LabelX" y="@LabelY(node, -1)" text-anchor="@Anchor(node)">@node.Badge</text></g>
+            }
             <text class="node-name" x="@node.LabelX" y="@LabelY(node, 0)" text-anchor="@Anchor(node)">@node.Name</text>
             <text class="node-meta" x="@node.LabelX" y="@LabelY(node, 1)" text-anchor="@Anchor(node)">@node.Meta</text>
-            <text class="node-makes" x="@node.LabelX" y="@LabelY(node, 2)" text-anchor="@Anchor(node)">@node.Makes</text>
+            <text class="node-info" x="@node.LabelX" y="@LabelY(node, 2)" text-anchor="@Anchor(node)">@node.Info</text>
+            <text class="node-age" x="@node.LabelX" y="@LabelY(node, 3)" text-anchor="@Anchor(node)">@node.AgeText</text>
         </g>
     }
 </g>
@@ -49,9 +54,19 @@
     [Parameter, EditorRequired]
     public MapViewModel Model { get; set; } = default!;
 
-    // Three label lines, 14 units apart, below the location or ending just above it.
-    private static int LabelY(MapNode node, int line) =>
-        node.LabelAbove ? node.Y - node.Radius - 10 - ((2 - line) * 14) : node.Y + node.Radius + 17 + (line * 14);
+    // Four label lines (and a badge above them), 14 units apart, below the location or ending just above it. Below the
+    // location the badge takes the first line and pushes the rest down; above it, the badge goes on top.
+    private static int LabelY(MapNode node, int line)
+    {
+        int last = MapView.LabelLines - 2;
+        if (node.LabelAbove)
+        {
+            return node.Y - node.Radius - 10 - ((last - line) * MapView.LabelLine);
+        }
+
+        int shift = node.Badge is null ? 0 : 1;
+        return node.Y + node.Radius + 17 + ((line + shift) * MapView.LabelLine);
+    }
 
     private static string Anchor(MapNode node) => node.Anchor switch
     {

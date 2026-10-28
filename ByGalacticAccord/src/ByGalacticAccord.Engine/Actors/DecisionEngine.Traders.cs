@@ -31,12 +31,16 @@ public static partial class DecisionEngine
     /// </summary>
     public static void RunTrader(SimulationContext context, ActorState trader)
     {
-        List<Contract> visible = Visible<Contract>(context, trader).ToList();
+        List<Contract> known = Known<Contract>(context, trader).ToList();
         foreach (Ship ship in trader.Ships.Select(context.Ship).Where(s => s.IsFree).ToList())
         {
-            if (BestOption(context, trader, ship, visible) is { } option)
+            // What it believes open may have been taken since the news reported it: it tries its best, and its next best once.
+            for (int attempt = 0; attempt < 2 && BestOption(context, trader, ship, known) is { } option; attempt++)
             {
-                Commit(context, trader, ship, option);
+                if (Commit(context, trader, ship, option) != Signing.NotOpen)
+                {
+                    break;
+                }
             }
 
             if (ship.IsFree)
@@ -58,7 +62,15 @@ public static partial class DecisionEngine
     /// Where <paramref name="seller"/> could get the goods for a delivered wanted Sale: its own goods aboard
     /// <paramref name="ship"/> or in storage, or a producer with them free, at the producer's ask.
     /// </summary>
-    public static IEnumerable<FillSource> FillSources(SimulationContext context, ActorState seller, SaleContract wanted, Ship? ship)
+    public static IEnumerable<FillSource> FillSources(SimulationContext context, ActorState seller, SaleContract wanted, Ship? ship) =>
+        FillSources(context, seller, wanted, ship, Visibility.Of(context, seller));
+
+    /// <summary>
+    /// Where <paramref name="seller"/> could get the goods for a delivered wanted Sale: its own goods aboard
+    /// <paramref name="ship"/> or in storage, or a producer it knows has them free, at the ask it knows (design §7, D32: live
+    /// where it is present, else as last read; a producer that turned it down in the last day it leaves out).
+    /// </summary>
+    internal static IEnumerable<FillSource> FillSources(SimulationContext context, ActorState seller, SaleContract wanted, Ship? ship, Sight sight)
     {
         if (ship is not null && ship.LotOf(seller.Id, wanted.Good) is { } lot && lot.Quantity >= wanted.Quantity)
         {
@@ -75,34 +87,34 @@ public static partial class DecisionEngine
 
         foreach (ActorState producer in context.ProducersOf(wanted.Good))
         {
-            if (producer.Id != seller.Id && !producer.IsPlayer && producer.Available(wanted.Good) >= wanted.Quantity
+            if (producer.Id != seller.Id && !producer.IsPlayer && Knowledge.KnownAsk(context, seller, producer, wanted.Quantity, sight) is { } ask
                 && context.FindPath(producer.Home, wanted.Place) is not null)
             {
-                Credits ask = Ask(producer);
-                yield return FillSource.FromProducer(producer, Credits.Of(ask.Amount * wanted.Quantity));
+                yield return FillSource.FromProducer(producer, Credits.Of(Math.Round(ask.Amount * wanted.Quantity, 2)));
             }
         }
     }
 
-    private static TraderOption? BestOption(SimulationContext context, ActorState trader, Ship ship, List<Contract> visible)
+    private static TraderOption? BestOption(SimulationContext context, ActorState trader, Ship ship, List<Contract> known)
     {
         TraderOption? best = null;
-        foreach (HaulContract haul in visible.OfType<HaulContract>())
+        Sight sight = Visibility.Of(context, trader);
+        foreach (HaulContract haul in known.OfType<HaulContract>())
         {
-            if (haul.IsOpen && ScoreHaul(context, trader, ship, haul) is { } option && (best is null || option.Utility > best.Value.Utility))
+            if (Knowledge.BelievesOpen(context, trader, sight, haul) && ScoreHaul(context, trader, ship, haul) is { } option && (best is null || option.Utility > best.Value.Utility))
             {
                 best = option;
             }
         }
 
-        foreach (SaleContract wanted in visible.OfType<SaleContract>())
+        foreach (SaleContract wanted in known.OfType<SaleContract>())
         {
-            if (!wanted.IsOpen || wanted.Side != SaleSide.Wanted || wanted.Quantity > ship.CargoCapacity)
+            if (!Knowledge.BelievesOpen(context, trader, sight, wanted) || wanted.Side != SaleSide.Wanted || wanted.Quantity > ship.CargoCapacity)
             {
                 continue;
             }
 
-            foreach (FillSource source in FillSources(context, trader, wanted, ship))
+            foreach (FillSource source in FillSources(context, trader, wanted, ship, sight))
             {
                 if (ScoreFill(context, trader, ship, wanted, source) is { } option && (best is null || option.Utility > best.Value.Utility))
                 {
@@ -286,13 +298,14 @@ public static partial class DecisionEngine
     // The commit threshold, set by liquidity preference: a cautious actor needs a clearly good deal (design §4.3).
     private static decimal Threshold(ActorState trader) => 4m * (0.5m + trader.Personality.LiquidityPreference);
 
-    private static void Commit(SimulationContext context, ActorState trader, Ship ship, TraderOption option)
+    private static Signing Commit(SimulationContext context, ActorState trader, Ship ship, TraderOption option)
     {
         Offer offer = option.Offer;
         Signing signed = option.Kind == OptionKind.Haul
             ? Market.SignAgreed(option.Contract, offer, () => Market.TakeHaul(context, trader, (HaulContract)option.Contract, ship, offer.Price))
             : Market.SignAgreed(option.Contract, offer, () => Market.FillWithShip(context, trader, (SaleContract)option.Contract, offer.Price, ship, option.Source!));
         NoteHaggled(context, option.Contract, signed);
+        return signed;
     }
 
     /// <summary>A free ship with the trader's own goods aboard and nothing better to do puts them into storage where it is.</summary>
@@ -324,14 +337,15 @@ public static partial class DecisionEngine
         Credits bestFee = Credits.Zero;
         decimal bestBudget = 0m;
         decimal bestUtility = Threshold(trader);
-        foreach (SaleContract wanted in Visible<SaleContract>(context, trader))
+        Sight sight = Visibility.Of(context, trader);
+        foreach (SaleContract wanted in Known<SaleContract>(context, trader))
         {
             if (wanted.Side != SaleSide.Wanted)
             {
                 continue;
             }
 
-            foreach (FillSource source in FillSources(context, trader, wanted, ship: null))
+            foreach (FillSource source in FillSources(context, trader, wanted, ship: null, sight))
             {
                 if (source.At == wanted.Place || context.FindPath(source.At, wanted.Place) is not { } laden
                     || context.StationOperatorAt(source.At) is not { } station)

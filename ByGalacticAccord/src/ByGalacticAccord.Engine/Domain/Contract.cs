@@ -322,6 +322,12 @@ public sealed class SaleContract : Contract
 
     public Credits UnitPrice => Credits.Of(Quantity <= 0m ? 0m : Price.Amount / Quantity);
 
+    /// <summary>
+    /// An order at a producer's door (<see cref="Simulation.Market.BuyAtSource"/>): a wanted Sale at its place, answered on the spot
+    /// at the producer's ask up to the price posted, and never on a board or in the news.
+    /// </summary>
+    public bool AtTheDoor { get; internal set; }
+
     internal void SetReceipt(Holding receipt) => Receipt = receipt;
 
     internal void SetReserved(Holding? reserved) => Reserved = reserved;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
 
 namespace ByGalacticAccord.Cli;
@@ -122,7 +123,7 @@ internal static class Soak
                 }
 
                 signed++;
-                if (c.Price != c.OfferedPrice && c.OfferedPrice.Amount > 0m)
+                if (c.Price != c.OfferedPrice && c.OfferedPrice.Amount > 0m && c is not SaleContract { AtTheDoor: true })
                 {
                     haggled++;
                     ratio += c.Price.Amount / c.OfferedPrice.Amount;
@@ -132,6 +133,14 @@ internal static class Soak
             string average = haggled == 0 ? "—" : (ratio / haggled).ToString("0.00", CultureInfo.InvariantCulture) + "× the posted price";
             Line("  " + label, $"{signed.ToString("N0", CultureInfo.InvariantCulture)} signed, {haggled.ToString("N0", CultureInfo.InvariantCulture)} haggled ({(signed == 0 ? 0m : (decimal)haggled / signed):P1}), on average {average}");
         }
+
+        Console.WriteLine();
+        Console.WriteLine("Information (design §7): what actors knew, and what the news told them:");
+        Line("  Orders at a producer's door", $"{ctx.DoorOrders.ToString("N0", CultureInfo.InvariantCulture)}, turned down {ctx.DoorRefusedForPrice.ToString("N0", CultureInfo.InvariantCulture)} for the price, {ctx.DoorRefusedForStock.ToString("N0", CultureInfo.InvariantCulture)} for stock");
+        NewsDesk news = ctx.News;
+        long issues = Math.Max(1, news.IssuesPublished);
+        Line("  The Daily Accord", $"{news.IssuesPublished.ToString("N0", CultureInfo.InvariantCulture)} issues, {(decimal)news.ItemsPublished / issues:0.0} items of {(decimal)news.CandidatesSeen / issues:0.0} contracts a day; {(news.ItemsPublished == 0 ? 0m : (decimal)news.FrontierItems / news.ItemsPublished):P0} about the frontier, {(news.ItemsPublished == 0 ? 0m : (decimal)news.PostedItems / news.ItemsPublished):P0} open posts");
+        Line("  Signed from the news", $"{ctx.SignedFromNews.ToString("N0", CultureInfo.InvariantCulture)}; tries that found the post closed {ctx.FoundClosedFromNews.ToString("N0", CultureInfo.InvariantCulture)}");
 
         Console.WriteLine();
         Console.WriteLine("Goods (produced = consumed + held + lost):");

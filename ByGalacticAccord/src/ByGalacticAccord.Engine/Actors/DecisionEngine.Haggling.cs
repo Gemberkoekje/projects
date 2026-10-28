@@ -230,7 +230,7 @@ public static partial class DecisionEngine
     /// <summary>Count a deal two AI actors signed at a price other than posted.</summary>
     private static void NoteHaggled(SimulationContext context, Contract contract, Signing signed)
     {
-        if (signed == Signing.Signed && contract.Price != contract.OfferedPrice)
+        if (signed == Signing.Signed && contract.Price != contract.OfferedPrice && contract is not SaleContract { AtTheDoor: true })
         {
             context.NoteHaggled();
         }
@@ -240,10 +240,12 @@ public static partial class DecisionEngine
 
     /// <summary>
     /// The player's new post reaches every AI actor that can see it and could answer it: after the hours its presence puts
-    /// between them and the post (<see cref="Visibility.ReachHours"/>), and the hours its answer takes (the tell), it takes the
-    /// post as posted, counters, or lets it pass (<see cref="PostReached"/>, <see cref="Respond"/>).
+    /// between them and the post (<see cref="Sight.ReachHours"/>: at once here, a few hours near, design §7.1), and the hours
+    /// its answer takes (the tell), it takes the post as posted, counters, or lets it pass (<see cref="PostReached"/>,
+    /// <see cref="Respond"/>). A far actor never sees it, unless The Daily Accord reports it: then it reaches every actor that
+    /// can't see it live (<paramref name="fromNews"/>), from the moment the paper is out.
     /// </summary>
-    public static void NoticePost(SimulationContext context, Contract post)
+    public static void NoticePost(SimulationContext context, Contract post, bool fromNews = false)
     {
         if (!context.Config.PostsDrawAnswers)
         {
@@ -253,7 +255,9 @@ public static partial class DecisionEngine
         Offer posted = Offer.Of(post);
         foreach (ActorState actor in context.ActorsOrdered)
         {
-            if (actor.Id == post.PostedBy || !Answers(actor, post) || Visibility.ReachHours(context, actor, post) is not { } reach
+            Sight sight = Visibility.Of(context, actor);
+            long? reach = fromNews ? (sight.CanSee(post) ? null : 0) : sight.ReachHours(post);
+            if (actor.Id == post.PostedBy || !Answers(actor, post) || reach is null || context.NegotiationWith(post.Id, actor.Id) is not null
                 || QuoteFor(context, actor, post, posted) is not { } quote)
             {
                 continue;
@@ -266,7 +270,7 @@ public static partial class DecisionEngine
             }
 
             long hours = Haggling.ReplyHours(actor.Personality.ConcessionRate, answer.Tell, post.Id.Value + actor.Id.Value);
-            context.Schedule(new PostReached(context.CurrentTick + reach + hours, post.Id, actor.Id));
+            context.Schedule(new PostReached(context.CurrentTick + reach.Value + hours, post.Id, actor.Id));
         }
     }
 

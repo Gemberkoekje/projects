@@ -392,6 +392,7 @@ public sealed class FailurePathTests
         ActorState player = context.Player();
         ActorState camp = context.Actor("Rust Belt Camp");
         ActorState juno = context.Actor("Juno Okafor");
+        context.PresentAt(player, "Rust Belt");
         SaleContract wanted = context.PostWanted(camp, GoodType.Food, 40m, 900m, hours: 400);
         PlayerActions.BrokerFeasibility check = PlayerActions.CheckBroker(context, player, wanted);
         Assert.True(check.Ok);
@@ -475,6 +476,7 @@ public sealed class FailurePathTests
         ActorState sable = context.Actor("Sable Vance");
         ActorState farm = context.Actor("Verdant Agricombine");
         LocationId halcyon = context.Place("Halcyon Refinery").Id;
+        context.PresentAt(player, "Halcyon Refinery"); // so it sees the lot (design §7.1)
         context.PutInStorage(sable, halcyon, context.TakeFromStock(farm, GoodType.Food, 40m, reserved: false) with { Quality = 0.3m });
         SaleContract lot = Market.PostSale(
             context, sable, SaleSide.ForSale, GoodType.Food, 40m, halcyon, Credits.Of(120m), Credits.Of(100m), context.CurrentTick + 1,

@@ -65,7 +65,8 @@ public static partial class DecisionEngine
     /// <summary>
     /// A producer answers a wanted Sale at its location, if it has the goods free: as posted when the price meets its ask,
     /// else, for an AI buyer that would pay that much, in closed form (design §3.6). The player's price is all it would pay,
-    /// so with the player it is as posted or a counter over game time (<see cref="Respond"/>).
+    /// so with the player it is as posted or a counter over game time (<see cref="Respond"/>). An order at its door it fills
+    /// at its ask, if the order goes that high.
     /// </summary>
     private static bool TryAnswer(SimulationContext context, ActorState producer, SaleContract wanted)
     {
@@ -77,6 +78,17 @@ public static partial class DecisionEngine
 
         decimal floor = Ask(producer).Amount * wanted.Quantity * 0.999m;
         Offer offer = Offer.Of(wanted);
+        if (wanted.AtTheDoor)
+        {
+            if (wanted.OfferedPrice.Amount < floor)
+            {
+                return false;
+            }
+
+            Credits atAsk = Credits.Of(Math.Min(wanted.OfferedPrice.Amount, Math.Round(Ask(producer).Amount * wanted.Quantity, 2)));
+            return Market.SignAgreed(wanted, offer with { Price = atAsk }, () => Market.Supply(context, producer, wanted, atAsk, Holding.StockAt(producer.Home))) == Signing.Signed;
+        }
+
         if (wanted.OfferedPrice.Amount < floor)
         {
             if (Market.HagglesInGameTime(context.Actor(wanted.PostedBy))
@@ -116,7 +128,7 @@ public static partial class DecisionEngine
         Offer? bestOffer = null;
         Credits bestFee = Credits.Zero;
         decimal bestMargin = 0m;
-        foreach (SaleContract wanted in Visible<SaleContract>(context, producer))
+        foreach (SaleContract wanted in Known<SaleContract>(context, producer))
         {
             // A carrier has to come for the goods before it can fly them: allow it the trip twice over and two days.
             if (wanted.Side != SaleSide.Wanted || wanted.Good != profile.Good || wanted.Place == producer.Home

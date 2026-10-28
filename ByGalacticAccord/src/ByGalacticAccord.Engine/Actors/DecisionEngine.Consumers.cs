@@ -133,7 +133,7 @@ public static partial class DecisionEngine
         SaleContract? best = null;
         Offer? bestOffer = null;
         decimal bestCost = decimal.MaxValue;
-        foreach (SaleContract lot in Visible<SaleContract>(context, consumer))
+        foreach (SaleContract lot in Known<SaleContract>(context, consumer))
         {
             if (lot.Side != SaleSide.ForSale || lot.Good != demand.Good || lot.Quantity > deficit * 1.2m || lot.Quantity < deficit * 0.3m)
             {
@@ -197,23 +197,26 @@ public static partial class DecisionEngine
 
     /// <summary>
     /// Post a delivered wanted Sale for what is short (design §4.1). The price sits between what the cheapest
-    /// producer asks and what the goods are worth to the consumer, which is its hidden reservation. With a
-    /// producer at home it is a local sale, answered at once.
+    /// producer asks, as the consumer knows it (design §7, D32: live at home, else as last read), and what the goods are
+    /// worth to the consumer, which is its hidden reservation. With a producer at home it is a local sale, answered at once.
     /// </summary>
     private static void PostWanted(SimulationContext context, ActorState consumer, ConsumerDemand demand, decimal quantity)
     {
         ActorState? source = null;
         decimal bestAsk = decimal.MaxValue;
+        decimal sourceAsk = 0m;
         long hours = 0;
+        Sight sight = Visibility.Of(context, consumer);
         foreach (ActorState producer in context.ProducersOf(demand.Good))
         {
-            if (producer.Available(demand.Good) < 1m || Hours(context, producer.Home, consumer.Home) is not { } h)
+            if (Knowledge.ReadingOf(context, consumer, producer, sight) is not { } reading || reading.CurrentStock is < 1m
+                || Hours(context, producer.Home, consumer.Home) is not { } h)
             {
                 continue;
             }
 
-            decimal ask = Ask(producer).Amount;
-            if (producer.Home == consumer.Home && producer.Available(demand.Good) >= quantity)
+            decimal ask = reading.Ask.Amount;
+            if (producer.Home == consumer.Home && reading.CurrentStock >= quantity)
             {
                 ask *= 0.5m; // a producer at home needs no carrier: always the one to buy from
             }
@@ -222,6 +225,7 @@ public static partial class DecisionEngine
             {
                 bestAsk = ask;
                 source = producer;
+                sourceAsk = reading.Ask.Amount;
                 hours = h;
             }
         }
@@ -232,7 +236,7 @@ public static partial class DecisionEngine
         }
 
         bool local = source.Home == consumer.Home;
-        decimal goods = Ask(source).Amount * quantity;
+        decimal goods = sourceAsk * quantity;
         decimal worth = Willingness(consumer, demand.Good, demand.TargetStock).Amount * quantity;
         decimal budget = worth - goods;
         if (budget <= (local ? 0m : 1m))

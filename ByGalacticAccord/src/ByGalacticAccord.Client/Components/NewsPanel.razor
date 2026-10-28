@@ -1,0 +1,51 @@
+@* The Daily Accord (design §7.4): a few of yesterday's contracts, sector-wide, each as it stood when the paper went to press;
+   a line selects its contract. Below it, the signals in what the player knows (design §11.2), each with its age. *@
+<section class="panel news-panel" data-testid="news">
+    <div class="panel-head">
+        <h2 class="caps">@Model.Title</h2>
+    </div>
+    <p class="news-note xsmall muted">@Model.Note</p>
+    <ol class="news-items">
+        @if (Model.Items.Count == 0)
+        {
+            <li class="empty small muted">@Model.Empty</li>
+        }
+        @foreach (NewsLine item in Model.Items)
+        {
+            <li class="news-item">
+                <button type="button" class="link-text small tone-@item.Tone" @onclick="() => OnSelect.InvokeAsync(item.Contract)">@item.Text</button>
+            </li>
+        }
+    </ol>
+    <h3 class="block-title">@Model.SignalsTitle</h3>
+    <ol class="signals" data-testid="signals">
+        @if (Model.Signals.Count == 0)
+        {
+            <li class="empty small muted">@Model.SignalsEmpty</li>
+        }
+        @foreach (SignalLine signal in Model.Signals)
+        {
+            <li class="signal age-@signal.Age">
+                <span class="small">@signal.Text</span>
+                <span class="age xsmall muted">@signal.AgeText</span>
+            </li>
+        }
+    </ol>
+</section>
+
+@code {
+    private NewsViewModel? _rendered;
+
+    [Parameter, EditorRequired]
+    public NewsViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
+
+    protected override bool ShouldRender()
+    {
+        bool changed = !ReferenceEquals(_rendered, Model);
+        _rendered = Model;
+        return changed;
+    }
+}

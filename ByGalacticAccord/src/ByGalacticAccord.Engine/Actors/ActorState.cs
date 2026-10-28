@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 
 namespace ByGalacticAccord.Engine.Actors;
 
@@ -59,6 +60,9 @@ public sealed class ActorState
     public StationProfile? Station { get; init; }
 
     public IReadOnlyList<ShipId> Ships => _ships;
+
+    /// <summary>What it knows of the sector, and how old each thing it knows is (design §7.2): it decides on this, trusting what it last saw (D32).</summary>
+    public ActorKnowledge Knowledge { get; } = new();
 
     public decimal Stock(GoodType good) => _stock.TryGetValue(good, out decimal q) ? q : 0m;
 

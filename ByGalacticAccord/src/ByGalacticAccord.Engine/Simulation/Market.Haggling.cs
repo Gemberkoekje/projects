@@ -20,7 +20,13 @@ public static partial class Market
     public static Negotiation? Counter(
         SimulationContext context, ActorState actor, Contract contract, Offer offer, Negotiation? thread = null, long? replyHours = null, Tell tell = Tell.None)
     {
-        if (!contract.IsOpen || contract is StorageContract || offer.Price.Amount <= 0m || offer.Deadline <= context.CurrentTick)
+        if (!contract.IsOpen)
+        {
+            NotOpen(context, actor, contract); // it knew of it from the news: now it knows better
+            return null;
+        }
+
+        if (contract is StorageContract || offer.Price.Amount <= 0m || offer.Deadline <= context.CurrentTick)
         {
             return null;
         }

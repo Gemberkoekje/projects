@@ -252,6 +252,7 @@ public static class Settlement
 
         FreeSetAside(context, contract, performer);
         Blame(context, performer, contract, Late(context, contract));
+        context.Records.Failed(contract);
         contract.MarkBreached();
         context.NoteBreached();
         context.NoteFailure(reason switch
@@ -297,6 +298,7 @@ public static class Settlement
 
             paid = bond;
             Blame(context, performer, contract, Late(context, contract));
+            context.Records.CancelledForDefault(contract);
             context.NoteFailure(FailureKind.CancelledForDefault);
         }
         else
@@ -315,6 +317,7 @@ public static class Settlement
 
             paid = Credits.Of(fromEscrow) + context.TransferUpTo(by, other, Credits.Of(fee.Amount - fromEscrow));
             Blame(context, by, contract, 0, 0.3m);
+            context.Records.WalkedAway(contract, by.Id);
             context.NoteFailure(FailureKind.CancelledAtWill);
         }
 
@@ -338,6 +341,7 @@ public static class Settlement
         }
 
         Blame(context, payer, contract, 0);
+        context.Records.Defaulted(contract);
         contract.MarkDefaulted();
         context.NoteDefaulted();
         context.NoteFailure(FailureKind.PayerDefault);
@@ -438,6 +442,7 @@ public static class Settlement
         }
 
         context.NoteFulfilled();
+        context.Records.Delivered(contract, ticksLate, delivered < quantity);
         if (ticksLate > 0)
         {
             context.NoteFailure(FailureKind.LateDelivery);

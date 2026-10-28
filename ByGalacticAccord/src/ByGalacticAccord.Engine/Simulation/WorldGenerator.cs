@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Events;
 using ByGalacticAccord.Engine.Random;
 
@@ -137,6 +138,12 @@ public static class WorldGenerator
 
         context.Schedule(new InflationCheck(context.Config.InflationCheckInterval));
         context.Schedule(new ReputationDecay(context.Config.ReputationDecayInterval));
+
+        // Information (design §7): everyone knows the sector as it stands at the start; then the morning bulletin and The Daily
+        // Accord, each day at the same hour, the bulletin first.
+        Knowledge.Seed(context);
+        context.Schedule(new PricesPosted(GameTime.At(0, PriceBulletin.Hour)));
+        context.Schedule(new NewsPublished(GameTime.At(0, PriceBulletin.Hour)));
 
         // Start the faucet mid-range so the monitor settles toward equilibrium without a warm-up flood.
         context.FaucetMultiplier = 0.6m;

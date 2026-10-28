@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
 using ByGalacticAccord.Presentation.Session;
 using ByGalacticAccord.Presentation.Text;
@@ -17,11 +18,13 @@ public enum LabelAnchor
 }
 
 /// <summary>
-/// A location on the map, with the facts its label shows. The label sits above the location when more of
-/// its routes leave downwards, and hugs the frame's edge near one.
+/// A location on the map, with the facts its label shows: what it is, the asks the player knows there and how old they are
+/// (design §7.1, §7.2: drawn fainter with age, a dashed ring beyond the player's sight), and its most pressing signal, if any.
+/// The label sits above the location when more of its routes leave downwards, and hugs the frame's edge near one.
 /// </summary>
 public sealed record MapNode(
-    LocationId Id, string Name, int X, int Y, int Radius, string Meta, string Makes, bool Here, string Tip, bool LabelAbove, LabelAnchor Anchor, int LabelX);
+    LocationId Id, string Name, int X, int Y, int Radius, string Meta, string Info, string AgeText, Age Age, Tier Tier, string? Badge,
+    bool Here, string Tip, bool LabelAbove, LabelAnchor Anchor, int LabelX);
 
 /// <summary>A route, styled by its danger band; <see cref="Dimmed"/> when the selected contract's overlay covers it.</summary>
 public sealed record MapRoute(int X1, int Y1, int X2, int Y2, DangerBand Band, string Hours, int LabelX, int LabelY, bool Dimmed, string Tip);
@@ -47,6 +50,7 @@ public sealed record MapViewModel(
     IReadOnlyList<MapLeg> Overlay,
     IReadOnlyList<MapNode> Nodes,
     IReadOnlyList<MapLegendItem> Legend,
+    string FarLegend,
     string? OverlayTitle,
     string? OverlayEta,
     Tone OverlayTone,
@@ -66,6 +70,12 @@ public static class MapView
 
     // Within this many map units of the frame's side, a location's label runs inwards instead of centring.
     private const int LabelEdge = 110;
+
+    /// <summary>A location's label: its badge, name, kind, asks and their age, one line apart (the client lays them out so).</summary>
+    public const int LabelLines = 5;
+
+    /// <summary>The map units between a label's lines.</summary>
+    public const int LabelLine = 14;
 
     public static MapViewModel Build(GameSession session, ContractId? selected)
     {
@@ -98,9 +108,11 @@ public static class MapView
         }
 
         var nodes = new List<MapNode>();
+        Sight sight = session.Sight;
+        IReadOnlyList<SignalLine> signals = NewsView.Signals(session);
         foreach (Location location in context.Locations.Values.OrderBy(l => l.Id.Value))
         {
-            nodes.Add(Node(context, location, here == location.Id));
+            nodes.Add(Node(session, location, here == location.Id, sight, signals));
         }
 
         List<MapRegion> regions = Regions(context, nodes);
@@ -115,7 +127,7 @@ public static class MapView
 
         return new MapViewModel(
             Width, Height, Templates.Get("Map.Title"), Templates.Get("Map.Hint"),
-            regions, routes, overlay, nodes, legend, overlayTitle, overlayEta, overlayTone,
+            regions, routes, overlay, nodes, legend, Templates.Get("Map.Legend.Far"), overlayTitle, overlayEta, overlayTone,
             Templates.Get("Map.Description"));
     }
 
@@ -291,31 +303,79 @@ public static class MapView
         }
     }
 
-    private static MapNode Node(SimulationContext context, Location location, bool here)
+    private static MapNode Node(GameSession session, Location location, bool here, Sight sight, IReadOnlyList<SignalLine> signals)
     {
-        var made = new List<string>();
+        SimulationContext context = session.Context;
+        Tier tier = sight.TierOf(location.Id);
+        var asks = new List<string>();
+        PriceReading? newest = null;
         foreach (ActorId resident in location.Residents)
         {
-            if (context.Actor(resident).Producer is { } producer)
+            if (context.Actor(resident) is { Producer: { } producer } maker && Knowledge.ReadingOf(context, session.Player, maker, sight) is { } reading)
             {
-                string good = Templates.Good(producer.Good);
-                if (!made.Contains(good))
+                asks.Add(Templates.Fill("Map.Node.Ask", ("good", Templates.Good(producer.Good)), ("unit", Format.MoneyCents(reading.Ask))));
+                if (newest is not { } before || reading.AskTick > before.AskTick)
                 {
-                    made.Add(good);
+                    newest = reading;
                 }
             }
         }
 
         string meta = Templates.Fill(
             "Map.Node.Meta", ("type", Templates.LocationKind(location.Type)), ("jurisdiction", Templates.JurisdictionShort(location.Reach)));
-        string makes = made.Count == 0 ? string.Empty : Templates.Fill("Map.Node.Makes", ("goods", string.Join(", ", made)));
-        string tip = Templates.Fill(here ? "Map.Node.Tip.Here" : "Map.Node.Tip", ("name", location.Name), ("meta", meta));
+        string info = asks.Count == 0 ? Templates.Get("Map.Node.NoProducers") : string.Join(" · ", asks);
+        (string ageText, Age age) = NodeAge(session, location, tier, newest);
+        string tip = Templates.Fill("Map.Node.Tip." + tier, ("name", location.Name), ("meta", meta));
         int radius = location.Type == LocationType.CoreWorld ? 12 : 9;
 
         (LabelAnchor anchor, int labelX) = location.Map.X > Width - LabelEdge
             ? (LabelAnchor.End, location.Map.X + radius + 4)
             : location.Map.X < LabelEdge ? (LabelAnchor.Start, location.Map.X - radius - 4) : (LabelAnchor.Middle, location.Map.X);
-        return new MapNode(location.Id, location.Name, location.Map.X, location.Map.Y, radius, meta, makes, here, tip, LabelAbove(context, location), anchor, labelX);
+        return new MapNode(
+            location.Id, location.Name, location.Map.X, location.Map.Y, radius, meta, info, ageText, age, tier, Badge(session, location, signals),
+            here, tip, LabelAbove(context, location), anchor, labelX);
+    }
+
+    // How old what the player knows of a place is: live where it is present; else its newest reading there, or its last presence.
+    private static (string Text, Age Age) NodeAge(GameSession session, Location location, Tier tier, PriceReading? newest)
+    {
+        if (tier == Tier.Here)
+        {
+            return (Templates.Get("Map.Age.Here"), Age.Live);
+        }
+
+        if (newest is { } latest)
+        {
+            return (Templates.Fill("Map.Age." + latest.Source, ("when", Format.Date(latest.AskTick))), InfoText.AgeOf(latest, session.Now));
+        }
+
+        return session.Player.Knowledge.LastHere(location.Id) is { } last
+            ? (Templates.Fill("Map.Age.Last", ("when", Format.Date(last))), InfoText.AgeOf(last, session.Now))
+            : (Templates.Get("Map.Age.Never"), Age.Old);
+    }
+
+    // A place's most pressing signal (design §11.2): an idle producer, a low price, a consumer running short, a Sale wanted
+    // there that the player knows of from the news, a high price.
+    private static string? Badge(GameSession session, Location location, IReadOnlyList<SignalLine> signals)
+    {
+        foreach (SignalKind kind in new[] { SignalKind.Idle, SignalKind.PriceLow, SignalKind.Short })
+        {
+            if (signals.Any(s => s.At == location.Id && s.Kind == kind))
+            {
+                return Templates.Get("Map.Badge." + kind);
+            }
+        }
+
+        foreach (Contract contract in session.KnownOpen())
+        {
+            if (contract is SaleContract { Side: SaleSide.Wanted } wanted && wanted.Place == location.Id && wanted.PostedBy != session.Player.Id
+                && Knowledge.FromNews(session.Context, session.Player, wanted) && !session.Sight.CanSee(wanted))
+            {
+                return Templates.Fill("Map.Badge.News", ("good", Templates.Good(wanted.Good)));
+            }
+        }
+
+        return signals.Any(s => s.At == location.Id && s.Kind == SignalKind.PriceHigh) ? Templates.Get("Map.Badge.PriceHigh") : null;
     }
 
     // A label goes on the side of its location that fewer routes leave from: above when most go down.
@@ -379,15 +439,16 @@ public static class MapView
     // Roughly where a location's dot and label lines reach, from character counts at the label sizes.
     private static (double Left, double Top, double Right, double Bottom) Extent(MapNode node)
     {
-        double width = Math.Max(node.Name.Length * 7.4, Math.Max(node.Meta.Length * 6.0, node.Makes.Length * 6.6));
+        double width = Math.Max(node.Name.Length * 7.4, Math.Max(node.Meta.Length * 6.0, Math.Max(node.Info.Length * 6.6, node.AgeText.Length * 5.6)));
         (double left, double right) = node.Anchor switch
         {
             LabelAnchor.Start => (node.LabelX, node.LabelX + width),
             LabelAnchor.End => (node.LabelX - width, node.LabelX),
             _ => (node.LabelX - (width / 2), node.LabelX + (width / 2)),
         };
-        double labelTop = node.LabelAbove ? node.Y - node.Radius - 10 - 28 - 11 : node.Y + node.Radius + 6;
-        double labelBottom = node.LabelAbove ? node.Y - node.Radius - 6 : node.Y + node.Radius + 17 + 28 + 4;
+        int lines = node.Badge is null ? LabelLines - 1 : LabelLines;
+        double labelTop = node.LabelAbove ? node.Y - node.Radius - 10 - (lines * LabelLine) - 11 : node.Y + node.Radius + 6;
+        double labelBottom = node.LabelAbove ? node.Y - node.Radius - 6 : node.Y + node.Radius + 17 + (lines * LabelLine) + 4;
         return (
             Math.Min(left, node.X - node.Radius),
             Math.Min(labelTop, node.Y - node.Radius),

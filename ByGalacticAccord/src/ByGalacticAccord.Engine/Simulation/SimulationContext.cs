@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Events;
 using ByGalacticAccord.Engine.Random;
 
@@ -22,7 +23,6 @@ public sealed class SimulationContext
     private readonly Dictionary<LocationId, Location> _locations = new();
     private readonly Dictionary<ContractId, Contract> _contracts = new();
     private readonly List<Route> _routes = new();
-    private readonly Dictionary<(ActorId Actor, LocationId Location), long> _scoutedUntil = new();
 
     // Shortest paths are a pure function of the static route graph, so each pair is solved once.
     // Adding a location or a route clears the cache.
@@ -92,6 +92,15 @@ public sealed class SimulationContext
 
     public ReputationLedger Reputation { get; }
 
+    /// <summary>The morning price bulletin: every producer's ask, posted daily (design §7.1, "near": prices updated daily).</summary>
+    public PriceBulletin Bulletin { get; } = new();
+
+    /// <summary>The Daily Accord's issues and what they made known (design §7.4).</summary>
+    public NewsDesk News { get; } = new();
+
+    /// <summary>The Accord's public record and each actor's own dealings (design §7.3).</summary>
+    public Records Records { get; } = new();
+
     public long CurrentTick { get; private set; }
 
     public ActorId? PlayerActorId { get; set; }
@@ -138,6 +147,19 @@ public sealed class SimulationContext
     public long NegotiationsOpened { get; private set; }
 
     public long NegotiationsAgreed { get; private set; }
+
+    /// <summary>Orders at a producer's door (design §7: at the ask the buyer knew, up to a limit), and those turned down: its ask above the limit, or too little stock.</summary>
+    public long DoorOrders { get; private set; }
+
+    public long DoorRefusedForPrice { get; private set; }
+
+    public long DoorRefusedForStock { get; private set; }
+
+    /// <summary>Contracts signed by a taker that knew of them only from The Daily Accord (design §7.4).</summary>
+    public long SignedFromNews { get; private set; }
+
+    /// <summary>Tries at a contract known only from the news that found it already closed.</summary>
+    public long FoundClosedFromNews { get; private set; }
 
     public IReadOnlyDictionary<ActorId, ActorState> Actors => _actors;
 
@@ -269,6 +291,23 @@ public sealed class SimulationContext
     internal void NoteAgreed() => NegotiationsAgreed++;
 
     public void NoteHaggled() => DealsHaggled++;
+
+    internal void NoteDoorOrder(bool refused, bool forStock)
+    {
+        DoorOrders++;
+        if (refused && forStock)
+        {
+            DoorRefusedForStock++;
+        }
+        else if (refused)
+        {
+            DoorRefusedForPrice++;
+        }
+    }
+
+    internal void NoteSignedFromNews() => SignedFromNews++;
+
+    internal void NoteFoundClosedFromNews() => FoundClosedFromNews++;
 
     public ActorState Actor(ActorId id) => _actors[id];
 
@@ -821,6 +860,12 @@ public sealed class SimulationContext
     public IEnumerable<StorageContract> StoragesAt(LocationId location) =>
         _storages.Where(s => s.Location == location).ToArray();
 
+    /// <summary>Every open store, in the order they were opened.</summary>
+    public IReadOnlyList<StorageContract> OpenStorages => _storages;
+
+    /// <summary>One more than the largest location id: the length of an array indexed by location.</summary>
+    public long LocationIdLimit => _nextLocationId;
+
     /// <summary>The renter's open stores, in the order they were opened.</summary>
     public IEnumerable<StorageContract> StoragesOf(ActorId renter) =>
         _storages.Where(s => s.Renter == renter).ToArray();
@@ -913,13 +958,6 @@ public sealed class SimulationContext
     public void NoteIncident() => IncidentsOccurred++;
 
     public void NoteSold(decimal quantity) => GoodsSold += quantity;
-
-    // ---- scouting / visibility (§4.6) ----
-    public void Scout(ActorId actor, LocationId location) =>
-        _scoutedUntil[(actor, location)] = CurrentTick + Config.ScoutFreshnessTicks;
-
-    public bool HasFreshScout(ActorId actor, LocationId location) =>
-        _scoutedUntil.TryGetValue((actor, location), out long until) && until >= CurrentTick;
 
     // ---- player hard-pause alerts (§3.4). In headless runs PlayerActorId is null and these never fire. ----
     // An alert is the journal entry that needs the player's attention; the interface words it.

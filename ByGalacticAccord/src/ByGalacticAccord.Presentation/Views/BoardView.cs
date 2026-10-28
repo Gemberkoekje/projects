@@ -10,7 +10,8 @@ namespace ByGalacticAccord.Presentation.Views;
 
 /// <summary>
 /// One open contract on the board: kind, jurisdiction, danger and term package at a glance, and what it is worth to the
-/// player (design §11.3): the take-home of a haul or a delivered Sale, or the cost of a lot.
+/// player (design §11.3): the take-home of a haul or a delivered Sale, or the cost of a lot. One the player knows only from
+/// The Daily Accord says so (<see cref="Seen"/>), and is drawn by the age of that issue (design §7.2).
 /// </summary>
 public sealed record BoardRow(
     ContractId Id,
@@ -28,21 +29,27 @@ public sealed record BoardRow(
     string Due,
     string? Note,
     Tone NoteTone,
-    bool Blocked);
+    bool Blocked,
+    string? Seen,
+    Age Age);
 
 public sealed record BoardViewModel(string Title, string Hint, string Empty, IReadOnlyList<BoardRow> Rows);
 
-/// <summary>Builds the board: the open Sales and Hauls the player can see, newest first.</summary>
+/// <summary>
+/// Builds the board: the Sales and Hauls the player believes open (design §7.1, D31), newest first: those it sees live, and
+/// those The Daily Accord reported that it can't see, which may have been taken since.
+/// </summary>
 public static class BoardView
 {
     public static BoardViewModel Build(GameSession session)
     {
         var rows = new List<BoardRow>();
-        foreach (Contract contract in Visibility.OpenContractsVisibleTo(session.Context, session.Player).Reverse())
+        Sight sight = session.Sight;
+        foreach (Contract contract in session.KnownOpen().Reverse())
         {
-            if (contract.Status == ContractStatus.Open && contract is SaleContract or HaulContract && contract.PostedBy != session.Player.Id)
+            if (contract is SaleContract or HaulContract && contract.PostedBy != session.Player.Id)
             {
-                rows.Add(Row(session, contract));
+                rows.Add(Row(session, contract, sight));
             }
         }
 
@@ -53,7 +60,7 @@ public static class BoardView
             rows);
     }
 
-    private static BoardRow Row(GameSession session, Contract contract)
+    private static BoardRow Row(GameSession session, Contract contract, Sight sight)
     {
         var context = session.Context;
         long now = session.Now;
@@ -106,9 +113,22 @@ public static class BoardView
 
         DangerBand band = estimate?.Band ?? DangerBand.Green;
         (string? note, Tone noteTone) = Note(session, contract, block, estimate);
+        (string? seen, Age age) = Seen(session, contract, sight);
         return new BoardRow(
             contract.Id, contract.Type, Templates.KindLine(contract), title, route, value, tone, rate,
-            band, Templates.Danger(band), Templates.Jurisdiction(contract.Jurisdiction), Templates.Package(contract.Terms.Package), due, note, noteTone, blocked);
+            band, Templates.Danger(band), Templates.Jurisdiction(contract.Jurisdiction), Templates.Package(contract.Terms.Package), due, note, noteTone, blocked,
+            seen, age);
+    }
+
+    /// <summary>How the player knows of a contract: live, or from an issue of The Daily Accord, with that issue's age.</summary>
+    public static (string? Seen, Age Age) Seen(GameSession session, Contract contract, Sight sight)
+    {
+        if (sight.CanSee(contract) || session.Context.News.ReportedOpenAt(contract.Id) is not { } reported)
+        {
+            return (null, Age.Live);
+        }
+
+        return (Templates.Fill("Board.Seen.News", ("date", Format.Date(reported))), InfoText.AgeOf(reported, session.Now));
     }
 
     // The one thing a row most needs to say beyond its figures: why you can't take it, or what the figures already count against you.

@@ -85,6 +85,7 @@ public static partial class Market
             context.NextContractId(), poster.Id, context.CurrentTick, side, good, quantity, place, price, reservation,
             Terms.TaxRate(context, location.Reach), deadline, location.Reach, location.Region, terms);
         sale.SetSeen(stored);
+        sale.AtTheDoor = atTheDoor;
         if (side == SaleSide.Wanted)
         {
             sale.SetReceipt(holding);
@@ -303,15 +304,28 @@ public static partial class Market
     }
 
     /// <summary>
-    /// Buy goods at a producer's location by posting a wanted Sale there at <paramref name="price"/>: an order at the door,
-    /// which an AI producer there answers at once, for the player as for anyone. Null, with the post withdrawn, if none did
-    /// (or, outside the Accord, if the buyer then couldn't pay).
+    /// How far above the price it expects a buyer goes in an order at a producer's door: its knowledge of the ask may be a day
+    /// old or more (design §7.2), and it pays the ask as it stands, up to this much more.
+    /// </summary>
+    public const decimal DoorTolerance = 0.10m;
+
+    /// <summary>The most an order at the door pays for goods the buyer expects to cost <paramref name="expected"/>.</summary>
+    public static Credits DoorLimit(Credits expected) => Credits.Of(Math.Round(expected.Amount * (1m + DoorTolerance), 2));
+
+    /// <summary>
+    /// Buy goods at a producer's location with an order at the door: a wanted Sale there that an AI producer answers at once, for
+    /// the player as for anyone, at its ask as it stands, so long as that is within <see cref="DoorTolerance"/> of what the
+    /// buyer expects to pay (<paramref name="expected"/>, from what it knows). Null, with the post withdrawn, if none did (or,
+    /// outside the Accord, if the buyer then couldn't pay).
     /// </summary>
     public static SaleContract? BuyAtSource(
-        SimulationContext context, ActorState buyer, GoodType good, decimal quantity, LocationId source, Credits price, Holding receipt, long deadline)
+        SimulationContext context, ActorState buyer, GoodType good, decimal quantity, LocationId source, Credits expected, Holding receipt, long deadline)
     {
-        SaleContract post = PostSale(context, buyer, SaleSide.Wanted, good, quantity, source, price, price, deadline, receipt, null, 1m, atTheDoor: true);
-        if (post.Status is ContractStatus.Active or ContractStatus.Fulfilled)
+        Credits limit = DoorLimit(expected);
+        SaleContract post = PostSale(context, buyer, SaleSide.Wanted, good, quantity, source, limit, limit, deadline, receipt, null, 1m, atTheDoor: true);
+        bool bought = post.Status is ContractStatus.Active or ContractStatus.Fulfilled;
+        context.NoteDoorOrder(refused: !bought, forStock: !bought && !context.ProducersOf(good).Any(p => p.Home == source && p.Available(good) >= quantity));
+        if (bought)
         {
             return post;
         }
@@ -329,7 +343,7 @@ public static partial class Market
     {
         if (!wanted.IsOpen || wanted.Side != SaleSide.Wanted)
         {
-            return Signing.NotOpen;
+            return NotOpen(context, seller, wanted);
         }
 
         if (!CanFund(wanted, context.Actor(wanted.PostedBy), price))
@@ -365,7 +379,7 @@ public static partial class Market
             purchase = BuyAtSource(context, seller, wanted.Good, wanted.Quantity, pickup, source.PurchasePrice, Holding.Aboard(ship.Id, pickup), collect);
             if (purchase is null)
             {
-                return Signing.SupplierDeclined;
+                return Declined(context, seller, source);
             }
         }
 
@@ -408,7 +422,7 @@ public static partial class Market
         haul = null;
         if (!wanted.IsOpen || wanted.Side != SaleSide.Wanted)
         {
-            return Signing.NotOpen;
+            return NotOpen(context, seller, wanted);
         }
 
         if (!CanFund(wanted, context.Actor(wanted.PostedBy), price))
@@ -423,7 +437,7 @@ public static partial class Market
                 if (BuyAtSource(context, seller, wanted.Good, wanted.Quantity, source.At, source.PurchasePrice, Holding.StorageAt(source.At), context.CurrentTick + 24)
                     is not { Status: ContractStatus.Fulfilled })
                 {
-                    return Signing.SupplierDeclined;
+                    return Declined(context, seller, source);
                 }
 
                 from = Holding.StorageAt(source.At);
@@ -447,12 +461,16 @@ public static partial class Market
         return signed;
     }
 
-    /// <summary>Whether a signed contract is being performed: a ship's job serves it, or a signed haul delivers for it.</summary>
+    /// <summary>
+    /// Whether a signed contract is being performed: a ship's job serves it, or carries goods for a haul that delivers for it (a
+    /// haul its shipper cancelled on the way still sets the goods down, and they go on to the Sale), or a signed haul delivers
+    /// for it.
+    /// </summary>
     public static bool UnderWay(SimulationContext context, Contract contract)
     {
         foreach (Ship ship in context.Ships.Values)
         {
-            if (ship.Job is { } job && job.Serves(contract.Id))
+            if (ship.Job is { } job && (job.Serves(contract.Id) || Delivers(context, job, contract)))
             {
                 return true;
             }
@@ -471,7 +489,7 @@ public static partial class Market
     {
         foreach (Ship ship in context.Ships.Values)
         {
-            if (ship.Job is { } job && job.Serves(contract.Id))
+            if (ship.Job is { } job && (job.Serves(contract.Id) || Delivers(context, job, contract)))
             {
                 return NextFree(context, ship).Tick;
             }
@@ -490,6 +508,10 @@ public static partial class Market
 
         return null;
     }
+
+    // A ship's job carries a haul's goods, loaded, toward the place of the Sale that haul serves.
+    private static bool Delivers(SimulationContext context, ShipJob job, Contract contract) =>
+        job.Haul is { } id && context.Contract(id) is HaulContract { PickedUp: true } haul && haul.Serves == contract.Id;
 
     /// <summary>Where and when a ship is next free: now where it sits, or where and when its job ends.</summary>
     public static (LocationId At, long Tick) NextFree(SimulationContext context, Ship ship)
@@ -556,12 +578,40 @@ public static partial class Market
         }
     }
 
+    // A taker found a contract closed that it believed open (it knew of it from the news): it won't count on it again.
+    private static Signing NotOpen(SimulationContext context, ActorState taker, Contract contract)
+    {
+        if (context.News.WasReportedOpen(contract.Id) && !Visibility.Of(context, taker).CanSee(contract))
+        {
+            context.NoteFoundClosedFromNews();
+        }
+
+        Knowledge.NoteClosed(context, taker, contract);
+        return Signing.NotOpen;
+    }
+
+    // A producer turned down an order at its door: the buyer stops counting on it for a while.
+    private static Signing Declined(SimulationContext context, ActorState buyer, FillSource source)
+    {
+        if (source.Producer is { } producer)
+        {
+            Knowledge.NoteRefused(context, buyer, producer);
+        }
+
+        return Signing.SupplierDeclined;
+    }
+
     // Sign, then lock the payer's price and tax and the performer's bond in Accord escrow (design §16.4).
     private static Signing Sign(SimulationContext context, Contract contract, ActorState taker, Credits price)
     {
-        if (!contract.IsOpen || contract.PostedBy == taker.Id)
+        if (contract.PostedBy == taker.Id)
         {
             return Signing.NotOpen;
+        }
+
+        if (!contract.IsOpen)
+        {
+            return NotOpen(context, taker, contract);
         }
 
         ActorState payer = contract switch
@@ -572,6 +622,11 @@ public static partial class Market
         if (!CanFund(contract, payer, price))
         {
             return Signing.PayerCannotFund;
+        }
+
+        if (context.News.WasReportedOpen(contract.Id) && !Visibility.Of(context, taker).CanSee(contract))
+        {
+            context.NoteSignedFromNews();
         }
 
         context.Sign(contract, taker, price);

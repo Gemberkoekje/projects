@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
 
 namespace ByGalacticAccord.Presentation.Session;
@@ -231,9 +232,9 @@ public sealed class GameSession
         Contract contract = Context.Contract(id);
         Negotiation? negotiation = thread is { } t ? Context.Negotiation(t) : null;
         DealBlock block = PlayerActions.CheckCounter(Context, Player, contract, offer, negotiation);
-        if (block == DealBlock.None)
+        if (block == DealBlock.None && PlayerActions.Counter(Context, Player, contract, offer, negotiation) is null && !contract.IsOpen)
         {
-            PlayerActions.Counter(Context, Player, contract, offer, negotiation);
+            block = DealBlock.NotOpen; // known only from the news, and taken since
         }
 
         Revision++;
@@ -253,6 +254,18 @@ public sealed class GameSession
 
     /// <summary>Take one of the player's open posts down.</summary>
     public bool Withdraw(ContractId id) => Changed(PlayerActions.Withdraw(Context, Player, Context.Contract(id)));
+
+    /// <summary>
+    /// What the player can see now (design §7.1): its presence and the tier of every location from it. Built afresh each time,
+    /// since a ship that moves changes it.
+    /// </summary>
+    public Sight Sight => Visibility.Of(Context, Player);
+
+    /// <summary>
+    /// The contracts the player believes open, in id order: those it sees live and are open, and those The Daily Accord reported
+    /// open that it can't see live and hasn't found closed (design §7.1, D31). Its own posts are among them.
+    /// </summary>
+    public IReadOnlyList<Contract> KnownOpen() => Knowledge.OpenContracts(Context, Player, Sight);
 
     /// <summary>The player's haggles, newest first.</summary>
     public IEnumerable<Negotiation> PlayerNegotiations =>

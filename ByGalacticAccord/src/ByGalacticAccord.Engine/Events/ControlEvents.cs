@@ -30,8 +30,10 @@ public sealed class ActorHeartbeat : ISimEvent
             return;
         }
 
-        // Ships cost money every day, earning or idle, whoever owns them: the player too (design §6.5).
+        // Ships cost money every day, earning or idle, whoever owns them: the player too (design §6.5). Then it looks around
+        // where it is present, and decides on what it knows (design §7, D32).
         DecisionEngine.ChargeRunningCosts(context, actor);
+        Knowledge.Look(context, actor);
 
         // The player's actor is driven by the human, not the decision engine (§4.7.3).
         if (!actor.IsPlayer)

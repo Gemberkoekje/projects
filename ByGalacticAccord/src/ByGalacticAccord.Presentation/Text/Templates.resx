@@ -498,10 +498,10 @@
   </data>
   <!-- The map. -->
   <data name="Map.Title" xml:space="preserve">
-    <value>The sector</value>
+    <value>The sector · what you know</value>
   </data>
   <data name="Map.Hint" xml:space="preserve">
-    <value>Select a contract on the board to draw its route</value>
+    <value>Faded: older news. Dashed: beyond your sight. Select a contract to draw its route.</value>
   </data>
   <data name="Map.Description" xml:space="preserve">
     <value>Schematic map of the sector: locations, routes by danger, and ships</value>
@@ -518,14 +518,8 @@
   <data name="Map.Node.Meta" xml:space="preserve">
     <value>{type} · {jurisdiction}</value>
   </data>
-  <data name="Map.Node.Makes" xml:space="preserve">
-    <value>makes {goods}</value>
-  </data>
-  <data name="Map.Node.Tip" xml:space="preserve">
-    <value>{name}: {meta}</value>
-  </data>
   <data name="Map.Node.Tip.Here" xml:space="preserve">
-    <value>{name}: {meta}. Your ship is here.</value>
+    <value>{name}: {meta}. You are present: everything here is live.</value>
   </data>
   <data name="Map.Region.Accord" xml:space="preserve">
     <value>Accord space · {region}</value>
@@ -568,7 +562,7 @@
     <value>Board · {count}</value>
   </data>
   <data name="Board.Hint" xml:space="preserve">
-    <value>Open contracts you can see. Take-home is what is left after the costs the game knows for certain; a lot shows what it costs to buy and collect.</value>
+    <value>Open contracts you can see, and those The Daily Accord reported from beyond your sight. Take-home is what is left after the costs the game knows for certain; a lot shows what it costs to buy and collect.</value>
   </data>
   <data name="Board.Empty" xml:space="preserve">
     <value>Nothing open that you can see yet. Run the clock: consumers post when their stock runs low.</value>
@@ -656,7 +650,7 @@
     <value>Goods, bought at {source}</value>
   </data>
   <data name="Line.Goods.Note" xml:space="preserve">
-    <value>{quantity} {good} from {supplier} at its ask, {unit} each</value>
+    <value>{quantity} {good} from {supplier} at its ask as you know it, {unit} each ({age})</value>
   </data>
   <data name="Line.Goods.Own" xml:space="preserve">
     <value>Goods, your own</value>
@@ -1752,5 +1746,258 @@
   </data>
   <data name="Board.Note.Reject" xml:space="preserve">
     <value>{good} arrives {quality} fresh, below {floor}: {poster} may reject it</value>
+  </data>
+  <!-- What the player knows, and how old it is (design §7). -->
+  <data name="Age.Live" xml:space="preserve">
+    <value>live</value>
+  </data>
+  <data name="Age.Seen" xml:space="preserve">
+    <value>as of {when}</value>
+  </data>
+  <data name="Age.Daily" xml:space="preserve">
+    <value>daily bulletin, {when}</value>
+  </data>
+  <data name="Age.News" xml:space="preserve">
+    <value>from the news, as posted {when}</value>
+  </data>
+  <data name="Age.Start" xml:space="preserve">
+    <value>as of {when}, the start</value>
+  </data>
+  <data name="Map.Age.Here" xml:space="preserve">
+    <value>live: you are present</value>
+  </data>
+  <data name="Map.Age.Live" xml:space="preserve">
+    <value>live</value>
+  </data>
+  <data name="Map.Age.Seen" xml:space="preserve">
+    <value>as of {when}</value>
+  </data>
+  <data name="Map.Age.Daily" xml:space="preserve">
+    <value>daily · {when}</value>
+  </data>
+  <data name="Map.Age.News" xml:space="preserve">
+    <value>news · {when}</value>
+  </data>
+  <data name="Map.Age.Start" xml:space="preserve">
+    <value>as of {when}</value>
+  </data>
+  <data name="Map.Age.Last" xml:space="preserve">
+    <value>last present {when}</value>
+  </data>
+  <data name="Map.Age.Never" xml:space="preserve">
+    <value>never present</value>
+  </data>
+  <data name="Map.Node.Ask" xml:space="preserve">
+    <value>{good} {unit}</value>
+  </data>
+  <data name="Map.Node.NoProducers" xml:space="preserve">
+    <value>no producers</value>
+  </data>
+  <data name="Map.Node.Tip.Near" xml:space="preserve">
+    <value>{name}: {meta}. A jump from your presence: its contracts reach you a few hours after posting, its prices once a day, and you see nothing of its warehouses.</value>
+  </data>
+  <data name="Map.Node.Tip.Far" xml:space="preserve">
+    <value>{name}: {meta}. Beyond your sight: you know its prices as you last saw them, and its contracts only from the news.</value>
+  </data>
+  <data name="Map.Badge.Idle" xml:space="preserve">
+    <value>Idle</value>
+  </data>
+  <data name="Map.Badge.PriceLow" xml:space="preserve">
+    <value>Price low</value>
+  </data>
+  <data name="Map.Badge.PriceHigh" xml:space="preserve">
+    <value>Price high</value>
+  </data>
+  <data name="Map.Badge.Short" xml:space="preserve">
+    <value>Running short</value>
+  </data>
+  <data name="Map.Badge.News" xml:space="preserve">
+    <value>{good} wanted · news</value>
+  </data>
+  <data name="Map.Legend.Far" xml:space="preserve">
+    <value>beyond your sight</value>
+  </data>
+  <data name="Board.Seen.News" xml:space="preserve">
+    <value>From The Daily Accord, {date}: it may have been taken since</value>
+  </data>
+  <!-- The Daily Accord (design §7.4). Headlines: no party's name is the subject of a verb, so "You" reads as well as any. -->
+  <data name="News.Title" xml:space="preserve">
+    <value>The Daily Accord · Day {day}</value>
+  </data>
+  <data name="News.Title.None" xml:space="preserve">
+    <value>The Daily Accord</value>
+  </data>
+  <data name="News.Note" xml:space="preserve">
+    <value>Once a day at 06:00: a few of yesterday's contracts, sector-wide. The first issue comes out on Day 1.</value>
+  </data>
+  <data name="News.Note.Issue" xml:space="preserve">
+    <value>{count} of the {candidates} contracts that moved on Day {day}, sector-wide, each as it stood at 06:00.</value>
+  </data>
+  <data name="News.Empty" xml:space="preserve">
+    <value>Nothing to report.</value>
+  </data>
+  <data name="News.OnTime" xml:space="preserve">
+    <value>on time</value>
+  </data>
+  <data name="News.Late" xml:space="preserve">
+    <value>{late} late</value>
+  </data>
+  <data name="News.Reason.CargoLost" xml:space="preserve">
+    <value>the goods were lost on the way</value>
+  </data>
+  <data name="News.Reason.NotDelivered" xml:space="preserve">
+    <value>the goods never came</value>
+  </data>
+  <data name="News.Reason.ShortDelivery" xml:space="preserve">
+    <value>delivered short under strict terms</value>
+  </data>
+  <data name="News.Reason.Rejected" xml:space="preserve">
+    <value>rejected on inspection</value>
+  </data>
+  <data name="News.Versus.Above" xml:space="preserve">
+    <value>, {pct} above the week's sector average of {average}</value>
+  </data>
+  <data name="News.Versus.Below" xml:space="preserve">
+    <value>, {pct} below the week's sector average of {average}</value>
+  </data>
+  <data name="News.Posted.Sale.Wanted" xml:space="preserve">
+    <value>Wanted at {place}: {quantity} {good}, delivered by {deadline}, at {unit} a unit{versus}. Posted by {poster}.</value>
+  </data>
+  <data name="News.Posted.Sale.ForSale" xml:space="preserve">
+    <value>For sale at {place}: {quantity} {good} at {unit} a unit{versus}, until {deadline}. Offered by {poster}.</value>
+  </data>
+  <data name="News.Posted.Haul" xml:space="preserve">
+    <value>Carrier wanted: {quantity} {good}, {origin} → {destination}, by {deadline}, for a fee of {fee}. Posted by {poster}.</value>
+  </data>
+  <data name="News.Signed.Sale.Wanted" xml:space="preserve">
+    <value>Signed: {quantity} {good} to be delivered at {place} by {deadline}, for {price}{versus}. Buyer {poster}, seller {taker}.</value>
+  </data>
+  <data name="News.Signed.Sale.ForSale" xml:space="preserve">
+    <value>Sold: {quantity} {good} at {place}, for {price}{versus}. Seller {poster}, buyer {taker}.</value>
+  </data>
+  <data name="News.Signed.Haul" xml:space="preserve">
+    <value>Signed: {quantity} {good} to be carried {origin} → {destination} by {deadline}, for a fee of {fee}. Shipper {poster}, carrier {taker}.</value>
+  </data>
+  <data name="News.Expired.Sale.Wanted" xml:space="preserve">
+    <value>Nobody came: {quantity} {good} wanted at {place} at {unit} a unit, posted by {poster}, expired unfilled.</value>
+  </data>
+  <data name="News.Expired.Sale.ForSale" xml:space="preserve">
+    <value>Unsold: {quantity} {good} offered at {place} at {unit} a unit by {poster}.</value>
+  </data>
+  <data name="News.Expired.Haul" xml:space="preserve">
+    <value>No carrier: {quantity} {good}, {origin} → {destination}, posted by {poster}, expired untaken.</value>
+  </data>
+  <data name="News.Delivered.Sale" xml:space="preserve">
+    <value>Delivered {when}: {quantity} {good} at {place}, for {price}. Seller {seller}, buyer {buyer}.</value>
+  </data>
+  <data name="News.Delivered.Haul" xml:space="preserve">
+    <value>Delivered {when}: {quantity} {good}, {origin} → {destination}. Carrier {carrier}, shipper {shipper}.</value>
+  </data>
+  <data name="News.Short.Sale" xml:space="preserve">
+    <value>Delivered short, {when}: {quantity} {good} at {place}, paid pro rata. Seller {seller}, buyer {buyer}.</value>
+  </data>
+  <data name="News.Short.Haul" xml:space="preserve">
+    <value>Delivered short, {when}: {quantity} {good}, {origin} → {destination}. Carrier {carrier}, shipper {shipper}.</value>
+  </data>
+  <data name="News.Failed.Sale" xml:space="preserve">
+    <value>Failed: {quantity} {good} at {place}, {reason}. Seller {seller}, buyer {buyer}.</value>
+  </data>
+  <data name="News.Failed.Haul" xml:space="preserve">
+    <value>Failed: {quantity} {good}, {origin} → {destination}, {reason}. Carrier {carrier}, shipper {shipper}.</value>
+  </data>
+  <data name="News.Cancelled.ForDefault.Sale" xml:space="preserve">
+    <value>Cancelled for default: {quantity} {good} at {place}, not delivered in its grace. Cancelled by {by}; seller {seller}.</value>
+  </data>
+  <data name="News.Cancelled.ForDefault.Haul" xml:space="preserve">
+    <value>Cancelled for default: {quantity} {good}, {origin} → {destination}, not delivered in its grace. Cancelled by {by}; carrier {carrier}.</value>
+  </data>
+  <data name="News.Cancelled.AtWill.Sale" xml:space="preserve">
+    <value>Walked away from: {quantity} {good} at {place}, the break fee paid by {by}. Seller {seller}, buyer {buyer}.</value>
+  </data>
+  <data name="News.Cancelled.AtWill.Haul" xml:space="preserve">
+    <value>Walked away from: {quantity} {good}, {origin} → {destination}, the break fee paid by {by}. Carrier {carrier}, shipper {shipper}.</value>
+  </data>
+  <data name="News.Defaulted.Sale" xml:space="preserve">
+    <value>Unpaid: {quantity} {good} at {place}, the buyer couldn't pay at handover. Seller {seller}, buyer {buyer}.</value>
+  </data>
+  <data name="News.Defaulted.Haul" xml:space="preserve">
+    <value>Unpaid: {quantity} {good}, {origin} → {destination}, the shipper couldn't pay at delivery. Carrier {carrier}, shipper {shipper}.</value>
+  </data>
+  <!-- Signals (design §11.2). -->
+  <data name="Signals.Title" xml:space="preserve">
+    <value>Signals</value>
+  </data>
+  <data name="Signals.Empty" xml:space="preserve">
+    <value>Nothing stands out in what you know.</value>
+  </data>
+  <data name="Signal.Idle" xml:space="preserve">
+    <value>Idle: {producer} at {place} has a full warehouse of {good}.</value>
+  </data>
+  <data name="Signal.Short" xml:space="preserve">
+    <value>Running short: {consumer} at {place} has {stock} {good} of the {target} it keeps.</value>
+  </data>
+  <data name="Signal.PriceLow" xml:space="preserve">
+    <value>Price low: {producer} asks {unit} a unit of {good}, {pct} below your readings since {since}.</value>
+  </data>
+  <data name="Signal.PriceHigh" xml:space="preserve">
+    <value>Price high: {producer} asks {unit} a unit of {good}, {pct} above your readings since {since}.</value>
+  </data>
+  <!-- The public record (design §7.3). -->
+  <data name="Record.Public" xml:space="preserve">
+    <value>Public record: {parts}.</value>
+  </data>
+  <data name="Record.Public.None" xml:space="preserve">
+    <value>Public record: no Accord contracts yet.</value>
+  </data>
+  <data name="Record.Yours" xml:space="preserve">
+    <value>Your own dealings with {name}: {parts}.</value>
+  </data>
+  <data name="Record.Yours.None" xml:space="preserve">
+    <value>Your own dealings with {name}: none.</value>
+  </data>
+  <data name="Record.Frontier" xml:space="preserve">
+    <value>Outside the Accord, deals leave no public record: only each side remembers them.</value>
+  </data>
+  <data name="Record.Separator" xml:space="preserve">
+    <value>; </value>
+  </data>
+  <data name="Record.Delivered" xml:space="preserve">
+    <value>{onTime} of {delivered} delivered on time</value>
+  </data>
+  <data name="Record.Short" xml:space="preserve">
+    <value>{n} short</value>
+  </data>
+  <data name="Record.Failed" xml:space="preserve">
+    <value>{n} failed</value>
+  </data>
+  <data name="Record.CancelledForDefault" xml:space="preserve">
+    <value>{n} cancelled for default</value>
+  </data>
+  <data name="Record.WalkedAway" xml:space="preserve">
+    <value>walked away from {n} it was to perform</value>
+  </data>
+  <data name="Record.Paid" xml:space="preserve">
+    <value>paid for {n} in full</value>
+  </data>
+  <data name="Record.Defaulted" xml:space="preserve">
+    <value>defaulted on {n}</value>
+  </data>
+  <data name="Record.PayerWalkedAway" xml:space="preserve">
+    <value>walked away from {n} it was to pay for</value>
+  </data>
+  <data name="Uncertain.StillOpen" xml:space="preserve">
+    <value>Still open?</value>
+  </data>
+  <data name="Uncertain.StillOpen.Note" xml:space="preserve">
+    <value>Last known open on {date}, from The Daily Accord: {place} is beyond your sight. You find out when you try.</value>
+  </data>
+  <data name="Uncertain.Ask" xml:space="preserve">
+    <value>The ask at {source} when you sign</value>
+  </data>
+  <data name="Uncertain.Ask.Note" xml:space="preserve">
+    <value>Known: {age}. An order at the producer's door pays its ask as it stands then, up to {limit} for the lot ({tolerance} over what you know).{range}</value>
+  </data>
+  <data name="Uncertain.Ask.Range" xml:space="preserve">
+    <value> Your readings since {since}: {low} to {high} a unit.</value>
   </data>
 </root>

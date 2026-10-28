@@ -48,6 +48,14 @@ internal static class TestWorld
 
     public static Ship ShipOf(this SimulationContext context, ActorState owner) => context.Ship(owner.Ships[0]);
 
+    /// <summary>
+    /// Give an actor a presence at a place (design §7.1), so it sees the contracts there live: a unit of ore in storage there,
+    /// taken from the ore producer's warehouse. For tests of what the player does with contracts it would otherwise know of only
+    /// from the news.
+    /// </summary>
+    public static void PresentAt(this SimulationContext context, ActorState actor, string place) =>
+        context.PutInStorage(actor, context.Place(place).Id, context.TakeFromStock(context.Actor("Rust Belt Extraction"), GoodType.Ore, 1m, reserved: false));
+
     /// <summary>Run until a contract is settled one way or another (or the horizon passes).</summary>
     public static void RunUntilSettled(this SimulationContext context, Contract contract, long horizon = 2_000)
     {

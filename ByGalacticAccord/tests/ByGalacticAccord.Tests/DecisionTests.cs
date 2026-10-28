@@ -56,6 +56,7 @@ public sealed class DecisionTests
         ActorState habs = context.Actor("Meridian Habs");
         ActorState juno = context.Actor("Juno Okafor");
         SaleContract wanted = context.PostWanted(habs, GoodType.Food, 60m, 900m, hours: 200);
+        context.RunTo(context.CurrentTick + Visibility.ReachNear); // Meridian is a jump from Juno's Verdant: the post reaches it a few hours on
 
         DecisionEngine.RunTrader(context, juno);
 
@@ -71,6 +72,7 @@ public sealed class DecisionTests
         ActorState juno = context.Actor("Juno Okafor");
         Market.Dispatch(context, context.ShipOf(juno), new ShipJob(juno.Id, GoodType.Food, 0m, context.Place("Edge Station").Id, PickupSource.Aboard, null, Delivery: new ContractId(999)));
         SaleContract wanted = context.PostWanted(habs, GoodType.Food, 60m, 1200m, hours: 300);
+        context.RunTo(context.CurrentTick + Visibility.ReachNear);
 
         DecisionEngine.RunTrader(context, juno);
 
@@ -89,6 +91,7 @@ public sealed class DecisionTests
         ActorState farm = context.Actor("Verdant Agricombine");
         context.Produce(farm, GoodType.Food, farm.Producer!.StockCap - farm.Stock(GoodType.Food));
         SaleContract wanted = context.PostWanted(habs, GoodType.Food, 60m, 1200m, hours: 300);
+        context.RunTo(context.CurrentTick + Visibility.ReachNear);
 
         DecisionEngine.RunProducer(context, farm);
 

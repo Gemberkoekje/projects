@@ -80,6 +80,31 @@ public sealed class EconomyTests
         Assert.True(richest < total * 0.85m, "one actor holds almost everything — monopoly lock-in.");
     }
 
+    /// <summary>
+    /// Plan risk R1 and S6's verify: with distant contracts invisible but through the news (D31), the frontier must still be
+    /// supplied. Every consumer outside the Accord gets at least this share of each good it wants over a million ticks.
+    /// </summary>
+    [Theory]
+    [Trait(TestWorld.Category, TestWorld.Soak)]
+    [InlineData(42L)]
+    [InlineData(20260619L)]
+    public void The_frontier_is_still_supplied_when_only_the_news_reaches_it(long seed)
+    {
+        SimulationContext context = TestWorld.RunHeadless(seed, 1_000_000);
+        decimal heartbeats = context.CurrentTick / (decimal)context.Config.HeartbeatInterval;
+        foreach (var actor in context.ActorsOrdered.Where(a => a.Demands.Count > 0 && context.Location(a.Home).Reach == AccordReach.OutsideAccord))
+        {
+            foreach (var demand in actor.Demands)
+            {
+                decimal met = actor.Consumed(demand.Good) / (demand.ConsumptionPerHeartbeat * heartbeats);
+                Assert.True(met >= 0.3m, $"{actor.Name} got {met:P0} of the {demand.Good} it wanted over a million ticks of seed {seed}.");
+            }
+        }
+
+        Assert.True(context.SignedFromNews > 0, "Nobody signed a contract it knew of only from the news.");
+        context.AssertSound();
+    }
+
     [Fact]
     public void Goods_actually_reach_the_frontier()
     {

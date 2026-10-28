@@ -95,6 +95,7 @@ public sealed class DealEstimateTests
         SimulationContext context = TestWorld.Quiet(withPlayer: true);
         ActorState player = context.Player();
         Ship ship = context.ShipOf(player);
+        context.PresentAt(player, "Rust Belt");
         SaleContract wanted = context.PostWanted(context.Actor("Rust Belt Camp"), GoodType.Food, 60m, 1400m, hours: 400);
         DealEstimate estimate = DealEstimate.For(context, player, ship, wanted)!;
         PlayerActions.FillFeasibility check = PlayerActions.CheckFill(context, player, wanted);

@@ -212,7 +212,17 @@ a:hover { color: var(--accent-hover); }
 .here-ring { fill: none; stroke: var(--accent); stroke-width: 2; }
 .node-name { fill: var(--ink); font-size: 13px; font-weight: 600; }
 .node-meta { fill: var(--muted); font-size: 11px; }
-.node-makes { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+.node-info { fill: var(--ink); font-family: var(--mono); font-size: 11px; }
+.node-age { fill: var(--muted); font-size: 10px; }
+.node-badge { fill: var(--warn); font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.node.tier-Far .node-dot { stroke: var(--faint); stroke-dasharray: 3 3; }
+.node.tier-Far .node-info, .node.tier-Far .node-age { fill: var(--faint); }
+
+/* Information age is opacity (design §11.1): live, today, a few days, older. */
+.age-Today .node-info, .board-row.age-Today { opacity: 0.92; }
+.age-Days .node-info, .board-row.age-Days { opacity: 0.75; }
+.age-Old .node-info, .board-row.age-Old { opacity: 0.58; }
+.board-row.on { opacity: 1; }
 
 .ship circle { fill: var(--map-ground); stroke: var(--ship); stroke-width: 2; }
 .ship.yours circle { stroke: var(--accent); stroke-width: 3; }
@@ -256,6 +266,9 @@ a:hover { color: var(--accent-hover); }
 .term { margin: 0; line-height: 1.45; border-top: 1px solid var(--divider); padding-top: 6px; }
 .party { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
 .party-name { display: flex; flex-direction: column; gap: 2px; }
+.party { display: flex; flex-direction: column; gap: 6px; }
+.record { margin: 0; color: var(--muted); line-height: 1.4; }
+.row-seen { font-style: italic; }
 .outcome { margin: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--ok-border); background: var(--ok-bg); }
 .blocked { margin: 0; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -293,6 +306,20 @@ a:hover { color: var(--accent-hover); }
 .ledger-line .line-value { gap: 4px; }
 .ledger-line .line-value .mono { white-space: nowrap; }
 .button.small { min-height: 30px; padding: 0 10px; font-size: 12px; }
+
+/* ---- the news ---- */
+.news-panel { display: flex; flex-direction: column; gap: 8px; }
+.news-note { margin: 0; }
+.news-items, .signals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.news-item, .signal { border-top: 1px solid var(--divider); padding: 6px 0; line-height: 1.45; }
+.news-item:first-child, .signal:first-child { border-top: none; }
+.signal { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.signal .age { white-space: nowrap; }
+.signal.age-Today > .small { opacity: 0.92; }
+.signal.age-Days > .small { opacity: 0.75; }
+.signal.age-Old > .small { opacity: 0.58; }
+.lower-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.lower-row > .panel { flex: 1 1 360px; min-width: 0; }
 
 /* ---- the log ---- */
 .log-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 380px; overflow-y: auto; }

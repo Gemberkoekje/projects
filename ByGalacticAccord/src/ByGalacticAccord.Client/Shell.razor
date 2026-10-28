@@ -33,7 +33,10 @@ else if (_session is not null)
         <div class="columns">
             <div class="column-main">
                 <SectorMap Model="_map" Ships="_ships" Fleet="@_header.Fleet" />
-                <CaptainsLog Model="_log" OnSelect="Select" />
+                <div class="lower-row">
+                    <NewsPanel Model="_news" OnSelect="Select" />
+                    <CaptainsLog Model="_log" OnSelect="Select" />
+                </div>
             </div>
             <div class="column-side">
                 <BoardPanel Model="_board" Selected="_selected" OnSelect="Select" />
@@ -72,6 +75,7 @@ else if (_session is not null)
     private BoardViewModel _board = default!;
     private MapViewModel _map = default!;
     private LogViewModel _log = default!;
+    private NewsViewModel _news = default!;
     private LedgerViewModel _ledger = default!;
     private PostsViewModel _posts = default!;
 
@@ -157,6 +161,7 @@ else if (_session is not null)
             _board = BoardView.Build(_session);
             _map = MapView.Build(_session, _selected);
             _log = LogView.Build(_session);
+            _news = NewsView.Build(_session);
             _ledger = LedgerView.Build(_session);
             _posts = PostsView.Build(_session);
             _composer = _draft is { } draft ? ComposerView.Build(_session, draft) : null;

@@ -196,7 +196,7 @@ public sealed class TemplateTests
     }
 
     // A Sale of the producer's good at the consumer's home, posted by poster.
-    private static SaleContract Sale(SimulationContext context, ActorId poster, SaleSide side, ActorState producer, ActorState consumer)
+    internal static SaleContract Sale(SimulationContext context, ActorId poster, SaleSide side, ActorState producer, ActorState consumer)
     {
         var sale = new SaleContract(
             context.NextContractId(), poster, 0, side, producer.Producer!.Good, 40m, consumer.Home, Credits.Of(120m), Credits.Of(150m), 0.04m, 500,
@@ -206,7 +206,7 @@ public sealed class TemplateTests
     }
 
     // A haul of the producer's good from its home to the consumer's.
-    private static HaulContract Haul(SimulationContext context, ActorId shipper, ActorState producer, ActorState consumer)
+    internal static HaulContract Haul(SimulationContext context, ActorId shipper, ActorState producer, ActorState consumer)
     {
         var haul = new HaulContract(
             context.NextContractId(), shipper, 0, producer.Producer!.Good, 40m, producer.Home, consumer.Home, Holding.StockAt(producer.Home), null,
@@ -215,7 +215,7 @@ public sealed class TemplateTests
         return haul;
     }
 
-    private static Contract Signed(SimulationContext context, Contract contract, ActorId taker)
+    internal static Contract Signed(SimulationContext context, Contract contract, ActorId taker)
     {
         contract.Sign(taker, contract.OfferedPrice, 1);
         return contract;

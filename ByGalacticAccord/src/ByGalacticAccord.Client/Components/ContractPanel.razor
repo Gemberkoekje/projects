@@ -12,6 +12,10 @@
             <span class="caps mono xsmall muted">@Model.KindLine</span>
             <h2 class="contract-title">@Model.Head</h2>
             <span class="small muted">@Model.Sub</span>
+            @if (Model.Known is not null)
+            {
+                <span class="small tone-Warn" data-testid="known">@Model.Known</span>
+            }
         </div>
 
         @if (Model.Status is not null)
@@ -108,11 +112,15 @@
             </div>
         }
 
-        <div class="party">
+        <div class="party" data-testid="party">
             <span class="party-name">
                 <span class="strong small">@Model.Party</span>
                 <span class="xsmall muted">@Model.PartyRole</span>
             </span>
+            @foreach (string line in Model.Record)
+            {
+                <p class="record xsmall">@line</p>
+            }
         </div>
 
         @if (Model.Threads.Count > 0)

@@ -344,10 +344,13 @@ public static partial class DecisionEngine
     /// <summary>What a shipper reposts an untaken haul at: a quarter dearer.</summary>
     public static Credits RaisedHaulOffer(HaulContract haul) => Credits.Of(Math.Round(haul.OfferedPrice.Amount * 1.25m, 2));
 
-    /// <summary>A visible open contract of a kind, in id order.</summary>
-    private static IEnumerable<T> Visible<T>(SimulationContext context, ActorState actor)
+    /// <summary>
+    /// Others' contracts of a kind that an actor believes open, in id order (design §7.1, D31, D32): open ones it sees, and
+    /// ones the news reported open that it hasn't found closed. It finds out whether those still are by trying.
+    /// </summary>
+    private static IEnumerable<T> Known<T>(SimulationContext context, ActorState actor)
         where T : Contract =>
-        Visibility.OpenContractsVisibleTo(context, actor).OfType<T>().Where(c => c.Status == ContractStatus.Open && c.PostedBy != actor.Id);
+        Knowledge.OpenContracts(context, actor, Visibility.Of(context, actor)).OfType<T>().Where(c => c.PostedBy != actor.Id);
 
     /// <summary>Hours at standard speed between two places, or null if no route joins them.</summary>
     private static long? Hours(SimulationContext context, LocationId from, LocationId to) =>

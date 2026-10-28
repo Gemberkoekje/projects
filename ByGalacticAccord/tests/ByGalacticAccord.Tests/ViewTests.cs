@@ -61,7 +61,7 @@ public sealed class ViewTests
             AssertFilled(board.Title);
             foreach (BoardRow row in board.Rows)
             {
-                AssertFilled(row.Kind, row.Title, row.Route, row.TakeHome, row.Rate, row.Danger, row.Jurisdiction, row.Due, row.Note ?? string.Empty);
+                AssertFilled(row.Kind, row.Title, row.Route, row.TakeHome, row.Rate, row.Danger, row.Jurisdiction, row.Due, row.Note ?? string.Empty, row.Seen ?? string.Empty);
                 Assert.Equal(session.Context.Contract(row.Id).Type, row.Type);
                 seen.Add(row.Id);
                 kinds.Add(row.Type);
@@ -77,6 +77,20 @@ public sealed class ViewTests
             foreach (LogLine line in LogView.Build(session).Lines)
             {
                 AssertFilled(line.When, line.Text);
+            }
+
+            // The news, the signals and what the map says the player knows of each place (design §7).
+            NewsViewModel news = NewsView.Build(session);
+            AssertFilled(news.Title, news.Note);
+            AssertFilled(news.Items.Select(i => i.Text).Concat(news.Signals.Select(g => g.Text)).Concat(news.Signals.Select(g => g.AgeText)));
+            foreach (NewsLine item in news.Items)
+            {
+                CheckContract(session, item.Contract);
+            }
+
+            foreach (MapNode node in MapView.Build(session, null).Nodes)
+            {
+                AssertFilled(node.Info, node.AgeText, node.Tip, node.Badge ?? string.Empty);
             }
 
             CheckShips(session);
@@ -167,7 +181,8 @@ public sealed class ViewTests
         BoardViewModel board = BoardView.Build(session);
 
         Assert.NotEmpty(board.Rows);
-        Assert.All(board.Rows, r => Assert.Equal(ContractStatus.Open, session.Context.Contract(r.Id).Status));
+        Assert.All(board.Rows, r => Assert.True(
+            session.Context.Contract(r.Id).Status == ContractStatus.Open || r.Seen is not null, "A row is open, or known only from the news (and says so)."));
         Assert.All(board.Rows, r => Assert.Contains(r.Type, new[] { ContractType.Sale, ContractType.Haul }));
         Assert.Equal(board.Rows.Select(r => r.Id.Value).OrderByDescending(v => v), board.Rows.Select(r => r.Id.Value));
         BoardRow row = board.Rows.Single(r => r.Id == haul.Id);
@@ -244,6 +259,7 @@ public sealed class ViewTests
         ActorState habs = context.Actor("Meridian Habs");
         ActorState camp = context.Actor("Rust Belt Camp");
         ActorState farm = context.Actor("Verdant Agricombine");
+        context.PresentAt(context.Player(), "Rust Belt");
 
         // What the player would perform, in the Accord and outside it; a lot it would buy; a haul it posted as shipper.
         SaleContract wanted = context.PostWanted(habs, GoodType.Food, 40m, 700m, hours: 200, package);

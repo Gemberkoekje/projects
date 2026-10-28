@@ -188,10 +188,21 @@ async function main() {
         check(await page.locator('svg.map .node').count() === 7, 'the map draws seven locations');
         check(await page.locator('svg.map .route').count() === 9, 'the map draws nine routes');
         check(await page.locator('svg.map .ship').count() === 10, 'the map draws ten ships');
+
+        // 1b. What the player knows (design §7): the tiers from Meridian, the age of what it knows elsewhere, and the news.
+        const tiers = await page.locator('svg.map .node').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-tier')));
+        check(tiers.join(',') === 'Here,Near,Near,Near,Far,Far,Far', `the map shows here, near and far from Meridian (${tiers.join(', ')})`);
+        const ages = (await page.locator('svg.map .node .node-age').allTextContents()).map(t => t.trim());
+        check(ages[0].startsWith('live') && ages[1].startsWith('daily') && ages.slice(4).every(a => /^(as of|news|last present|never)/.test(a)),
+            `each location says how old what you know of it is (${ages.join('; ')})`);
+        const newsTitle = (await page.textContent('[data-testid="news"] .caps')).trim();
+        const newsItems = await page.locator('[data-testid="news"] .news-item').count();
+        check(newsTitle === 'The Daily Accord · Day 1' && newsItems >= 1, `The Daily Accord is out (${newsTitle}, ${newsItems} items)`);
         await page.screenshot({ path: path.join(shots, '01-start.png'), fullPage: true });
+        await page.locator('.lower-row').screenshot({ path: path.join(shots, '12-news.png') });
 
         // 2. Selecting a contract opens it beside the map and draws its route.
-        const takeable = page.locator('.board-row:not(.blocked)').filter({ has: page.locator('.take.tone-Gain') }).first();
+        const takeable = page.locator('.board-row[data-seen="live"]:not(.blocked)').filter({ has: page.locator('.take.tone-Gain') }).first();
         await takeable.click();
         await page.waitForSelector('[data-testid="take-home"]');
         const takeHome = (await page.textContent('[data-testid="take-home"]')).trim();
@@ -205,7 +216,22 @@ async function main() {
         const counterForm = page.locator('.contract-panel [data-testid="counter"] [data-testid="offer-form"]');
         check(await counterForm.count() === 1 && await counterForm.locator('[data-field="price"]').count() === 1,
             'an open post offers a counter-offer: price, due date, terms and late fee');
+        const record = (await page.locator('.contract-panel [data-testid="party"] .record').allTextContents()).map(t => t.trim());
+        check(record.some(r => r.startsWith('Public record:')) && record.some(r => r.startsWith('Your own dealings')), `the party's public record and your dealings with it ("${record[0]}")`);
         await page.screenshot({ path: path.join(shots, '02-contract.png'), fullPage: true });
+
+        // 2b. A contract the player knows of only from the news says so, and that it may have been taken since.
+        const fromNews = page.locator('.board-row[data-seen="news"]');
+        if (await fromNews.count() > 0) {
+            await fromNews.first().click();
+            const known = (await page.textContent('.contract-panel [data-testid="known"]')).trim();
+            const stillOpen = await page.locator('.contract-panel .line', { hasText: 'Still open?' }).count();
+            check(known.startsWith('From The Daily Accord') && stillOpen === 1, `a contract from the news says so ("${known}")`);
+            await page.locator('.contract-panel').screenshot({ path: path.join(shots, '13-from-news.png') });
+            await takeable.click();
+        } else {
+            results.push('info  no contract on the board came from the news at the start');
+        }
 
         // 3. Accepting it signs it through the engine, while paused, and the ledger lists it.
         await page.click('.contract-panel .button.primary');
@@ -245,12 +271,19 @@ async function main() {
             await page.locator('.contract-panel').screenshot({ path: path.join(shots, '07-broker.png') });
         }
 
-        // 3c. Still paused, post a wanted Sale of its own (design §3.6): food at Verdant, below what anyone there asks.
+        // 3c. Still paused, post a wanted Sale of its own (design §3.6): food at Verdant, below its ask as the map shows it.
+        const verdantInfo = (await page.locator('svg.map .node').nth(1).locator('.node-info').textContent()).trim();
+        const verdantAsk = Number((verdantInfo.match(/Food ₵([\d.]+)/) || [null, '5'])[1]);
+        const quantity = 20; // what the farm's warehouse can spare even after the busy first day
+        const offered = Math.round(verdantAsk * quantity * 0.85);
         await page.click('[data-testid="new-post"]');
         await page.waitForSelector('[data-testid="composer"]');
         const verdant = await page.locator('[data-testid="composer"] [data-field="place"] option', { hasText: 'Verdant' }).getAttribute('value');
         await page.selectOption('[data-testid="composer"] [data-field="place"]', verdant);
-        await page.fill('[data-testid="composer"] [data-field="price"]', '300');
+        await page.fill('[data-testid="composer"] [data-field="quantity"]', String(quantity));
+        await page.locator('[data-testid="composer"] [data-field="quantity"]').dispatchEvent('change');
+        await page.waitForTimeout(100);
+        await page.fill('[data-testid="composer"] [data-field="price"]', String(offered));
         await page.locator('[data-testid="composer"] [data-field="price"]').dispatchEvent('change');
         await page.waitForTimeout(200);
         const composerTerms = await page.locator('[data-testid="composer-terms"] .term').count();
@@ -279,7 +312,7 @@ async function main() {
         // 4b. Answers to the post came while the clock ran: open it, read the threads, and counter the first that waits for you.
         await page.click('button[data-speed="Paused"]');
         await page.waitForTimeout(200);
-        await page.locator('[data-testid="posts"] .post-line .link-text').first().click();
+        await page.locator('[data-testid="posts"] .post-line').filter({ hasText: 'wanted at Verdant' }).locator('.link-text').first().click();
         const threads = page.locator('.contract-panel [data-testid="thread"]');
         const threadCount = await threads.count();
         check(threadCount >= 1, `the post drew answers as threads (${threadCount})`);
@@ -293,7 +326,7 @@ async function main() {
             check(/^Replied in \d/.test(tell), `a reply says how long it took and how it read ("${tell}")`);
             await page.locator('.contract-panel').screenshot({ path: path.join(shots, '10-answers.png') });
             const theirs = Number((await answer.locator('[data-field="price"]').inputValue()));
-            await answer.locator('[data-field="price"]').fill(String(Math.round((theirs + 300) / 2)));
+            await answer.locator('[data-field="price"]').fill(String(Math.round((theirs + offered) / 2)));
             await answer.locator('button[type="submit"]').click();
             const sent = (await page.textContent('.contract-panel .outcome')).trim();
             countered = sent.startsWith('Counter-offer sent');

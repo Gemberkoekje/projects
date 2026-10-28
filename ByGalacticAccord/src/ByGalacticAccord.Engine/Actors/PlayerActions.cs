@@ -101,6 +101,13 @@ public static class PlayerActions
         public bool Ok => Block == DealBlock.None;
     }
 
+    /// <summary>
+    /// Whether the player believes a contract open (design §7.1, D31): as it stands, where the player sees it live; as the news
+    /// left it, where it doesn't. Whether one known only from the news is still open, it finds out by trying.
+    /// </summary>
+    public static bool Believed(SimulationContext context, ActorState player, Contract contract) =>
+        Knowledge.BelievesOpen(context, player, Visibility.Of(context, player), contract);
+
     /// <summary>The player's ship that would do the job: a free one, else the first (busy, for estimates).</summary>
     public static Ship? ShipFor(SimulationContext context, ActorState player) =>
         player.Ships.Select(context.Ship).FirstOrDefault(s => s.IsFree)
@@ -109,7 +116,7 @@ public static class PlayerActions
     /// <summary>Can the player take this haul right now?</summary>
     public static HaulFeasibility CheckHaul(SimulationContext context, ActorState player, HaulContract haul)
     {
-        if (!haul.IsOpen || haul.PostedBy == player.Id)
+        if (!Believed(context, player, haul) || haul.PostedBy == player.Id)
         {
             return new HaulFeasibility(DealBlock.NotOpen, null);
         }
@@ -149,7 +156,7 @@ public static class PlayerActions
     /// </summary>
     public static FillFeasibility CheckFill(SimulationContext context, ActorState player, SaleContract wanted)
     {
-        if (!wanted.IsOpen || wanted.Side != SaleSide.Wanted || wanted.PostedBy == player.Id)
+        if (!Believed(context, player, wanted) || wanted.Side != SaleSide.Wanted || wanted.PostedBy == player.Id)
         {
             return new FillFeasibility(DealBlock.NotOpen, null, null);
         }
@@ -206,7 +213,7 @@ public static class PlayerActions
     /// <summary>Can the player buy this lot as posted and collect it with a ship?</summary>
     public static BuyFeasibility CheckBuy(SimulationContext context, ActorState player, SaleContract lot)
     {
-        if (!lot.IsOpen || lot.Side != SaleSide.ForSale || lot.PostedBy == player.Id)
+        if (!Believed(context, player, lot) || lot.Side != SaleSide.ForSale || lot.PostedBy == player.Id)
         {
             return new BuyFeasibility(DealBlock.NotOpen, null);
         }
@@ -248,7 +255,7 @@ public static class PlayerActions
     /// </summary>
     public static BrokerFeasibility CheckBroker(SimulationContext context, ActorState player, SaleContract wanted)
     {
-        if (!wanted.IsOpen || wanted.Side != SaleSide.Wanted || wanted.PostedBy == player.Id)
+        if (!Believed(context, player, wanted) || wanted.Side != SaleSide.Wanted || wanted.PostedBy == player.Id)
         {
             return new BrokerFeasibility(DealBlock.NotOpen, null, Credits.Zero);
         }
@@ -440,7 +447,7 @@ public static class PlayerActions
     /// </summary>
     public static DealBlock CheckCounter(SimulationContext context, ActorState player, Contract contract, Offer offer, Negotiation? thread = null)
     {
-        if (!contract.IsOpen || contract is StorageContract)
+        if (!Believed(context, player, contract) || contract is StorageContract)
         {
             return DealBlock.NotOpen;
         }
