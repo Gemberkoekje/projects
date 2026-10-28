@@ -36,6 +36,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.14 | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1.15 | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1.16 | 0.44 | 6.95 | 5.84 | 20.79 |
+| M1.17 (stop 1) | 0.44 | 6.95 | 5.84 | 20.79 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -185,3 +186,8 @@ M1.16 adds the window and changes nothing the integrator traces, so its row is M
 down-slope view with every debug output) rendered by `main` (62694e88) and by this slice are byte-identical, PNG and EXR, fifteen files.
 Only a render with a window's feed reads its image back after a pass (at most every 0.2 s); the CLI's renders
 take the same path as before.
+M1.17's stop 1 adds display options that change nothing by default, the golden check and the air's tables in fewer dispatches, so its
+row is M1.16's: the four ledger views (640 px, 16 spp, the down-slope view with every debug output) rendered by `main` (f7f52815) and
+by this slice are byte-identical, PNG and EXR, fifteen files. The air's tables are built in about 200 dispatches instead of about
+1400: rebuilt five times a process on the hero, two rounds alternating with `main`, 9.53 s of wall time against 11.04 (median of ten
+each), the GPU's time the same (3.96 s against 3.87); not in the ledger, which measures the trace (vista-log/M1.17.md).

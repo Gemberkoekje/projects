@@ -42,4 +42,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.14.md`](M1.14.md) | Auto camera v1 |
 | [`M1.15.md`](M1.15.md) | Time & VRAM estimate |
 | [`M1.16.md`](M1.16.md) | Preview & tweak window |
+| [`M1.17.md`](M1.17.md) | M1 sign-off (stop 1: the tools and the look's choices) |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |

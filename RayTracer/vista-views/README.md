@@ -408,3 +408,31 @@ powershell -File vista-views/window/check.ps1 [-Out folder] [-FinalSpp 64] [-NoF
 ```
 
 The window itself: `dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --window [--recipe name.recipe.json] [--seed 42]`.
+
+## The sign-off's look sheets (M1.17)
+
+`signoff/render.ps1` renders the look's open choices for the user's picks, each view once and displayed under every candidate (display
+options re-expose a render, never trace it again): the exposure at dusk (`dusk.png`: the hero as the sun sets through the user's dusk
+series' heights, the meter following the light all the way, half way and not at all, `--adaptation`), the sunset sky
+(`sunset.png`: `atmosphere/toward-sun.camera.json` at the 28-10 series' heights, one exposure for all, the display's white and 4400 K),
+the white balance (`balance.png`, `photo.png` beside the user's April photo), the deep clear sky's margin (`sky.png`, `--sky-margin`),
+the punchy look's shadows (`shadows.png`) and Zermatt at the Sunnegga webcam frames' dates and times (`webcam.png`). `hero.camera.json`
+is the auto camera's pick on M1's hero scene (`autocam/range-golden.recipe.json`, seed 42). With `-Photos` (a local folder of the
+user's dusk photos as `DD-MM-YYYY-HHMMSS.jpg`) it also writes `dusk-photos.png` and `sunset-photos.png` with the photos beside the
+renders: those stay local, never committed.
+
+```
+powershell -File vista-views/signoff/render.ps1 [-Sheets dusk,sunset,balance,photo,sky,shadows,webcam] [-Photo vista-views/sheets/m1-13-photo.png] [-Photos folder] [-CellWidth 320] [-Spp 64] [-Out folder]
+```
+
+## The golden suite (M1.17)
+
+`goldens/suite.json` lists the Vista goldens: previews at seed 42, each named for the M1 check it keeps, whose PNG and EXR are committed
+beside it. `--golden-check` renders every case through one session, as `--preview` would, and compares each with its golden: identical,
+within the suite's tolerance (the image's mean and its 16-pixel blocks' luminance, not pixel by pixel, so a driver that re-rolls a
+path's noise still passes), different or missing. `--update` writes the renders over the goldens, deliberately, when a slice means to
+move them; its log line says what each moved by.
+
+```
+dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --golden-check [--suite vista-views/goldens/suite.json] [--only hero,sky] [--update] [--out folder]
+```
