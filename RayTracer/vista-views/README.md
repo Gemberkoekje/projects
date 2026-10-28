@@ -437,3 +437,18 @@ move them; its log line says what each moved by. The goldens were taken at M1.17
 ```
 dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --golden-check [--suite vista-views/goldens/suite.json] [--only hero,sky] [--update] [--out folder]
 ```
+
+## The ground's map (M1a.1)
+
+`ground/render.ps1` maps what makes M1's hero read as a model (vista-plan §10, M1a): the hero with the four places boxed (`map.png`), and
+per place a 640×360 loupe of the 4K frame beside the debug output that shows its cause (`grooves.png`, `dots.png`, `beds.png`,
+`meadows.png`; the shaded places 2 EV brighter). For the grooves and the dots it adds the ground under the loupe from above at each stage
+of the world (the base terrain, the incision brought back to the 8 m grid, the pipe model's passes), from `--erosion-measure --crops`,
+whose log (`measure.log`) also holds the grid's own patterns at each stage (`GridArtefacts`: the share of the relief along the grid's
+eight directions, and of 128 m windows rippling at 2–4 cells) and each place's distance and metres a pixel. The erosion runs again, so a
+full run takes about five minutes.
+
+```
+powershell -File vista-views/ground/render.ps1 [-Sheets map,grooves,dots,beds,meadows]
+dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --erosion-measure --recipe vista-views/autocam/range-golden.recipe.json --seeds 42 --out <dir> --crops-camera vista-views/signoff/hero.camera.json --crops "2000,850;1300,1250"
+```

@@ -12,8 +12,9 @@ M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
 and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M1.13b (terrain-following valley mist), M1.14
 (auto camera v1, with its detail budget), M1.15 (the time and VRAM estimate), M1.16 (the preview and tweak window) and
-M1.17 (the sign-off) are done: **M1 is done** (2026-10-28), its goldens committed and passing and its hero rendered. M2 (measured
-spectra) is next, its slices planned first; what M1 found and did not need is in the parked list (§10). It sits
+M1.17 (the sign-off) are done: **M1 is done** (2026-10-28), its goldens committed and passing and its hero rendered. **M1a** (the
+ground's surface, the user's call after the hero) comes before M2 (measured spectra): its seven slices are planned in §10 (**M1a plan**)
+and M1a.1 (the map) is done; what M1 found and did not need is in the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -2123,7 +2124,8 @@ not a slice of M1, whose sign-off stands.)*
 - *Takes from the parked list:* "The nearest faces lack detail", with its options and order (shading and colour detail at 5–50 m
   first, geometry only where an outline needs it, a finer erosion tile if those fall short), its metres-per-pixel measure, and after it
   M1.14's detail budget relaxed, its limit re-chosen by the user's eye; "The meadow's regular banding", if it is the dots; "Steeper,
-  more alike slopes since the folded strata", if it bears on the grooves.
+  more alike slopes since the folded strata", if it bears on the grooves. *Added by M1a.1:* "Straight lines across flat valley
+  floors", whose likely cause the map found (the incision's 64 m seams).
 - *Deliverable:* first a map of each of the four on the hero's frame (which material, and which field or texture, makes it), so each
   fix aims at its cause; then the fixes, the grooves and planes first: gullies that branch and wander, ribs, buttresses, ledges and
   cliff bands from the rock's hardness, scree in the gullies, at the scales the hero shows; the dots gone; the beds broken and
@@ -2134,6 +2136,61 @@ not a slice of M1, whose sign-off stands.)*
   photo? Beside the webcam's lit rock (`23-08-2026-2010`, `12-10-2026-1820`) for texture, not shape. The detail budget's measure on
   M1.14's finalists before and after; the triangle ceiling (48 M) and the cost ledger; the goldens re-baselined deliberately; the maze
   unmoved.
+
+**M1a plan (proposed 2026-10-28 from M1a.1's map, for the user's yes).** Seven slices in the order below, each under the "every slice"
+rules at the top of this section. The map found the grooves and the dots to be patterns of the 8 m world grid, made by the erosion
+before any shading: the 64 m incision is brought back to the grid as flat facets with straight seams and the base terrain's finer detail
+faded off them, and the pipe model combs a rill every 2–4 cells down each steep facet and lays a washboard on the gentle ones. So the
+grid's fixes come first and the detail below the grid after them, and the rock's detail and the colours are tuned once, on the final
+grid, as M1 tuned its materials on its final terrain. Two measures of the grid's own patterns (`GridArtefacts`, in `--erosion-measure`)
+check every fix: the share of the relief running along the grid's eight directions (the base terrain 14.6%, 13.3% if it ran every way;
+incised 67.5%; eroded 33.1%) and the share of 128 m windows rippling at 2–4 cells (base 1.4%, incised 0.2%, eroded 7.5%).
+
+- **M1a.1 — The map.** What makes each of the four on the hero's frame, and the two measures. *Status (2026-10-28): done.* Grooves and
+  planes: the incision's 64 m facets (bilinear, detail faded at 25 m of change, channels carved as straight eight-direction links)
+  combed by the pipe model's rills, with nothing below the grid at 1.2 m a pixel. Dots: the pipe model's washboard on gentle loose
+  ground, cut into rows of scree, meadow and forest by the slope rules, which read the 8 m grid's normals. Marble: the beds' colour
+  keyed on height alone, with no relief, on smooth faces. Felt: the 8 m meadow rule sharpened to a clean edge, flat inside at this
+  distance. No image moved. *Judge this:* `m1a-1-map.png`, and the bottom rows of `m1a-1-grooves.png` and `m1a-1-dots.png` (the ground
+  from above as the world is made). *Ignore this:* the colours (M1a.5, M1a.6, M2); trees (M5). *Questions:* do the four boxes mark what
+  you saw, and does anything else read as a model? From above, does the left square of each pair look more like mountain ground than the
+  right? Is the order right? Log: [`vista-log/M1a.1.md`](vista-log/M1a.1.md).
+- **M1a.2 — Ground that gathers its water** (the grooves and planes, on the grid). The incision brought back to the 8 m grid smoothly
+  (an interpolant with a continuous slope in place of the bilinear one, so no 64 m facets or seams), with the base terrain's finer detail
+  kept on the faces it cut (scaled to them, not faded out at 25 m of change), and its channels carved along curved paths, not straight
+  links in eight directions; so the pipe model's water gathers into gullies that branch and wander instead of combing each facet. If the
+  comb stays: the pipe model's rills broken (rain or erodibility varying at 30–100 m, flow to eight neighbours), and a finer incision grid
+  (32 m, about 4–8 times its 37 s) last. *Verify:* the eroded world's alignment from 33% to within a few points of the base terrain's,
+  its ripple from 7.5% toward 1.4%; the drainage, relief and facet measures no worse; the hero beside M1's with a loupe on the lit
+  middle range; the erosion's time; the parked straight lines across flat valley floors looked for again.
+- **M1a.3 — The washboard gone** (the dots). Whatever ripple M1a.2 leaves on gentle loose ground: the pipe model's deposition kept
+  stable there (its rates on gentle slopes, a creep of loose material; M1.7's tuning measured again), and the rules' slope read from
+  the grid's normal over a few cells, so no grid-scale wobble is cut into dots. *Verify:* the loose ground's ripple at the base
+  terrain's; the dots' loupe; the parked meadow banding looked for on M1.12's meadow view. It shrinks to its checks if M1a.2 already
+  removes the washboard.
+- **M1a.4 — Rock below the grid** (the planes below the 8 m cell; the parked "nearest faces lack detail"). Structure at 5–50 m by
+  material and slope where the hero shows it (1–1.3 m a pixel in the lit middle range, 0.5 m in the foreground): ribs and gullies down
+  the fall line, ledges and cliff bands from the beds' hardness (hard beds stand, soft beds recede under their debris), buttresses, scree
+  in the gullies. Shading and colour first, geometry where an outline or a low sun's shadow needs it (golden hour reads relief by its
+  shadows, which shading alone cannot cast), a finer erosion tile only if those fall short. *Verify:* the hero's loupes beside M1's; the
+  metres-per-pixel measure (`--debug detail`) on M1.14's finalists before and after; the triangles against the 48 M ceiling; the cost
+  ledger.
+- **M1a.5 — Beds that read as rock** (the marble). The beds' colour tied to M1a.4's relief (a ledge's lit top and dark riser, soft beds
+  under scree and soil), broken by the gullies, weathered (streaks down the fall line below hard beds), the laminae shown where a ledge
+  shows them. *Verify:* the shaded foreground's loupe beside M1's; beside the webcam's lit rock (`23-08-2026-2010`, `12-10-2026-1820`)
+  for texture, not shape.
+- **M1a.6 — Meadows with ragged edges and texture** (the felt). The edge graded (grass thinning on steeper and stonier ground, rock
+  showing through) and broken at 5–30 m (tongues along gullies and benches), the meadow's tone varying at 5–50 m (moisture, exposure,
+  stones), no hard cut-out where a pixel covers metres. *Verify:* a meadow's edge in the hero's loupe beside M1's; M1.12's meadow view.
+- **M1a.7 — The sign-off.** M1a's verify (above): the hero beside M1's with its three loupes, for the user's yes or no; the webcam's
+  rock; the detail budget's measure before and after and its limit re-chosen by the user's eye; the triangle ceiling and the ledger; the
+  goldens re-baselined, once, here; the maze unmoved.
+
+*Decisions in the plan (revisit freely):* the grid's fixes before the detail below it (above). **The goldens re-baselined once, at
+M1a.7**, not in every slice that moves them: a re-baseline adds 3.1 MB to the repository, and M1a.2–M1a.6 each move every golden; in
+between, each slice runs `--golden-check` and its log lists what moved and why. **The hero's camera stays fixed**
+(`signoff/hero.camera.json`, 150 m above the eroded ground, more than M1a.2's changes can move it), so every slice's hero compares with
+M1's; the auto camera's pick on the hero scene is reported beside it.
 
 **M2 — Measured spectra.**
 Goal: "it is spectral" backed by measured data. Deliverable: verify access routes and
@@ -2268,12 +2325,14 @@ any of them.
   wallpaper sky. *Belongs:* M4.
 - **The meadow's regular banding** (M1.12's close-ups): wavy bands that look like a single-frequency
   pattern. *Belongs:* M5 (grass), checked when grass geometry lands. *2026-10-28:* M1a checks first whether it is the hero's
-  rows of dots.
+  rows of dots. *M1a.1:* probably: the dots are the pipe model's washboard on gentle loose ground (8.6% of the loose ground's windows
+  ripple at 2–4 cells), cut by the slope rules; M1a.3 looks for the banding on M1.12's meadow view once the washboard is gone.
 - **Folds without faults** (M1.12c): the beds bend but never break, as a height field's beds must.
   *Belongs:* unscheduled; faults and overhangs need more than a height field.
 - **Steeper, more alike slopes since the folded strata** (M1.12c): the facet measure rose from
   8.6–10.8% to 12.4–13.8%, though not at the talus angle. *Belongs:* watched at M1.17; acted on only
-  if the hero render shows it.
+  if the hero render shows it. *M1a.1:* the hero's planes are the incision's 64 m facets (vista-log/M1a.1.md); M1a.2 watches the
+  facet measure as it removes them.
 - **Glaciers that follow the place** (M1.13): today's glaciers are the recipe's, the same at Zermatt,
   Lofoten and Fiordland, in every season. *Decided (2026-10-25):* yes; how low glaciers reach follows
   the climate (far lower where it is cold and wet than in the Alps), so today's glaciers come from
@@ -2289,7 +2348,9 @@ any of them.
   southern valley at Fiordland's altitude, `pools/mist-lake`'s neighbour looking west), faint bright lines run straight toward the
   vanishing point, with or without the pools: in the terrain or its shading, not the air. *Belongs:* M1.14 (its candidate
   cameras look over such floors), or M1.17 if the hero render shows them. *M1.14:* none of its sixteen picks (eight seeds, both set
-  pieces, 320 px) shows them, so they wait for M1.17's hero render.
+  pieces, 320 px) shows them, so they wait for M1.17's hero render. *M1a.1:* their likely cause is the incision's 64 m seams: it
+  is brought back to the 8 m grid bilinearly, so its cells meet in straight creases along the coarse grid's rows and columns, plainest
+  where a filled floor is otherwise flat (the incised crops of `m1a-1-grooves.png`, `m1a-1-dots.png`). *Belongs now:* M1a.2.
 - **A leaner pools integrator** (M1.13b): the pools' variant costs a view with pools about 9 ns a sample before it takes a step
   (the golden-hour down-slope view 1.84× `main`, the misty ridges with a strong pool 3.1× the flat layer, over the plan's 2×):
   the march's state in fewer registers (its four wavelengths' coefficients and multiple-scattering ends live through every step),
@@ -2315,7 +2376,9 @@ any of them.
   from Sunnegga, about 8 km off, filling much of the frame). Shading and colour detail first (no triangles), geometry only where a
   silhouette needs it, a finer erosion tile if those fall short; judged by the same metres-per-pixel measure, after which M1.14's
   detail budget relaxes. Until then that budget keeps such frames out of the auto camera's picks. *Moved 2026-10-28 (the user's
-  call, after the M1 hero):* into M1a, ahead of M2.
+  call, after the M1 hero):* into M1a, ahead of M2. *M1a.1:* the hero passes the budget (no lit bare ground past 12 pixels a cell)
+  yet reads as a model at 6–7 pixels a cell, where the grid's own pattern shows; M1a.2 and M1a.3 remove that pattern, and M1a.4 is
+  this item.
 - **A sample costs more in dispatches of several samples a pixel** (M1.15): the snow view's sample costs 5.2 ns in passes of one
   sample a pixel and 6.7 in passes of four, the aerial view's 5.0 and 5.65, with the same rays (vista-log/M1.15.md); a cheap view's
   final is planned as passes of up to 64 samples a pixel. Likely the sample loop's registers lowering the GPU's occupancy; passes of
