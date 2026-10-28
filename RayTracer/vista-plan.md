@@ -11,8 +11,8 @@ measured decision to keep it for the far terrain), M1.10a (exposure and display)
 M1.11a (drainage), M1.11b (the display look), M1.11c (the output finish), M1.11d (uplift and rock hardness), M1.12 (materials by
 rule), M1.12a (the colour quadrature), M1.12b (forest as material), M1.12c (the world anchored to the place's valley floor,
 and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M1.13b (terrain-following valley mist), M1.14
-(auto camera v1, with its detail budget) and M1.15 (the time and VRAM estimate) are done, and M1.16 (the preview and tweak window) is
-next. M1's scope is frozen: new findings go to the parked list (§10). It sits
+(auto camera v1, with its detail budget), M1.15 (the time and VRAM estimate) and M1.16 (the preview and tweak window) are done, and
+M1.17 (the sign-off) is next. M1's scope is frozen: new findings go to the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -110,6 +110,12 @@ tools are modest: nudge in metres, small pan/tilt/roll, focal length, focus dist
 aperture, exposure. The camera has collision: it cannot end up underground, underwater
 or inside a tree.
 
+*As built (M1.16, `Vista.App --window`; [`vista-log/M1.16.md`](vista-log/M1.16.md)):* the window holds a scene and writes it as the
+CLI's own files (recipe, camera, slider and options files) before each run, and runs it as the CLI's own command line, so what it shows
+is what the CLI renders from the files it saves. Its preview is 640 px wide by default and refines pass by pass, the final's own passes
+read back as they finish; a change restarts it once the controls have been still for 0.2 s. The camera keeps eye height above the
+ground, its detail and the forest's crowns; there is no water to keep out of until M3.
+
 ### 3.2 Basic controls
 
 - **Set pieces**: one open-ended catalogue (eventually long) of things a wallpaper can
@@ -155,7 +161,9 @@ One generic mechanism, not special cases:
 - **Two speeds** within a scene. Time of day, fog, exposure and camera changes only
   restart the preview. Snow and season (snow depth near the camera, snow on branches, bare
   deciduous trees) change near-camera geometry and rebuild part of the scene — seconds,
-  not instant — still deterministic from seed + slider, so nothing moves.
+  not instant — still deterministic from seed + slider, so nothing moves. *Measured in M1.16's window:* the camera and the
+  exposure are the fast speed (0.1–1.7 s at 640 px), but the time of day and the fog are not: since M1.13a the auto valley
+  haze follows the hour, and any change of the air rebuilds its tables, about 9.5 s at half the GPU (the parked list).
 - **As built (M1.11):** the pins live in a **slider file** (`--sliders`), beside the recipe
   (what the world is made of) and the camera; a slider the file does not name is auto. Ten
   sliders, two of them coarse/fine pairs: season ⇄ date and the time-of-day preset ⇄ the solar
@@ -718,6 +726,9 @@ scene and per view, because cost varies too much between views (open sky at 0.3 
   the MiB (§7.1).
 - **The ETA refines live** during the final: after every dispatch, from every row's last measured cost and the samples it still
   needs; a line every 5 s, and the ETA at 10–90% of the trace beside what was in fact left in the sidecar.
+- **In the window (M1.16) the estimate runs on the kept stages**: its 4K mesh, acceleration structure and the air's tables stay for the
+  final that follows, so it counts only what that final still does (the trace, the files, about 0.1 s of setup). On the hero scene it
+  took 18 s and said 16–24 s; the final ran 21.1 s ([`vista-log/M1.16.md`](vista-log/M1.16.md)).
 
 ### 7.3 Batching, tiling, resumability
 
@@ -1994,6 +2005,19 @@ own passes. The preview is no guide to the cost (the final ran at 0.10–0.72× 
 - *Verify:* 3070: a converged window preview is bit-identical to a CLI preview of the files the
   window saves; the M1 checks walked through in the window, noted in its log.
 
+*Status (2026-10-28): done.* `Vista.App --window` drives M1 by hand on one session that keeps its stages: the progressive preview (the
+final's own passes read back, 640 px by default), the set pieces (a new scene, its camera the auto camera's) and the seed, every slider
+with its value, auto or pinned, a reset and an implausible mark, the camera's nudges, turns, lens and exposure with collision, the auto
+camera, the debug views and the denoiser, the estimate and the 4K final with a live ETA. The scene is the CLI's own files and each run
+the CLI's own command line. `--window-check` walks the real window through M1 (off the screen): three times its converged preview was a
+cold CLI preview of the saved files, PNG and EXR byte for byte; every step rebuilt only its stages (a nudge or a pan 1.6 s with its
+mesh, an exposure 0.14 s, a debug view 0.7 s, a new scene's auto camera 15–40 s); on the kept stages the estimate took 18 s and said
+16–24 s, and the 4K final ran 21.1 s. No image moved. Found: a change of the air (the time of day, the date, the weather) takes about
+9.5 s, 8.7 s of it the air's tables (parked for M1.17's performance pass). *Judge this:* the window itself (`--window`), and `m1-16-window.png`,
+`m1-16-controls.png`. *Ignore this:* the air's 9.5 s per change (M1.17); the images' look (M1.17). *Questions:* is anything you reach for
+missing, or in the wrong place? Is a step of 1.5 m and 5° the right "a little"? Is the 640 px preview sharp enough, or should the window
+default to 960 px (about twice the time)? Log: [`vista-log/M1.16.md`](vista-log/M1.16.md).
+
 **M1.17 — M1 sign-off.**
 - *Goal:* close M1 against its verification.
 - *Deliverable:* the Vista golden suite at preview size (fixed seeds, committed PNG/EXR goldens,
@@ -2217,6 +2241,13 @@ any of them.
   final is planned as passes of up to 64 samples a pixel. Likely the sample loop's registers lowering the GPU's occupancy; passes of
   one sample in row bands, or a loop the compiler keeps lean, may win back 10–25%. The estimate is unaffected (its probe traces the final's own
   dispatches). *Belongs:* M1.17's performance pass, beside the leaner pools integrator.
+- **A change of the air costs about 9.5 s in the window** (M1.16): the time of day, the date, the temperature, the humidity or the
+  haze rebuilds the air's tables and scattering orders, 8.7 s of a 9.5 s step at half the GPU's time (vista-log/M1.16.md), where
+  §3.4 puts the time of day with the camera as a change that only restarts the preview (0.1–1.7 s). Since M1.13a the auto valley haze
+  follows the hour, so even the time of day moves the tables; M1.13b's are larger (10 orders). Levers: fewer or coarser orders for the
+  layer's share, a table per hour reused while a slider is dragged, the orders' dispatches at full speed while the user waits on them.
+  (M1.13a found a pinned valley haze kept the tables over a change of time; not measured since M1.13b's pools.) *Belongs:* M1.17's
+  performance pass.
 
 ---
 

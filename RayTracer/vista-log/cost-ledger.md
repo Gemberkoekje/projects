@@ -35,6 +35,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.13b | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1.14 | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1.15 | 0.44 | 6.95 | 5.84 | 20.79 |
+| M1.16 | 0.44 | 6.95 | 5.84 | 20.79 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -180,3 +181,7 @@ plans its video memory first (the acceleration structure's size query and the sm
 thread of its own, and the renderer builds one triangle's acceleration structure when it is made (the driver's own memory, for the
 plan's base). The cost of a sample depends on how many samples a pass carries (vista-log/M1.15.md: the snow view's 5.2 ns at one sample
 a pixel, 6.7 at four, the same rays); the ledger's mean over a 64-spp render's dispatches includes its passes of several samples.
+M1.16 adds the window and changes nothing the integrator traces, so its row is M1.15's: the four ledger views (640 px, 16 spp, the
+down-slope view with every debug output) rendered by `main` (62694e88) and by this slice are byte-identical, PNG and EXR, fifteen files.
+Only a render with a window's feed reads its image back after a pass (at most every 0.2 s); the CLI's renders
+take the same path as before.

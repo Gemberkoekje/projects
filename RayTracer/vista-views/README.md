@@ -390,3 +390,21 @@ trace, and writes `check.csv`. `-Rounds` repeats the set.
 ```
 powershell -File vista-views/estimate/check.ps1 [-Views sky,aerial,default,down-slope,dawn,snow,fog-sea] [-Rounds 2] [-Spp 64] [-Width 3840] [-Out folder] [-Keep]
 ```
+
+## Window checks (M1.16)
+
+`window/check.ps1` runs `--window-check`: the real window, opened off the screen on M1's hero scene (an alpine range at golden hour,
+seed 42, Zermatt on 15 July), driven step by step through the methods its controls call. The new scene's auto camera, a 960×540
+preview at 256 spp refining on screen, dawn, dusk and golden hour, the camera's nudges, turns, exposure and collision (1000 km down
+lifts it clear of the ground), a temperature pinned, shown in °F and reset, an implausible date and season, the material, depth and
+denoised views, the snow-capped mountains as a new scene with their materials, their dawn and the sun 2° under the horizon, the saved
+scene opened again, then the estimate and the 4K final. After each step it checks which stages the runs built and reused and saves a
+picture of the window in `<Out>\shots`; three times it saves the scene and renders its files with a cold `--preview` process, which
+must write the window's PNG and EXR byte for byte. It ends by writing the slice's two sheets (`m1-16-window.png`,
+`m1-16-controls.png`) from the pictures. `-Visible` puts the window on the screen; `-NoFinal` skips the estimate and the final.
+
+```
+powershell -File vista-views/window/check.ps1 [-Out folder] [-FinalSpp 64] [-NoFinal] [-Visible]
+```
+
+The window itself: `dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --window [--recipe name.recipe.json] [--seed 42]`.
