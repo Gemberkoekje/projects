@@ -15,6 +15,9 @@
 #    cell's mean;
 #  - webcam.png: Zermatt at the Sunnegga webcam frames' dates and times (vista-plan section 10), from pools/fog-sea.camera.json (looking
 #    south-west as the webcam does): renders only, the frames are not ours and stay local.
+#  - with -Before (a build's Vista.App.dll from before M1.17's stop 2), before-after.png: that build's defaults against Vista's camera
+#    (stop 2: 5500 K, +1.5 EV, half of dusk's fall, a 0.03 margin) on the hero at golden hour and at dusk, the four ledger views,
+#    alpenglow at dusk and April's snow.
 # The user's own dusk photos are never committed: with -Photos (a folder of them, DD-MM-YYYY-HHMMSS.jpg), dusk-photos.png and
 # sunset-photos.png put them beside the renders, for showing locally.
 # Build first: dotnet build Vista.App -c Release (from RayTracer/).
@@ -23,9 +26,10 @@ param(
     [string]$App = '',
     [string]$Photo = '',
     [string]$Photos = '',
+    [string]$Before = '',
     [int]$CellWidth = 320,
     [int]$Spp = 64,
-    [string]$Sheets = 'dusk,sunset,balance,photo,sky,shadows,webcam'
+    [string]$Sheets = 'dusk,sunset,balance,photo,sky,shadows,webcam,before-after'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -258,6 +262,32 @@ if ($make -contains 'shadows') {
         $tiles += $all
     }
     Sheet $tiles $labels 4 'M1.17 the dark shadows at golden hour · the punchy look at +1 EV (today), +1.5 and +2, and the base look at +1' 'shadows.png'
+}
+
+# Before and after Vista's camera (stop 2): the same renders under the build before it and this one's defaults.
+if ($Before -ne '' -and $make -contains 'before-after') {
+    New-Item -ItemType Directory -Force (Join-Path $Out 'before-after') | Out-Null
+    $tiles = @(); $labels = @()
+    $shots = @(
+        @('hero · golden hour', $heroArgs),
+        @('hero · dusk (sun -1.9°)', ($heroArgs + @('--sun-elevation', '-1.9'))),
+        @('sky · noon', @('--recipe', $day, '--seed', '42', '--camera', (Join-Path $views 'sky.camera.json'))),
+        @('aerial · noon', @('--recipe', $day, '--seed', '42', '--camera', (Join-Path $views 'aerial.camera.json'))),
+        @('default · noon', @('--recipe', $day, '--seed', '42', '--camera', (Join-Path $views 'default.camera.json'))),
+        @('down the slope · golden hour', @('--recipe', $golden, '--seed', '42', '--camera', (Join-Path $views 'down-slope.camera.json'))),
+        @('alpenglow · sun -0.5°', @('--recipe', (Join-Path $views 'atmosphere\zermatt-july.recipe.json'), '--seed', '42', '--camera', (Join-Path $views 'atmosphere\range.camera.json'), '--sun-elevation', '-0.5')),
+        @('April · noon', @('--recipe', (Join-Path $views 'snow\mountains-april.recipe.json'), '--seed', '42', '--camera', (Join-Path $views 'atmosphere\range.camera.json'))))
+    foreach ($shot in $shots) {
+        $slug = ($shot[0] -replace '[^a-z0-9]+', '-').Trim('-')
+        foreach ($build in @(@('before', $Before, 'before (M1.16''s look)'), @('after', $App, 'Vista''s camera'))) {
+            $png = Join-Path $Out "before-after\$($build[0])-$slug.png"
+            & dotnet $build[1] (@('--preview') + $shot[1] + @('--width', "$CellWidth", '--spp', "$Spp", '--out', $png)) | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "The $($build[0]) render of $($shot[0]) failed." }
+            $tiles += $png
+            $labels += "$($shot[0]) · $($build[2]) · mean $('{0:0}' -f (Stats $png 0).Mean)"
+        }
+    }
+    Sheet (Small $tiles 256) $labels 4 'M1.17 Vista''s camera · before (left of each pair: the display''s white, +1 EV, the meter following dusk) and after (right: 5500 K, +1.5 EV, half of dusk''s fall, a 0.03 margin)' 'before-after.png'
 }
 
 # The webcam frames' dates and times at Zermatt, looking south-west as the webcam does.

@@ -43,11 +43,12 @@ public static class IncidentMeter
     public const double Calibration = 250.0;
 
     /// <summary>
-    /// The stops the incident meter adds on its own unless <c>--compensation</c> says otherwise (vista-plan §10 M1.11b), chosen by
-    /// sheet with the look (+1 EV with AgX's punchy look, which deepens middle grey by about 1 EV): the card's exposure is right for a
-    /// sunlit grey, but a whole landscape at it reads dark. The camera's EV comes on top. Provisional: re-judged at M1.17 with real materials.
+    /// The stops the incident meter adds on its own unless <c>--compensation</c> says otherwise: Vista's camera's
+    /// (<see cref="CameraSettings.CompensationEv"/>, +1.5 EV since M1.17, the user's pick; +1 EV from M1.11b, chosen with AgX's punchy look,
+    /// which deepens middle grey by about 1 EV). The card's exposure is right for a sunlit grey, but a whole landscape at it reads dark,
+    /// its shaded slopes darkest. The camera's EV comes on top.
     /// </summary>
-    public const double DefaultCompensationEv = 1.0;
+    public const double DefaultCompensationEv = CameraSettings.CompensationEv;
 
     /// <summary>
     /// The card's illuminance, lux, under which the exposure may stop following the light (vista-plan §10 M1.17, the exposure at dusk):
@@ -57,10 +58,11 @@ public static class IncidentMeter
     public const double AdaptationLux = 25000.0;
 
     /// <summary>
-    /// How far the exposure follows the light under <see cref="AdaptationLux"/> unless <c>--adaptation</c> says otherwise: all the way,
-    /// M1.10a's meter. Provisional: the user's pick at M1.17.
+    /// How far the exposure follows the light under <see cref="AdaptationLux"/> unless <c>--adaptation</c> says otherwise: Vista's camera's,
+    /// half the fall in stops (<see cref="CameraSettings.DuskAdaptation"/>, the user's pick at M1.17 beside the user's dusk photos; M1.10a's
+    /// meter followed it all the way, 1).
     /// </summary>
-    public const double DefaultAdaptation = 1.0;
+    public const double DefaultAdaptation = CameraSettings.DuskAdaptation;
 
     /// <summary>
     /// The stops an <paramref name="adaptation"/> takes off the exposure of a card lit by <paramref name="lux"/>: 0 at or above
@@ -211,10 +213,11 @@ public static class IncidentMeter
 
     /// <summary>
     /// The exposure of a view whose card received <paramref name="light"/> in <paramref name="frame"/>, with
-    /// <paramref name="compensationEv"/> stops on top: log₂(π / E) for the card's illuminance E in the image's Y units.
+    /// <paramref name="compensationEv"/> stops on top: log₂(π / E) for the card's illuminance E in the image's Y units. The meter alone,
+    /// following the light all the way; a render passes its camera's adaptation (<see cref="DefaultAdaptation"/>) to the overload below.
     /// </summary>
     public static ExposureInfo Measure(IncidentLight light, AtmosphereFrame frame, IntegratorTables tables, double compensationEv) =>
-        Measure(light, frame, tables, compensationEv, DefaultAdaptation);
+        Measure(light, frame, tables, compensationEv, 1.0);
 
     /// <summary>
     /// <see cref="Measure(IncidentLight, AtmosphereFrame, IntegratorTables, double)"/> with the exposure following the light under

@@ -164,8 +164,11 @@ public sealed class DisplayGradeTests
     public void TheCommandLine_SetsTheGradeAndTheAdaptation()
     {
         PreviewRequest plain = Parse();
-        Assert.AreEqual(DisplayGrade.None, plain.Grade, "none by default");
-        Assert.AreEqual(IncidentMeter.DefaultAdaptation, plain.Adaptation);
+        Assert.AreEqual(DisplayGrade.Default, plain.Grade, "Vista's camera's by default");
+        Assert.AreEqual((5500.0, 0.03), (plain.Grade.WhiteBalanceKelvin, plain.Grade.SkyMargin), "the user's picks (M1.17)");
+        Assert.AreEqual(0.5, plain.Adaptation, "half the fall into dusk");
+        Assert.AreEqual(1.5, IncidentMeter.DefaultCompensationEv, "+1.5 EV on the incident meter");
+        Assert.AreEqual(DisplayGrade.None, Parse("--white-balance", "none", "--sky-margin", "0").Grade, "M1.11c's look on request");
         Assert.AreEqual(5500.0, Parse("--white-balance", "5500K").Grade.WhiteBalanceKelvin);
         Assert.AreEqual(4400.0, Parse("--white-balance", "4400").Grade.WhiteBalanceKelvin);
         Assert.AreEqual(0.0, Parse("--white-balance", "none").Grade.WhiteBalanceKelvin);

@@ -322,12 +322,14 @@ public sealed class PreviewSessionTests
         // re-exposes the kept render instead of tracing it again.
         var session = new PreviewSession(new FakeRenderer());
         Sidecar plain = session.Run(Base);
-        Assert.AreEqual((0.0, 0.0), (plain.Image.WhiteBalanceKelvin, plain.Image.SkyMargin));
-        Assert.AreEqual(1.0, plain.Exposure!.Adaptation);
-        Sidecar graded = session.Run(Base with { Grade = new DisplayGrade(5500.0, 0.03), Adaptation = 0.5 });
+        Assert.AreEqual((5500.0, 0.03), (plain.Image.WhiteBalanceKelvin, plain.Image.SkyMargin), "Vista's camera's");
+        Assert.AreEqual(0.5, plain.Exposure!.Adaptation);
+        Sidecar graded = session.Run(Base with { Grade = new DisplayGrade(4400.0, 0.0), Adaptation = 1.0 });
         Assert.AreEqual(0, graded.Stages.Built.Count, $"the render is kept, built {string.Join(", ", graded.Stages.Built)}");
         Sidecar back = VistaJson.Deserialize<Sidecar>(File.ReadAllText(P("p.json")));
-        Assert.AreEqual((5500.0, 0.03), (back.Image.WhiteBalanceKelvin, back.Image.SkyMargin));
-        Assert.AreEqual(0.5, back.Exposure!.Adaptation);
+        Assert.AreEqual((4400.0, 0.0), (back.Image.WhiteBalanceKelvin, back.Image.SkyMargin));
+        Assert.AreEqual(1.0, back.Exposure!.Adaptation);
+        StringAssert.Contains(CameraSettings.Describe(plain), "white balance 5500 K (daylight); exposure by the incident meter +1.5 EV");
+        StringAssert.Contains(CameraSettings.Describe(back), "following dusk all the way");
     }
 }

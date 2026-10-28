@@ -100,10 +100,10 @@ public static class DisplayTransform
     public const string AcesName = "exposure + ACES fit (Narkowicz 2016, per channel) + sRGB";
 
     /// <summary>
-    /// The look AgX gets unless another is asked for: punchy since M1.11b, chosen by sheet with the incident meter's
-    /// <see cref="IncidentMeter.DefaultCompensationEv"/> (vista-plan §10 M1.11b). Provisional: re-judged at M1.17 with real materials.
+    /// The look AgX gets unless another is asked for: Vista's camera's (<see cref="CameraSettings.Look"/>), punchy since M1.11b, chosen by
+    /// sheet with the incident meter's compensation and kept at M1.17 with a margin short of the gamut's edge (<see cref="DisplayGrade"/>).
     /// </summary>
-    public const DisplayLook DefaultLook = DisplayLook.Punchy;
+    public const DisplayLook DefaultLook = CameraSettings.Look;
 
     /// <summary>How a PNG made with <paramref name="curve"/> was display-encoded, for the sidecar.</summary>
     public static string NameOf(DisplayCurve curve) => NameOf(curve, DisplayLook.Base);
@@ -243,7 +243,7 @@ public static class DisplayTransform
             throw new ArgumentException("RGB data must hold three floats per pixel.", nameof(linearRgb));
         float scale = (float)Math.Pow(2.0, exposureEv);
         float[] input = linearRgb.ToArray();
-        if (grade.WhiteBalanceKelvin != 0.0)
+        if (grade.HasWhiteBalance)
             Balance(input, grade.WhiteBalance());
         float margin = (float)grade.SkyMargin;
         var encoded = new float[input.Length];

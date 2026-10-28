@@ -326,6 +326,7 @@ internal static class Program
                 $"exposure: {reading} (EV100 {(exposure.Ev100 is double ev ? ev.ToString("0.0", CultureInfo.InvariantCulture) : "none: no light")}), " +
                 $"scaled by {exposure.AppliedEv:+0.0;-0.0} EV, display {sidecar.Image.Display.ToString().ToLowerInvariant()}; atmosphere {sidecar.Atmosphere.Mode.ToString().ToLowerInvariant()}"));
         }
+        Console.WriteLine($"camera: {CameraSettings.Describe(sidecar)}");
         if (sidecar.World.Erosion is { } erosion)
         {
             string how = erosion.Source switch

@@ -185,8 +185,8 @@ public sealed class DenoisingTests
         foreach (string file in sidecar.Outputs.Values)
             Assert.IsTrue(File.Exists(P(file)), file);
         float[] halved = [.. input.Color.Select(c => 0.5f * c)];
-        byte[] finished = DisplayTransform.ToSrgb8(halved, sidecar.Exposure.AppliedEv, DisplayCurve.Agx, DisplayTransform.DefaultLook, DisplayTransform.DefaultDither,
-            PixelWindow.Full(32, 18));
+        byte[] finished = DisplayTransform.ToSrgb8(halved, sidecar.Exposure.AppliedEv, DisplayCurve.Agx, DisplayTransform.DefaultLook, DisplayGrade.Default,
+            DisplayTransform.DefaultDither, PixelWindow.Full(32, 18));
         CollectionAssert.AreEqual(PngEncoder.Encode(finished, 32, 18, PngColor.Rgb), File.ReadAllBytes(P("p.denoised.png")),
             "the denoised PNG is exposed, display-encoded and dithered like the raw one");
         CollectionAssert.AreEqual(ExrEncoder.EncodeRgb(halved, 32, 18), File.ReadAllBytes(P("p.denoised.exr")));

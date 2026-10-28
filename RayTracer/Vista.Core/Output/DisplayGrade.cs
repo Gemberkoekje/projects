@@ -5,8 +5,9 @@ namespace Vista.Output;
 
 /// <summary>
 /// The camera's choices between the image's light and the display curve (vista-plan §10 M1.17): a white balance and the punchy
-/// look's margin short of the gamut's edge. The default is neither, M1.11c's bytes: the display's own white (D65) and the look's
-/// saturation held back only where a channel would go below 0. The EXR never changes.
+/// look's margin short of the gamut's edge. A render takes Vista's camera's (<see cref="Default"/>: 5500 K and 0.03, the user's picks);
+/// <see cref="None"/> is M1.11c's bytes: the display's own white (D65) and the look's saturation held back only where a channel would go
+/// below 0. The EXR never changes.
 /// </summary>
 /// <param name="WhiteBalanceKelvin">
 /// The colour temperature that renders neutral, as a camera's Kelvin setting: a Planckian light of this temperature comes out as
@@ -30,14 +31,20 @@ public readonly record struct DisplayGrade(double WhiteBalanceKelvin, double Sky
     /// <summary>No white balance and no margin: M1.11c's bytes.</summary>
     public static DisplayGrade None => default;
 
+    /// <summary>Vista's camera's grade (<see cref="CameraSettings"/>): a daylight white balance of 5500 K and a 0.03 margin.</summary>
+    public static DisplayGrade Default => new(CameraSettings.WhiteBalanceKelvin, CameraSettings.SkyMargin);
+
     /// <summary>True when this grade changes nothing.</summary>
-    public bool IsNone => WhiteBalanceKelvin == 0.0 && SkyMargin == 0.0;
+    public bool IsNone => !HasWhiteBalance && !(SkyMargin > 0.0);
+
+    /// <summary>True when the grade balances the white (<see cref="WhiteBalanceKelvin"/> is not 0).</summary>
+    public bool HasWhiteBalance => WhiteBalanceKelvin > 0.0 || WhiteBalanceKelvin < 0.0;
 
     /// <summary>The problems with this grade's values, empty when it is valid.</summary>
     public IReadOnlyList<string> Validate()
     {
         var problems = new List<string>();
-        if (WhiteBalanceKelvin != 0.0 && !(WhiteBalanceKelvin >= MinKelvin && WhiteBalanceKelvin <= MaxKelvin))
+        if (HasWhiteBalance && !(WhiteBalanceKelvin >= MinKelvin && WhiteBalanceKelvin <= MaxKelvin))
             problems.Add($"The white balance must be 0 (none) or {MinKelvin:0}–{MaxKelvin:0} K, got {WhiteBalanceKelvin}.");
         if (!(SkyMargin >= 0.0 && SkyMargin <= MaxSkyMargin))
             problems.Add($"The sky margin must be 0–{MaxSkyMargin}, got {SkyMargin}.");
@@ -52,7 +59,7 @@ public readonly record struct DisplayGrade(double WhiteBalanceKelvin, double Sky
     /// </summary>
     public double[] WhiteBalance()
     {
-        if (WhiteBalanceKelvin == 0.0)
+        if (!HasWhiteBalance)
             return [1, 0, 0, 0, 1, 0, 0, 0, 1];
         double[] toRec709 = EngineToRec709();
         double[] toXyz = Invert(toRec709);
@@ -80,10 +87,11 @@ public readonly record struct DisplayGrade(double WhiteBalanceKelvin, double Sky
             ? -0.2661239e9 / t3 - 0.2343589e6 / t2 + 0.8776956e3 / t + 0.179910
             : -3.0258469e9 / t3 + 2.1070379e6 / t2 + 0.2226347e3 / t + 0.240390;
         double x2 = x * x, x3 = x2 * x;
-        double y = t <= 2222.0 ? -1.1063814 * x3 - 1.34811020 * x2 + 2.18555832 * x - 0.20219683
-            : t <= 4000.0 ? -0.9549476 * x3 - 1.37418593 * x2 + 2.09137015 * x - 0.16748867
-            : 3.0817580 * x3 - 5.87338670 * x2 + 3.75112997 * x - 0.37001483;
-        return (x, y);
+        if (t <= 2222.0)
+            return (x, -1.1063814 * x3 - 1.34811020 * x2 + 2.18555832 * x - 0.20219683);
+        if (t <= 4000.0)
+            return (x, -0.9549476 * x3 - 1.37418593 * x2 + 2.09137015 * x - 0.16748867);
+        return (x, 3.0817580 * x3 - 5.87338670 * x2 + 3.75112997 * x - 0.37001483);
     }
 
     /// <summary>Bradford's cone response matrix, row-major.</summary>
