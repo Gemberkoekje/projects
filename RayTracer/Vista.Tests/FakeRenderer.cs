@@ -33,6 +33,9 @@ internal sealed class FakeRenderer : IVistaRenderer
 
     public BatchPlanner? Planner { get; private set; }
 
+    /// <summary>Told each batch once it is complete (a test cancels a render part of the way through).</summary>
+    public Action<SampleBatch>? Dispatched { get; set; }
+
     public IReadOnlySet<Aov>? Requested { get; private set; }
 
     public VistaScene? Scene { get; private set; }
@@ -109,14 +112,6 @@ internal sealed class FakeRenderer : IVistaRenderer
         PixelWindow window = settings.Rendered;
         Assert.AreEqual(window.Width, planner.Width, "the planner is sized to the rendered window");
         Assert.AreEqual(window.Height, planner.Height, "the planner is sized to the rendered window");
-        int dispatches = 0;
-        while (planner.HasNext)
-        {
-            SampleBatch batch = planner.Next();
-            planner.Complete(batch, TimeSpan.FromMilliseconds(1));
-            dispatches++;
-        }
-
         int pixels = window.Pixels;
         var xyz = new float[pixels * 3];
         float k = SceneDependent ? Signature(scene, settings) : 1f;
@@ -128,6 +123,18 @@ internal sealed class FakeRenderer : IVistaRenderer
             xyz[p * 3] = 0.95f * t * k;
             xyz[p * 3 + 1] = t * k;
             xyz[p * 3 + 2] = 1.09f * t * k;
+        }
+
+        int dispatches = 0;
+        while (planner.HasNext)
+        {
+            SampleBatch batch = planner.Next();
+            planner.Complete(batch, TimeSpan.FromMilliseconds(1));
+            dispatches++;
+            Dispatched?.Invoke(batch);
+            // The window's feed (M1.16): the image so far after a pass, as the D3D12 host hands it (its interval ignored).
+            if (planner.Feed?.Pass is { } pass && planner.EndsPass(batch) && planner.HasNext)
+                pass(new PassImage(window.Width, window.Height, planner.SamplesCompleted, settings.SamplesPerPixel, [.. xyz]));
         }
         var buffers = new Dictionary<Aov, float[]>();
         foreach (Aov aov in aovs.Where(a => a != Skip))

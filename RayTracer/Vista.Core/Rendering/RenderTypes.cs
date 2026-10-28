@@ -275,7 +275,9 @@ public interface IVistaRenderer
     /// <summary>
     /// Renders the <see cref="RenderSettings.Rendered"/> window of <paramref name="scene"/>, issuing dispatches
     /// from <paramref name="planner"/> (made for that window's size; its rows are window rows) and reporting
-    /// each one's GPU time back to it, and returns the requested <paramref name="aovs"/>.
+    /// each one's GPU time back to it, and returns the requested <paramref name="aovs"/>. With the planner's
+    /// <see cref="BatchPlanner.Feed"/> asking for them (vista-plan §10 M1.16), it hands the feed the image after each
+    /// pass but the last; a cancelled feed stops it with <see cref="OperationCanceledException"/> at its next batch.
     /// </summary>
     RenderOutput Render(VistaScene scene, RenderSettings settings, IReadOnlySet<Aov> aovs, BatchPlanner planner);
 

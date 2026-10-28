@@ -13,7 +13,8 @@ namespace Vista.App;
 /// <summary>
 /// Vista entry point (vista-plan §7.4). Runs the headless preview CLI — on the RTX 3070 through the offline
 /// integrator, or without a GPU with <c>--dry-run</c> — the contact sheets (<c>--sheet</c> renders variants,
-/// <c>--sheet-from</c> tiles existing images), watch mode (<c>--watch</c> renders again whenever its files change, M1.8), and
+/// <c>--sheet-from</c> tiles existing images), watch mode (<c>--watch</c> renders again whenever its files change, M1.8), the preview and
+/// tweak window (<c>--window</c>, M1.16, and its check <c>--window-check</c>), and
 /// the dev-box checks: <c>--watch-check</c> (a watch changed step by step against cold renders), <c>--gpu-selftest</c> and
 /// <c>--atmosphere-check</c> (the LUT air against the reference atmosphere, by direction and segment) and
 /// <c>--atmosphere-compare</c> (one view rendered with both, by distance), <c>--sampling-compare</c> (one view
@@ -56,6 +57,10 @@ internal static class Program
 
         if (args.FirstOrDefault() == WatchCheck.Flag)
             return WatchCheck.Run(args, Console.Out);
+        if (args.FirstOrDefault() == Window.WindowApp.Flag)
+            return Window.WindowApp.Run(args);
+        if (args.FirstOrDefault() == Window.WindowCheck.Flag)
+            return Window.WindowCheck.Run(args, Console.Out);
         if (args.FirstOrDefault() == ValleyMeasure.Flag)
             return ValleyMeasure.Run(args, Console.Out);
 
@@ -256,7 +261,9 @@ internal static class Program
         Console.Error.WriteLine(PreviewCommandLine.Usage);
         Console.Error.WriteLine(SheetCommandLine.Usage);
         Console.Error.WriteLine(WatchCommandLine.Usage);
+        Console.Error.WriteLine(Window.WindowApp.Usage);
         Console.Error.WriteLine(WatchCheck.Usage);
+        Console.Error.WriteLine(Window.WindowCheck.Usage);
         Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism and LUT checks on the GPU)");
         Console.Error.WriteLine(AtmosphereCheck.Usage);
         Console.Error.WriteLine(AtmosphereCompare.Usage);

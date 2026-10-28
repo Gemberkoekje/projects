@@ -60,6 +60,9 @@ public sealed record SliderState(
     /// <summary>Every hint for the user: the almanac's (a preset height the sun never reaches), the implausible ones, the notes.</summary>
     public IReadOnlyList<string> Hints => [.. Almanac.Hints, .. Implausible, .. Notes];
 
+    /// <summary>The pinned sliders an <see cref="Implausible"/> hint is about, so the window marks each one's row (vista-plan §10 M1.16).</summary>
+    public IReadOnlySet<Slider> ImplausibleSliders { get; init; } = new HashSet<Slider>();
+
     /// <summary>
     /// How far the world's lowest valleys stand above its height 0, m (vista-plan §10 M1.12c, <see cref="WorldFooting"/>); 0 when
     /// resolved without a world.
@@ -156,6 +159,7 @@ public static class LinkedSliders
         SliderPushes pushes = SliderPushes.For(recipe.SetPieces);
         var readings = new Dictionary<Slider, SliderReading>();
         var implausible = new List<string>();
+        var flagged = new HashSet<Slider>();
         var notes = new List<string>();
 
         // The place.
@@ -211,7 +215,10 @@ public static class LinkedSliders
                 pins.Season is not null ? "pinned" : $"auto: the pinned date's, in the {hemisphere} hemisphere");
             Season actual = SeasonCalendar.SeasonOf(date, place.LatitudeDegrees);
             if (pins.Season is Season pinnedSeason && pinnedSeason != actual)
+            {
                 implausible.Add($"Implausible: {Iso(date)} is {JsonName(actual.ToString())} at {place.Name}, but the season is pinned to {JsonName(pinnedSeason.ToString())}.");
+                flagged.UnionWith([Slider.Date, Slider.Season]);
+            }
         }
         else
         {
@@ -398,15 +405,25 @@ public static class LinkedSliders
         // Contradictions: rendered as asked, with a hint.
         bool frozenLake = recipe.SetPieces.Contains(SetPiece.FrozenLake);
         if (frozenLake && pins.Temperature is not null && temperature > FrozenLakeImplausibleCelsius)
+        {
             implausible.Add(Invariant($"Implausible: a frozen lake with the valley at {Celsius(temperature, pins.TemperatureUnit)} (the temperature is pinned)."));
+            flagged.Add(Slider.Temperature);
+        }
         if (frozenLake && pins.Season == Season.Summer)
+        {
             implausible.Add("Implausible: a frozen lake in summer (the season is pinned).");
+            flagged.Add(Slider.Season);
+        }
         if ((pins.Snowline is not null || pins.Temperature is not null) && snowline < freezingLevel - SnowBelowFreezingLevelImplausibleMetres)
+        {
             implausible.Add(Invariant($"Implausible: seasonal snow down to {snowline:0} m with the freezing level at {freezingLevel:0} m."));
+            flagged.UnionWith(((Slider[])[Slider.Snow, Slider.Temperature]).Where(pins.IsPinned));
+        }
 
         return new SliderState(pins, pushes, almanac, altitude, climate, stationDay, day, climateTemperature, temperature, dewPoint, humidity,
             freezingLevel, climateSnowline, snowline, hazeHumidity, opticalDepth, visibility, readings, implausible, notes)
         {
+            ImplausibleSliders = flagged,
             FootingMetres = lift,
             ValleyFloorMetres = floor,
             ValleyHaze = layer,

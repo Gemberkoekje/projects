@@ -96,7 +96,9 @@ public sealed class PreviewSessionTests
             ("seed", r => r with { Seed = 8 }, [PreviewStage.World, PreviewStage.Mesh, PreviewStage.AccelerationStructure, PreviewStage.AtmosphereTables,
                 PreviewStage.ScatteringOrders, .. Sky, .. Image]),
             ("width", r => r with { Width = 48, Height = 27 }, [.. Mesh, .. Render]),
-            ("width back", r => r with { Width = 32, Height = 18 }, [.. Mesh, .. Render]),
+            // Two meshes are kept since M1.16 (the window's preview and its final): the last width's comes back, its acceleration
+            // structure is built again (the renderer holds one).
+            ("width back", r => r with { Width = 32, Height = 18 }, [PreviewStage.AccelerationStructure, .. Render]),
             ("average meter", r => r with { Meter = Metering.Average }, [PreviewStage.ExposureMeter]),
             ("ACES", r => r with { Display = DisplayCurve.Aces }, []),
             ("incident meter again", r => r with { Meter = Metering.Incident }, []),

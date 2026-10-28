@@ -179,6 +179,33 @@ public static class FinalEstimate
         return setup;
     }
 
+    /// <summary>
+    /// The setup stages (<see cref="SetupStages"/>' names) a session that keeps its stages still has once its estimate ran (vista-plan §10
+    /// M1.16, <see cref="Cli.PreviewSession.KeepsFinalStages"/>): the process's start, the world, the camera, the mesh, the exposure meter, and
+    /// the renderer's device, shaders, upload, acceleration structures and air are the final's already. What is left runs in every final:
+    /// the pools, the memory plan, the renderer's per-render setup and its readback.
+    /// </summary>
+    public static IReadOnlySet<string> KeptStages { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "startup", "worldGen", "autoCamera", "mesh", "exposureMeter",
+        "render." + RenderStageKeys.DeviceInit, "render." + RenderStageKeys.ShaderCompile, "render." + RenderStageKeys.ReferenceShaderCompile,
+        "render." + RenderStageKeys.LowAirShaderCompile, "render." + RenderStageKeys.MeshUpload, "render." + RenderStageKeys.AccelerationBuild,
+        "render.atmosphereLuts", "render.sunlightVolume", "render.skyDistribution",
+    };
+
+    /// <summary>The stages of <paramref name="setup"/> a final that follows its estimate in the same session still runs (<see cref="KeptStages"/>).</summary>
+    public static SortedDictionary<string, double> StillToBuild(IReadOnlyDictionary<string, double> setup)
+    {
+        ArgumentNullException.ThrowIfNull(setup);
+        var left = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        foreach ((string key, double seconds) in setup)
+        {
+            if (!KeptStages.Contains(key))
+                left[key] = seconds;
+        }
+        return left;
+    }
+
     /// <summary>The whole run: the parts' ranges summed end to end (errors that may all fall the same way).</summary>
     public static TimeRange Total(TimeRange setup, TimeRange trace, TimeRange write, TimeRange? denoise) =>
         setup + trace + write + (denoise ?? TimeRange.Zero);

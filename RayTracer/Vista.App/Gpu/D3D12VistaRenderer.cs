@@ -325,6 +325,8 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         double traceSeconds = 0.0;
         double maxCostNs = 0.0;
         var pace = new DispatchPace();
+        int pixels = window.Pixels;
+        var sincePass = Stopwatch.StartNew();
         while (planner.HasNext)
         {
             SampleBatch batch = planner.Next();
@@ -332,10 +334,17 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
             planner.Complete(batch, TimeSpan.FromSeconds(seconds));
             traceSeconds += seconds;
             maxCostNs = Math.Max(maxCostNs, seconds * 1e9 / batch.PixelSamples(window.Width));
+            // The window's progressive preview (M1.16): the image so far after a whole pass, read between dispatches.
+            if (planner.Feed is { Pass: { } pass } feed && planner.EndsPass(batch) && planner.HasNext && sincePass.Elapsed.TotalSeconds >= feed.IntervalSeconds)
+            {
+                int samples = planner.SamplesCompleted;
+                pass(new PassImage(window.Width, window.Height, samples, settings.SamplesPerPixel,
+                    IntegratorReadback.MeanXyz(ReadFloats(_xyzSum!, pixels * IntegratorReadback.XyzSumStride), pixels, samples)));
+                sincePass.Restart();
+            }
         }
         stages["trace"] = Lap(stopwatch);
 
-        int pixels = window.Pixels;
         float[] xyz = IntegratorReadback.MeanXyz(ReadFloats(_xyzSum!, pixels * IntegratorReadback.XyzSumStride), pixels, settings.SamplesPerPixel);
         var buffers = new Dictionary<Aov, float[]>();
         if (aovs.Contains(Aov.Albedo))

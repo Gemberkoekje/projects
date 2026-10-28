@@ -31,9 +31,13 @@ public sealed partial class PreviewSession
     /// the final's later passes keep. The files are timed by writing the probe's as the final writes its own (and removing them); the
     /// denoising from a centred crop of the probe. The preview at its own size gives the noise and the preview's own cost, the first
     /// calibration. The video memory is planned before anything is allocated: a final that would not fit is not probed at all.
+    /// In a session that keeps the final's stages (a window's, <see cref="KeepsFinalStages"/>, vista-plan §10 M1.16) the preview renders
+    /// before the probe, so the final's mesh, its acceleration structure and the air's tables are still the renderer's when the final
+    /// starts, and the setup counts only what that final will still build (<see cref="FinalEstimate.StillToBuild"/>).
     /// </summary>
     private (EstimateInfo Estimate, ExposureInfo Exposure) Estimate(PreviewRequest request, EstimateView view, Func<CameraSpec, TerrainMesh, VistaScene> sceneWith,
-        SortedDictionary<PreviewStage, bool> stages, SortedDictionary<string, double> timings, List<string> warnings, Func<string, string> sibling)
+        SortedDictionary<PreviewStage, bool> stages, SortedDictionary<string, double> timings, List<string> warnings, Func<string, string> sibling,
+        CancellationToken cancellation)
     {
         IVistaRenderer renderer = _renderer!;
         VistaScene scene = view.Scene;
@@ -45,6 +49,8 @@ public sealed partial class PreviewSession
         var stopwatch = Stopwatch.StartNew();
 
         MemoryPlan plan = renderer.PlanMemory(scene, settings, aovs);
+        // The final plans its memory too (M1.16: in a window's final, with its stages kept, that is a share of the run worth counting).
+        timings["memoryPlan"] = Lap(stopwatch);
         if (plan.Warning() is { } warning)
         {
             warnings.Add(warning);
@@ -59,9 +65,18 @@ public sealed partial class PreviewSession
                 TimeRange.Zero, null, null, null, null, null, null, null, MemoryInfo.Of(plan, 0), null), metered);
         }
 
+        // A window's estimate renders its preview first (M1.16), so the probe's mesh and tables are the renderer's when the final starts.
+        PreviewRender? preview = null;
+        double previewSeconds = 0.0;
+        if (KeepsFinalStages)
+        {
+            preview = RenderPreview(request, view, sceneWith, cancellation);
+            previewSeconds = Lap(stopwatch);
+        }
+
         // The probe: the final's own first passes over the whole frame, on its mesh, with its outputs, until the planner stops.
         RenderSettings probing = settings with { Batching = settings.Batching with { StopAfterGpuSeconds = FinalEstimate.ProbeGpuSeconds } };
-        var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, probing.Batching);
+        var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, probing.Batching) { Feed = Stopping(cancellation) };
         var clock = new TraceClock(planner, _time);
         RenderOutput probe = renderer.Render(scene, probing, aovs, planner);
         int probeSamples = planner.SamplesCompleted;
@@ -77,6 +92,8 @@ public sealed partial class PreviewSession
         SortedDictionary<string, double> setup = FinalEstimate.SetupStages(timings, probe.Stats.StageSeconds);
         if (StartupSeconds > 0.0)
             setup["startup"] = StartupSeconds;
+        if (KeepsFinalStages)
+            setup = FinalEstimate.StillToBuild(setup);
 
         // The files, written as the final writes its own, then removed.
         float[] linear = DisplayTransform.XyzToLinearRec709(probe.Xyz);
@@ -108,14 +125,18 @@ public sealed partial class PreviewSession
         TimeRange setupRange = TimeRange.Around(setup.Values.Sum(), FinalEstimate.SetupMargin);
         TimeRange total = FinalEstimate.Total(setupRange, trace, write, denoise);
 
-        (NoiseInfo? noise, PreviewProbeInfo? preview) = PreviewProbe(request, view, sceneWith, exposure, projection, setupRange, write, denoise);
-        timings["estimatePreview"] = Lap(stopwatch);
+        preview ??= RenderPreview(request, view, sceneWith, cancellation);
+        (NoiseInfo noise, PreviewProbeInfo previewInfo) = PreviewNoise(request, view.Settings, preview, exposure, projection, setupRange, write, denoise);
+        timings["estimatePreview"] = previewSeconds + Lap(stopwatch);
 
         var estimate = new EstimateInfo(window.Width, window.Height, settings.SamplesPerPixel, setup, setupRange,
             new ProbeInfo(probeSamples, [.. clock.Passes], probe.Stats.RaysTraced, clock.WallSeconds), projection, trace, write, denoise, total, noise,
-            MemoryInfo.Of(plan, probe.Stats.PeakVideoMemoryBytes), preview);
+            MemoryInfo.Of(plan, probe.Stats.PeakVideoMemoryBytes), previewInfo);
         return (estimate, exposure);
     }
+
+    /// <summary>The preview an estimate reads the noise from: its image with its variance, its samples and its mesh.</summary>
+    private sealed record PreviewRender(RenderOutput Output, int SamplesPerPixel, TerrainMesh Mesh);
 
     /// <summary>
     /// The final's denoising, from a centred crop of the probe a <see cref="FinalEstimate.DenoiseCropDivisor"/>th of the frame on a side
@@ -172,12 +193,11 @@ public sealed partial class PreviewSession
     }
 
     /// <summary>
-    /// The preview of the final's view at the preview's own size, mesh and samples (at least 64, so each pixel's variance holds): its noise,
-    /// carried to the final's samples and to a noise target (<see cref="NoiseMeter"/>), and its own cost per pixel-sample against the probe's,
-    /// the first calibration (vista-plan §7.2).
+    /// The preview of the final's view at the preview's own size, mesh and samples (at least 64, so each pixel's variance holds), with its
+    /// variance: what an estimate reads the noise and the preview's own cost from.
     /// </summary>
-    private (NoiseInfo Noise, PreviewProbeInfo Preview) PreviewProbe(PreviewRequest request, EstimateView view, Func<CameraSpec, TerrainMesh, VistaScene> sceneWith,
-        ExposureInfo exposure, TraceProjection projection, TimeRange setup, TimeRange write, TimeRange? denoise)
+    private PreviewRender RenderPreview(PreviewRequest request, EstimateView view, Func<CameraSpec, TerrainMesh, VistaScene> sceneWith,
+        CancellationToken cancellation)
     {
         RenderSettings final = view.Settings;
         int width = Math.Min(PreviewCommandLine.DefaultWidth, final.Width);
@@ -186,8 +206,19 @@ public sealed partial class PreviewSession
         TerrainMesh mesh = _worlds.Mesh(MeshView.For(view.Scene.Camera, width, height, view.GroundRadius), request.Mesh with { Forest = view.Forest });
         RenderSettings settings = final with { Width = width, Height = height, SamplesPerPixel = samples, Window = default };
         RenderOutput preview = _renderer!.Render(sceneWith(view.Scene.Camera, mesh), settings, new HashSet<Aov> { Aov.Variance },
-            new BatchPlanner(width, height, samples, settings.Batching));
+            new BatchPlanner(width, height, samples, settings.Batching) { Feed = Stopping(cancellation) });
+        return new PreviewRender(preview, samples, mesh);
+    }
 
+    /// <summary>
+    /// The noise of <paramref name="render"/>, the preview, carried to the final's samples and to a noise target (<see cref="NoiseMeter"/>), and
+    /// its own cost per pixel-sample against the probe's, the first calibration (vista-plan §7.2).
+    /// </summary>
+    private static (NoiseInfo Noise, PreviewProbeInfo Preview) PreviewNoise(PreviewRequest request, RenderSettings final, PreviewRender render,
+        ExposureInfo exposure, TraceProjection projection, TimeRange setup, TimeRange write, TimeRange? denoise)
+    {
+        (RenderOutput preview, int samples, TerrainMesh mesh) = (render.Output, render.SamplesPerPixel, render.Mesh);
+        int width = preview.Width, height = preview.Height;
         float[] steps = NoiseMeter.OneSampleSteps(DisplayTransform.XyzToLinearRec709(preview.Xyz), preview.Xyz, preview.Aovs[Aov.Variance], samples,
             exposure.AppliedEv, request.Display, request.Look);
         double oneSample = NoiseMeter.PercentileOf(steps, NoiseMeter.Percentile);

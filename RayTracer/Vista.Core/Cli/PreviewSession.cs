@@ -45,6 +45,11 @@ namespace Vista.Cli;
 /// <see cref="TraceClock"/>, whose live ETA goes to <see cref="Progress"/> and whose checkpoints and the memory's plan and peak go in the
 /// sidecar.</para>
 ///
+/// <para>Since M1.16 the window (<see cref="Tweak.TweakRunner"/>) drives a session through a <see cref="PreviewFeed"/>: it stops a run
+/// between stages and dispatches, and it shows the image after each pass, exposed first so each frame looks as the PNG will (the files
+/// are the same with a feed and without one). A window's session keeps the final's stages for the final that follows its estimate
+/// (<see cref="KeepsFinalStages"/>), and <see cref="LastWorld"/> gives the window its ground for the camera's collision.</para>
+///
 /// <para>Not thread-safe: one render at a time.</para>
 /// </summary>
 public sealed partial class PreviewSession
@@ -106,10 +111,27 @@ public sealed partial class PreviewSession
     public RenderOutput? LastRender => _render;
 
     /// <summary>
-    /// Runs <paramref name="request"/>, reusing every stage the session's last render left whose inputs are the same; returns the
-    /// sidecar that was written. A watch session passes <paramref name="watch"/>, which the sidecar records with the run's wall time.
+    /// The world the last run built or reused (null before one), whose surface the window's camera collision reads (vista-plan §10
+    /// M1.16). A world is never changed once built, so it may be read from another thread.
     /// </summary>
-    public Sidecar Run(PreviewRequest request, WatchInfo? watch = null)
+    public TerrainWorld? LastWorld { get; private set; }
+
+    /// <summary>
+    /// True for a session a window drives (vista-plan §10 M1.16), where an estimate is followed by its final in the same session: the
+    /// estimate renders the preview it reads the noise from before its probe, so the final's mesh, its acceleration structure and the
+    /// air's tables are still the renderer's when the final starts, and it counts in its setup only what the final will still build
+    /// (<see cref="FinalEstimate.StillToBuild"/>). False for the CLI, whose final is a fresh process that builds everything again.
+    /// </summary>
+    public bool KeepsFinalStages { get; init; }
+
+    /// <summary>
+    /// Runs <paramref name="request"/>, reusing every stage the session's last render left whose inputs are the same; returns the
+    /// sidecar that was written. A watch session passes <paramref name="watch"/>, which the sidecar records with the run's wall time; a
+    /// window passes <paramref name="feed"/> (vista-plan §10 M1.16), which can stop the run between stages and dispatches and gets the
+    /// image after each pass. A run that is stopped throws <see cref="OperationCanceledException"/>, writes no sidecar and keeps every
+    /// stage it finished.
+    /// </summary>
+    public Sidecar Run(PreviewRequest request, WatchInfo? watch = null, PreviewFeed? feed = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (_renderer is null && !request.DryRun)
@@ -123,13 +145,17 @@ public sealed partial class PreviewSession
         var stages = new SortedDictionary<PreviewStage, bool>();
         var total = Stopwatch.StartNew();
         var stopwatch = Stopwatch.StartNew();
+        CancellationToken cancellation = feed?.Cancellation ?? CancellationToken.None;
+        cancellation.ThrowIfCancellationRequested();
 
         Recipe recipe = ReadInput(request.RecipePath, text => VistaJson.ParseRecipe(JsonOverrides.Apply(text, request.RecipeOverrides)));
         TerrainWorld world = _worlds.World(recipe, request.Seed, request.Grid, _eroder, _erosionCache, request.Erosion, out bool worldReused);
         stages[PreviewStage.World] = worldReused;
+        LastWorld = world;
         warnings.AddRange(world.Warnings);
         HeightField terrain = world.Surface;
         timings["worldGen"] = Lap(stopwatch);
+        cancellation.ThrowIfCancellationRequested();
 
         // The auto camera (M1.14) chooses its camera below, once the sun, the pools and the ground are known.
         CameraSpec camera = request.CameraPath is null
@@ -174,7 +200,8 @@ public sealed partial class PreviewSession
         AutoCameraInfo? autoCamera = null;
         if (request.AutoCamera is { } auto)
         {
-            (camera, autoCamera) = ChooseCamera(request, auto, recipe, world, sliders, ground, groundAltitude, air, pools, lowAir, materials, warnings);
+            (camera, autoCamera) = ChooseCamera(request, auto, recipe, world, sliders, ground, groundAltitude, air, pools, lowAir, materials, warnings,
+                cancellation);
             File.WriteAllText(Sibling(".camera.json"), VistaJson.Serialize(camera));
             outputs["autoCamera"] = baseName + ".camera.json";
             if (request.CameraOverrides.Count > 0)
@@ -188,6 +215,7 @@ public sealed partial class PreviewSession
         TerrainMesh mesh = _worlds.Mesh(meshView, request.Mesh with { Forest = ForestOf(ground, groundAltitude) }, out bool meshReused);
         stages[PreviewStage.Mesh] = meshReused;
         timings["mesh"] = Lap(stopwatch);
+        cancellation.ThrowIfCancellationRequested();
         AtmosphereFrame frame = VistaScene.FrameFor(air, groundAltitude, almanac.Sun, camera, mesh);
         var settings = new RenderSettings
         {
@@ -226,7 +254,7 @@ public sealed partial class PreviewSession
             // The estimate (vista-plan §10 M1.15) instead of the image: PreviewSession.Estimate.cs.
             var view = new EstimateView(SceneWith(camera, mesh), settings, frame, world.Surface, air.PlanetRadiusMetres + groundAltitude,
                 ForestOf(ground, groundAltitude));
-            (estimate, exposure) = Estimate(request, view, SceneWith, stages, timings, warnings, Sibling);
+            (estimate, exposure) = Estimate(request, view, SceneWith, stages, timings, warnings, Sibling, cancellation);
         }
         else if (_renderer is null || request.DryRun)
         {
@@ -270,6 +298,15 @@ public sealed partial class PreviewSession
             var built = new HashSet<string>(StringComparer.Ordinal);
             bool rendered = false;
 
+            // A window's progressive preview (M1.16) is shown as the PNG will be, so it is exposed before it traces: the incident meter
+            // reads only the air's tables, which the render builds the same either way.
+            ExposureInfo? metered = null;
+            if (feed?.Frame is not null && request.Meter == Metering.Incident)
+            {
+                metered = MeterExposure(request, scene, settings, frame, materials, stages, built, ref rendered);
+                timings["exposureMeter"] = Lap(stopwatch);
+            }
+
             // The image: reused when the renderer would read the same, and the last render made every output asked for now
             // (asking for fewer debug outputs never changes the beauty, vista-plan §10 M0).
             var renderKey = RenderKey.Of(scene, settings);
@@ -285,7 +322,10 @@ public sealed partial class PreviewSession
                 (_render, _renderKey) = (null, null);
                 // Its video memory planned before anything is allocated (M1.15): refused when it does not fit, warned about when tight.
                 MemoryPlan plan = CheckMemory(scene, settings, aovs, warnings);
-                var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, settings.Batching);
+                var planner = new BatchPlanner(window.Width, window.Height, settings.SamplesPerPixel, settings.Batching)
+                {
+                    Feed = TraceFeedOf(feed, metered, request),
+                };
                 var clock = new TraceClock(planner, _time);
                 if (Progress is { } progress)
                     clock.Progressed += progress;
@@ -306,8 +346,12 @@ public sealed partial class PreviewSession
             }
             timings["render"] = Lap(stopwatch);
 
-            exposure = MeterExposure(request, scene, settings, frame, materials, stages, built, ref rendered);
-            timings["exposureMeter"] = Lap(stopwatch);
+            if (metered is null)
+            {
+                metered = MeterExposure(request, scene, settings, frame, materials, stages, built, ref rendered);
+                timings["exposureMeter"] = Lap(stopwatch);
+            }
+            exposure = metered;
             MarkRendererStages(stages, rendered, built, settings);
 
             if (output.Aovs.TryGetValue(Aov.MaterialId, out float[]? ids) && output.Aovs.TryGetValue(Aov.Normal, out float[]? normals) && mesh.Materials is not null)
@@ -427,6 +471,28 @@ public sealed partial class PreviewSession
         File.WriteAllText(Sibling(sidecarSuffix), VistaJson.Serialize(sidecar));
         return sidecar;
     }
+
+    /// <summary>
+    /// What the image render's planner tells a window (vista-plan §10 M1.16): its stop, and with an exposure already metered the image after
+    /// each pass, exposed and display-encoded as the PNG (without its dither); null without a feed.
+    /// </summary>
+    private static TraceFeed? TraceFeedOf(PreviewFeed? feed, ExposureInfo? exposure, PreviewRequest request)
+    {
+        if (feed is null)
+            return null;
+        Action<PassImage>? pass = null;
+        if (feed.Frame is { } show && exposure is not null)
+        {
+            double ev = exposure.AppliedEv;
+            pass = image => show(new PreviewFrame(image.Width, image.Height, image.Samples, image.SamplesPerPixel,
+                DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(image.Xyz), ev, request.Display, request.Look)));
+        }
+        return new TraceFeed { Cancellation = feed.Cancellation, Pass = pass, IntervalSeconds = feed.IntervalSeconds };
+    }
+
+    /// <summary>A planner's feed that only stops it (the auto camera's finalists, an estimate's probes); null for none.</summary>
+    private static TraceFeed? Stopping(CancellationToken cancellation) =>
+        cancellation.CanBeCanceled ? new TraceFeed { Cancellation = cancellation } : null;
 
     /// <summary>The renderer outputs <paramref name="request"/>'s image needs: its debug images' and, when it denoises, the albedo and the normal.</summary>
     private static HashSet<Aov> AovsOf(PreviewRequest request)
@@ -571,7 +637,7 @@ public sealed partial class PreviewSession
     /// </summary>
     private (CameraSpec Camera, AutoCameraInfo Info) ChooseCamera(PreviewRequest request, AutoCameraSettings auto, Recipe recipe, TerrainWorld world,
         SliderState sliders, GroundCover ground, double groundAltitude, AtmosphereModel air, ValleyPools pools, LowAir? lowAir,
-        IReadOnlyList<VistaMaterial> materials, List<string> warnings)
+        IReadOnlyList<VistaMaterial> materials, List<string> warnings, CancellationToken cancellation)
     {
         CompositionIntent intent = Composition.AutoCamera.IntentOf(recipe);
         if (intent == CompositionIntent.None)
@@ -619,6 +685,7 @@ public sealed partial class PreviewSession
             MeshSettings meshSettings = request.Mesh with { Forest = forest };
             foreach (ScoredCandidate finalist in finalists)
             {
+                cancellation.ThrowIfCancellationRequested();
                 CameraSpec camera = finalist.Candidate.Camera;
                 TerrainMesh mesh = _worlds.Mesh(MeshView.For(camera, fw, fh, radius), meshSettings);
                 var scene = new VistaScene(recipe, request.Seed, camera, world.Surface, mesh, sun, materials, air, groundAltitude)
@@ -640,7 +707,7 @@ public sealed partial class PreviewSession
                     Canopy = request.Canopy,
                 };
                 RenderOutput output = _renderer.Render(scene, settings, new HashSet<Aov> { Aov.Depth, Aov.Normal, Aov.MaterialId },
-                    new BatchPlanner(fw, fh, settings.SamplesPerPixel, settings.Batching));
+                    new BatchPlanner(fw, fh, settings.SamplesPerPixel, settings.Batching) { Feed = Stopping(cancellation) });
                 IncidentLight light = _renderer.MeasureIncidentLight(scene);
                 ExposureInfo exposure = IncidentMeter.Measure(light, scene.AirFrame(), Tables(materials, scene.Wavelengths()),
                     camera.ExposureEv + (request.MeterCompensationEv ?? IncidentMeter.DefaultCompensationEv));
@@ -668,6 +735,7 @@ public sealed partial class PreviewSession
             ScoredCandidate[] order = Composition.AutoCamera.Rank(rendered);
             for (int k = 0; k < order.Length; k++)
             {
+                cancellation.ThrowIfCancellationRequested();
                 if (!order[k].Feasible)
                     continue;
                 CameraSpec camera = order[k].Candidate.Camera;

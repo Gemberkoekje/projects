@@ -11,10 +11,14 @@ namespace Vista.World;
 /// line and altitude, vista-plan §10 M1.12b); the mesh follows the hierarchy, the
 /// camera's position, the frame's pixels per radian, the ground sphere and the mesh settings, never the camera's heading
 /// (<see cref="ViewMesher"/>). The same mesh instance also lets a renderer keep its acceleration structure. One world is kept,
-/// not several: a seed the session saw before comes back from the erosion cache on disk in about a second.
+/// not several: a seed the session saw before comes back from the erosion cache on disk in about a second. Since M1.16 the last
+/// <see cref="KeptMeshes"/> meshes are kept, not one: a window's preview and its final (or an estimate's preview and probe) take turns.
 /// </summary>
 public sealed class WorldCache
 {
+    /// <summary>The meshes kept: the preview's and the final's (vista-plan §10 M1.16).</summary>
+    public const int KeptMeshes = 2;
+
     private (TerrainProfile Profile, ulong Seed, WorldGrid Grid, bool Erode, bool CanErode)? _key;
     private Recipe? _recipe;
     private TerrainWorld? _world;
@@ -24,8 +28,8 @@ public sealed class WorldCache
     private HeightField? _far;
     private TerrainHierarchy? _hierarchy;
     private (bool Detail, bool Materials, ForestPlacement Forest)? _hierarchyKey;
-    private (MeshView View, MeshSettings Settings)? _meshKey;
-    private TerrainMesh? _mesh;
+    // The kept meshes, the most recently asked for first.
+    private readonly List<(MeshView View, MeshSettings Settings, TerrainMesh Mesh)> _meshes = [];
 
     /// <summary>
     /// The world for <paramref name="recipe"/> and <paramref name="seed"/> on <paramref name="grid"/> (<see cref="WorldBuilder"/>),
@@ -45,32 +49,41 @@ public sealed class WorldCache
         {
             _world = WorldBuilder.Build(recipe, seed, grid, eroder, cache, erode);
             (_key, _recipe) = (key, recipe);
-            (_materials, _forested, _hierarchy, _hierarchyKey, _meshKey, _mesh, _pools, _far) = (null, null, null, null, null, null, null, null);
+            (_materials, _forested, _hierarchy, _hierarchyKey, _pools, _far) = (null, null, null, null, null, null);
+            _meshes.Clear();
         }
         return _world!;
     }
 
-    /// <summary>The mesh of the cached world for <paramref name="view"/> under <paramref name="settings"/>; reused when the last one was built for the same.</summary>
+    /// <summary>The mesh of the cached world for <paramref name="view"/> under <paramref name="settings"/>; reused when a kept one was built for the same.</summary>
     public TerrainMesh Mesh(MeshView view, MeshSettings settings) => Mesh(view, settings, out _);
 
     /// <summary>
-    /// As <see cref="Mesh(MeshView, MeshSettings)"/>; <paramref name="reused"/> says whether it was the last one. The world must
-    /// have been asked for first.
+    /// As <see cref="Mesh(MeshView, MeshSettings)"/>; <paramref name="reused"/> says whether it was one of the last <see cref="KeptMeshes"/>.
+    /// The world must have been asked for first.
     /// </summary>
     public TerrainMesh Mesh(MeshView view, MeshSettings settings, out bool reused)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (_world is null || _key is null)
             throw new InvalidOperationException("Ask for the world before its mesh.");
-        reused = _mesh is not null && _meshKey == (view, settings);
+        int kept = _meshes.FindIndex(m => m.View == view && m.Settings == settings);
+        reused = kept >= 0;
         if (reused)
-            return _mesh!;
+        {
+            var hit = _meshes[kept];
+            _meshes.RemoveAt(kept);
+            _meshes.Insert(0, hit);
+            return hit.Mesh;
+        }
 
         double hierarchySeconds = 0.0;
         TerrainHierarchy hierarchy = Hierarchy(settings, ref hierarchySeconds);
         TerrainMesh mesh = ViewMesher.Build(hierarchy, view, settings);
         mesh.Info = mesh.Info with { HierarchySeconds = hierarchySeconds };
-        (_mesh, _meshKey) = (mesh, (view, settings));
+        _meshes.Insert(0, (view, settings, mesh));
+        if (_meshes.Count > KeptMeshes)
+            _meshes.RemoveAt(_meshes.Count - 1);
         return mesh;
     }
 

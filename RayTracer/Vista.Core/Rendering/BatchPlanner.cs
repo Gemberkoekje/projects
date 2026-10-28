@@ -154,15 +154,28 @@ public sealed class BatchPlanner
     public TimeSpan EstimatedRemaining =>
         TimeSpan.FromMilliseconds((PixelSamplesTotal - PixelSamplesCompleted) * CostNsPerPixelSample / 1e6);
 
+    /// <summary>
+    /// The feed of a render someone watches (vista-plan §10 M1.16): <see cref="Next"/> refuses a batch once it is cancelled, and the
+    /// renderer hands it the image after each pass; null for none.
+    /// </summary>
+    public TraceFeed? Feed { get; init; }
+
+    /// <summary>True when <paramref name="batch"/> is the last of its pass: once it is complete, every pixel has <see cref="SamplesCompleted"/>.</summary>
+    public bool EndsPass(SampleBatch batch) => batch.RowStart + batch.RowCount >= Height;
+
     /// <summary>Raised by <see cref="Next"/> with the batch it planned (a <see cref="TraceClock"/> starts its wall clock on the first).</summary>
     public event Action<SampleBatch>? Issued;
 
     /// <summary>Raised by <see cref="Complete"/> with the batch and its GPU time, once the planner has taken it in (vista-plan §10 M1.15's live ETA).</summary>
     public event Action<SampleBatch, TimeSpan>? Completed;
 
-    /// <summary>Plans the next dispatch. Throws when <see cref="HasNext"/> is false.</summary>
+    /// <summary>
+    /// Plans the next dispatch. Throws when <see cref="HasNext"/> is false, and <see cref="OperationCanceledException"/> once the
+    /// <see cref="Feed"/>'s cancellation is cancelled.
+    /// </summary>
     public SampleBatch Next()
     {
+        Feed?.Cancellation.ThrowIfCancellationRequested();
         if (!HasNext)
             throw new InvalidOperationException("Every batch has already been issued.");
 
