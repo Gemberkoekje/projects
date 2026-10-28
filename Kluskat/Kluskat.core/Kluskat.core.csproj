@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Kluskat.core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kluskat.test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Qowaiv" />
+    <PackageReference Include="Qowaiv.CodeGeneration.SingleValueObjects" PrivateAssets="All" />
+    <PackageReference Include="Qowaiv.DomainModel" />
+    <PackageReference Include="Qowaiv.Validation.Fluent" />
+  </ItemGroup>
+
+</Project>

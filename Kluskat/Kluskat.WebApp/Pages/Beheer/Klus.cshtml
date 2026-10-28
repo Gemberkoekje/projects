@@ -1,0 +1,56 @@
+@page "{id:guid}"
+@model Kluskat.WebApp.Pages.Beheer.KlusBeheerModel
+@using Kluskat.WebApp.Pages.Beheer
+@{
+    ViewData["Title"] = $"{Model.Klus.Naam} · Beheer · Kluskat";
+    ViewData["SchermKlasse"] = "breed";
+}
+
+<header class="kop">
+    <a class="tekstknop" asp-page="/Beheer/Index">← alle klussen</a>
+    <h1>@Model.Klus.Ruimte · @Model.Klus.Naam</h1>
+</header>
+
+@if (!string.IsNullOrEmpty(Model.Melding))
+{
+    <p class="melding" role="status">@Model.Melding</p>
+}
+@foreach (var fout in Model.Fouten)
+{
+    <p class="fout" role="alert">@fout</p>
+}
+
+<form method="post" asp-page-handler="Opslaan" asp-route-id="@Model.Klus.Id" class="kaart formulier">
+    <h2>Aanpassen</h2>
+    <label asp-for="Formulier.Ruimte">Waar</label>
+    <input asp-for="Formulier.Ruimte" />
+    <label asp-for="Formulier.Naam">Wat</label>
+    <input asp-for="Formulier.Naam" />
+    <label asp-for="Formulier.IntervalDagen">Om de hoeveel dagen</label>
+    <input asp-for="Formulier.IntervalDagen" type="number" min="1" max="3650" />
+    <label asp-for="Formulier.Grootte">Grootte</label>
+    <select asp-for="Formulier.Grootte">
+        @foreach (var grootte in Formulieren.Groottes)
+        {
+            <option value="@grootte" selected="@(Model.Formulier.Grootte == grootte)">@Weergave.GrootteWoord(grootte) (@Weergave.Grootte(grootte))</option>
+        }
+    </select>
+    <button type="submit" class="knop knop-hoofd">Opslaan</button>
+</form>
+
+<form method="post" asp-page-handler="GedaanOp" asp-route-id="@Model.Klus.Id" class="kaart formulier">
+    <h2>Zonder de app gedaan?</h2>
+    <p class="hint">Laatst gedaan: @Weergave.Datum(Model.Klus.LaatstGedaan)</p>
+    <label for="datum">Gedaan op</label>
+    <input id="datum" name="datum" type="date" value="@Kalender.Datum(Qowaiv.Clock.UtcNow()).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+    <button type="submit" class="knop knop-zacht">Bijwerken</button>
+</form>
+
+<form method="post" asp-page-handler="Schrappen" asp-route-id="@Model.Klus.Id" class="kaart formulier gevaar"
+      onsubmit="return confirm('Deze klus schrappen?');">
+    <input type="hidden" asp-for="Formulier.Ruimte" />
+    <input type="hidden" asp-for="Formulier.Naam" />
+    <h2>Schrappen</h2>
+    <p class="hint">De klus verdwijnt van de lijst. Wat je ermee gedaan hebt, blijft bewaard.</p>
+    <button type="submit" class="knop knop-gevaar">Schrappen</button>
+</form>

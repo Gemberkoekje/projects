@@ -1,0 +1,90 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Kluskat";
+    var keuze = Model.Keuze;
+}
+
+@if (!string.IsNullOrEmpty(Model.Melding))
+{
+    <p class="melding" role="status">@Model.Melding</p>
+}
+
+@if (keuze.Uitkomst == KeuzeUitkomst.Klus)
+{
+    var klus = keuze.Klus;
+
+    <div class="kat-plek">
+        <p class="tekstballon">@Model.Aanmoediging</p>
+        @KatSprite.Html(KatHouding.Zit)
+    </div>
+
+    <section class="kaart klus">
+        <p class="ruimte">@klus.Ruimte</p>
+        <h1 class="klusnaam">@klus.Naam</h1>
+        <p class="chips">
+            <span class="chip @Weergave.GrootteKlasse(klus.Grootte)">@Weergave.Grootte(klus.Grootte)</span>
+            @if (keuze.Vooruit)
+            {
+                <span class="chip chip-vooruit">vooruitwerken</span>
+            }
+        </p>
+    </section>
+
+    <div class="knoppen">
+        <form method="post" asp-page-handler="Gedaan" asp-route-id="@klus.Id">
+            <button type="submit" class="knop knop-hoofd">Gedaan!</button>
+        </form>
+        <div class="knoppen-rij">
+            <form method="post" asp-page-handler="GeenZin" asp-route-id="@klus.Id">
+                <button type="submit" class="knop knop-zacht">Geen zin</button>
+            </form>
+            <form method="post" asp-page-handler="GeenTijd" asp-route-id="@klus.Id">
+                <button type="submit" class="knop knop-zacht">Geen tijd</button>
+            </form>
+        </div>
+        @if (keuze.KleinGehouden)
+        {
+            <p class="hint">Je had geen tijd, dus je krijgt even alleen kleinere klussen.</p>
+        }
+    </div>
+}
+else if (keuze.Uitkomst == KeuzeUitkomst.AllesOvergeslagen)
+{
+    <div class="kat-plek">
+        <p class="tekstballon">Ook goed.</p>
+        @KatSprite.Html(KatHouding.Zit)
+    </div>
+
+    <section class="kaart leeg">
+        <h1>Dat was het voor nu</h1>
+        <p>Wat je hebt overgeslagen, komt over een paar uur vanzelf terug.</p>
+    </section>
+
+    <div class="knoppen">
+        <a class="knop knop-hoofd" asp-page="/Klaar">Klaar voor nu</a>
+        <form method="post" asp-page-handler="Vrijgeven">
+            <button type="submit" class="tekstknop">Laat ze nu toch zien</button>
+        </form>
+    </div>
+}
+else
+{
+    <div class="kat-plek">
+        <span class="zzz" aria-hidden="true">z<span>z</span><span>z</span></span>
+        @KatSprite.Html(KatHouding.Slaap)
+    </div>
+
+    <section class="kaart leeg">
+        <h1>Niks dat op je wacht</h1>
+        <p>De kat is tevreden. Jij mag ook tevreden zijn.</p>
+    </section>
+
+    <div class="knoppen">
+        <a class="tekstknop" asp-page="/Index" asp-route-vooruit="true">Toch iets doen?</a>
+    </div>
+}
+
+<footer class="voet">
+    <a asp-page="/Beheer/Index">beheer</a>
+</footer>

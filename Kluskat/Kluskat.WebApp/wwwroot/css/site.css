@@ -1,0 +1,545 @@
+/* Kluskat: one warm, calm column. Chunky "pressable" buttons, a pixel cat, nothing that counts
+   what is left. Colours are tokens so dark mode is one block below. */
+
+:root {
+    --bg: #fbf4ea;
+    --kaart: #fffdf9;
+    --rand: #ecdcc8;
+    --tekst: #3a2a20;
+    --zacht: #8b7565;
+    --hoofd: #2f9e74;
+    --hoofd-tekst: #ffffff;
+    --hoofd-rand: #237a59;
+    --knop: #f4e7d7;
+    --knop-tekst: #3a2a20;
+    --knop-rand: #dcc7ae;
+    --gevaar: #c4543d;
+    --gevaar-rand: #93392a;
+    --ballon: #ffffff;
+    --schaduw: #eadbc6;
+    --chip-klein: #dcf2e6;
+    --chip-klein-tekst: #1f6a4b;
+    --chip-middel: #fcefd2;
+    --chip-middel-tekst: #85570e;
+    --chip-groot: #fbe0da;
+    --chip-groot-tekst: #973a29;
+    --chip-vooruit: #e6e4fb;
+    --chip-vooruit-tekst: #463d9e;
+    --melding: #e9f5ee;
+    --melding-tekst: #1f6a4b;
+    --fout: #c4543d;
+    --rond: 18px;
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #1c1713;
+        --kaart: #29211b;
+        --rand: #3e3229;
+        --tekst: #f4e9dd;
+        --zacht: #b9a493;
+        --hoofd: #34a97d;
+        --hoofd-tekst: #0f2a1f;
+        --hoofd-rand: #1f6b4f;
+        --knop: #3a2f27;
+        --knop-tekst: #f4e9dd;
+        --knop-rand: #261e18;
+        --ballon: #342a23;
+        --schaduw: #120e0b;
+        --chip-klein: #1d3a2d;
+        --chip-klein-tekst: #9fe0bf;
+        --chip-middel: #3d3016;
+        --chip-middel-tekst: #f3cf86;
+        --chip-groot: #432520;
+        --chip-groot-tekst: #f4b2a4;
+        --chip-vooruit: #2c2950;
+        --chip-vooruit-tekst: #c4bff5;
+        --melding: #1d3a2d;
+        --melding-tekst: #9fe0bf;
+        --fout: #f08f7b;
+        color-scheme: dark;
+    }
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--tekst);
+    font-family: "Nunito", ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.45;
+    display: flex;
+    justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+.scherm {
+    width: 100%;
+    max-width: 420px;
+    min-height: calc(100dvh - 32px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 18px;
+}
+
+.scherm.breed {
+    max-width: 560px;
+    justify-content: flex-start;
+}
+
+h1,
+h2,
+h3 {
+    margin: 0;
+    line-height: 1.2;
+}
+
+a {
+    color: inherit;
+}
+
+/* ---- The cat ---------------------------------------------------------------------------- */
+
+.kat-plek {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.kat {
+    width: 156px;
+    height: auto;
+    display: block;
+    image-rendering: pixelated;
+}
+
+.kat-schaduw {
+    fill: var(--schaduw);
+}
+
+.kat-knipper {
+    opacity: 0;
+    animation: knipper 5.5s steps(1, end) infinite;
+}
+
+@keyframes knipper {
+    0%, 93% { opacity: 0; }
+    94%, 96% { opacity: 1; }
+    97%, 100% { opacity: 0; }
+}
+
+.kat-blij .kat-lijf {
+    animation: hop 0.5s steps(2, jump-none) 4;
+}
+
+@keyframes hop {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+    100% { transform: translateY(0); }
+}
+
+.kat-slaap .kat-lijf {
+    transform-origin: 50% 100%;
+    transform-box: fill-box;
+    animation: adem 3.2s steps(2, jump-none) infinite;
+}
+
+@keyframes adem {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.97); }
+}
+
+.zzz {
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 104px);
+    font-weight: 900;
+    color: var(--zacht);
+    font-size: 15px;
+    letter-spacing: 2px;
+    animation: zweef 3.2s ease-in-out infinite;
+}
+
+.zzz span:nth-child(1) { font-size: 19px; }
+.zzz span:nth-child(2) { font-size: 23px; }
+
+@keyframes zweef {
+    0%, 100% { transform: translateY(0); opacity: 0.6; }
+    50% { transform: translateY(-6px); opacity: 1; }
+}
+
+.tekstballon {
+    position: relative;
+    margin: 0;
+    padding: 8px 16px;
+    background: var(--ballon);
+    border: 2px solid var(--rand);
+    border-radius: 14px;
+    font-weight: 800;
+    font-size: 16px;
+}
+
+.tekstballon::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -9px;
+    width: 12px;
+    height: 12px;
+    background: var(--ballon);
+    border-right: 2px solid var(--rand);
+    border-bottom: 2px solid var(--rand);
+    transform: translateX(-50%) rotate(45deg);
+}
+
+/* ---- Cards ------------------------------------------------------------------------------- */
+
+.kaart {
+    background: var(--kaart);
+    border: 2px solid var(--rand);
+    border-radius: var(--rond);
+    box-shadow: 0 4px 0 var(--rand);
+    padding: 22px;
+}
+
+.klus,
+.leeg,
+.winst {
+    text-align: center;
+}
+
+.ruimte {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--zacht);
+}
+
+.klusnaam {
+    margin: 6px 0 14px;
+    font-size: 28px;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+}
+
+.winst .klusnaam {
+    margin: 4px 0 2px;
+    font-size: 22px;
+}
+
+.leeg h1 {
+    font-size: 24px;
+    font-weight: 900;
+    margin-bottom: 6px;
+}
+
+.leeg p {
+    margin: 0;
+    color: var(--zacht);
+}
+
+.chips {
+    margin: 0;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.chip {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.chip-klein { background: var(--chip-klein); color: var(--chip-klein-tekst); }
+.chip-middel { background: var(--chip-middel); color: var(--chip-middel-tekst); }
+.chip-groot { background: var(--chip-groot); color: var(--chip-groot-tekst); }
+.chip-vooruit { background: var(--chip-vooruit); color: var(--chip-vooruit-tekst); }
+
+.vinkje {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 6px;
+    border-radius: 50%;
+    background: var(--hoofd);
+    position: relative;
+}
+
+.vinkje::after {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 9px;
+    width: 10px;
+    height: 19px;
+    border-right: 5px solid var(--hoofd-tekst);
+    border-bottom: 5px solid var(--hoofd-tekst);
+    transform: rotate(45deg);
+}
+
+.week {
+    margin: 14px 0 0;
+    color: var(--zacht);
+}
+
+.week strong {
+    color: var(--tekst);
+}
+
+/* ---- Buttons ----------------------------------------------------------------------------- */
+
+.knoppen {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+}
+
+.knoppen form {
+    margin: 0;
+}
+
+.knoppen-rij {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.knop {
+    display: block;
+    width: 100%;
+    padding: 15px 16px;
+    border: 0;
+    border-radius: 16px;
+    font: inherit;
+    font-size: 18px;
+    font-weight: 900;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 60ms ease, box-shadow 60ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.knop:active {
+    transform: translateY(3px);
+}
+
+.knop-hoofd {
+    background: var(--hoofd);
+    color: var(--hoofd-tekst);
+    box-shadow: 0 5px 0 var(--hoofd-rand);
+    font-size: 20px;
+}
+
+.knop-hoofd:active {
+    box-shadow: 0 2px 0 var(--hoofd-rand);
+}
+
+.knop-zacht {
+    background: var(--knop);
+    color: var(--knop-tekst);
+    box-shadow: 0 4px 0 var(--knop-rand);
+}
+
+.knop-zacht:active {
+    box-shadow: 0 1px 0 var(--knop-rand);
+}
+
+.knop-gevaar {
+    background: var(--gevaar);
+    color: #ffffff;
+    box-shadow: 0 4px 0 var(--gevaar-rand);
+}
+
+.knop:focus-visible,
+.tekstknop:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 3px solid var(--hoofd);
+    outline-offset: 3px;
+}
+
+.tekstknop {
+    display: block;
+    margin: 0 auto;
+    padding: 8px;
+    background: none;
+    border: 0;
+    font: inherit;
+    font-size: 15px;
+    color: var(--zacht);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.hint {
+    margin: 0;
+    font-size: 14px;
+    color: var(--zacht);
+    text-align: center;
+}
+
+.voet {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.voet a,
+.voet .tekstknop {
+    color: var(--zacht);
+    font-size: 13px;
+}
+
+.melding {
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--melding);
+    color: var(--melding-tekst);
+    font-weight: 700;
+    text-align: center;
+}
+
+.fout {
+    margin: 0;
+    color: var(--fout);
+    font-weight: 700;
+}
+
+/* ---- Forms (sign-in, beheer) -------------------------------------------------------------- */
+
+.aanmelden,
+.formulier {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.formulier h2 {
+    font-size: 19px;
+    margin-bottom: 4px;
+}
+
+label {
+    font-weight: 800;
+    font-size: 15px;
+}
+
+label small {
+    font-weight: 600;
+    color: var(--zacht);
+}
+
+input,
+select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid var(--rand);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--tekst);
+    font: inherit;
+}
+
+.formulier .knop,
+.aanmelden .knop {
+    margin-top: 10px;
+}
+
+.gevaar {
+    border-color: var(--rand);
+}
+
+.kop {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.kop .tekstknop {
+    margin: 0;
+    padding: 0;
+    text-align: left;
+}
+
+.kop h1 {
+    font-size: 26px;
+    font-weight: 900;
+}
+
+.kaart h3 {
+    margin: 16px 0 6px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--zacht);
+}
+
+.lijst {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.lijst a {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--rand);
+    text-decoration: none;
+}
+
+.lijst small {
+    color: var(--zacht);
+    white-space: nowrap;
+}
+
+/* ---- Confetti (feest.js) ----------------------------------------------------------------- */
+
+.confetti {
+    position: fixed;
+    top: -12px;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+    animation: val var(--duur, 1.8s) cubic-bezier(0.3, 0.6, 0.5, 1) forwards;
+}
+
+@keyframes val {
+    to { transform: translate(var(--drift, 0), 105vh) rotate(var(--draai, 360deg)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kat-knipper,
+    .kat-lijf,
+    .zzz {
+        animation: none !important;
+    }
+}

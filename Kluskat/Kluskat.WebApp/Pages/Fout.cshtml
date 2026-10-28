@@ -1,0 +1,19 @@
+@page
+@model FoutModel
+@{
+    ViewData["Title"] = "Oeps · Kluskat";
+}
+
+<div class="kat-plek">
+    <p class="tekstballon">Miauw?</p>
+    @KatSprite.Html(KatHouding.Zit)
+</div>
+
+<section class="kaart leeg">
+    <h1>Er ging iets mis</h1>
+    <p>De kat heeft er een bolletje wol van gemaakt. Probeer het zo nog eens.</p>
+</section>
+
+<div class="knoppen">
+    <a class="knop knop-zacht" href="~/">Terug</a>
+</div>

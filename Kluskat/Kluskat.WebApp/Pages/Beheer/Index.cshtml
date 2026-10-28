@@ -1,0 +1,64 @@
+@page
+@model Kluskat.WebApp.Pages.Beheer.BeheerModel
+@using Kluskat.WebApp.Pages.Beheer
+@{
+    ViewData["Title"] = "Beheer · Kluskat";
+    ViewData["SchermKlasse"] = "breed";
+}
+
+<header class="kop">
+    <a class="tekstknop" asp-page="/Index">← terug naar de kat</a>
+    <h1>Beheer</h1>
+</header>
+
+@if (!string.IsNullOrEmpty(Model.Melding))
+{
+    <p class="melding" role="status">@Model.Melding</p>
+}
+
+<section class="kaart">
+    <h2>Klussen</h2>
+    @foreach (var ruimte in Model.Klussen.GroupBy(k => k.Ruimte))
+    {
+        <h3>@ruimte.Key</h3>
+        <ul class="lijst">
+            @foreach (var klus in ruimte)
+            {
+                <li>
+                    <a asp-page="/Beheer/Klus" asp-route-id="@klus.Id">
+                        <span>@klus.Naam</span>
+                        <small>elke @klus.IntervalDagen dagen · @Weergave.GrootteWoord(klus.Grootte)</small>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<form method="post" class="kaart formulier">
+    <h2>Klus toevoegen</h2>
+    @foreach (var fout in Model.Fouten)
+    {
+        <p class="fout" role="alert">@fout</p>
+    }
+    <label asp-for="Nieuw.Ruimte">Waar</label>
+    <input asp-for="Nieuw.Ruimte" placeholder="Keuken" />
+    <label asp-for="Nieuw.Naam">Wat</label>
+    <input asp-for="Nieuw.Naam" placeholder="Stofzuigen" />
+    <label asp-for="Nieuw.IntervalDagen">Om de hoeveel dagen</label>
+    <input asp-for="Nieuw.IntervalDagen" type="number" min="1" max="3650" />
+    <label asp-for="Nieuw.Grootte">Grootte</label>
+    <select asp-for="Nieuw.Grootte">
+        @foreach (var grootte in Formulieren.Groottes)
+        {
+            <option value="@grootte" selected="@(Model.Nieuw.Grootte == grootte)">@Weergave.GrootteWoord(grootte) (@Weergave.Grootte(grootte))</option>
+        }
+    </select>
+    <label for="laatstGedaanOp">Laatst gedaan <small>(leeg = meteen aan de beurt)</small></label>
+    <input id="laatstGedaanOp" name="LaatstGedaanOp" type="date" value="@Model.LaatstGedaanOp" />
+    <button type="submit" class="knop knop-hoofd">Toevoegen</button>
+</form>
+
+<form method="post" asp-page="/Aanmelden" asp-page-handler="Afmelden" class="voet">
+    <button type="submit" class="tekstknop">afmelden op dit apparaat</button>
+</form>

@@ -1,0 +1,47 @@
+# Local development and a stand-alone run. Production runs on the gembernodes k3s cluster (see
+# DEPLOY.md), against the cluster's shared PostgreSQL; this file is for your own machine.
+#
+#   docker compose up -d postgres     # just the database, then `dotnet run` the WebApp
+#   docker compose up -d --build      # everything in containers (needs a published app, see Dockerfile)
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: kluskat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kluskat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-kluskat}
+      TZ: Europe/Amsterdam
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Loopback only, on 5434 so it does not clash with plotboek (5432) or werkplaats (5433).
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kluskat} -d ${POSTGRES_DB:-kluskat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  webapp:
+    image: ghcr.io/gemberkoekje/kluskat:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kluskat-webapp
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${WEBAPP_PORT:-8082}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      TZ: Europe/Amsterdam
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-kluskat};Username=${POSTGRES_USER:-kluskat};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+      Auth__Password: ${KLUSKAT_PASSWORD:?Set KLUSKAT_PASSWORD in .env}
+
+volumes:
+  postgres_data:

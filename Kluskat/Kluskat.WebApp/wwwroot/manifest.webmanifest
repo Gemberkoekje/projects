@@ -1,0 +1,18 @@
+{
+  "name": "Kluskat",
+  "short_name": "Kluskat",
+  "description": "Eén klusje tegelijk.",
+  "lang": "nl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbf4ea",
+  "theme_color": "#f2a65a",
+  "icons": [
+    { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/img/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

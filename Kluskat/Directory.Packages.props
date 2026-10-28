@@ -1,0 +1,37 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="AsyncFixer" Version="2.1.0" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
+    <PackageVersion Include="AwesomeAssertions.Analyzers" Version="9.0.8" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="DotNetProjectFile.Analyzers" Version="1.15.2" />
+    <PackageVersion Include="IDisposableAnalyzers" Version="4.0.8" />
+    <PackageVersion Include="Marten" Version="9.14.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.6.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.302" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
+    <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
+    <PackageVersion Include="NUnit" Version="4.6.1" />
+    <PackageVersion Include="NUnit.Analyzers" Version="4.14.0" />
+    <PackageVersion Include="NUnit3TestAdapter" Version="6.2.0" />
+    <PackageVersion Include="Qowaiv" Version="8.0.0" />
+    <PackageVersion Include="Qowaiv.Analyzers.CSharp" Version="2.5.1" />
+    <PackageVersion Include="Qowaiv.CodeGeneration.SingleValueObjects" Version="1.1.5" />
+    <PackageVersion Include="Qowaiv.Diagnostics.Contracts" Version="2.0.6" />
+    <PackageVersion Include="Qowaiv.DomainModel" Version="3.0.0" />
+    <PackageVersion Include="Qowaiv.Validation.Abstractions" Version="2.1.0" />
+    <PackageVersion Include="Qowaiv.Validation.Fluent" Version="4.1.0" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.30.0.144632" />
+    <PackageVersion Include="StyleCop.Analyzers" Version="1.1.118" />
+  </ItemGroup>
+
+</Project>

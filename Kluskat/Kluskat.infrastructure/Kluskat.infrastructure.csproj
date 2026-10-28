@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Kluskat.infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kluskat.test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- For IXmlRepository: the data-protection key ring lives in PostgreSQL next to everything else. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Marten" />
+    <PackageReference Include="Qowaiv" />
+    <PackageReference Include="Qowaiv.DomainModel" />
+    <PackageReference Include="Qowaiv.Validation.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Services/startvulling.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Kluskat.application/Kluskat.application.csproj" />
+    <ProjectReference Include="../Kluskat.core/Kluskat.core.csproj" />
+  </ItemGroup>
+
+</Project>

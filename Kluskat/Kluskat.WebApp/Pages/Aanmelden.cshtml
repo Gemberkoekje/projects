@@ -1,0 +1,20 @@
+@page
+@model AanmeldenModel
+@{
+    ViewData["Title"] = "Aanmelden · Kluskat";
+}
+
+<div class="kat-plek">
+    <p class="tekstballon">Wie ben jij?</p>
+    @KatSprite.Html(KatHouding.Zit)
+</div>
+
+<form method="post" class="kaart aanmelden">
+    <label for="wachtwoord">Wachtwoord</label>
+    <input id="wachtwoord" type="password" asp-for="Wachtwoord" autocomplete="current-password" autofocus required />
+    @if (!string.IsNullOrEmpty(Model.Fout))
+    {
+        <p class="fout" role="alert">@Model.Fout</p>
+    }
+    <button type="submit" class="knop knop-hoofd">Binnenkomen</button>
+</form>

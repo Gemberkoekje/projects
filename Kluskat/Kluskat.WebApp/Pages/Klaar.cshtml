@@ -1,0 +1,19 @@
+@page
+@model KlaarModel
+@{
+    ViewData["Title"] = "Tot later · Kluskat";
+}
+
+<div class="kat-plek">
+    <span class="zzz" aria-hidden="true">z<span>z</span><span>z</span></span>
+    @KatSprite.Html(KatHouding.Slaap)
+</div>
+
+<section class="kaart leeg">
+    <h1>Goed gedaan</h1>
+    <p>Tot later. De kat houdt de boel in de gaten.</p>
+</section>
+
+<div class="knoppen">
+    <a class="tekstknop" asp-page="/Index">Toch nog eentje</a>
+</div>

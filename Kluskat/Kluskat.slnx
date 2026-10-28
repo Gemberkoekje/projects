@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".globalconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="Dockerfile" />
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="Kluskat.core/Kluskat.core.csproj" />
+  <Project Path="Kluskat.application/Kluskat.application.csproj" />
+  <Project Path="Kluskat.infrastructure/Kluskat.infrastructure.csproj" />
+  <Project Path="Kluskat.WebApp/Kluskat.WebApp.csproj" />
+  <Project Path="Kluskat.test/Kluskat.test.csproj" />
+</Solution>

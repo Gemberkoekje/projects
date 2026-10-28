@@ -1,0 +1,33 @@
+@page "{id:guid}"
+@model GedaanModel
+@{
+    ViewData["Title"] = "Gedaan! · Kluskat";
+    var klus = Model.Overwinning.Klus;
+}
+
+<div class="kat-plek" data-feest>
+    <p class="tekstballon">@Model.Juich</p>
+    @KatSprite.Html(KatHouding.Blij)
+</div>
+
+<section class="kaart winst">
+    <p class="vinkje" aria-hidden="true"></p>
+    <h1 class="klusnaam">@klus.Naam</h1>
+    <p class="ruimte">@klus.Ruimte</p>
+    <p class="week">Deze week: <strong>@Weergave.Klusjes(Model.Overwinning.AantalDezeWeek)</strong></p>
+</section>
+
+<div class="knoppen">
+    <a class="knop knop-hoofd" asp-page="/Index">Nog eentje</a>
+    <a class="knop knop-zacht" asp-page="/Klaar">Klaar voor nu</a>
+    @if (klus.KanTerugdraaien)
+    {
+        <form method="post" asp-page-handler="Terugdraaien" asp-route-id="@klus.Id">
+            <button type="submit" class="tekstknop">Oeps, niet gedaan</button>
+        </form>
+    }
+</div>
+
+@section Scripts {
+    <script src="~/js/feest.js" asp-append-version="true"></script>
+}
