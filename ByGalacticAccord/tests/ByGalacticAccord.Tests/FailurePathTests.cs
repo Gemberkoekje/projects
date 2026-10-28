@@ -357,6 +357,30 @@ public sealed class FailurePathTests
     }
 
     [Fact]
+    public void A_trader_whose_haul_goes_untaken_sends_its_own_ship_only_if_the_goods_fit()
+    {
+        // Sable Vance flies a Fast Courier (45 units). It sells 100 food from its storage at Halcyon, delivered to Meridian, and
+        // its haul is withdrawn untaken. Its own ship can't carry the lot, so it posts the haul again rather than overload the hold.
+        SimulationContext context = TestWorld.Quiet();
+        ActorState sable = context.Actor("Sable Vance");
+        LocationId halcyon = context.Place("Halcyon Refinery").Id;
+        context.PutInStorage(sable, halcyon, context.TakeFromStock(context.Actor("Verdant Agricombine"), GoodType.Food, 100m, reserved: false));
+        SaleContract wanted = context.PostWanted(context.Actor("Meridian Habs"), GoodType.Food, 100m, 1500m, hours: 240);
+        Assert.Equal(
+            Signing.Signed,
+            Market.FillViaHaul(context, sable, wanted, wanted.OfferedPrice, FillSource.FromStorage(halcyon), Credits.Of(5m), Credits.Of(5m), out HaulContract? haul));
+        Market.Withdraw(context, haul!);
+        Ship courier = context.ShipOf(sable);
+        Assert.True(courier.IsFree && courier.CargoCapacity < wanted.Quantity);
+
+        DecisionEngine.RunTrader(context, sable);
+
+        Assert.True(courier.IsFree);
+        Assert.Contains(context.LiveContractsOf(sable.Id), c => c is HaulContract { IsOpen: true } h && h.Serves == wanted.Id);
+        context.AssertSound();
+    }
+
+    [Fact]
     public void The_player_walks_away_from_a_haul_and_pays_the_break_fee_from_its_bond()
     {
         SimulationContext context = TestWorld.Quiet(withPlayer: true);

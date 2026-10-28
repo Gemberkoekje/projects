@@ -199,7 +199,7 @@ public static partial class DecisionEngine
 
     /// <summary>
     /// Sellers whose signed delivered Sale has goods set aside away from the place and nothing moving them (its haul
-    /// expired unsigned) arrange transport again: their own free ship, or a new haul, while a carrier near the goods
+    /// expired unsigned) arrange transport again: their own free ship if one can carry the goods, or a new haul, while a carrier near the goods
     /// could still make it before the sale's grace runs out. Once none could, the seller walks away
     /// (<see cref="WouldWalkAway"/>) rather than wait to be cancelled for default.
     /// </summary>
@@ -232,7 +232,10 @@ public static partial class DecisionEngine
                 continue;
             }
 
-            Ship? ship = from.Kind == HoldingKind.Storage ? seller.Ships.Select(context.Ship).FirstOrDefault(s => s.IsFree) : null;
+            // Its own free ship, if one can carry the goods; else a haul.
+            Ship? ship = from.Kind == HoldingKind.Storage
+                ? seller.Ships.Select(context.Ship).FirstOrDefault(s => s.IsFree && s.CargoCapacity >= sale.Quantity)
+                : null;
             if (ship is not null && context.FindPath(ship.Location, from.Location) is not null)
             {
                 Market.Dispatch(context, ship, new ShipJob(seller.Id, sale.Good, sale.Quantity, from.Location, PickupSource.Storage, sale.Place, Delivery: sale.Id));
