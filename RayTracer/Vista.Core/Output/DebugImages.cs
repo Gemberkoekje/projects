@@ -253,6 +253,45 @@ public static class DebugImages
     }
 
     /// <summary>
+    /// A grey hillshade of <paramref name="cells"/>² samples of <paramref name="field"/> around world (<paramref name="x"/>,
+    /// <paramref name="z"/>), north up, each sample <paramref name="scale"/> pixels a side (vista-plan §10 M1a.1): the grid's own
+    /// relief, cell by cell, under <see cref="HeightMap"/>'s light from the north-west, with no tint by height so the cells' pattern
+    /// shows. Samples off the grid are black.
+    /// </summary>
+    public static (byte[] Rgb, int Size) ReliefCrop(HeightField field, double x, double z, int cells, int scale)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentOutOfRangeException.ThrowIfLessThan(cells, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(scale, 1);
+        int size = cells * scale;
+        int i0 = (int)Math.Round((x - field.OriginX) / field.CellSize) - cells / 2;
+        int j0 = (int)Math.Round((z - field.OriginZ) / field.CellSize) - cells / 2;
+        var bytes = new byte[size * size * 3];
+        for (int r = 0; r < cells; r++)
+        {
+            int j = j0 + cells - 1 - r; // north (high j) at the top
+            for (int c = 0; c < cells; c++)
+            {
+                int i = i0 + c;
+                byte v = 0;
+                if (i >= 1 && j >= 1 && i < field.Size - 1 && j < field.Size - 1)
+                {
+                    double dhdx = (field[i + 1, j] - field[i - 1, j]) / (2.0 * field.CellSize);
+                    double dhdz = (field[i, j + 1] - field[i, j - 1]) / (2.0 * field.CellSize);
+                    double shade = Math.Clamp((dhdx * 0.577 - dhdz * 0.577 + 0.577) / Math.Sqrt(dhdx * dhdx + 1.0 + dhdz * dhdz), 0.0, 1.0);
+                    v = (byte)Math.Round(255.0 * (0.25 + 0.75 * shade));
+                }
+                for (int dy = 0; dy < scale; dy++)
+                {
+                    for (int dx = 0; dx < scale; dx++)
+                        Put(bytes, (r * scale + dy) * size + c * scale + dx, (v, v, v));
+                }
+            }
+        }
+        return (bytes, size);
+    }
+
+    /// <summary>
     /// The erosion maps over a grey hillshade of the eroded surface, top-down with north up like <see cref="HeightMap"/>: loose
     /// material in tan (full at 30 m and more, on a log scale), the mean discharge in blue where it is in the grid's top tenth (log
     /// scale from the 90th percentile, none, to the 99.9th, full: the channel network), water still standing at the end deeper than 0.5 m in dark blue. At most <paramref name="maxSize"/> pixels a

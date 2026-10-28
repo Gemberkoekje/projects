@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using Vista.Composition;
 using Vista.Output;
 using Vista.Recipes;
 using Vista.Scene;
@@ -22,6 +23,9 @@ namespace Vista.App.Gpu;
 /// </code>
 /// <c>--sight-lines</c> first measures what each camera sees on the base terrain of each grid's extent (<see cref="SightLines"/>):
 /// how much is terrain, sky, or beyond the grid, and how far the terrain is, and stops there unless <c>--seeds</c> is given too.
+/// Since M1a.1 it reports the grid's own patterns (<see cref="GridArtefacts"/>) of the base, the incised and the eroded world, and
+/// <c>--crops-camera c.json --crops x,y;x,y</c> writes top-down crops of each around the ground that pixel (x, y) of the camera's
+/// 3840×2160 frame sees, <c>--crop-cells</c> samples a side (default 96), with that ground's distance and patterns.
 /// </summary>
 internal static class ErosionMeasure
 {
@@ -32,7 +36,20 @@ internal static class ErosionMeasure
     public const string Usage =
         "       Vista.App --erosion-measure [--recipe r.json] [--seeds 42,43] [--grid 4097x8] [--set Name=value ...] [--parity] [--incise-only]\n" +
         "                 [--out dir] [--sight-lines c1.json,c2.json [--sight-grids 1025x16,1025x32]]\n" +
-        "                 (erosion on the GPU: time, memory, drainage, top-down maps; what cameras see on each grid extent)";
+        "                 [--crops-camera c.json --crops x,y;x,y [--crop-cells 96]]\n" +
+        "                 (erosion on the GPU: time, memory, drainage, the grid's patterns, top-down maps and crops; what cameras see on each grid extent)";
+
+    /// <summary>The frame the crops' pixels are on: the final frame's (vista-plan §10 M1.14).</summary>
+    private const int CropFrameWidth = 3840, CropFrameHeight = 2160;
+
+    /// <summary>Each crop sample's side in pixels.</summary>
+    private const int CropScale = 4;
+
+    /// <summary>The slope from which a face counts as steep in the grid's patterns, degrees.</summary>
+    private const double SteepDegrees = 30.0;
+
+    /// <summary>The loose material from which ground counts as loose in the grid's patterns, metres.</summary>
+    private const float LooseMetres = 0.5f;
 
     /// <summary>Runs the measurement; returns 0, or 1 for bad arguments or a failed parity check.</summary>
     public static int Run(IReadOnlyList<string> args, TextWriter log)
@@ -44,6 +61,9 @@ internal static class ErosionMeasure
         var overrides = new List<string>();
         bool parity = false, inciseOnly = false;
         List<string>? sightLines = null;
+        string? cropsCamera = null;
+        var crops = new List<(double X, double Y)>();
+        int cropCells = 96;
         var sightGrids = new List<WorldGrid> { new(1025, 16.0), new(1025, 32.0) };
         for (int i = 1; i < args.Count; i++)
         {
@@ -56,6 +76,12 @@ internal static class ErosionMeasure
                 case "--parity": parity = true; break;
                 case "--incise-only": inciseOnly = true; break;
                 case "--sight-lines": sightLines = Next().Split(',').ToList(); break;
+                case "--crops-camera": cropsCamera = Next(); break;
+                case "--crop-cells": cropCells = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--crops":
+                    crops = Next().Split(';', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Split(','))
+                        .Select(p => (double.Parse(p[0], CultureInfo.InvariantCulture), double.Parse(p[1], CultureInfo.InvariantCulture))).ToList();
+                    break;
                 case "--sight-grids":
                     sightGrids = Next().Split(',').Select(g => g.Split('x')).Select(p => new WorldGrid(int.Parse(p[0], CultureInfo.InvariantCulture), double.Parse(p[1], CultureInfo.InvariantCulture))).ToList();
                     break;
@@ -75,6 +101,12 @@ internal static class ErosionMeasure
                     log.WriteLine(Usage);
                     return 1;
             }
+        }
+        if ((cropsCamera is null) != (crops.Count == 0) || (crops.Count > 0 && outDir is null) || cropCells < 8)
+        {
+            log.WriteLine("--crops-camera and --crops go together, need --out, and --crop-cells must be at least 8.");
+            log.WriteLine(Usage);
+            return 1;
         }
         Recipe recipe = recipePath is null ? new Recipe { SetPieces = [SetPiece.AlpineRange] } : VistaJson.ParseRecipe(File.ReadAllText(recipePath));
         ErosionSettings settings = ErosionSettings.For(TerrainProfile.For(recipe.SetPieces));
@@ -200,6 +232,15 @@ internal static class ErosionMeasure
                 log.WriteLine("  " + Describe("eroded", DrainageStats.Measure(r.Drainage, threshold)));
             }
             log.WriteLine("  " + Describe("base  ", ReliefStats.Measure(ground)));
+            // M1a.1: the grid's own patterns, stage by stage (the base terrain, the incision, the pipe-model passes), on the whole grid,
+            // its steep faces and, eroded, its loose ground.
+            log.WriteLine("  " + Describe("base   ", GridArtefacts.Measure(ground), GridArtefacts.Measure(ground, Steep(ground)), null));
+            if (!ReferenceEquals(incised, ground))
+                log.WriteLine("  " + Describe("incised", GridArtefacts.Measure(incised), GridArtefacts.Measure(incised, Steep(incised)), null));
+            log.WriteLine("  " + Describe("eroded ", GridArtefacts.Measure(r.Surface), GridArtefacts.Measure(r.Surface, Steep(r.Surface)),
+                GridArtefacts.Measure(r.Surface, c => r.Loose[c] >= LooseMetres)));
+            if (cropsCamera is not null)
+                Crops(VistaJson.ParseCamera(File.ReadAllText(cropsCamera)), crops, cropCells, seed, ground, incised, r.Surface, outDir!, log);
             // The eroded slopes against each cell's own rock talus angle (the GPU erosion's, from the rock's hardness there).
             double tanSoft = Math.Tan(settings.RockTalusDegrees * Math.PI / 180.0), tanHard = Math.Tan(settings.RockTalusHardDegrees * Math.PI / 180.0);
             log.WriteLine("  " + Describe("eroded", ReliefStats.Measure(r.Surface, c => Math.Atan(tanSoft + (tanHard - tanSoft) * r.Hardness[c]) * 180.0 / Math.PI)));
@@ -263,6 +304,67 @@ internal static class ErosionMeasure
             }
         }
         return pass ? 0 : 1;
+    }
+
+    /// <summary>
+    /// The crops (vista-plan §10 M1a.1): for each frame pixel of <paramref name="camera"/>, the ground it sees on the eroded world, its
+    /// distance and the metres a pixel covers there, and top-down crops of the base, incised and eroded worlds around it.
+    /// </summary>
+    private static void Crops(CameraSpec camera, List<(double X, double Y)> pixels, int cells, ulong seed, HeightField ground, HeightField incised,
+        HeightField eroded, string outDir, TextWriter log)
+    {
+        var sight = new TerrainSight(eroded, null, new Atmosphere.AtmosphereModel().PlanetRadiusMetres);
+        var rays = new CameraRays(camera, CropFrameWidth, CropFrameHeight);
+        double pixelAngle = 2.0 * Math.Tan(0.5 * camera.VerticalFovRadians()) / CropFrameHeight;
+        for (int k = 0; k < pixels.Count; k++)
+        {
+            (double px, double py) = pixels[k];
+            Vector3D d = rays.Direction(px, py);
+            double t = sight.Hit(camera.Position, d);
+            if (!double.IsFinite(t) || double.IsNaN(sight.GroundAt(camera.Position.X + d.X * t, camera.Position.Z + d.Z * t)))
+            {
+                log.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  crop {k + 1}: pixel ({px:0}, {py:0}) sees no ground on the grid"));
+                continue;
+            }
+            double x = camera.Position.X + d.X * t, z = camera.Position.Z + d.Z * t;
+            double half = 0.5 * cells * ground.CellSize;
+            bool Near(int c) => Math.Abs(ground.XOf(c % ground.Size) - x) <= half && Math.Abs(ground.ZOf(c / ground.Size) - z) <= half;
+            GridArtefacts before = GridArtefacts.Measure(ground, Near), after = GridArtefacts.Measure(eroded, Near);
+            log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  crop {k + 1}: pixel ({px:0}, {py:0}) sees ({x:0}, {z:0}) at {t:0} m, {t * pixelAngle:0.00} m a pixel ({ground.CellSize / (t * pixelAngle):0.0} pixels a cell); " +
+                $"along the grid {before.AlignedShare:0.0%} base, {after.AlignedShare:0.0%} eroded; rippling {before.RippleShare:0.0%} base, {after.RippleShare:0.0%} eroded"));
+            foreach ((string stage, HeightField field) in new[] { ("base", ground), ("incised", incised), ("eroded", eroded) })
+            {
+                (byte[] image, int size) = DebugImages.ReliefCrop(field, x, z, cells, CropScale);
+                PngEncoder.Write(Path.Combine(outDir, $"seed{seed}.crop{k + 1}.{stage}.png"), image, size, size, PngColor.Rgb);
+            }
+        }
+    }
+
+    /// <summary>The samples of <paramref name="field"/> whose slope is at least <see cref="SteepDegrees"/>.</summary>
+    private static Func<int, bool> Steep(HeightField field)
+    {
+        int n = field.Size;
+        double tan = Math.Tan(SteepDegrees * Math.PI / 180.0) * 2.0 * field.CellSize;
+        return c =>
+        {
+            int i = c % n, j = c / n;
+            if (i < 1 || j < 1 || i >= n - 1 || j >= n - 1)
+                return false;
+            double dx = field[i + 1, j] - field[i - 1, j], dz = field[i, j + 1] - field[i, j - 1];
+            return dx * dx + dz * dz >= tan * tan;
+        };
+    }
+
+    /// <summary>One line of the grid's patterns (vista-plan §10 M1a.1): the whole grid, its steep faces and its loose ground.</summary>
+    internal static string Describe(string label, GridArtefacts all, GridArtefacts steep, GridArtefacts? loose)
+    {
+        string looseAligned = loose is null ? "" : string.Create(CultureInfo.InvariantCulture, $", loose ground {loose.AlignedShare:0.0%}");
+        string looseRipple = loose is null ? "" : string.Create(CultureInfo.InvariantCulture, $", loose ground {loose.RippleShare:0.0%}");
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{label} along the grid's 8 directions (±{GridArtefacts.AlignedHalfWidthDegrees:0}°; {GridArtefacts.IsotropicShare:0.0%} if it ran every way): " +
+            $"{all.AlignedShare:0.0%}, steep faces {steep.AlignedShare:0.0%}{looseAligned}; rippling at {GridArtefacts.RippleShortestCells:0}–" +
+            $"{GridArtefacts.RippleLongestCells:0} cells: {all.RippleShare:0.0%} of the windows, steep faces {steep.RippleShare:0.0%}{looseRipple}");
     }
 
     /// <summary>One line of drainage measures.</summary>
