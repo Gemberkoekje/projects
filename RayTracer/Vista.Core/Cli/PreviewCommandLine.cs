@@ -139,6 +139,18 @@ public sealed record PreviewRequest
     public double? MeterCompensationEv { get; init; }
 
     /// <summary>
+    /// The PNG's white balance and the punchy look's margin short of the gamut's edge (vista-plan §10 M1.17): none by default, M1.11c's
+    /// bytes. The EXR never changes.
+    /// </summary>
+    public DisplayGrade Grade { get; init; }
+
+    /// <summary>
+    /// How far the incident meter's exposure follows the light at dusk (vista-plan §10 M1.17; <see cref="IncidentMeter.AdaptationEv"/>):
+    /// 1 all the way by default, 0 not at all. The average meter ignores it. The EXR never changes.
+    /// </summary>
+    public double Adaptation { get; init; } = IncidentMeter.DefaultAdaptation;
+
+    /// <summary>
     /// The 8-bit PNG's dither (vista-plan §10 M1.11c): the triangular dither by default, <see cref="PngDither.Off"/> for M1.11b's
     /// bytes. A 16-bit PNG has none. The EXR never changes.
     /// </summary>
@@ -211,6 +223,7 @@ public sealed record PreviewRequest
 ///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature blend | bins | redTail | engine]
 ///           [--forest on | off] [--canopy kernels | rough] [--snow on | off] [--pools on | flat]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
+///           [--white-balance none | 5500K] [--sky-margin 0.05] [--adaptation 1]
 ///           [--dither on | off] [--png16] [--auto-camera [--finalists 10] [--detail-budget on | off]] [--estimate [--noise 1]]
 /// </code>
 /// The preview keeps the final's quality settings and changes only the pixel count, at the target's aspect
@@ -241,6 +254,10 @@ public sealed record PreviewRequest
 /// instead of each valley's pool and its mist in three dimensions (M1.13b).
 /// <c>--meter average</c> exposes the PNG by the frame's log-average luminance (M1.3's meter) instead of a grey card facing the sun
 /// (M1.10a), and <c>--display aces</c> display-encodes it through the ACES fit instead of AgX; neither changes the EXR.
+/// <c>--white-balance</c> renders a Planckian light of that many Kelvin neutral, as a camera's setting does, instead of the display's own
+/// white (M1.17); <c>--sky-margin</c> stops the punchy look's saturation that share of a colour's luminance short of the gamut's edge;
+/// <c>--adaptation</c> says how far the incident meter's exposure follows the light down into dusk (1 all the way, 0 not at all). None of
+/// them changes the EXR.
 /// <c>--dither off</c> rounds the 8-bit PNG's values without M1.11c's dither, and <c>--png16</c> writes the beauty and the denoised
 /// beauty at 16 bits a channel instead, which need none.
 /// <c>--auto-camera</c> chooses the camera for a mountain set piece instead of reading one (M1.14): the planted shot, a few hundred
@@ -310,6 +327,11 @@ public static class PreviewCommandLine
         "  frame's log-average luminance. --display agx (default) | aces: the PNG's display curve. --look punchy (default) | base: AgX's look\n" +
         "  (the ACES fit has none). --compensation <EV>: the stops the meter adds on its own, beside the camera's EV (default: the\n" +
         "  incident meter's +1 EV, the average meter's 0). None of them changes the EXR.\n" +
+        "--white-balance none (default) | <kelvin>K: render a Planckian light of that colour temperature neutral, as a camera's\n" +
+        "  Kelvin setting does (none: the display's own white, D65). --sky-margin <share> (default 0): stop the punchy look's saturation\n" +
+        "  that share of a colour's luminance short of the gamut's edge, so a deep sky keeps some red. --adaptation <0..1> (default 1):\n" +
+        "  how far the incident meter's exposure follows the light down into dusk, from the card's light with the sun about 2° up:\n" +
+        "  1 all the way, 0 not at all (dusk darkens as it does to a camera set before it). None of them changes the EXR.\n" +
         "--dither on (default) | off: a triangular dither of ±1 step before the 8-bit PNG is rounded, against banding in smooth skies.\n" +
         "--png16: write <preview>.png (and <preview>.denoised.png) at 16 bits a channel instead, with no dither.\n" +
         "--auto-camera: choose the camera for the recipe's mountains instead of --camera: candidates around the planted shot scored\n" +
@@ -371,7 +393,7 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--valley-haze", "--mist", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists", "--detail-budget",
+        "--white-balance", "--sky-margin", "--adaptation", "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists", "--detail-budget",
         "--noise",
     };
 
@@ -460,6 +482,9 @@ public static class PreviewCommandLine
         DisplayCurve display = Display(values.GetValueOrDefault("--display"), problems);
         DisplayLook look = Look(values.GetValueOrDefault("--look"), problems);
         double? compensation = Compensation(values.GetValueOrDefault("--compensation"), problems);
+        var grade = new DisplayGrade(WhiteBalance(values.GetValueOrDefault("--white-balance"), problems),
+            SkyMargin(values.GetValueOrDefault("--sky-margin"), problems));
+        double adaptation = Adaptation(values.GetValueOrDefault("--adaptation"), problems);
         PngDither dither = Dither(values.GetValueOrDefault("--dither"), problems);
         DiffuseModel diffuse = Diffuse(values.GetValueOrDefault("--diffuse"), problems);
         Quadrature quadrature = QuadratureOf(values.GetValueOrDefault("--quadrature"), problems);
@@ -532,6 +557,8 @@ public static class PreviewCommandLine
             Display = display,
             Look = look,
             MeterCompensationEv = compensation,
+            Grade = grade,
+            Adaptation = adaptation,
             Dither = dither,
             BitDepth = flags.Contains("--png16") ? 16 : DisplayTransform.DefaultBitDepth,
             Diffuse = diffuse,
@@ -688,6 +715,58 @@ public static class PreviewCommandLine
             return ev;
         problems.Add($"--compensation must be a number of stops within ±{MaxCompensationEv}, got '{text}'.");
         return null;
+    }
+
+    /// <summary>
+    /// Parses a <c>--white-balance</c> value: <c>none</c> (0), or a colour temperature in Kelvin, with or without a trailing <c>K</c>,
+    /// within <see cref="DisplayGrade.MinKelvin"/>–<see cref="DisplayGrade.MaxKelvin"/>.
+    /// </summary>
+    internal static bool TryParseWhiteBalance(string text, out double kelvin)
+    {
+        kelvin = 0.0;
+        if (text == "none")
+            return true;
+        string number = text.EndsWith('K') ? text[..^1] : text;
+        return double.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out kelvin)
+            && kelvin >= DisplayGrade.MinKelvin && kelvin <= DisplayGrade.MaxKelvin;
+    }
+
+    private static double WhiteBalance(string? text, List<string> problems)
+    {
+        if (text is null)
+            return 0.0;
+        if (TryParseWhiteBalance(text, out double kelvin))
+            return kelvin;
+        problems.Add($"--white-balance must be none or {DisplayGrade.MinKelvin:0}K–{DisplayGrade.MaxKelvin:0}K, got '{text}'.");
+        return 0.0;
+    }
+
+    /// <summary>Parses a <c>--sky-margin</c> value: a share of a colour's luminance, 0 to <see cref="DisplayGrade.MaxSkyMargin"/>.</summary>
+    internal static bool TryParseSkyMargin(string text, out double margin) =>
+        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out margin) && margin >= 0.0 && margin <= DisplayGrade.MaxSkyMargin;
+
+    private static double SkyMargin(string? text, List<string> problems)
+    {
+        if (text is null)
+            return 0.0;
+        if (TryParseSkyMargin(text, out double margin))
+            return margin;
+        problems.Add($"--sky-margin must be a share from 0 to {DisplayGrade.MaxSkyMargin}, got '{text}'.");
+        return 0.0;
+    }
+
+    /// <summary>Parses an <c>--adaptation</c> value: 0 to 1.</summary>
+    internal static bool TryParseAdaptation(string text, out double adaptation) =>
+        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out adaptation) && adaptation >= 0.0 && adaptation <= 1.0;
+
+    private static double Adaptation(string? text, List<string> problems)
+    {
+        if (text is null)
+            return IncidentMeter.DefaultAdaptation;
+        if (TryParseAdaptation(text, out double adaptation))
+            return adaptation;
+        problems.Add($"--adaptation must be from 0 to 1, got '{text}'.");
+        return IncidentMeter.DefaultAdaptation;
     }
 
     private static bool Erosion(string? text, List<string> problems)

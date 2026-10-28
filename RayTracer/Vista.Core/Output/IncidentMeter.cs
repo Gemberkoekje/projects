@@ -49,6 +49,33 @@ public static class IncidentMeter
     /// </summary>
     public const double DefaultCompensationEv = 1.0;
 
+    /// <summary>
+    /// The card's illuminance, lux, under which the exposure may stop following the light (vista-plan §10 M1.17, the exposure at dusk):
+    /// about the card's light with the sun 2° up (25 000 lux; 28 000 at the hero's golden hour, 2.3° up). Above it the meter exposes as it always has, so golden hour is the meter's whatever
+    /// the adaptation; below it an adaptation under 1 lets dusk darken.
+    /// </summary>
+    public const double AdaptationLux = 25000.0;
+
+    /// <summary>
+    /// How far the exposure follows the light under <see cref="AdaptationLux"/> unless <c>--adaptation</c> says otherwise: all the way,
+    /// M1.10a's meter. Provisional: the user's pick at M1.17.
+    /// </summary>
+    public const double DefaultAdaptation = 1.0;
+
+    /// <summary>
+    /// The stops an <paramref name="adaptation"/> takes off the exposure of a card lit by <paramref name="lux"/>: 0 at or above
+    /// <see cref="AdaptationLux"/>, else (1 − adaptation) · log₂(<see cref="AdaptationLux"/> / lux), negated; 0 for a card with no light
+    /// (only the camera's EV is applied then).
+    /// </summary>
+    public static double AdaptationEv(double lux, double adaptation)
+    {
+        if (!(adaptation >= 0.0 && adaptation <= 1.0))
+            throw new ArgumentOutOfRangeException(nameof(adaptation), adaptation, "The adaptation lies on [0, 1].");
+        if (!double.IsFinite(lux) || lux <= 0.0 || lux >= AdaptationLux || adaptation == 1.0)
+            return 0.0;
+        return -(1.0 - adaptation) * Math.Log2(AdaptationLux / lux);
+    }
+
     /// <summary>Wavelengths per kernel item (a float4).</summary>
     public const int WavelengthsPerItem = 4;
 
@@ -186,7 +213,14 @@ public static class IncidentMeter
     /// The exposure of a view whose card received <paramref name="light"/> in <paramref name="frame"/>, with
     /// <paramref name="compensationEv"/> stops on top: log₂(π / E) for the card's illuminance E in the image's Y units.
     /// </summary>
-    public static ExposureInfo Measure(IncidentLight light, AtmosphereFrame frame, IntegratorTables tables, double compensationEv)
+    public static ExposureInfo Measure(IncidentLight light, AtmosphereFrame frame, IntegratorTables tables, double compensationEv) =>
+        Measure(light, frame, tables, compensationEv, DefaultAdaptation);
+
+    /// <summary>
+    /// <see cref="Measure(IncidentLight, AtmosphereFrame, IntegratorTables, double)"/> with the exposure following the light under
+    /// <see cref="AdaptationLux"/> only by <paramref name="adaptation"/> (<see cref="AdaptationEv(double, double)"/>, vista-plan §10 M1.17).
+    /// </summary>
+    public static ExposureInfo Measure(IncidentLight light, AtmosphereFrame frame, IntegratorTables tables, double compensationEv, double adaptation)
     {
         ArgumentNullException.ThrowIfNull(light);
         ArgumentNullException.ThrowIfNull(frame);
@@ -201,11 +235,21 @@ public static class IncidentMeter
             sun * IntegratorTables.LuminancePerY,
             sky * IntegratorTables.LuminancePerY);
         if (!double.IsFinite(total) || total <= 0.0)
-            return new ExposureInfo(Metering.Incident, BlackMethodName, compensationEv, null, null, compensationEv) { Incident = reading };
+        {
+            return new ExposureInfo(Metering.Incident, BlackMethodName, compensationEv, null, null, compensationEv)
+            {
+                Incident = reading,
+                Adaptation = adaptation,
+            };
+        }
         double metered = Math.Log2(Math.PI / total);
-        return new ExposureInfo(Metering.Incident, MethodName, compensationEv, metered, Math.Log2(reading.IlluminanceLux * 100.0 / Calibration), metered + compensationEv)
+        double held = AdaptationEv(reading.IlluminanceLux, adaptation);
+        return new ExposureInfo(Metering.Incident, MethodName, compensationEv, metered, Math.Log2(reading.IlluminanceLux * 100.0 / Calibration),
+            metered + compensationEv + held)
         {
             Incident = reading,
+            Adaptation = adaptation,
+            AdaptationEv = held,
         };
     }
 }

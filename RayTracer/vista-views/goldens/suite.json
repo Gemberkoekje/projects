@@ -1,0 +1,59 @@
+{
+  // The Vista golden suite (vista-plan section 10, M1.17): previews at fixed seeds whose PNG and EXR are committed beside this file as
+  // <name>.png and <name>.exr. Vista.App --golden-check renders each case as --preview would and compares it with its golden;
+  // --golden-check --update re-baselines them, deliberately, when a slice means to move them. File options are relative to this folder.
+  "schema": 1,
+  "tolerance": { "meanRelative": 0.01, "blockRelative": 0.03, "blockPixels": 16, "pngMeanLevels": 1.0 },
+  "cases": [
+    {
+      "name": "sky",
+      "checks": "the spectral atmosphere: the deep clear sky at noon (M1.3, M1.5)",
+      "arguments": [ "--recipe", "../mountains-day.recipe.json", "--seed", "42", "--camera", "../sky.camera.json", "--spp", "64" ]
+    },
+    {
+      "name": "aerial",
+      "checks": "aerial perspective and the materials by rule from 4 km up at noon (M1.4, M1.12)",
+      "arguments": [ "--recipe", "../mountains-day.recipe.json", "--seed", "42", "--camera", "../aerial.camera.json", "--spp", "64" ]
+    },
+    {
+      "name": "default",
+      "checks": "erosion, the view-dependent mesh and the snow-capped range at noon (M1.7, M1.9, M1.13)",
+      "arguments": [ "--recipe", "../mountains-day.recipe.json", "--seed", "42", "--camera", "../default.camera.json", "--spp", "64" ]
+    },
+    {
+      "name": "down-slope",
+      "checks": "golden hour down a slope over valleys' pools of haze (M1.13b's low air)",
+      "arguments": [ "--recipe", "../mountains-golden.recipe.json", "--seed", "42", "--camera", "../down-slope.camera.json", "--spp", "64" ]
+    },
+    {
+      "name": "hero",
+      "checks": "the hero: an alpine range at golden hour, the auto camera's pick (M1.14, M1.17)",
+      "arguments": [ "--recipe", "../autocam/range-golden.recipe.json", "--seed", "42", "--camera", "../signoff/hero.camera.json", "--spp", "64" ]
+    },
+    {
+      "name": "alpenglow-dusk",
+      "checks": "alpenglow at dusk with no special-casing: the summits lit red, the sun half a degree down (M1.13)",
+      "arguments": [ "--recipe", "../atmosphere/zermatt-july.recipe.json", "--seed", "42", "--camera", "../atmosphere/range.camera.json", "--sun-elevation", "-0.5", "--spp", "64" ]
+    },
+    {
+      "name": "alpenglow-dawn",
+      "checks": "alpenglow at dawn: first light on the summits, the sun half a degree down and rising (M1.13)",
+      "arguments": [ "--recipe", "../atmosphere/zermatt-october.recipe.json", "--seed", "42", "--camera", "../pools/fog-sea.camera.json", "--time", "dawn", "--sun-elevation", "-0.5", "--spp", "64" ]
+    },
+    {
+      "name": "april-slopes",
+      "checks": "snowcaps with bare steep faces: April's snow down to the forest (M1.13)",
+      "arguments": [ "--recipe", "../snow/mountains-april.recipe.json", "--seed", "42", "--camera", "../atmosphere/range.camera.json", "--spp", "64" ]
+    },
+    {
+      "name": "misty-ridges",
+      "checks": "valley mist on an autumn morning: the pools in three dimensions and their mist (M1.13a, M1.13b)",
+      "arguments": [ "--recipe", "../atmosphere/zermatt-october.recipe.json", "--seed", "42", "--camera", "../haze/misty-ridges.camera.json", "--time", "07:30", "--spp", "64" ]
+    },
+    {
+      "name": "twilight",
+      "checks": "deep twilight toward the sun from 4.2 km up: the sky's light alone, the sun 4 degrees down (M1.3, M1.10a's meter)",
+      "arguments": [ "--recipe", "../atmosphere/zermatt-july.recipe.json", "--seed", "42", "--camera", "../atmosphere/toward-sun.camera.json", "--sun-elevation", "-4", "--spp", "64" ]
+    }
+  ]
+}

@@ -312,6 +312,22 @@ public sealed class PreviewSessionTests
         Assert.AreEqual(0, back.Stages.Built.Count);
         Assert.AreEqual("camera.exposureEv: 0 → 1", back.Watch!.Changes.Single());
         StringAssert.Contains(File.ReadAllText(P("p.json")), "\"accelerationStructure\"");
-        Assert.AreEqual(26, back.Schema);
+        Assert.AreEqual(27, back.Schema);
+    }
+
+    [TestMethod]
+    public void Sidecar_RecordsTheGradeAndTheAdaptation_WithoutRenderingAgain()
+    {
+        // The white balance, the margin and the adaptation are the display's (vista-plan §10 M1.17): recorded, and a change of them
+        // re-exposes the kept render instead of tracing it again.
+        var session = new PreviewSession(new FakeRenderer());
+        Sidecar plain = session.Run(Base);
+        Assert.AreEqual((0.0, 0.0), (plain.Image.WhiteBalanceKelvin, plain.Image.SkyMargin));
+        Assert.AreEqual(1.0, plain.Exposure!.Adaptation);
+        Sidecar graded = session.Run(Base with { Grade = new DisplayGrade(5500.0, 0.03), Adaptation = 0.5 });
+        Assert.AreEqual(0, graded.Stages.Built.Count, $"the render is kept, built {string.Join(", ", graded.Stages.Built)}");
+        Sidecar back = VistaJson.Deserialize<Sidecar>(File.ReadAllText(P("p.json")));
+        Assert.AreEqual((5500.0, 0.03), (back.Image.WhiteBalanceKelvin, back.Image.SkyMargin));
+        Assert.AreEqual(0.5, back.Exposure!.Adaptation);
     }
 }

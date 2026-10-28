@@ -63,12 +63,15 @@ namespace Vista.Output;
 /// <c>--debug detail</c>. Schema 26 (M1.15) added <see cref="Estimate"/>, what a final would take (the kind <c>estimate</c>, written as
 /// <c>&lt;preview&gt;.estimate.json</c>), and, in <see cref="Render"/>, the render's video memory as planned and as measured
 /// (<see cref="RenderInfo.Memory"/>; the stats gained the peak and DXGI's budget) and its trace's clock with the live ETA's checkpoints
-/// (<see cref="RenderInfo.Trace"/>).</para>
+/// (<see cref="RenderInfo.Trace"/>). Schema 27 (M1.17) added the PNG's white balance and the punchy look's margin
+/// (<see cref="ImageInfo.WhiteBalanceKelvin"/>, <see cref="ImageInfo.SkyMargin"/>), and in <see cref="Exposure"/> how far the incident
+/// meter followed the light at dusk and the stops that took off (<see cref="ExposureInfo.Adaptation"/>,
+/// <see cref="ExposureInfo.AdaptationEv"/>).</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 26;
+    public const int CurrentSchema = 27;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -194,6 +197,18 @@ public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int M
 
     /// <summary>The beauty's and the denoised beauty's bits per channel (schema 15): 8, or 16.</summary>
     public int BitDepth { get; init; } = Output.DisplayTransform.DefaultBitDepth;
+
+    /// <summary>
+    /// The PNG's white balance (schema 27, vista-plan §10 M1.17): the Kelvin of the Planckian light it renders neutral, or 0 for none,
+    /// the display's own white (<see cref="DisplayGrade.WhiteBalanceKelvin"/>).
+    /// </summary>
+    public double WhiteBalanceKelvin { get; init; }
+
+    /// <summary>
+    /// How far short of the gamut's edge the punchy look's saturation stopped (schema 27; <see cref="DisplayGrade.SkyMargin"/>): 0 for
+    /// M1.11c's "just enough", and under any other look.
+    /// </summary>
+    public double SkyMargin { get; init; }
 
     /// <summary>
     /// Which lights surfaces sampled (vista-plan §10 M1.5): <see cref="LightSampling.Mis"/>, or M1.4's

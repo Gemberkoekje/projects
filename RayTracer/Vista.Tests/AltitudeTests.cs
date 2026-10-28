@@ -100,7 +100,7 @@ public sealed class AltitudeTests
         // The world's lowest valleys, not its height 0, at the valley floor (M1.12c).
         StringAssert.StartsWith(valley.Atmosphere.GroundAltitudeFrom, "auto: the valley floor of Zermatt (Zermatt village), where the world's lowest valleys stand (its 5th percentile");
         Assert.AreEqual(1608.0, valley.Atmosphere.GroundAltitudeMetres + valley.World.Footing!.HeightMetres, 1e-9);
-        Assert.AreEqual(26, valley.Schema);
+        Assert.AreEqual(27, valley.Schema);
     }
 
     [TestMethod]

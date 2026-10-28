@@ -34,10 +34,29 @@ internal sealed partial class D3D12VistaRenderer
     private const int LutGroupSize = 64;
 
     /// <summary>
-    /// Work items per LUT dispatch: the 4D density at 32 × 32 directions takes about 0.1 s per million, far below the TDR; a quarter
-    /// of that on a shared GPU (<see cref="GpuShare"/>), so each dispatch stays short.
+    /// Work items per LUT dispatch at full speed: the 4D density at 32 × 32 directions takes about 0.03 s per million, far below the TDR.
+    /// On a shared GPU (<see cref="GpuShare"/>) each builder's dispatches are sized from its own measured rate instead
+    /// (<see cref="LutChunk"/>).
     /// </summary>
-    private static readonly int LutItemsPerDispatch = GpuShare.Capped ? 1 << 18 : 1 << 20;
+    private const int LutItemsPerDispatch = 1 << 20;
+
+    /// <summary>
+    /// The GPU time a LUT dispatch aims at on a shared GPU, s (vista-plan §10 M1.17): two thirds of <see cref="GpuShare.CappedDispatchMs"/>,
+    /// so a chunk heavier than the builder's average still keeps under it. M1.16 found a fixed quarter of a million items a dispatch ran
+    /// 2–8 ms, and the air's 3.8 GPU seconds took 10.8 s of wall time in some 1400 submissions, each waited on and paused after.
+    /// </summary>
+    private const double LutTargetSeconds = GpuShare.CappedDispatchMs * (2.0 / 3.0) / 1000.0;
+
+    /// <summary>
+    /// The fewest items a LUT dispatch takes on a shared GPU, and the first dispatch of a builder whose rate is not known yet: a table this
+    /// small runs in one dispatch, as at full speed. Fewer leave the GPU idle but for a few thread groups, and a builder whose items each
+    /// loop long takes as long for a few of them as for all: the ground irradiance's 6400 items run 175 ms in one dispatch, and split by
+    /// their rate into dispatches of 71 items each of those took about as long (90 dispatches, 12.3 s).
+    /// </summary>
+    private const int LutFirstItems = 1 << 16;
+
+    /// <summary>Each LUT builder's GPU seconds per item, from its last dispatch (a shared GPU sizes the next one by it).</summary>
+    private readonly Dictionary<ID3D12PipelineState, double> _lutSecondsPerItem = [];
 
     /// <summary>The LUT builders' bindings, by root parameter slot (registers in the comments).</summary>
     private enum LutSlot
@@ -266,9 +285,31 @@ internal sealed partial class D3D12VistaRenderer
     private double BuildLut(ID3D12PipelineState pipeline, int items, int order, Dictionary<LutSlot, ID3D12Resource> bindings)
     {
         double seconds = 0.0;
-        for (int first = 0; first < items; first += LutItemsPerDispatch)
-            seconds += BuildLutChunk(pipeline, items, first, Math.Min(LutItemsPerDispatch, items - first), order, bindings);
+        for (int first = 0; first < items;)
+        {
+            int count = Math.Min(LutChunk(pipeline), items - first);
+            double chunk = BuildLutChunk(pipeline, items, first, count, order, bindings);
+            if (chunk > 0.0)
+                _lutSecondsPerItem[pipeline] = chunk / count;
+            seconds += chunk;
+            first += count;
+        }
         return seconds;
+    }
+
+    /// <summary>
+    /// The items of <paramref name="pipeline"/>'s next dispatch: <see cref="LutItemsPerDispatch"/> at full speed; on a shared GPU as many
+    /// as its last rate says fit in <see cref="LutTargetSeconds"/>, in whole thread groups, never fewer than <see cref="LutFirstItems"/>
+    /// (and that many before it has a rate). Every item is computed alone (gather-only), so how the items are split never changes a table.
+    /// </summary>
+    private int LutChunk(ID3D12PipelineState pipeline)
+    {
+        if (!GpuShare.Capped)
+            return LutItemsPerDispatch;
+        if (!_lutSecondsPerItem.TryGetValue(pipeline, out double rate) || !(rate > 0.0))
+            return LutFirstItems;
+        double fit = LutTargetSeconds / rate;
+        return (int)Math.Clamp(Math.Floor(fit / LutGroupSize) * LutGroupSize, LutFirstItems, 1 << 24);
     }
 
     private double BuildLutChunk(ID3D12PipelineState pipeline, int items, int first, int count, int order, Dictionary<LutSlot, ID3D12Resource> bindings)

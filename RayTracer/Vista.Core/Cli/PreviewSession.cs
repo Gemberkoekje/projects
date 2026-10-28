@@ -434,6 +434,8 @@ public sealed partial class PreviewSession
                 Look = DisplayTransform.LookOf(request.Display, request.Look),
                 Dither = DisplayTransform.DitherOf(request.BitDepth, request.Dither),
                 BitDepth = request.BitDepth,
+                WhiteBalanceKelvin = request.Grade.WhiteBalanceKelvin,
+                SkyMargin = DisplayTransform.LookOf(request.Display, request.Look) == DisplayLook.Punchy ? request.Grade.SkyMargin : 0.0,
             },
             World = new WorldInfo(
                 TerrainProfile.For(recipe.SetPieces).Name,
@@ -485,7 +487,7 @@ public sealed partial class PreviewSession
         {
             double ev = exposure.AppliedEv;
             pass = image => show(new PreviewFrame(image.Width, image.Height, image.Samples, image.SamplesPerPixel,
-                DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(image.Xyz), ev, request.Display, request.Look)));
+                DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(image.Xyz), ev, request.Display, request.Look, request.Grade)));
         }
         return new TraceFeed { Cancellation = feed.Cancellation, Pass = pass, IntervalSeconds = feed.IntervalSeconds };
     }
@@ -553,7 +555,7 @@ public sealed partial class PreviewSession
                 rendered = true;
                 stages[PreviewStage.ExposureMeter] = false;
             }
-            exposure = IncidentMeter.Measure(light, frame, Tables(materials, scene.Wavelengths()), camera.ExposureEv + meterCompensation);
+            exposure = IncidentMeter.Measure(light, frame, Tables(materials, scene.Wavelengths()), camera.ExposureEv + meterCompensation, request.Adaptation);
         }
         else
         {
@@ -710,8 +712,8 @@ public sealed partial class PreviewSession
                     new BatchPlanner(fw, fh, settings.SamplesPerPixel, settings.Batching) { Feed = Stopping(cancellation) });
                 IncidentLight light = _renderer.MeasureIncidentLight(scene);
                 ExposureInfo exposure = IncidentMeter.Measure(light, scene.AirFrame(), Tables(materials, scene.Wavelengths()),
-                    camera.ExposureEv + (request.MeterCompensationEv ?? IncidentMeter.DefaultCompensationEv));
-                byte[] srgb = DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(output.Xyz), exposure.AppliedEv, request.Display, request.Look);
+                    camera.ExposureEv + (request.MeterCompensationEv ?? IncidentMeter.DefaultCompensationEv), request.Adaptation);
+                byte[] srgb = DisplayTransform.ToSrgb8(DisplayTransform.XyzToLinearRec709(output.Xyz), exposure.AppliedEv, request.Display, request.Look, request.Grade);
                 var values = new float[fw * fh];
                 for (int p = 0; p < values.Length; p++)
                     values[p] = (0.2126f * srgb[p * 3] + 0.7152f * srgb[p * 3 + 1] + 0.0722f * srgb[p * 3 + 2]) / 255f;
@@ -797,10 +799,11 @@ public sealed partial class PreviewSession
     {
         if (request.BitDepth == 16)
         {
-            PngEncoder.Write16(path, DisplayTransform.ToSrgb16(linear, exposureEv, request.Display, request.Look), window.Width, window.Height, PngColor.Rgb);
+            PngEncoder.Write16(path, DisplayTransform.ToSrgb16(linear, exposureEv, request.Display, request.Look, request.Grade), window.Width, window.Height,
+                PngColor.Rgb);
             return;
         }
-        PngEncoder.Write(path, DisplayTransform.ToSrgb8(linear, exposureEv, request.Display, request.Look, request.Dither, window), window.Width, window.Height,
+        PngEncoder.Write(path, DisplayTransform.ToSrgb8(linear, exposureEv, request.Display, request.Look, request.Grade, request.Dither, window), window.Width, window.Height,
             PngColor.Rgb);
     }
 
@@ -857,7 +860,7 @@ public sealed partial class PreviewSession
         var probe = new TerrainSight(terrain, request.Mesh.FarField ? _worlds.FarTerrain() : null, groundRadius);
         CompositionBuffer buffer = CompositionBuffer.FromRender(output, camera, output.Width, output.Height, null, groundRadius);
         DetailMap map = CompositionScorer.Detail(buffer, camera, sun, limits, probe, DetailInfo.Thresholds.Min());
-        byte[] rgb = DisplayTransform.ToSrgb8(linear, exposureEv, request.Display, request.Look);
+        byte[] rgb = DisplayTransform.ToSrgb8(linear, exposureEv, request.Display, request.Look, request.Grade);
         GroundClass[] others = [GroundClass.Meadow, GroundClass.Forest];
         for (int p = 0; p < map.CellPixels.Length; p++)
         {

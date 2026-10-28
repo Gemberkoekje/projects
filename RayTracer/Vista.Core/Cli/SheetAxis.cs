@@ -132,6 +132,9 @@ public sealed class SheetAxis
                 "look" => Checked(values, Look, (r, v) => r with { Look = Look(v) }),
                 "compensation" => Checked(values, Compensation, (r, v) => r with { MeterCompensationEv = Compensation(v) }),
                 "dither" => Checked(values, Dither, (r, v) => r with { Dither = Dither(v) }),
+                "whiteBalance" => Checked(values, WhiteBalance, (r, v) => r with { Grade = r.Grade with { WhiteBalanceKelvin = WhiteBalance(v) } }),
+                "skyMargin" => Checked(values, SkyMargin, (r, v) => r with { Grade = r.Grade with { SkyMargin = SkyMargin(v) } }),
+                "adaptation" => Checked(values, Adaptation, (r, v) => r with { Adaptation = Adaptation(v) }),
                 "recipe" => (r, v) => r with { RecipePath = v },
                 "camera" => (r, v) => r with { CameraPath = v == "default" ? null : v },
                 "sliders" => (r, v) => r with { SlidersPath = v },
@@ -169,6 +172,15 @@ public sealed class SheetAxis
 
     private static Output.DisplayCurve Display(string text) =>
         PreviewCommandLine.TryParseDisplay(text, out Output.DisplayCurve curve) ? curve : throw new ArgumentException($"'{text}' is not agx or aces.");
+
+    private static double WhiteBalance(string text) =>
+        PreviewCommandLine.TryParseWhiteBalance(text, out double kelvin) ? kelvin : throw new ArgumentException($"'{text}' is not none or a Kelvin value.");
+
+    private static double SkyMargin(string text) =>
+        PreviewCommandLine.TryParseSkyMargin(text, out double margin) ? margin : throw new ArgumentException($"'{text}' is not a sky margin.");
+
+    private static double Adaptation(string text) =>
+        PreviewCommandLine.TryParseAdaptation(text, out double adaptation) ? adaptation : throw new ArgumentException($"'{text}' is not an adaptation from 0 to 1.");
 
     private static Output.DisplayLook Look(string text) =>
         PreviewCommandLine.TryParseLook(text, out Output.DisplayLook look) ? look : throw new ArgumentException($"'{text}' is not base or punchy.");

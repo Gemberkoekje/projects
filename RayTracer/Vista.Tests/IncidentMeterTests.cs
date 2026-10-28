@@ -150,5 +150,30 @@ public sealed class IncidentMeterTests
         Assert.IsNull(night.Ev100);
         Assert.AreEqual(0.5, night.AppliedEv);
         Assert.IsTrue(double.IsNaN(night.MeterScale()));
+        Assert.AreEqual(1.0, dusk.Adaptation, "the meter follows the light all the way by default");
+        Assert.AreEqual(0.0, dusk.AdaptationEv);
+    }
+
+    [TestMethod]
+    public void TheAdaptation_HoldsTheExposureBackOnlyUnderItsLight()
+    {
+        double lux = IncidentMeter.AdaptationLux;
+        Assert.AreEqual(0.0, IncidentMeter.AdaptationEv(lux * 4.0, 0.0), "golden hour and brighter: the meter's");
+        Assert.AreEqual(0.0, IncidentMeter.AdaptationEv(lux / 64.0, 1.0), "all the way: the meter's");
+        Assert.AreEqual(-6.0, IncidentMeter.AdaptationEv(lux / 64.0, 0.0), 1e-12, "not at all: the light's drop shows in full");
+        Assert.AreEqual(-3.0, IncidentMeter.AdaptationEv(lux / 64.0, 0.5), 1e-12, "half way: half the drop");
+        Assert.AreEqual(0.0, IncidentMeter.AdaptationEv(0.0, 0.0), "no light: only the camera's EV");
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => IncidentMeter.AdaptationEv(100.0, 1.5));
+
+        IntegratorTables tables = IntegratorTables.Build(MaterialCatalog.M0, WavelengthTable.Bins);
+        double[] Flat(double v) => [.. Enumerable.Repeat(v, AtmosphereLuts.Wavelengths)];
+        var light = new IncidentLight(Flat(0.0), Flat(0.01));
+        ExposureInfo meter = IncidentMeter.Measure(light, Frame(-4.0), tables, 1.0);
+        ExposureInfo fixedCamera = IncidentMeter.Measure(light, Frame(-4.0), tables, 1.0, 0.0);
+        double drop = Math.Log2(lux / meter.Incident!.IlluminanceLux);
+        Assert.AreEqual(-drop, fixedCamera.AdaptationEv, 1e-9);
+        Assert.AreEqual(meter.AppliedEv - drop, fixedCamera.AppliedEv, 1e-9);
+        Assert.AreEqual(meter.MeteredEv, fixedCamera.MeteredEv, "the reading itself is the same");
+        Assert.AreEqual(0.0, fixedCamera.Adaptation);
     }
 }

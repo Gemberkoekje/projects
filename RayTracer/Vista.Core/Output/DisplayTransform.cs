@@ -155,9 +155,16 @@ public static class DisplayTransform
     /// <paramref name="curve"/> with <paramref name="look"/> (AgX's only; the ACES fit ignores it), each value rounded to the nearest
     /// step: no dither, M1.11b's bytes.
     /// </summary>
-    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look)
+    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look) =>
+        ToSrgb8(linearRgb, exposureEv, curve, look, DisplayGrade.None);
+
+    /// <summary>
+    /// <see cref="ToSrgb8(ReadOnlySpan{float}, double, DisplayCurve, DisplayLook)"/> with <paramref name="grade"/>'s white balance and
+    /// margin (vista-plan §10 M1.17).
+    /// </summary>
+    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look, DisplayGrade grade)
     {
-        float[] encoded = Encode(linearRgb, exposureEv, curve, look);
+        float[] encoded = Encode(linearRgb, exposureEv, curve, look, grade);
         var bytes = new byte[encoded.Length];
         for (int i = 0; i < encoded.Length; i++)
             bytes[i] = Quantise8(encoded[i]);
@@ -170,13 +177,22 @@ public static class DisplayTransform
     /// pixel and a loupe stays an exact crop of the frame. <see cref="PngDither.Off"/> writes the undithered bytes.
     /// </summary>
     /// <exception cref="ArgumentException">The window does not hold as many pixels as <paramref name="linearRgb"/>.</exception>
-    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look, PngDither dither, PixelWindow window)
+    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look, PngDither dither, PixelWindow window) =>
+        ToSrgb8(linearRgb, exposureEv, curve, look, DisplayGrade.None, dither, window);
+
+    /// <summary>
+    /// <see cref="ToSrgb8(ReadOnlySpan{float}, double, DisplayCurve, DisplayLook, PngDither, PixelWindow)"/> with <paramref name="grade"/>'s
+    /// white balance and margin (vista-plan §10 M1.17).
+    /// </summary>
+    /// <exception cref="ArgumentException">The window does not hold as many pixels as <paramref name="linearRgb"/>.</exception>
+    public static byte[] ToSrgb8(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look, DisplayGrade grade, PngDither dither,
+        PixelWindow window)
     {
         if ((long)window.Pixels * 3 != linearRgb.Length)
             throw new ArgumentException($"The window {window} holds {window.Pixels} pixels, the image {linearRgb.Length / 3}.", nameof(window));
         if (DitherOf(8, dither) == PngDither.Off)
-            return ToSrgb8(linearRgb, exposureEv, curve, look);
-        float[] encoded = Encode(linearRgb, exposureEv, curve, look);
+            return ToSrgb8(linearRgb, exposureEv, curve, look, grade);
+        float[] encoded = Encode(linearRgb, exposureEv, curve, look, grade);
         var bytes = new byte[encoded.Length];
         for (int q = 0; q < window.Pixels; q++)
         {
@@ -193,9 +209,16 @@ public static class DisplayTransform
     /// <see cref="ToSrgb8(ReadOnlySpan{float}, double, DisplayCurve, DisplayLook)"/>, each value rounded to the nearest of 65 535
     /// steps, which needs no dither.
     /// </summary>
-    public static ushort[] ToSrgb16(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look)
+    public static ushort[] ToSrgb16(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look) =>
+        ToSrgb16(linearRgb, exposureEv, curve, look, DisplayGrade.None);
+
+    /// <summary>
+    /// <see cref="ToSrgb16(ReadOnlySpan{float}, double, DisplayCurve, DisplayLook)"/> with <paramref name="grade"/>'s white balance and
+    /// margin (vista-plan §10 M1.17).
+    /// </summary>
+    public static ushort[] ToSrgb16(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look, DisplayGrade grade)
     {
-        float[] encoded = Encode(linearRgb, exposureEv, curve, look);
+        float[] encoded = Encode(linearRgb, exposureEv, curve, look, grade);
         var samples = new ushort[encoded.Length];
         for (int i = 0; i < encoded.Length; i++)
             samples[i] = (ushort)(encoded[i] * 65535f + 0.5f);
@@ -207,12 +230,22 @@ public static class DisplayTransform
     /// <paramref name="curve"/> with <paramref name="look"/>: everything before the quantisation. Pixels are independent, so they are
     /// split across threads in blocks, which changes no bit.
     /// </summary>
-    internal static float[] Encode(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look)
+    internal static float[] Encode(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look) =>
+        Encode(linearRgb, exposureEv, curve, look, DisplayGrade.None);
+
+    /// <summary>
+    /// <see cref="Encode(ReadOnlySpan{float}, double, DisplayCurve, DisplayLook)"/> with <paramref name="grade"/> (vista-plan §10 M1.17):
+    /// the white balance before the exposure, the punchy look's margin in its saturation. <see cref="DisplayGrade.None"/> changes no bit.
+    /// </summary>
+    internal static float[] Encode(ReadOnlySpan<float> linearRgb, double exposureEv, DisplayCurve curve, DisplayLook look, DisplayGrade grade)
     {
         if (linearRgb.Length % 3 != 0)
             throw new ArgumentException("RGB data must hold three floats per pixel.", nameof(linearRgb));
         float scale = (float)Math.Pow(2.0, exposureEv);
         float[] input = linearRgb.ToArray();
+        if (grade.WhiteBalanceKelvin != 0.0)
+            Balance(input, grade.WhiteBalance());
+        float margin = (float)grade.SkyMargin;
         var encoded = new float[input.Length];
         int pixels = input.Length / 3;
         switch (curve)
@@ -223,7 +256,7 @@ public static class DisplayTransform
                 {
                     for (int p = first * 3; p < end * 3; p += 3)
                     {
-                        Vector3 c = Agx(new Vector3(input[p], input[p + 1], input[p + 2]) * scale, agxLook);
+                        Vector3 c = Vector3.Clamp(AgxLinear(new Vector3(input[p], input[p + 1], input[p + 2]) * scale, agxLook, margin, out _), Vector3.Zero, Vector3.One);
                         encoded[p] = Transfer(c.X);
                         encoded[p + 1] = Transfer(c.Y);
                         encoded[p + 2] = Transfer(c.Z);
@@ -256,6 +289,21 @@ public static class DisplayTransform
             return;
         }
         Parallel.For(0, blocks, b => body(b * BlockPixels, Math.Min(pixels, (b + 1) * BlockPixels)));
+    }
+
+    /// <summary>Applies the row-major white balance <paramref name="matrix"/> to interleaved linear Rec.709, in place.</summary>
+    private static void Balance(float[] rgb, double[] matrix)
+    {
+        var m = new Matrix3((float)matrix[0], (float)matrix[1], (float)matrix[2], (float)matrix[3], (float)matrix[4], (float)matrix[5],
+            (float)matrix[6], (float)matrix[7], (float)matrix[8]);
+        ForBlocks(rgb.Length / 3, (first, end) =>
+        {
+            for (int p = first * 3; p < end * 3; p += 3)
+            {
+                Vector3 c = m.Times(new Vector3(rgb[p], rgb[p + 1], rgb[p + 2]));
+                (rgb[p], rgb[p + 1], rgb[p + 2]) = (c.X, c.Y, c.Z);
+            }
+        });
     }
 
     /// <summary>The Narkowicz ACES fit, clamped to [0, 1]; NaN and negatives map to 0.</summary>
@@ -307,7 +355,7 @@ public static class DisplayTransform
     /// <summary>
     /// <see cref="Agx(Vector3)"/> with <paramref name="look"/> graded on the sigmoid's output, before the outset, where Filament's
     /// <c>AgxToneMapper</c> applies its looks (<see cref="AgxPunchy"/>; its saturation gamut-safe since M1.11c,
-    /// <see cref="AgxLinear"/>).
+    /// <see cref="AgxLinear(Vector3, DisplayLook, float, out float)"/>).
     /// </summary>
     public static Vector3 Agx(Vector3 linear, DisplayLook look) => Vector3.Clamp(AgxLinear(linear, look, out _), Vector3.Zero, Vector3.One);
 
@@ -316,7 +364,13 @@ public static class DisplayTransform
     /// clamp would cut off. Under the punchy look, <paramref name="saturation"/> is the look's saturation this colour got
     /// (<see cref="GamutSafePunchy"/>); otherwise 1.
     /// </summary>
-    internal static Vector3 AgxLinear(Vector3 linear, DisplayLook look, out float saturation)
+    internal static Vector3 AgxLinear(Vector3 linear, DisplayLook look, out float saturation) => AgxLinear(linear, look, 0f, out saturation);
+
+    /// <summary>
+    /// <see cref="AgxLinear(Vector3, DisplayLook, out float)"/> with the punchy look's saturation held back <paramref name="margin"/>
+    /// short of the gamut's edge (<see cref="DisplayGrade.SkyMargin"/>): no Rec.709 channel below the margin times the colour's luminance.
+    /// </summary>
+    internal static Vector3 AgxLinear(Vector3 linear, DisplayLook look, float margin, out float saturation)
     {
         Vector3 c = AgxInset.Times(Rec709ToRec2020.Times(Finite(linear)));
         c = new Vector3(AgxEncode(c.X), AgxEncode(c.Y), AgxEncode(c.Z));
@@ -324,8 +378,8 @@ public static class DisplayTransform
         saturation = 1f;
         return look switch
         {
-            DisplayLook.Base or DisplayLook.None => AgxDisplay(c, out _),
-            DisplayLook.Punchy => GamutSafePunchy(c, out saturation),
+            DisplayLook.Base or DisplayLook.None => AgxDisplay(c, 0f, out _),
+            DisplayLook.Punchy => GamutSafePunchy(c, margin, out saturation),
             _ => throw new ArgumentOutOfRangeException(nameof(look), look, "Unknown look."),
         };
     }
@@ -351,10 +405,10 @@ public static class DisplayTransform
     /// Rec.709 channel below 0, and the 2.2 power between them has no closed form. So the bound is the top of a bisection
     /// (<see cref="SaturationBisections"/> halvings) through the rest of the curve, which keeps the side that does not clip.</para>
     /// </summary>
-    private static Vector3 GamutSafePunchy(Vector3 sigmoid, out float saturation)
+    private static Vector3 GamutSafePunchy(Vector3 sigmoid, float margin, out float saturation)
     {
         saturation = PunchySaturation;
-        Vector3 display = AgxDisplay(AgxPunchy(sigmoid, saturation), out bool clipped);
+        Vector3 display = AgxDisplay(AgxPunchy(sigmoid, saturation), margin, out bool clipped);
         if (!clipped)
             return display;
 
@@ -369,13 +423,13 @@ public static class DisplayTransform
         }
 
         saturation = 1f;
-        display = AgxDisplay(AgxPunchy(sigmoid, saturation), out clipped);
+        display = AgxDisplay(AgxPunchy(sigmoid, saturation), margin, out clipped);
         if (clipped || high <= saturation)
             return display;
         for (int i = 0; i < SaturationBisections; i++)
         {
             float middle = 0.5f * (saturation + high);
-            Vector3 trial = AgxDisplay(AgxPunchy(sigmoid, middle), out clipped);
+            Vector3 trial = AgxDisplay(AgxPunchy(sigmoid, middle), margin, out clipped);
             if (clipped)
             {
                 high = middle;
@@ -390,15 +444,17 @@ public static class DisplayTransform
 
     /// <summary>
     /// The rest of AgX after the sigmoid and the look: the outset, a 2.2 power back to linear, back to Rec.709, not yet clamped.
-    /// <paramref name="clipped"/> says whether a channel went below 0, at the outset (where the power's clamp cuts it) or in Rec.709.
+    /// <paramref name="clipped"/> says whether a channel went below 0, at the outset (where the power's clamp cuts it) or in Rec.709,
+    /// or in Rec.709 below <paramref name="margin"/> times the colour's luminance (<see cref="DisplayGrade.SkyMargin"/>).
     /// </summary>
-    private static Vector3 AgxDisplay(Vector3 graded, out bool clipped)
+    private static Vector3 AgxDisplay(Vector3 graded, float margin, out bool clipped)
     {
         Vector3 c = AgxOutset.Times(graded);
         clipped = Math.Min(c.X, Math.Min(c.Y, c.Z)) < 0f;
         c = new Vector3(MathF.Pow(Math.Max(c.X, 0f), 2.2f), MathF.Pow(Math.Max(c.Y, 0f), 2.2f), MathF.Pow(Math.Max(c.Z, 0f), 2.2f));
         c = Rec2020ToRec709.Times(c);
-        clipped |= Math.Min(c.X, Math.Min(c.Y, c.Z)) < 0f;
+        float floor = margin > 0f ? margin * Math.Max(Vector3.Dot(c, new Vector3(0.2126f, 0.7152f, 0.0722f)), 0f) : 0f;
+        clipped |= Math.Min(c.X, Math.Min(c.Y, c.Z)) < floor;
         return c;
     }
 

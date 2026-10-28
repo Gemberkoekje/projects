@@ -98,7 +98,7 @@ public sealed class MaterialOptionsTests
             Erosion = false,
         };
         Sidecar rule = PreviewPipeline.Run(request, new FakeRenderer());
-        Assert.AreEqual(26, rule.Schema);
+        Assert.AreEqual(27, rule.Schema);
         MaterialsInfo materials = rule.Materials!;
         Assert.IsTrue(materials.ByRule);
         CollectionAssert.AreEqual(new[] { "rock.hard", "rock.soft", "scree", "soil", "grass", "forest", "snow", "ice", "firn", "snow.wet" },

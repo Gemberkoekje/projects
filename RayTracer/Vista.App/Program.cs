@@ -54,6 +54,8 @@ internal static class Program
             return RunGpu(() => QuadratureCompare.Run(args, Console.Out));
         if (args.FirstOrDefault() == PoolsCompare.Flag)
             return RunGpu(() => PoolsCompare.Run(args, Console.Out));
+        if (args.FirstOrDefault() == GoldenCheck.Flag)
+            return RunGpu(() => GoldenCheck.Run(args, Console.Out));
 
         if (args.FirstOrDefault() == WatchCheck.Flag)
             return WatchCheck.Run(args, Console.Out);
@@ -263,6 +265,7 @@ internal static class Program
         Console.Error.WriteLine(WatchCommandLine.Usage);
         Console.Error.WriteLine(Window.WindowApp.Usage);
         Console.Error.WriteLine(WatchCheck.Usage);
+        Console.Error.WriteLine(GoldenCheck.Usage);
         Console.Error.WriteLine(Window.WindowCheck.Usage);
         Console.Error.WriteLine($"       Vista.App {SelfTestFlag}   (determinism and LUT checks on the GPU)");
         Console.Error.WriteLine(AtmosphereCheck.Usage);

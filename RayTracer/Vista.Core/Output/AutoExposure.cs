@@ -32,8 +32,8 @@ public enum Metering
 /// <param name="MeteredEv">The stops the meter alone scaled the linear image by (log₂ of <see cref="MeterScale"/>); null when it found no light.</param>
 /// <param name="Ev100">The scene's exposure value at ISO 100 by that meter's calibration; null when it found no light.</param>
 /// <param name="AppliedEv">
-/// The stops the display transform scaled the linear image by: the metered stops plus the camera's compensation and
-/// <see cref="MeterCompensationEv"/>.
+/// The stops the display transform scaled the linear image by: the metered stops plus the camera's compensation,
+/// <see cref="MeterCompensationEv"/> and <see cref="AdaptationEv"/>.
 /// </param>
 public sealed record ExposureInfo(Metering Meter, string Method, double CompensationEv, double? MeteredEv, double? Ev100, double AppliedEv)
 {
@@ -42,6 +42,19 @@ public sealed record ExposureInfo(Metering Meter, string Method, double Compensa
     /// default the incident meter's <see cref="IncidentMeter.DefaultCompensationEv"/> and the average meter's 0.
     /// </summary>
     public double MeterCompensationEv { get; init; }
+
+    /// <summary>
+    /// How far the incident meter's exposure followed the light below <see cref="IncidentMeter.AdaptationLux"/> (vista-plan §10 M1.17):
+    /// 1 all the way (M1.10a's meter), 0 not at all (a camera whose exposure was set before dusk), between partly. Null for the
+    /// average meter, which always follows the frame.
+    /// </summary>
+    public double? Adaptation { get; init; }
+
+    /// <summary>
+    /// The stops the adaptation took off the exposure, 0 or less: (1 − <see cref="Adaptation"/>) times the stops the card's light lay
+    /// under <see cref="IncidentMeter.AdaptationLux"/>. Already in <see cref="AppliedEv"/>.
+    /// </summary>
+    public double AdaptationEv { get; init; }
 
     /// <summary>The average meter's reading (<see cref="Metering.Average"/>); null for the incident meter.</summary>
     public AverageReading? Average { get; init; }
