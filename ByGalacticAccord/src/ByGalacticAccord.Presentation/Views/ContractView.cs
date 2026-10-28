@@ -69,6 +69,8 @@ public sealed record ContractViewModel(
     string PartyRole,
     IReadOnlyList<string> Record,
     string? Known,
+    string? Shown,
+    ShowingModel? Advertise,
     bool IsOpen,
     bool CanAccept,
     string AcceptLabel,
@@ -164,7 +166,8 @@ public static class ContractView
         string? known = null;
         if (contract.IsOpen || PlayerActions.Believed(context, session.Player, contract))
         {
-            (known, _) = BoardView.Seen(session, contract, session.Sight);
+            Sight sight = session.Sight;
+            known = sight.CanSee(contract) ? null : BoardView.Seen(session, contract, sight).Seen; // only the news needs a caution
         }
 
         return new ContractViewModel(
@@ -173,6 +176,7 @@ public static class ContractView
             schedule, Templates.Get("Contract.Uncertain"), uncertain,
             Templates.Fill("Contract.Terms.Package", ("package", Templates.Package(contract.Terms.Package))), TermsOf(session, contract), poster.Name, partyRole,
             Record(session, contract, poster), known,
+            contract.IsOpen ? AdView.ShownLine(session, contract) : null, AdView.ForPost(session, contract),
             contract.IsOpen && contract.PostedBy != session.Player.Id, canAccept, Templates.Get(AcceptKey(contract)), blocked,
             actions, Templates.Get("Contract.Why"), why, whyEnd,
             Templates.Get(contract.PostedBy == session.Player.Id ? "Contract.Answers" : "Contract.Haggle"), threads,

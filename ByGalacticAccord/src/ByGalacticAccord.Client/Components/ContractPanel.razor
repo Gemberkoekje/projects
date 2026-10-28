@@ -16,6 +16,10 @@
             {
                 <span class="small tone-Warn" data-testid="known">@Model.Known</span>
             }
+            @if (Model.Shown is not null)
+            {
+                <span class="xsmall muted" data-testid="shown">@Model.Shown</span>
+            }
         </div>
 
         @if (Model.Status is not null)
@@ -157,6 +161,10 @@
                     <span class="xsmall muted">@action.Note</span>
                 </div>
             }
+            @if (Model.Advertise is { } advertise)
+            {
+                <ShowingBlock Model="advertise.Choose(_chosen)" TestId="advertising" OnToggle="Toggle" OnShow="Show" />
+            }
             @if (Model.Counter is { } counter)
             {
                 <div class="block counter" data-testid="counter">
@@ -179,6 +187,11 @@
     private ContractViewModel? _rendered;
     private string? _renderedOutcome;
     private bool _renderedOnce;
+
+    // The systems ticked to show the player's own post in, kept until it pays or another contract is shown.
+    private readonly HashSet<LocationId> _chosen = new();
+    private ContractId? _chosenFor;
+    private bool _ticked;
 
     [Parameter]
     public ContractViewModel? Model { get; set; }
@@ -207,12 +220,43 @@
     [Parameter]
     public EventCallback<(NegotiationId? Thread, Offer Offer)> OnCounter { get; set; }
 
+    [Parameter]
+    public EventCallback<IReadOnlyCollection<LocationId>> OnAdvertise { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Model?.Id != _chosenFor)
+        {
+            _chosen.Clear();
+            _chosenFor = Model?.Id;
+        }
+    }
+
     protected override bool ShouldRender()
     {
-        bool changed = !_renderedOnce || !ReferenceEquals(_rendered, Model) || _renderedOutcome != Outcome;
+        bool changed = !_renderedOnce || !ReferenceEquals(_rendered, Model) || _renderedOutcome != Outcome || _ticked;
         _rendered = Model;
         _renderedOutcome = Outcome;
         _renderedOnce = true;
+        _ticked = false;
         return changed;
+    }
+
+    private void Toggle(LocationId at)
+    {
+        if (!_chosen.Remove(at))
+        {
+            _chosen.Add(at);
+        }
+
+        _ticked = true;
+    }
+
+    private async Task Show()
+    {
+        var chosen = _chosen.ToList();
+        _chosen.Clear();
+        _ticked = true;
+        await OnAdvertise.InvokeAsync(chosen);
     }
 }

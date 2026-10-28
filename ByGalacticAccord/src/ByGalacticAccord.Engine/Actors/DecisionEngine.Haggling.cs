@@ -239,13 +239,14 @@ public static partial class DecisionEngine
     // ---- the player's posts reach those who can see them (design §3.6, §16.6) ----
 
     /// <summary>
-    /// The player's new post reaches every AI actor that can see it and could answer it: after the hours its presence puts
-    /// between them and the post (<see cref="Sight.ReachHours"/>: at once here, a few hours near, design §7.1), and the hours
-    /// its answer takes (the tell), it takes the post as posted, counters, or lets it pass (<see cref="PostReached"/>,
-    /// <see cref="Respond"/>). A far actor never sees it, unless The Daily Accord reports it: then it reaches every actor that
-    /// can't see it live (<paramref name="fromNews"/>), from the moment the paper is out.
+    /// The player's new post reaches every AI actor that can see it and could answer it: once it is shown where the actor is
+    /// present (<see cref="Sight.ReachHours"/>: at once in its own system, later where the player paid to show it, design §7.1,
+    /// D38), and after the hours its answer takes (the tell), the actor takes the post as posted, counters, or lets it pass
+    /// (<see cref="PostReached"/>, <see cref="Respond"/>). Shown further later (<paramref name="newlyShown"/>), it reaches the
+    /// actors present only there. One that can't see it at all hears of it only if The Daily Accord reports it: then it reaches
+    /// every actor that can't see it live (<paramref name="fromNews"/>), from the moment the paper is out.
     /// </summary>
-    public static void NoticePost(SimulationContext context, Contract post, bool fromNews = false)
+    public static void NoticePost(SimulationContext context, Contract post, bool fromNews = false, IReadOnlyCollection<LocationId>? newlyShown = null)
     {
         if (!context.Config.PostsDrawAnswers)
         {
@@ -256,7 +257,7 @@ public static partial class DecisionEngine
         foreach (ActorState actor in context.ActorsOrdered)
         {
             Sight sight = Visibility.Of(context, actor);
-            long? reach = fromNews ? (sight.CanSee(post) ? null : 0) : sight.ReachHours(post);
+            long? reach = fromNews ? (sight.CanSee(post) ? null : 0) : newlyShown is null ? sight.ReachHours(post) : NewlyReached(post, sight, newlyShown);
             if (actor.Id == post.PostedBy || !Answers(actor, post) || reach is null || context.NegotiationWith(post.Id, actor.Id) is not null
                 || QuoteFor(context, actor, post, posted) is not { } quote)
             {
@@ -272,6 +273,29 @@ public static partial class DecisionEngine
             long hours = Haggling.ReplyHours(actor.Personality.ConcessionRate, answer.Tell, post.Id.Value + actor.Id.Value);
             context.Schedule(new PostReached(context.CurrentTick + reach.Value + hours, post.Id, actor.Id));
         }
+    }
+
+    // A post just shown further reaches an actor present where it is newly shown and nowhere it was shown before.
+    private static long? NewlyReached(Contract post, Sight sight, IReadOnlyCollection<LocationId> newlyShown)
+    {
+        long? soonest = null;
+        foreach (LocationId at in sight.Presence)
+        {
+            if (post.ShownFrom(at) is not { } from)
+            {
+                continue;
+            }
+
+            if (!newlyShown.Contains(at))
+            {
+                return null; // it already reached this actor
+            }
+
+            long hours = Math.Max(0L, from - sight.Tick);
+            soonest = soonest is { } s ? Math.Min(s, hours) : hours;
+        }
+
+        return soonest;
     }
 
     /// <summary>Whether an actor's habits (design §4.1) make it answer a kind of post: carriers take hauls; producers and carriers fill wanted Sales; consumers buy lots.</summary>

@@ -12,7 +12,8 @@ namespace ByGalacticAccord.Presentation.Views;
 
 /// <summary>
 /// The composer's fields as the player has them (the client keeps it): what kind of post, which goods and how many, where
-/// (and for a haul, to where), and its first offer: price, how many hours it runs, package and late fee.
+/// (and for a haul, to where), its first offer (price, how many hours it runs, package and late fee), and the further systems
+/// to show it in, for a fee (design §7.1, D38).
 /// </summary>
 public sealed record ComposerDraft(
     PostKind Kind,
@@ -23,7 +24,8 @@ public sealed record ComposerDraft(
     decimal Price,
     long Hours,
     TermPackage Package,
-    decimal LateFeeScale);
+    decimal LateFeeScale,
+    IReadOnlyList<LocationId>? ShowAt = null);
 
 /// <summary>
 /// The post composer (design §3.6, §11.3): the choices for each field, what posting it means, the reference figures the
@@ -54,6 +56,7 @@ public sealed record ComposerViewModel(
     string? Stored,
     string TermsTitle,
     IReadOnlyList<string> Terms,
+    ShowingModel Showing,
     string Commitment,
     string? Blocked,
     bool CanPost,
@@ -96,10 +99,15 @@ public static class ComposerView
             ? DecisionEngine.UsualHaulOffer(context, draft.Place, draft.Destination).Amount
             : System.Math.Round(Engine.Domain.Goods.Info(draft.Good).BaseValue * draft.Quantity, 2);
 
-    /// <summary>The engine's post for a draft: its deadline counted from now.</summary>
-    public static PostDraft ToPost(GameSession session, ComposerDraft draft) =>
-        new(draft.Kind, draft.Good, draft.Quantity, draft.Place, draft.Kind == PostKind.Haul ? draft.Destination : null,
+    /// <summary>The engine's post for a draft: its deadline counted from now; shown further only where that is still a choice (not one of its own places).</summary>
+    public static PostDraft ToPost(GameSession session, ComposerDraft draft)
+    {
+        var post = new PostDraft(
+            draft.Kind, draft.Good, draft.Quantity, draft.Place, draft.Kind == PostKind.Haul ? draft.Destination : null,
             new Offer(Credits.Of(System.Math.Round(draft.Price, 2)), session.Now + draft.Hours, draft.Package, draft.LateFeeScale));
+        var further = Advertising.Options(session.Context, post.Places, post.Offer.Price).Select(o => o.At).ToHashSet();
+        return post with { ShowAt = (draft.ShowAt ?? System.Array.Empty<LocationId>()).Where(further.Contains).Distinct().ToList() };
+    }
 
     public static ComposerViewModel Build(GameSession session, ComposerDraft draft)
     {
@@ -140,6 +148,7 @@ public static class ComposerView
             Reference(session, draft),
             stored,
             Templates.Fill("Contract.Terms.Package", ("package", Templates.Package(draft.Package))), terms,
+            AdView.ForDraft(session, post),
             Commitment(session, post),
             block == PostBlock.None ? null : BlockText(session, post, block),
             block == PostBlock.None,
@@ -157,8 +166,7 @@ public static class ComposerView
                 "PostBlock.NoGoods", ("quantity", Format.Quantity(draft.Quantity)), ("good", Templates.Good(draft.Good)), ("place", place)),
             PostBlock.NoRoute => Templates.Fill(
                 "PostBlock.NoRoute", ("origin", place), ("destination", draft.Destination is { } d ? context.Location(d).Name : place)),
-            PostBlock.CannotAfford => Templates.Fill(
-                "PostBlock.CannotAfford", ("cost", Format.Money(Credits.Of(draft.Offer.Price.Amount * (1m + TaxAt(context, draft))))), ("credits", Format.Money(session.Player.Credits))),
+            PostBlock.CannotAfford => CannotAfford(session, draft),
             _ => Templates.Fill("PostBlock." + block, ("place", place)),
         };
     }
@@ -217,7 +225,20 @@ public static class ComposerView
             ("good", Templates.Good(draft.Good)),
         };
         string key = "Composer.Commits." + draft.Kind + (accord || draft.Kind == PostKind.Lot ? string.Empty : ".Frontier");
-        return Templates.Fill(key, facts) + " " + Templates.Get("Composer.Commits.Answers");
+        Credits showing = draft.ShowFee(context);
+        string shown = showing.Amount > 0m ? " " + Templates.Fill("Composer.Commits.Showing", ("fee", Format.MoneyCents(showing))) : string.Empty;
+        return Templates.Fill(key, facts) + shown + " " + Templates.Get("Composer.Commits.Answers");
+    }
+
+    // What posting it would cost against what the player has; with a fee to show it further, to the cent (design §7.1, D38).
+    private static string CannotAfford(GameSession session, PostDraft draft)
+    {
+        SimulationContext context = session.Context;
+        decimal locked = draft.Kind == PostKind.Lot ? 0m : draft.Offer.Price.Amount * (1m + TaxAt(context, draft));
+        decimal showing = draft.ShowFee(context).Amount;
+        return showing > 0m
+            ? Templates.Fill("PostBlock.CannotAfford.Showing", ("cost", Format.MoneyCents(locked + showing)), ("credits", Format.MoneyCents(session.Player.Credits)))
+            : Templates.Fill("PostBlock.CannotAfford", ("cost", Format.Money(Credits.Of(locked))), ("credits", Format.Money(session.Player.Credits)));
     }
 
     // The Accord tax on the price where it would be performed: a Sale's place, a haul's destination.

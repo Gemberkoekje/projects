@@ -157,6 +157,35 @@ async function runUntil(page, target, timeoutMs) {
     return true;
 }
 
+// Run the clock at 4× until a takeable row is on the board, then pause with it there.
+async function runUntilTakeable(page, takeable, timeoutMs) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+        await page.click('button[data-speed="X4"]');
+        while (await takeable.count() === 0 && Date.now() - started < timeoutMs) {
+            if (await answerDecision(page)) {
+                await page.click('button[data-speed="X4"]');
+            }
+
+            const resume = page.locator('.alert button');
+            if (await resume.count() > 0) {
+                await resume.click();
+                await page.click('button[data-speed="X4"]');
+            }
+
+            await page.waitForTimeout(50);
+        }
+
+        await page.click('button[data-speed="Paused"]');
+        await page.waitForTimeout(200);
+        if (await takeable.count() > 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 async function main() {
     const server = await serve();
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -201,8 +230,17 @@ async function main() {
         await page.screenshot({ path: path.join(shots, '01-start.png'), fullPage: true });
         await page.locator('.lower-row').screenshot({ path: path.join(shots, '12-news.png') });
 
-        // 2. Selecting a contract opens it beside the map and draws its route.
-        const takeable = page.locator('.board-row[data-seen="live"]:not(.blocked)').filter({ has: page.locator('.take.tone-Gain') }).first();
+        // 2. Selecting a contract opens it beside the map and draws its route. At the start the board holds what is posted at
+        //    Meridian and what the news reported: a post a jump away shows only once its poster pays to show it here (design
+        //    §7.1, D38), which an AI does after a day unsold. So the clock runs until something takeable is live.
+        const takeable = page.locator('.board-row[data-seen="live"]:not(.blocked), .board-row[data-seen="ad"]:not(.blocked)')
+            .filter({ has: page.locator('.take.tone-Gain') }).first();
+        const waitedFrom = await tick(page);
+        if (await takeable.count() === 0) {
+            const found = await runUntilTakeable(page, takeable, 60000);
+            check(found, `something takeable is live after ${await tick(page) - waitedFrom} game hours (none at the start)`);
+        }
+        const takeableSeen = await takeable.getAttribute('data-seen');
         await takeable.click();
         await page.waitForSelector('[data-testid="take-home"]');
         const takeHome = (await page.textContent('[data-testid="take-home"]')).trim();
@@ -218,6 +256,7 @@ async function main() {
             'an open post offers a counter-offer: price, due date, terms and late fee');
         const record = (await page.locator('.contract-panel [data-testid="party"] .record').allTextContents()).map(t => t.trim());
         check(record.some(r => r.startsWith('Public record:')) && record.some(r => r.startsWith('Your own dealings')), `the party's public record and your dealings with it ("${record[0]}")`);
+        results.push(`info  the contract taken is seen ${takeableSeen === 'ad' ? 'where its poster advertised it' : 'live in its own system'}`);
         await page.screenshot({ path: path.join(shots, '02-contract.png'), fullPage: true });
 
         // 2b. A contract the player knows of only from the news says so, and that it may have been taken since.
@@ -289,12 +328,36 @@ async function main() {
         const composerTerms = await page.locator('[data-testid="composer-terms"] .term').count();
         const reference = (await page.textContent('[data-testid="composer-reference"]')).trim();
         check(composerTerms >= 6 && reference.includes('base value'), `the composer reads its terms (${composerTerms}) and the figures to price by ("${reference.slice(0, 70)}…")`);
+
+        // 3d. Shown at Verdant only, unless the player pays to show it further (design §7.1, D38): tick Meridian, a jump away.
+        const showing = page.locator('[data-testid="composer-showing"]');
+        const unticked = (await showing.locator('[data-testid="composer-showing-total"]').textContent()).trim();
+        await showing.locator('.show-option', { hasText: 'Meridian Station' }).locator('input').check();
+        await page.waitForTimeout(200);
+        const tickedTotal = (await showing.locator('[data-testid="composer-showing-total"]').textContent()).trim();
+        const commits = (await page.textContent('[data-testid="composer"] .small.muted:has-text("Answers come")')).trim();
+        check(unticked === 'Shown at Verdant only.' && /^Showing it in one more system costs ₵0\.\d\d\.$/.test(tickedTotal) && commits.includes('Showing it further costs'),
+            `the composer offers further systems for a fee ("${unticked}" → "${tickedTotal}")`);
         await page.locator('[data-testid="composer"]').screenshot({ path: path.join(shots, '09-composer.png') });
         await page.click('[data-testid="post"]');
         const posted = (await page.textContent('.contract-panel .outcome')).trim();
         check(posted.startsWith('Posted:') && posted.includes('Verdant'), `posting it puts it up ("${posted}")`);
         check(await page.locator('[data-testid="posts"] .post-line').filter({ hasText: 'wanted at Verdant' }).count() === 1, 'your posts list it');
         check(await page.locator('[data-testid="composer"]').count() === 0, 'the composer closes once it is posted');
+
+        // 3e. The open post says where it is shown, and pays to show it one system further still.
+        await page.locator('[data-testid="posts"] .post-line').filter({ hasText: 'wanted at Verdant' }).locator('.link-text').first().click();
+        await page.waitForSelector('.contract-panel [data-testid="advertising"]');
+        const shownLine = (await page.textContent('.contract-panel [data-testid="shown"]')).trim();
+        const advertising = page.locator('.contract-panel [data-testid="advertising"]');
+        await advertising.locator('.show-option input').first().check();
+        await page.waitForTimeout(200);
+        const adTotal = (await advertising.locator('[data-testid="advertising-total"]').textContent()).trim();
+        await page.locator('.contract-panel').screenshot({ path: path.join(shots, '14-advertise.png') });
+        await advertising.locator('[data-testid="advertise"]').click();
+        const advertised = (await page.textContent('.contract-panel .outcome')).trim();
+        check(/^Shown at Verdant; Meridian Station from Day/.test(shownLine) && adTotal.startsWith('Showing it in one more system') && advertised.startsWith('Paid ₵'),
+            `the post shows where it is seen and is shown further for a fee ("${shownLine}"; "${advertised.slice(0, 60)}…")`);
 
         // 4. The clock runs at 16×; ships move.
         const before = await tick(page);

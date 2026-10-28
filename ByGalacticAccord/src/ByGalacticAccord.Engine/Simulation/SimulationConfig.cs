@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using ByGalacticAccord.Engine.Domain;
 
 namespace ByGalacticAccord.Engine.Simulation;
@@ -53,6 +54,30 @@ public sealed record SimulationConfig
 
     /// <summary>How much likelier a contract with a place outside the Accord is to make the news (plan risk R1: the frontier must hear of it).</summary>
     public decimal NewsFrontierWeight { get; init; } = 3m;
+
+    /// <summary>
+    /// How many jumps out from its place a post is shown free of charge (design §7.1, D38). At 0 it is shown in its own system
+    /// only; further out, its poster pays to show it (<see cref="Economy.Advertising"/>).
+    /// </summary>
+    public int AdFreeJumps { get; init; } = 0;
+
+    /// <summary>The fee to show a post in one system a jump away, as a share of its price (plan S6b's experiments: 0.05%).</summary>
+    public decimal AdFeeShare { get; init; } = 0.0005m;
+
+    /// <summary>The least a post costs to show in one system a jump away.</summary>
+    public Credits AdFeeFloor { get; init; } = Credits.Of(0.20m);
+
+    /// <summary>How much dearer each further jump is, per system shown (×4: a jump costs four times the one before).</summary>
+    public decimal AdFeeGrowth { get; init; } = 4m;
+
+    /// <summary>How many hours after it is paid for a post is shown at a distance, by jumps; past the last, a day more a jump.</summary>
+    public IReadOnlyList<long> AdDelayHours { get; init; } = new long[] { 0, 4, 24, 48 };
+
+    /// <summary>How long an AI actor's post sits unsold, since it was posted or last shown further, before it pays to show it a jump further.</summary>
+    public long AdWaitHours { get; init; } = 24;
+
+    /// <summary>The most an AI actor pays to show a post one jump further, as a share of the post's price.</summary>
+    public decimal AdBudgetShare { get; init; } = 0.05m;
 
     /// <summary>The most a consumer keeps in hand, in days of income; the rest goes on things outside the sector (a sink).</summary>
     public decimal ConsumerSavingsDays { get; init; } = 90m;

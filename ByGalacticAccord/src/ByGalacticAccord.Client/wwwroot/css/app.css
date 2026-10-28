@@ -292,6 +292,10 @@ a:hover { color: var(--accent-hover); }
 .field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .offer-form { display: flex; flex-direction: column; gap: 8px; }
 .composer-panel > p { margin: 0; }
+.showing p { margin: 0; }
+.show-options { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.show-option { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--divider); padding: 5px 0; cursor: pointer; }
+.show-option input { accent-color: var(--accent); margin: 0; align-self: center; }
 .thread { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
 .thread[data-your-turn="true"] { border-color: var(--warn-border); }
 .thread-head { display: flex; flex-direction: column; gap: 2px; }

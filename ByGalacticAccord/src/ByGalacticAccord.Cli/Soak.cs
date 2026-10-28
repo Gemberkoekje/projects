@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
@@ -140,6 +141,7 @@ internal static class Soak
         NewsDesk news = ctx.News;
         long issues = Math.Max(1, news.IssuesPublished);
         Line("  The Daily Accord", $"{news.IssuesPublished.ToString("N0", CultureInfo.InvariantCulture)} issues, {(decimal)news.ItemsPublished / issues:0.0} items of {(decimal)news.CandidatesSeen / issues:0.0} contracts a day; {(news.ItemsPublished == 0 ? 0m : (decimal)news.FrontierItems / news.ItemsPublished):P0} about the frontier, {(news.ItemsPublished == 0 ? 0m : (decimal)news.PostedItems / news.ItemsPublished):P0} open posts");
+        Line("  Paid to show posts further", $"{ctx.AdFeesPaid}: {string.Join(", ", Enumerable.Range(1, 4).Select(j => $"{ctx.AdsShown[j].ToString("N0", CultureInfo.InvariantCulture)} at {(j == 4 ? "4+" : j.ToString(CultureInfo.InvariantCulture))} jumps"))}; signed only through an ad {ctx.SignedViaAd.ToString("N0", CultureInfo.InvariantCulture)}");
         Line("  Signed from the news", $"{ctx.SignedFromNews.ToString("N0", CultureInfo.InvariantCulture)}; tries that found the post closed {ctx.FoundClosedFromNews.ToString("N0", CultureInfo.InvariantCulture)}");
 
         Console.WriteLine();

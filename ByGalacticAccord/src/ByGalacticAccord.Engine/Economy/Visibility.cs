@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
@@ -5,23 +6,23 @@ using ByGalacticAccord.Engine.Simulation;
 
 namespace ByGalacticAccord.Engine.Economy;
 
-/// <summary>How close a location is to an actor's presence (design §7.1), and so how much the actor knows of it.</summary>
+/// <summary>How close a location is to an actor's presence (design §7.1), and so how much the actor knows of its prices.</summary>
 public enum Tier
 {
-    /// <summary>A location where it has a presence: every contract the moment it is posted, live prices and stock levels.</summary>
+    /// <summary>A location where it has a presence: live prices and stock levels, and every post shown there.</summary>
     Here,
 
-    /// <summary>One jump from such a location: contracts a few hours after posting, prices updated daily, no internal state.</summary>
+    /// <summary>One jump from such a location: prices updated daily, no internal state.</summary>
     Near,
 
-    /// <summary>Anywhere else: no contracts, except those that make the news; prices as of the last time it was there.</summary>
+    /// <summary>Anywhere else: prices as of the last time it was there.</summary>
     Far,
 }
 
 /// <summary>
-/// What one actor can see at one moment (design §7.1): where it is present, the tier of every location from there, and so
-/// which contracts it sees live and how soon a new post reaches it. Built once per question (<see cref="Visibility.Of"/>)
-/// and asked many times; it goes stale as soon as a ship moves.
+/// What one actor can see at one moment (design §7.1, D38): where it is present, the tier of every location from there (for
+/// prices), and so which contracts it sees live: those shown where it is present (<see cref="Advertising"/>). Built once per
+/// question (<see cref="Visibility.Of"/>) and asked many times; it goes stale as soon as a ship moves.
 /// </summary>
 public sealed class Sight
 {
@@ -46,27 +47,10 @@ public sealed class Sight
 
     public Tier TierOf(LocationId location) => location.Value >= 0 && location.Value < _tiers.Length ? _tiers[location.Value] : Tier.Far;
 
-    /// <summary>The nearest tier of any of a contract's places.</summary>
-    public Tier TierOf(Contract contract)
-    {
-        Tier best = Tier.Far;
-        IReadOnlyList<LocationId> places = contract.Places;
-        for (int i = 0; i < places.Count; i++)
-        {
-            Tier tier = TierOf(places[i]);
-            if (tier < best)
-            {
-                best = tier;
-            }
-        }
-
-        return best;
-    }
-
     /// <summary>
-    /// Whether the actor sees a contract live (design §7.1): its own; one with a place where it is present, from the moment it
-    /// is posted; one with a place a jump from its presence, a few hours after (<see cref="Visibility.ReachNear"/>). Nothing
-    /// further: a far contract reaches it only through the news (<see cref="Knowledge"/>).
+    /// Whether the actor sees a contract live (design §7.1, D38): its own; or one shown, by now, at a location where it is
+    /// present. A post is shown in its own system at once, and further out only where its poster paid to show it
+    /// (<see cref="Advertising"/>). Anything else reaches it only through the news (<see cref="Knowledge"/>).
     /// </summary>
     public bool CanSee(Contract contract)
     {
@@ -75,21 +59,32 @@ public sealed class Sight
             return true;
         }
 
-        return TierOf(contract) switch
+        for (int i = 0; i < Presence.Count; i++)
         {
-            Tier.Here => true,
-            Tier.Near => Tick - contract.PostedTick >= Visibility.ReachNear,
-            _ => false,
-        };
+            if (contract.ShownFrom(Presence[i]) is { } from && from <= Tick)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    /// <summary>How many game hours a new post takes to reach the actor (design §3.6, §7.1): at once here, a few hours near; never from far.</summary>
-    public long? ReachHours(Contract contract) => TierOf(contract) switch
+    /// <summary>How many game hours until a post reaches the actor (design §3.6): until it is shown where the actor is present; null if it isn't shown there.</summary>
+    public long? ReachHours(Contract contract)
     {
-        Tier.Here => Visibility.ReachHere,
-        Tier.Near => Visibility.ReachNear,
-        _ => null,
-    };
+        long? soonest = null;
+        for (int i = 0; i < Presence.Count; i++)
+        {
+            if (contract.ShownFrom(Presence[i]) is { } from)
+            {
+                long hours = Math.Max(0L, from - Tick);
+                soonest = soonest is { } s ? Math.Min(s, hours) : hours;
+            }
+        }
+
+        return soonest;
+    }
 }
 
 /// <summary>
@@ -100,12 +95,6 @@ public sealed class Sight
 /// </summary>
 public static class Visibility
 {
-    /// <summary>How long a new post takes to reach an actor where it is present (design §7.1: here, at once).</summary>
-    public const long ReachHere = 0;
-
-    /// <summary>One jump from its presence: "contracts a few hours after posting" (design §7.1).</summary>
-    public const long ReachNear = 4;
-
     /// <summary>What <paramref name="actor"/> can see now.</summary>
     public static Sight Of(SimulationContext context, ActorState actor)
     {

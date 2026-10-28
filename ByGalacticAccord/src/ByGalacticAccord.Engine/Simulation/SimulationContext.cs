@@ -161,6 +161,17 @@ public sealed class SimulationContext
     /// <summary>Tries at a contract known only from the news that found it already closed.</summary>
     public long FoundClosedFromNews { get; private set; }
 
+    /// <summary>Fees paid to show posts further out (design §7.1, D38).</summary>
+    public Credits AdFeesPaid { get; private set; } = Credits.Zero;
+
+    /// <summary>The systems those fees bought, by jumps from the post: index 1 to 4, the last for 4 and further.</summary>
+    public IReadOnlyList<long> AdsShown => _adsShown;
+
+    /// <summary>Contracts signed by a taker that saw them only where their poster paid to show them.</summary>
+    public long SignedViaAd { get; private set; }
+
+    private readonly long[] _adsShown = new long[5];
+
     public IReadOnlyDictionary<ActorId, ActorState> Actors => _actors;
 
     public IReadOnlyDictionary<ShipId, Ship> Ships => _ships;
@@ -196,6 +207,7 @@ public sealed class SimulationContext
     {
         _locations[location.Id] = location;
         _pathCache.Clear();
+        _jumps = null;
     }
 
     public void Add(Route route)
@@ -203,11 +215,13 @@ public sealed class SimulationContext
         _routes.Add(route);
         _pathCache.Clear();
         _adjacent.Clear();
+        _jumps = null;
     }
 
     public void Add(Contract contract)
     {
         _contracts[contract.Id] = contract;
+        Advertising.ShowOnPosting(this, contract);
         Index(contract.PostedBy, contract);
         if (contract.CounterpartyId is { } counterparty)
         {
@@ -306,6 +320,14 @@ public sealed class SimulationContext
     }
 
     internal void NoteSignedFromNews() => SignedFromNews++;
+
+    internal void NoteAdShown(int jumps, Credits fee)
+    {
+        _adsShown[System.Math.Clamp(jumps, 1, _adsShown.Length - 1)]++;
+        AdFeesPaid += fee;
+    }
+
+    internal void NoteSignedViaAd() => SignedViaAd++;
 
     internal void NoteFoundClosedFromNews() => FoundClosedFromNews++;
 
@@ -445,6 +467,38 @@ public sealed class SimulationContext
     // ---- world graph helpers ----
     public Route? RouteBetween(LocationId a, LocationId b) =>
         _routes.FirstOrDefault(r => r.Connects(a, b));
+
+    // Jumps between every pair, built on first use; adding a location or route clears it.
+    private Dictionary<(LocationId, LocationId), int>? _jumps;
+
+    /// <summary>The fewest jumps between two locations, along routes; int.MaxValue if no route joins them.</summary>
+    public int Jumps(LocationId a, LocationId b)
+    {
+        if (_jumps is null)
+        {
+            _jumps = new Dictionary<(LocationId, LocationId), int>();
+            foreach (LocationId from in _locations.Keys)
+            {
+                var queue = new Queue<LocationId>();
+                _jumps[(from, from)] = 0;
+                queue.Enqueue(from);
+                while (queue.Count > 0)
+                {
+                    LocationId at = queue.Dequeue();
+                    foreach (LocationId to in _locations.Keys)
+                    {
+                        if (!_jumps.ContainsKey((from, to)) && Adjacent(at, to))
+                        {
+                            _jumps[(from, to)] = _jumps[(from, at)] + 1;
+                            queue.Enqueue(to);
+                        }
+                    }
+                }
+            }
+        }
+
+        return _jumps.TryGetValue((a, b), out int jumps) ? jumps : int.MaxValue;
+    }
 
     /// <summary>Whether a route joins two locations directly.</summary>
     public bool Adjacent(LocationId a, LocationId b)

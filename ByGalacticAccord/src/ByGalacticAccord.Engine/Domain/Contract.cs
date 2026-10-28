@@ -101,6 +101,7 @@ public abstract class Contract
         Region = region;
         Terms = terms;
         Status = ContractStatus.Open;
+        LastAdvertised = postedTick;
     }
 
     public ContractId Id { get; }
@@ -113,6 +114,51 @@ public abstract class Contract
     public ActorId? CounterpartyId { get; private set; }
 
     public long PostedTick { get; }
+
+    // Where it is shown (design §7.1, D38): from which tick, by location. Its own places from its posting; further out where
+    // its poster paid to show it (Economy.Advertising).
+    private SortedDictionary<long, long>? _shown;
+
+    /// <summary>From when it is shown at a location; null if it isn't.</summary>
+    public long? ShownFrom(LocationId location) => _shown is not null && _shown.TryGetValue(location.Value, out long from) ? from : null;
+
+    /// <summary>Every location it is shown at, with from when, in location order.</summary>
+    public IEnumerable<(LocationId At, long From)> Shown
+    {
+        get
+        {
+            if (_shown is null)
+            {
+                yield break;
+            }
+
+            foreach (KeyValuePair<long, long> entry in _shown)
+            {
+                yield return (new LocationId(entry.Key), entry.Value);
+            }
+        }
+    }
+
+    /// <summary>When its poster last paid to show it further; its posting, if never.</summary>
+    public long LastAdvertised { get; private set; }
+
+    /// <summary>Whether its poster has paid to show it beyond the free reach.</summary>
+    public bool Advertised { get; private set; }
+
+    internal void ShowAt(LocationId location, long from)
+    {
+        _shown ??= new SortedDictionary<long, long>();
+        if (!_shown.TryGetValue(location.Value, out long already) || from < already)
+        {
+            _shown[location.Value] = from;
+        }
+    }
+
+    internal void NoteAdvertised(long tick)
+    {
+        LastAdvertised = tick;
+        Advertised = true;
+    }
 
     public long? SignedTick { get; private set; }
 

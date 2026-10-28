@@ -13,7 +13,7 @@
         {
             bool on = Selected == row.Id;
             <button type="button" class="board-row age-@row.Age @(on ? "on" : null) @(row.Blocked ? "blocked" : null)" aria-pressed="@(on ? "true" : "false")"
-                    data-seen="@(row.Seen is null ? "live" : "news")" @key="row.Id" @onclick="() => OnSelect.InvokeAsync(row.Id)">
+                    data-seen="@(!row.Live ? "news" : row.Seen is null ? "live" : "ad")" @key="row.Id" @onclick="() => OnSelect.InvokeAsync(row.Id)">
                 <span class="row-line">
                     <span class="kind caps mono">@row.Kind</span>
                     <span class="take mono tone-@row.TakeHomeTone">@row.TakeHome</span>

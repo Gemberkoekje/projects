@@ -6,8 +6,8 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-10-28):** S1–S6 done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
-[S4 log](log/S4.md), [S5 log](log/S5.md), [S6 log](log/S6.md)); S7 is next. The UI mockup
+**Status (2026-10-28):** S1–S6 and S6b done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
+[S4 log](log/S4.md), [S5 log](log/S5.md), [S6 log](log/S6.md), [S6b log](log/S6b.md)); S7 is next. The UI mockup
 is at <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
@@ -50,8 +50,8 @@ foundation is sound; most of the game logic on top of it changes shape.
 | *Found in S4:* filling a Sale through a carrier pays only if the player watches its haul: at the usual offer about one in seven goes untaken and the Sale is cancelled for the bond, and the player can raise an offer only by reposting it | S5 (in part: the player posts a haul at its own price and terms, and haggles with the carriers that answer). S6: a post reaches only the carriers that can see it or read of it in the news; I didn't measure the untaken share again |
 | *Found in S4:* decisions rarely reach the player, which is a payer only of the hauls it posts and the lots it buys | S5 (in part: the player can post wanted Sales and is then asked about defaults and inspections, but neither bot met a decision in 8,333 game days) |
 | *Found in S5:* the market reader rarely finds a spread worth posting for (2–7 posts in 8,333 game days) and doesn't reliably beat the board taker | S6 (fixed: the reader judges each deal's risk and the next leg, and wins 9 of 10 seeds at 1.16× the taker; buying into a spread still loses money, so that part is off) |
-| *Found in S5:* the share of signed contracts that fail or are cancelled rose from 4.3–4.8% to 6.6–7.5%, and payer default from 41–239 to 474–601 a million ticks, as haggling signs marginal deals | Open (S6: 6.3–6.5%, payer default 691–804): see the questions in [`log/S5.md`](log/S5.md) |
-| *Found in S6:* a consumer doesn't see lots two jumps away, so Helios Prime, which bought its machinery as lots from Tycho, gets 66–72% of it (S5: 98–99%) | Open: see the questions in [`log/S6.md`](log/S6.md); S7's part factories sell lots too |
+| *Found in S5:* the share of signed contracts that fail or are cancelled rose from 4.3–4.8% to 6.6–7.5%, and payer default from 41–239 to 474–601 a million ticks, as haggling signs marginal deals | Open (S6: 6.3–6.5%, payer default 691–804; over ten seeds S6 is 4.5–7.0% and S6b 4.5–6.0%, payer default 467–1,201): see the questions in [`log/S5.md`](log/S5.md) |
+| *Found in S6:* a consumer doesn't see lots two jumps away, so Helios Prime, which bought its machinery as lots from Tycho, gets 66–72% of it (S5: 98–99%) | S6b (in part: a producer pays to show a lot that sits unsold further out, and Helios Prime gets 80–96% of its machinery over ten seeds; its food fell from 74–91% to 52–90%). S7's part factories sell lots too |
 | *Found after S6* (in the advertising experiments): a trader whose Sale from its own storage lost its haul sent its own free ship without checking it could carry the goods (a 45-unit Fast Courier took 100 food). Plain S6 did it 5 times in a million ticks on seed 2; the soak checks invariants every 5,000 ticks, so it missed them | Fixed 2026-10-28 (`DecisionEngine.ArrangeTransport` sends its own ship only if the goods fit; `FailurePathTests.A_trader_whose_haul_goes_untaken_sends_its_own_ship_only_if_the_goods_fit`) |
 | *Found in S3:* Dust Runner Kael's armoured freighter costs more to run than it earns in this sector, and an actor can't change its fleet | S7 |
 
@@ -212,6 +212,32 @@ foundation is sound; most of the game logic on top of it changes shape.
   taker. The client fades what the player knows by age, marks the tiers, and shows The Daily Accord, the signals and
   each party's public record. See [`log/S6.md`](log/S6.md).
 
+### S6b — Showing a post further
+
+- **Goal:** where you post matters, and reaching further costs something (design §7.1, D38). Added after S6's review,
+  from the user's proposal: a post is shown in its own system, and its poster pays to show it further out. Ten-seed
+  experiments chose the version below from 29 settings (fees destroyed, or paid to stations, consumers or the
+  government; one jump free or none; the fee's size and growth).
+- **Deliverable:**
+  - A post shown at its places the moment it is posted, and nowhere else.
+  - Further systems for a fee to each system's station operator: 0.05% of the price (at least ₵0.20), four times as
+    much a jump further; shown there 4 hours, a day, two days or three days later.
+  - AI posters: a post still unsold a day after it was posted or last shown further is shown a ring further, if the
+    ring costs at most 5% of its price.
+  - The player picks the systems in the composer and on its open post; the board says when a row is seen through an ad.
+  - Telemetry: fees paid, systems shown by distance, contracts signed only through an ad.
+- **Verify:**
+  - Tests for the fees, delays and operators paid, the AI's budget, and the player's post reaching an actor only once
+    it is shown there.
+  - Over ten seeds at a million ticks, invariants hold and the frontier is still supplied (R1).
+  - The market reader still beats the board taker.
+- **Status (2026-10-28):** done. Over ten seeds invariants hold, 3% more contracts are fulfilled than in S6 (9 seeds
+  of 10), 4.5–6.0% fail or are cancelled (S6 on the same seeds: 4.5–7.0%), and Helios Prime gets 80–96% of its
+  machinery (S6: 64–74%). Its food fell to 52–90% (S6: 74–91%), and Edge Station still gets 51–55% of its food and
+  77–86% of its machinery. Posters pay about ₵590,000 a million ticks, and a quarter of signed contracts were seen
+  only through an ad. The market reader wins all ten seeds at 1.22× the board taker. The client's composer and the
+  player's open posts carry a "Shown at" list with each system's fee and delay. See [`log/S6b.md`](log/S6b.md).
+
 ### S7 — Ships from parts
 
 - **Goal:** the signature decision (§6): stock, second-hand or custom.
@@ -226,6 +252,10 @@ foundation is sound; most of the game logic on top of it changes shape.
   - Second-hand Sales (AI sells idle ships; Edge Salvage); ship histories.
   - AI companies order ships when they want to grow.
   - Client: the ship sheet, the orders tree, the build composer, and the yard bids.
+  - **Showing a post further, measured again (D38):** decide which board a Build goes on (design A.2), then re-run
+    S6b's ten-seed comparison. Yards want parts from factories two or more jumps away, and ships cost far more than
+    goods, so a ring's fee and the AI's 5% budget mean something else; change the fee share, growth, delays, wait and
+    budget to match.
 - **Verify:**
   - Goods conservation holds through parts into ships.
   - A test per build failure path.
@@ -242,6 +272,11 @@ foundation is sound; most of the game logic on top of it changes shape.
   - The cruise or push throttle.
   - Incident outcomes that shift with danger and are modulated by toughness and reliability.
   - Docking fees.
+  - **Showing a post further, measured again (D38):** ad fees go to station operators, which pass what they hold
+    above their float out through `PayOut`. Once debt and insolvency replace that payout, where the fees end up
+    changes, and S6b's experiments found the destination matters: fees that are destroyed or hoarded shrink trade
+    through the inflation monitor. Re-measure the fee level and where it goes; if the station operators keep it, they
+    have to spend it.
 - **Verify:**
   - Insolvency tests for an AI and for the player.
   - In a soak, some AI actors fail and their ships resell, but not en masse.
@@ -267,9 +302,14 @@ foundation is sound; most of the game logic on top of it changes shape.
 
 - **Goal:** meet the definition of done (§12).
 - **Deliverable:**
-  - The seeded start state that guarantees beats 1–3.
+  - The seeded start state that guarantees beats 1–3. Since S6b a post a jump away isn't seen until its poster pays,
+    which an AI does after a day: the board at Day 1 · 06:00 holds only Meridian's posts and the news (the browser
+    check runs five game hours before anything takeable is live), and beat 2 needs Verdant's cheap food visible from
+    Meridian. The seeded start has to show those posts at Meridian, or the AI has to advertise sooner.
   - Bot players that measure beats 4–5 and the skill gap.
-  - Tuning against the §17 pacing targets.
+  - Tuning against the §17 pacing targets, with advertising's figures among the knobs (D38): the fee share and growth,
+    the delays, the AI's wait and budget, and whether a jump of free reach helps the first hour. S6b's experiments
+    measured each; the market reader's edge was widest with no free reach and small fees.
   - Playtests.
 - **Verify:**
   - All six done criteria in §12.

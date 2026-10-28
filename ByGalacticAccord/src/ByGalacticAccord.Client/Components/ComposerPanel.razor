@@ -104,6 +104,11 @@
         </div>
     }
 
+    @if (Model.Showing.Options.Count > 0)
+    {
+        <ShowingBlock Model="Model.Showing" TestId="composer-showing" OnToggle="Toggle" />
+    }
+
     <p class="small muted">@Model.Commitment</p>
     @if (Outcome is not null)
     {
@@ -138,6 +143,13 @@
     public EventCallback OnClose { get; set; }
 
     private Task Change(ComposerDraft draft) => OnChange.InvokeAsync(draft);
+
+    // Ticking a system adds it to where the post is shown when it goes up; unticking takes it off.
+    private Task Toggle(LocationId at)
+    {
+        IReadOnlyList<LocationId> chosen = Draft.ShowAt ?? Array.Empty<LocationId>();
+        return Change(Draft with { ShowAt = chosen.Contains(at) ? chosen.Where(l => l != at).ToList() : chosen.Append(at).ToList() });
+    }
 
     private static string Number(decimal value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 

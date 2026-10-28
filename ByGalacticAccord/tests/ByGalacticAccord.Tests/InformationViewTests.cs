@@ -166,7 +166,7 @@ public sealed class InformationViewTests
         ActorState metropole = context.Actor("Helios Prime Metropole");
         context.PostWanted(metropole, GoodType.Medicine, 5m, 600m); // handed over on the spot: on its record as paid
         SaleContract wanted = context.PostWanted(metropole, GoodType.Food, 40m, 900m);
-        context.RunTo(context.CurrentTick + Visibility.ReachNear);
+        context.ShowAJumpFurther(wanted);
 
         ContractViewModel view = ContractView.Build(session, wanted.Id);
         Assert.Equal("Public record: paid for 1 in full.", view.Record[0]);

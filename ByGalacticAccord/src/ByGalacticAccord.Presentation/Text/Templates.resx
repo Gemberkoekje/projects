@@ -1720,6 +1720,64 @@
   <data name="PostBlock.CannotAfford" xml:space="preserve">
     <value>It would lock {cost} with its tax, and you have {credits}.</value>
   </data>
+  <!-- Showing a post further out, for a fee (design §7.1, D38). -->
+  <data name="Ads.Title" xml:space="preserve">
+    <value>Shown at</value>
+  </data>
+  <data name="Ads.Note" xml:space="preserve">
+    <value>A post is shown in its own system at once. Further out it is shown only where you pay: the fee goes to that system's station, and is {growth} times as much for each jump further.</value>
+  </data>
+  <data name="Ads.Option" xml:space="preserve">
+    <value>{jumps} · {fee} · shown {delay} after you pay</value>
+  </data>
+  <data name="Ads.Jumps.One" xml:space="preserve">
+    <value>1 jump</value>
+  </data>
+  <data name="Ads.Jumps" xml:space="preserve">
+    <value>{n} jumps</value>
+  </data>
+  <data name="Ads.Total.None" xml:space="preserve">
+    <value>Shown at {places} only.</value>
+  </data>
+  <data name="Ads.Total.One" xml:space="preserve">
+    <value>Showing it in one more system costs {fee}.</value>
+  </data>
+  <data name="Ads.Total" xml:space="preserve">
+    <value>Showing it in {count} more systems costs {fee}.</value>
+  </data>
+  <data name="Ads.Show" xml:space="preserve">
+    <value>Show it there</value>
+  </data>
+  <data name="Ads.Shown" xml:space="preserve">
+    <value>Shown at {places}.</value>
+  </data>
+  <data name="Ads.Shown.From" xml:space="preserve">
+    <value>{place} from {date}</value>
+  </data>
+  <data name="Ads.Separator" xml:space="preserve">
+    <value>; </value>
+  </data>
+  <data name="Outcome.Advertised" xml:space="preserve">
+    <value>Paid {fee} to show it at {places}. It appears there after the delay; the actors there that can answer it hear of it then.</value>
+  </data>
+  <data name="AdBlock.NotYours" xml:space="preserve">
+    <value>Only your own open posts can be shown further.</value>
+  </data>
+  <data name="AdBlock.NothingChosen" xml:space="preserve">
+    <value>Choose where else to show it.</value>
+  </data>
+  <data name="AdBlock.CannotAfford" xml:space="preserve">
+    <value>Showing it there costs {fee}, and you have {credits}.</value>
+  </data>
+  <data name="Board.Seen.Ad" xml:space="preserve">
+    <value>Advertised at {place}</value>
+  </data>
+  <data name="Composer.Commits.Showing" xml:space="preserve">
+    <value>Showing it further costs {fee}, paid when you post.</value>
+  </data>
+  <data name="PostBlock.CannotAfford.Showing" xml:space="preserve">
+    <value>It would cost {cost} with its tax and showing it further, and you have {credits}.</value>
+  </data>
   <data name="Term.Sale.Wanted.Them" xml:space="preserve">
     <value>{Performer} hands you {quantity} {good} at {place} by {deadline}, into your storage there.</value>
   </data>

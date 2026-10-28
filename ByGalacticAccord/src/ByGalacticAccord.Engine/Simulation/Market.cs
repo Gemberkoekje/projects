@@ -629,6 +629,11 @@ public static partial class Market
             context.NoteSignedFromNews();
         }
 
+        if (contract.Advertised && Advertising.SeenOnlyThroughAd(context, contract, Visibility.Of(context, taker)))
+        {
+            context.NoteSignedViaAd();
+        }
+
         context.Sign(contract, taker, price);
         if (contract.UsesEscrow)
         {

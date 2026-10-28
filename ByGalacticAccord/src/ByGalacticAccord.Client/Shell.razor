@@ -46,7 +46,7 @@ else if (_session is not null)
                     <ComposerPanel Model="_composer" Draft="_draft" Outcome="@_composerOutcome" OnChange="ChangeDraft" OnPost="Post" OnClose="CloseComposer" />
                 }
                 <ContractPanel Model="_contract" Outcome="@_outcome" NoneText="@Templates.Get("Contract.None")" OnAccept="Accept" OnCommand="Command" OnSelect="Select"
-                               OnAcceptOffer="AcceptOffer" OnDecline="Decline" OnCounter="args => Counter(args.Thread, args.Offer)" />
+                               OnAcceptOffer="AcceptOffer" OnDecline="Decline" OnCounter="args => Counter(args.Thread, args.Offer)" OnAdvertise="Advertise" />
                 <LedgerPanel Model="_ledger" OnSelect="Select" OnAction="Act" />
             </div>
         </div>
@@ -233,6 +233,20 @@ else if (_session is not null)
             ContractCommand.Withdraw => ContractView.CommandText(_session, contract, command, _session.Withdraw(id)),
             _ => null,
         };
+        Rebuild();
+    }
+
+    // Pay to show the player's own post in further systems (design §7.1, D38).
+    private void Advertise(IReadOnlyCollection<LocationId> at)
+    {
+        if (_session is null || _selected is not { } id)
+        {
+            return;
+        }
+
+        var contract = _session.Context.Contract(id);
+        (AdBlock block, Credits fee) = _session.Advertise(id, at);
+        _outcome = AdView.OutcomeText(_session, contract, at, block, fee);
         Rebuild();
     }
 

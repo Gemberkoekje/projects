@@ -164,7 +164,7 @@ On the frontier, terms still exist; nobody enforces them. A frontier buyer who d
 
 ### 3.6 Posting, responding and haggling
 
-**Posting.** Anyone can post a contract of any kind. A post is seen by whoever can see it (§7): post at a busy core station and many actors see it quickly; post at a remote outpost and few do. Responses arrive over time, each either an acceptance of the posted terms or a counter-offer. The poster can accept a response, counter it, or withdraw the post.
+**Posting.** Anyone can post a contract of any kind. A post is seen by whoever can see it (§7): post at a busy core station and many actors see it quickly; post at a remote outpost and few do. Beyond its own system it is seen only where its poster pays to show it (§7.1, D38). Responses arrive over time, each either an acceptance of the posted terms or a counter-offer. The poster can accept a response, counter it, show it further, or withdraw the post.
 
 **Responding.** Anyone who can see an open contract can accept it as posted, which is immediate, or counter.
 
@@ -347,11 +347,13 @@ You know what your presence lets you see. How much you know about a place depend
 
 | Tier | Where | You see |
 |---|---|---|
-| **Here** | A location where you have a presence | Every contract the moment it's posted; live prices and stock levels; who is idle and who is running short; full details on every actor there |
-| **Near** | One jump from such a location | Contracts a few hours after posting; prices updated daily; no internal state |
-| **Far** | Anywhere else | No contracts, except those that make the news (§7.4); prices as of the last time you had a presence there |
+| **Here** | A location where you have a presence | Every contract posted there the moment it's posted, and every contract shown there for a fee once it is (below); live prices and stock levels; who is idle and who is running short; full details on every actor there |
+| **Near** | One jump from such a location | Prices updated daily; no internal state; its contracts only if their posters pay to show them where you are, or the news reports them |
+| **Far** | Anywhere else | Prices as of the last time you had a presence there; its contracts only if they are shown where you are, or make the news (§7.4) |
 
 The same rules apply to every actor. A company with five ships knows more than a pilot with one; that is what scale buys. Your own posts reach others by the same rules (§3.6).
+
+**Showing a post further** (D38). A post is shown at its own places (a Sale's handover place; a Haul's origin and destination) the moment it is posted, and nowhere else. Its poster can pay to show it in further systems, one by one: the fee for a system is a small share of the post's price (0.05%, at least ₵0.20 in Slice 1), four times as much for each jump further, and goes to that system's station operator. The post is shown there a while after it is paid for: four hours one jump out, a day two jumps out, two days three, three days beyond. An AI actor whose post sits unsold for a day pays to show it in every system one jump further, and again each day, as long as that ring costs no more than 5% of the post's price. The player chooses the systems, when posting or later. The figures are Slice 1's starting point, to be tuned against the pacing targets (§17).
 
 ### 7.2 Information age
 
@@ -856,7 +858,7 @@ Each slice is a thin, end-to-end cut through data, simulation and interface that
 | Slice | Theme | Adds | Fantasy it unlocks |
 |---|---|---|---|
 | **1** | **The contract web** | Part II of this document | *"I judge contracts, post my own, and live with the consequences."* |
-| 2 | Institutions and information | Standing contracts, bonding agents, data brokers and information contracts, market news, private offers, visibility terms (public or NDA), planned use on build orders, scouting, demand starvation, reputation by region and trade, AI that weighs information age by risk tolerance | *"I read the market, run a logistics business, and the world reacts to me."* |
+| 2 | Institutions and information | Standing contracts, bonding agents, data brokers and information contracts, market news, private offers, visibility terms (public or NDA), planned use on build orders, scouting, demand starvation, reputation by region and trade, AI that weighs information age by risk tolerance; advertising beyond D38 (AI that shows a post where it knows the buyers are, paying to be in the news, reach as a visibility term), with D38's fees and delays measured again against the new ways to learn of a post | *"I read the market, run a logistics business, and the world reacts to me."* |
 | 3 | Ownership and services | Facilities as assets (factories, warehouses, yards) bought or built through contracts; service contracts (hire pilots and operators); the player as contractor; multinationals | *"I own a piece of the supply chain."* |
 | 4 | Wear and insurance | Part wear, maintenance and repair contracts, refits, insurance | *"Every ship has a history I can read and price."* |
 | 5 | Piracy and enforcement | Pirate actors as a source of incidents, fences, escorts, police contracts, blockades and chokepoint control | *"The frontier is dangerous and I choose how to face it."* |
@@ -921,13 +923,15 @@ Plant the first two rungs on purpose (static danger, then "an adversary exists")
 | D35 | Slice 1 yards build one ship at a time. Later, boutique yards build custom ships a few at a time, and large yards build batches of near-identical standard ships. | v0.3 | Enough for queues now; yard kinds add a real market for ships later. | — |
 | D36 | Interface text is templates filled from event fields, computed values and explicit references; never intent, hidden state or prediction. A language model may later restyle the fact list, nothing more. | v0.3 | Determinism and legibility: text that claims more than the simulation knows misleads the player. | Free prose in the v0.3 mockup |
 | D37 | Build orders get an optional planned use (routes, goods) that interface text may compare against. Not in Slice 1; tentatively Slice 2. | v0.3 | Lets the game relate a ship to the player's plans without guessing them. | — |
+| D38 | A post is shown in its own system at once and nowhere else. Its poster pays to show it further, system by system: a small share of its price, four times as much a jump further, paid to that system's station, and shown there a while later (§7.1). AI actors pay a ring further for a post unsold for a day, within a budget; the player chooses the systems. | v0.3 | Where you post matters more, and reaching further costs something. Measured over ten seeds against S6's free near reach: free reach a jump out keeps trade up, but a fee as small as 0.05% of the price buys nearly the same reach; fees paid to stations come back as spending, while fees destroyed or paid to the government shrank trade through the inflation monitor (implementation plan, S6b). | "Near: contracts a few hours after posting" (§7.1, S6) |
 
 ## A.2 Open questions
 
 - **Grade steps and substitution discounts:** tuning, but they decide how much substitution stings.
 - **What makes the news:** the weights for size, novelty and failure, and how many items a day. Too few and the frontier starves for lack of information; too many and presence stops mattering.
-- **Which board does a post go on?** The poster's location, or the place the contract is performed? The mockup assumes the handover place for Sales and Hauls (a Wanted post for food at Verdant is seen from Verdant outward), and the poster's location for Builds. This decides whether you can post somewhere you have no presence.
-- **Can an actor pay to be in the news?** An advertising contract with the paper would be symmetric and useful for a poster at a remote outpost; it may belong with the visibility terms in Slice 2.
+- **Which board does a post go on?** The poster's location, or the place the contract is performed? The mockup assumes the handover place for Sales and Hauls (a Wanted post for food at Verdant is seen from Verdant outward), and the poster's location for Builds. This decides whether you can post somewhere you have no presence. *Settled for Sales and Hauls by D38: a post is shown at its places. Builds are still open.*
+- **Can an actor pay to be in the news?** An advertising contract with the paper would be symmetric and useful for a poster at a remote outpost; it may belong with the visibility terms in Slice 2. *D38 lets a poster pay to be shown in further systems; paying the paper is still open.*
+- **Showing a post further:** the fee share, its growth per jump, the delays, the AI's budget and wait, and whether Slice 1 needs any free reach at all (D38). Slice 1's figures were chosen from soaks of its economy before ships from parts, debt and insolvency, and the tuned first hour; each of those changes what a post is worth and who reads the boards, so each is a reason to measure them again.
 
 ---
 

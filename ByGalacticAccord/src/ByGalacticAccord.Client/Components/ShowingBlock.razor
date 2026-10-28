@@ -1,0 +1,40 @@
+@* Where a post is shown, and the further systems the player can pay to show it in (design §7.1, D38): one tick box a
+   system, nearest first, each with its fee and delay. The composer ticks into its draft and pays when it posts; the
+   contract panel keeps its ticks and pays with the button. *@
+<div class="block showing" data-testid="@TestId">
+    <h3 class="block-title">@Model.Title</h3>
+    <p class="xsmall muted">@Model.Note</p>
+    <ul class="show-options">
+        @foreach (ShowOption option in Model.Options)
+        {
+            <li @key="option.At">
+                <label class="show-option small">
+                    <input type="checkbox" checked="@option.Chosen" data-location="@option.At.Value" @onchange="() => OnToggle.InvokeAsync(option.At)" />
+                    <span>@option.Label</span>
+                    <span class="xsmall muted mono">@option.Detail</span>
+                </label>
+            </li>
+        }
+    </ul>
+    <p class="small" data-testid="@($"{TestId}-total")">@Model.Total</p>
+    @if (OnShow.HasDelegate)
+    {
+        <div class="actions">
+            <button type="button" class="button" disabled="@(Model.Fee <= 0m)" data-testid="advertise" @onclick="OnShow">@Model.ActionLabel</button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public ShowingModel Model { get; set; } = default!;
+
+    [Parameter]
+    public string TestId { get; set; } = "showing";
+
+    [Parameter]
+    public EventCallback<LocationId> OnToggle { get; set; }
+
+    [Parameter]
+    public EventCallback OnShow { get; set; }
+}

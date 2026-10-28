@@ -45,7 +45,7 @@ public sealed class InformationTests
     }
 
     [Fact]
-    public void Contracts_are_seen_at_once_here_a_few_hours_on_near_and_not_at_all_far()
+    public void A_post_is_seen_in_its_own_system_and_a_jump_away_only_once_its_poster_pays_to_show_it_there()
     {
         SimulationContext context = TestWorld.Quiet(withPlayer: true);
         ActorState player = context.Player();
@@ -55,12 +55,15 @@ public sealed class InformationTests
 
         Sight now = Visibility.Of(context, player);
         Assert.Equal((true, false, false), (now.CanSee(here), now.CanSee(near), now.CanSee(far)));
-        Assert.Equal(((long?)Visibility.ReachHere, (long?)Visibility.ReachNear, (long?)null), (now.ReachHours(here), now.ReachHours(near), now.ReachHours(far)));
+        Assert.Equal(((long?)0, (long?)null, (long?)null), (now.ReachHours(here), now.ReachHours(near), now.ReachHours(far)));
 
-        context.RunTo(context.CurrentTick + Visibility.ReachNear);
+        context.RunTo(context.CurrentTick + 48); // a jump away, nobody sees it on its own (D38)
+        Assert.False(Visibility.Of(context, player).CanSee(near));
+
+        context.ShowAJumpFurther(near); // Verdant Township pays to show it a jump out: at Meridian four hours later
         Sight later = Visibility.Of(context, player);
         Assert.Equal((true, true, false), (later.CanSee(here), later.CanSee(near), later.CanSee(far)));
-        Assert.DoesNotContain(far, Knowledge.OpenContracts(context, player, later));
+        Assert.Equal(context.News.WasReportedOpen(far.Id), Knowledge.OpenContracts(context, player, later).Contains(far)); // only if the news carried it
     }
 
     [Fact]

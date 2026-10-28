@@ -31,7 +31,8 @@ public sealed record BoardRow(
     Tone NoteTone,
     bool Blocked,
     string? Seen,
-    Age Age);
+    Age Age,
+    bool Live = true);
 
 public sealed record BoardViewModel(string Title, string Hint, string Empty, IReadOnlyList<BoardRow> Rows);
 
@@ -117,13 +118,28 @@ public static class BoardView
         return new BoardRow(
             contract.Id, contract.Type, Templates.KindLine(contract), title, route, value, tone, rate,
             band, Templates.Danger(band), Templates.Jurisdiction(contract.Jurisdiction), Templates.Package(contract.Terms.Package), due, note, noteTone, blocked,
-            seen, age);
+            seen, age, sight.CanSee(contract));
     }
 
-    /// <summary>How the player knows of a contract: live, or from an issue of The Daily Accord, with that issue's age.</summary>
+    /// <summary>
+    /// How the player knows of a contract: live (and where it is shown beyond its own places, that its poster advertised it
+    /// there), or from an issue of The Daily Accord, with that issue's age.
+    /// </summary>
     public static (string? Seen, Age Age) Seen(GameSession session, Contract contract, Sight sight)
     {
-        if (sight.CanSee(contract) || session.Context.News.ReportedOpenAt(contract.Id) is not { } reported)
+        if (sight.CanSee(contract))
+        {
+            // Seen only where it is shown beyond its own places: its poster paid to show it there (design §7.1, D38).
+            if (contract.PostedBy == session.Player.Id || contract.CounterpartyId == session.Player.Id || contract.Places.Any(sight.Presence.Contains))
+            {
+                return (null, Age.Live);
+            }
+
+            LocationId at = sight.Presence.First(p => contract.ShownFrom(p) is { } from && from <= sight.Tick);
+            return (Templates.Fill("Board.Seen.Ad", ("place", session.Context.Location(at).Name)), Age.Live);
+        }
+
+        if (session.Context.News.ReportedOpenAt(contract.Id) is not { } reported)
         {
             return (null, Age.Live);
         }

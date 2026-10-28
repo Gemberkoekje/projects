@@ -15,7 +15,8 @@ namespace ByGalacticAccord.Engine.Actors;
 /// <item>consumers post delivered wanted Sales, or buy a cheap lot at its source and have it hauled home;</item>
 /// <item>producers post for-sale lots, answer wanted Sales at their location, and sell delivered and post a Haul;</item>
 /// <item>traders take Hauls, fill delivered Sales by buying and carrying, and post Hauls when overcommitted;</item>
-/// <item>station operators collect rent.</item>
+/// <item>station operators collect rent;</item>
+/// <item>every one of them pays to show a post of its own that sits unsold a jump further out (<see cref="Advertising.AdvertiseUnsold"/>, D38).</item>
 /// </list>
 /// Every role also invokes its terms (design §3.4, §4.3): a payer whose counterparty is in default cancels or waits, a
 /// buyer handed spoiled goods rejects or accepts them, and a seller that can no longer deliver walks away rather than
@@ -46,6 +47,7 @@ public static partial class DecisionEngine
             RunTrader(context, actor);
         }
 
+        Advertising.AdvertiseUnsold(context, actor);
         if (actor.Role != ActorRole.Government)
         {
             PayOut(context, actor);

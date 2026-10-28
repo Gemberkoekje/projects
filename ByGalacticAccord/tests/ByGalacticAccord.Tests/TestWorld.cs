@@ -1,6 +1,7 @@
 using System.Linq;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
 
 namespace ByGalacticAccord.Tests;
@@ -55,6 +56,18 @@ internal static class TestWorld
     /// </summary>
     public static void PresentAt(this SimulationContext context, ActorState actor, string place) =>
         context.PutInStorage(actor, context.Place(place).Id, context.TakeFromStock(context.Actor("Rust Belt Extraction"), GoodType.Ore, 1m, reserved: false));
+
+    /// <summary>
+    /// Its poster pays to show a post one jump further out, in every system there (as an AI does for a post that sits unsold,
+    /// design §7.1, D38), and the clock runs until it is shown there.
+    /// </summary>
+    public static void ShowAJumpFurther(this SimulationContext context, Contract post)
+    {
+        int next = Advertising.Options(context, post)[0].Jumps;
+        var ring = Advertising.Options(context, post).Where(o => o.Jumps == next).Select(o => o.At).ToList();
+        Assert.True(Advertising.Show(context, context.Actor(post.PostedBy), post, ring), $"{post.Id} couldn't be shown further.");
+        context.RunTo(context.CurrentTick + Advertising.DelayHours(context, next));
+    }
 
     /// <summary>Run until a contract is settled one way or another (or the horizon passes).</summary>
     public static void RunUntilSettled(this SimulationContext context, Contract contract, long horizon = 2_000)

@@ -252,6 +252,24 @@ public sealed class GameSession
     /// <summary>Decline the other side's latest offer, ending that haggle.</summary>
     public bool Decline(NegotiationId id) => Changed(PlayerActions.Decline(Context, Player, Context.Negotiation(id)));
 
+    /// <summary>
+    /// Pay to show one of the player's open posts in further systems (design §7.1, D38): each system's fee goes to its station
+    /// operator, and the post appears there a few hours or days later. The block says why not, or none; the fee is what it cost.
+    /// </summary>
+    public (AdBlock Block, Credits Fee) Advertise(ContractId id, IReadOnlyCollection<LocationId> at)
+    {
+        Contract contract = Context.Contract(id);
+        Credits fee = Advertising.Quote(Context, contract, at) ?? Credits.Zero;
+        AdBlock block = PlayerActions.CheckAdvertise(Context, Player, contract, at);
+        if (block == AdBlock.None && !PlayerActions.Advertise(Context, Player, contract, at))
+        {
+            block = AdBlock.NotYours;
+        }
+
+        Revision++;
+        return (block, fee);
+    }
+
     /// <summary>Take one of the player's open posts down.</summary>
     public bool Withdraw(ContractId id) => Changed(PlayerActions.Withdraw(Context, Player, Context.Contract(id)));
 

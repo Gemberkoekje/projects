@@ -1,4 +1,5 @@
 using System.Linq;
+using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Simulation;
 
@@ -102,6 +103,14 @@ public sealed class EconomyTests
         }
 
         Assert.True(context.SignedFromNews > 0, "Nobody signed a contract it knew of only from the news.");
+
+        // The same long run checks plan S6b: posters pay to show what sits unsold further out, two jumps and more, and
+        // Helios Prime gets the machinery it buys as lots from Tycho, two jumps away (S6: 64–74%).
+        Assert.True(context.AdsShown[2] > 0 && context.AdsShown[3] > 0, $"Nobody paid to show a post two and three jumps out ({string.Join("/", context.AdsShown)}).");
+        Assert.True(context.SignedViaAd > 0, "Nobody signed a contract it saw only where its poster paid to show it.");
+        ActorState helios = context.ActorsOrdered.Single(a => a.Name == "Helios Prime Metropole");
+        decimal machinery = helios.Consumed(GoodType.Machinery) / (helios.Demands.Single(d => d.Good == GoodType.Machinery).ConsumptionPerHeartbeat * heartbeats);
+        Assert.True(machinery >= 0.75m, $"Helios Prime got {machinery:P0} of its machinery over a million ticks of seed {seed}.");
         context.AssertSound();
     }
 

@@ -19,7 +19,7 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 ## The current build
 
 **S1 (groundwork), S2 (the browser client), S3 (possession, Sale and Haul), S4 (terms and failure), S5
-(posting, responses and haggling) and S6 (information and the news) are done; S7 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
+(posting, responses and haggling), S6 (information and the news) and S6b (showing a post further) are done; S7 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
 station, or in a ship's hold. Two kinds of contract move them. A **Sale** is goods wanted or for sale, handed
 over at a place; a **Haul** carries a shipper's goods from one place to another. Consumers post the Sales they
 need delivered, producers sell lots and answer what is wanted, and traders fill Sales by buying and carrying,
@@ -34,7 +34,9 @@ settle among themselves at once, by the same rules of opening, conceding and wal
 player follows over game time, each reply coming 1 to 12 hours later and worded by how close it is to its limit.
 What an actor knows depends on where it is present (its home, its ships, its storage): live where it is, a daily
 bulletin of prices one jump away, and beyond that only what it last saw and what **The Daily Accord**, a daily
-digest of a few of yesterday's contracts, reports. Every actor decides on what it knows, and trusts what it last saw.
+digest of a few of yesterday's contracts, reports. A post is shown in its own system; to reach further its poster pays
+each further system's station a small fee, four times as much a jump further, and the post shows there hours or days
+later. AI actors pay a ring further each day a post sits unsold. Every actor decides on what it knows, and trusts what it last saw.
 Accord contracts leave a public record. Ships change shape in S7–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
 the soak harness) stays.
 
@@ -47,7 +49,7 @@ them and posting a haul for someone else to carry), buy a lot for sale and colle
 station, all as posted; you can walk away from a contract, cancel one whose counterparty is in default, raise
 an untaken haul, and answer the decisions the terms hand you, and every contract shows its terms as sentences
 and what led to it. You can **post** your own wanted Sale, goods for sale or haul at the price and terms you
-choose; whoever can see it answers over game time, as posted or with a counter, and the haggle reads as a thread
+choose, and pay to show it in further systems; whoever can see it answers over game time, as posted or with a counter, and the haggle reads as a thread
 of offers and replies. You can also counter anyone's post on the board. The map marks each place here, near or far
 from you and fades what you know of it with age ("live", "daily …", "as of …"); The Daily Accord and the signals
 (an idle producer, a consumer running short, a price off your readings) sit beside the log, a contract you know

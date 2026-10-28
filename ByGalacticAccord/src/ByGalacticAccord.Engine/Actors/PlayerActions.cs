@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Economy;
@@ -53,9 +54,35 @@ public enum PostBlock
 
 /// <summary>
 /// A contract the player means to post: what kind, which goods and how many, where (a Sale's place, or a haul's origin and
-/// <see cref="Destination"/>), and its first offer: price, deadline, package and late fee.
+/// <see cref="Destination"/>), its first offer (price, deadline, package and late fee), and where else to show it, for a fee
+/// (<see cref="ShowAt"/>, design §7.1, D38).
 /// </summary>
-public sealed record PostDraft(PostKind Kind, GoodType Good, decimal Quantity, LocationId Place, LocationId? Destination, Offer Offer);
+public sealed record PostDraft(PostKind Kind, GoodType Good, decimal Quantity, LocationId Place, LocationId? Destination, Offer Offer, IReadOnlyList<LocationId>? ShowAt = null)
+{
+    /// <summary>The post's places: a Sale's place, or a haul's origin and destination.</summary>
+    public IReadOnlyList<LocationId> Places => Destination is { } to && Kind == PostKind.Haul ? new[] { Place, to } : new[] { Place };
+
+    /// <summary>What showing it at <see cref="ShowAt"/> costs (<see cref="Advertising.FeeAt(SimulationContext, IReadOnlyList{LocationId}, Credits, LocationId)"/>).</summary>
+    public Credits ShowFee(SimulationContext context)
+    {
+        decimal fee = 0m;
+        foreach (LocationId at in (ShowAt ?? Array.Empty<LocationId>()).Distinct())
+        {
+            fee += Advertising.FeeAt(context, Places, Offer.Price, at).Amount;
+        }
+
+        return Credits.Of(fee);
+    }
+}
+
+/// <summary>Why the player can't show its post further (design §7.1, D38). The interface words each one.</summary>
+public enum AdBlock
+{
+    None,
+    NotYours,
+    NothingChosen,
+    CannotAfford,
+}
 
 /// <summary>
 /// The player's commands, through exactly the market commands an AI decision uses (plan §2, "symmetric by
@@ -385,10 +412,16 @@ public static class PlayerActions
             return PostBlock.NoStation;
         }
 
+        decimal showing = draft.ShowFee(context).Amount;
+        if (player.Credits.Amount < showing)
+        {
+            return PostBlock.CannotAfford;
+        }
+
         if (draft.Kind == PostKind.Wanted)
         {
             decimal tax = Terms.TaxRate(context, context.Location(draft.Place).Reach);
-            return player.Credits.Amount < offer.Price.Amount * (1m + tax) ? PostBlock.CannotAfford : PostBlock.None;
+            return player.Credits.Amount - showing < offer.Price.Amount * (1m + tax) ? PostBlock.CannotAfford : PostBlock.None;
         }
 
         if ((context.StorageOf(player.Id, draft.Place)?.Available(draft.Good) ?? 0m) < draft.Quantity)
@@ -411,7 +444,8 @@ public static class PlayerActions
             return PostBlock.NoRoute;
         }
 
-        return Market.CanFundHaul(context, player, draft.Place, to, offer.Price) ? PostBlock.None : PostBlock.CannotAfford;
+        decimal haulTax = Terms.TaxRate(context, context.Location(to).Reach);
+        return player.Credits.Amount - showing >= offer.Price.Amount * (1m + haulTax) ? PostBlock.None : PostBlock.CannotAfford;
     }
 
     /// <summary>
@@ -426,7 +460,7 @@ public static class PlayerActions
         }
 
         Offer offer = draft.Offer;
-        return draft.Kind switch
+        Contract posted = draft.Kind switch
         {
             PostKind.Wanted => Market.PostSale(
                 context, player, SaleSide.Wanted, draft.Good, draft.Quantity, draft.Place, offer.Price, offer.Price, offer.Deadline,
@@ -438,7 +472,36 @@ public static class PlayerActions
                 context, player, draft.Good, draft.Quantity, Holding.StorageAt(draft.Place), draft.Destination!.Value, offer.Price, offer.Price,
                 offer.Deadline, serves: null, offer.Package, cause: null, offer.LateFeeScale),
         };
+
+        // Shown further at once, for the fee (design §7.1, D38); its own places it is shown at anyway.
+        List<LocationId> further = (draft.ShowAt ?? Array.Empty<LocationId>()).Distinct().Where(at => posted.ShownFrom(at) is null).ToList();
+        if (further.Count > 0 && posted.IsOpen)
+        {
+            Advertising.Show(context, player, posted, further);
+        }
+
+        return posted;
     }
+
+    /// <summary>Can the player show its open post at these further locations (design §7.1, D38)?</summary>
+    public static AdBlock CheckAdvertise(SimulationContext context, ActorState player, Contract contract, IReadOnlyCollection<LocationId> locations)
+    {
+        if (contract.PostedBy != player.Id || !contract.IsOpen || contract is StorageContract)
+        {
+            return AdBlock.NotYours;
+        }
+
+        if (locations.Count == 0 || Advertising.Quote(context, contract, locations) is not { } fee)
+        {
+            return AdBlock.NothingChosen;
+        }
+
+        return player.Credits.Amount < fee.Amount ? AdBlock.CannotAfford : AdBlock.None;
+    }
+
+    /// <summary>Show the player's open post at further locations, paying each one's fee to that system's station operator; the actors there that can answer it hear of it.</summary>
+    public static bool Advertise(SimulationContext context, ActorState player, Contract contract, IReadOnlyCollection<LocationId> locations) =>
+        CheckAdvertise(context, player, contract, locations) == AdBlock.None && Advertising.Show(context, player, contract, locations);
 
     /// <summary>
     /// Can the player make this counter-offer? On someone else's post it must be able to take the contract now, as it would
