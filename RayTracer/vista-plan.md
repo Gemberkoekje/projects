@@ -2132,8 +2132,8 @@ not a slice of M1, whose sign-off stands.)*
   weathered so they read as rock layers; meadow edges ragged and graded, with texture. Its slices are planned first ("Every slice"),
   in the order the hero shows the four.
 - *Verify:* the hero re-rendered (the same recipe, seed and camera, `vista-views/signoff/hero.camera.json`) beside M1's, with loupes
-  on the lit middle range, the shaded foreground and a meadow's edge, for the user's yes or no: at arm's length, does it read as a
-  photo? Beside the webcam's lit rock (`23-08-2026-2010`, `12-10-2026-1820`) for texture, not shape. The detail budget's measure on
+  on the lit middle range, the shaded foreground and a meadow's edge (*added 2026-10-29, the user's question:* and the near face, the
+  slope at the frame's right 130–170 m off), for the user's yes or no: at arm's length, does it read as a photo? Beside the webcam's lit rock (`23-08-2026-2010`, `12-10-2026-1820`) for texture, not shape. The detail budget's measure on
   M1.14's finalists before and after; the triangle ceiling (48 M) and the cost ledger; the goldens re-baselined deliberately; the maze
   unmoved.
 
@@ -2161,20 +2161,23 @@ incised 67.5%; eroded 33.1%) and the share of 128 m windows rippling at 2–4 ce
   links in eight directions; so the pipe model's water gathers into gullies that branch and wander instead of combing each facet. If the
   comb stays: the pipe model's rills broken (rain or erodibility varying at 30–100 m, flow to eight neighbours), and a finer incision grid
   (32 m, about 4–8 times its 37 s) last. *Verify:* the eroded world's alignment from 33% to within a few points of the base terrain's,
-  its ripple from 7.5% toward 1.4%; the drainage, relief and facet measures no worse; the hero beside M1's with a loupe on the lit
-  middle range; the erosion's time; the parked straight lines across flat valley floors looked for again.
+  its ripple from 7.5% toward 1.4%; the drainage, relief and facet measures no worse; the hero beside M1's with loupes on the lit
+  middle range and the near face (where a 64 m facet is over a thousand pixels wide); the erosion's time; the parked straight lines across flat valley floors looked for again.
 - **M1a.3 — The washboard gone** (the dots). Whatever ripple M1a.2 leaves on gentle loose ground: the pipe model's deposition kept
   stable there (its rates on gentle slopes, a creep of loose material; M1.7's tuning measured again), and the rules' slope read from
   the grid's normal over a few cells, so no grid-scale wobble is cut into dots. *Verify:* the loose ground's ripple at the base
   terrain's; the dots' loupe; the parked meadow banding looked for on M1.12's meadow view. It shrinks to its checks if M1a.2 already
   removes the washboard.
-- **M1a.4 — Rock below the grid** (the planes below the 8 m cell; the parked "nearest faces lack detail"). Structure at 5–50 m by
-  material and slope where the hero shows it (1–1.3 m a pixel in the lit middle range, 0.5 m in the foreground): ribs and gullies down
-  the fall line, ledges and cliff bands from the beds' hardness (hard beds stand, soft beds recede under their debris), buttresses, scree
-  in the gullies. Shading and colour first, geometry where an outline or a low sun's shadow needs it (golden hour reads relief by its
-  shadows, which shading alone cannot cast), a finer erosion tile only if those fall short. *Verify:* the hero's loupes beside M1's; the
-  metres-per-pixel measure (`--debug detail`) on M1.14's finalists before and after; the triangles against the 48 M ceiling; the cost
-  ledger.
+- **M1a.4 — Rock below the grid** (the planes below the 8 m cell; the parked "nearest faces lack detail"). Structure by material and
+  slope at every distance the hero shows rock: the near face (the slope at the frame's right, 130–170 m off, 5 cm a pixel, the 8 m cell
+  150–190 pixels wide), the foreground (0.5–1.5 km, 0.15–0.5 m a pixel) and the lit middle range (3–4 km, 1–1.3 m a pixel). At 5–50 m:
+  ribs and gullies down the fall line, ledges and cliff bands from the beds' hardness (hard beds stand, soft beds recede under their
+  debris), buttresses, scree in the gullies. On the near face also the rock's own texture at 0.2–5 m (blocks, joints, cracks, broken
+  edges), where today's bump is the same fine noise on every rock; there a 5 m rib is a hundred pixels and makes an outline. Shading and
+  colour first, geometry where an outline or a low sun's shadow needs it (golden hour reads relief by its shadows, which shading alone
+  cannot cast), a finer erosion tile only if those fall short. The ground within about 100 m stays M5's (grass, shrubs) and M7's
+  (close-up snow). *Verify:* the hero's loupes beside M1's, the near face's among them; the metres-per-pixel measure (`--debug detail`)
+  on M1.14's finalists before and after; the triangles against the 48 M ceiling; the cost ledger.
 - **M1a.5 — Beds that read as rock** (the marble). The beds' colour tied to M1a.4's relief (a ledge's lit top and dark riser, soft beds
   under scree and soil), broken by the gullies, weathered (streaks down the fall line below hard beds), the laminae shown where a ledge
   shows them. *Verify:* the shaded foreground's loupe beside M1's; beside the webcam's lit rock (`23-08-2026-2010`, `12-10-2026-1820`)
@@ -2182,7 +2185,7 @@ incised 67.5%; eroded 33.1%) and the share of 128 m windows rippling at 2–4 ce
 - **M1a.6 — Meadows with ragged edges and texture** (the felt). The edge graded (grass thinning on steeper and stonier ground, rock
   showing through) and broken at 5–30 m (tongues along gullies and benches), the meadow's tone varying at 5–50 m (moisture, exposure,
   stones), no hard cut-out where a pixel covers metres. *Verify:* a meadow's edge in the hero's loupe beside M1's; M1.12's meadow view.
-- **M1a.7 — The sign-off.** M1a's verify (above): the hero beside M1's with its three loupes, for the user's yes or no; the webcam's
+- **M1a.7 — The sign-off.** M1a's verify (above): the hero beside M1's with its four loupes, for the user's yes or no; the webcam's
   rock; the detail budget's measure before and after and its limit re-chosen by the user's eye; the triangle ceiling and the ledger; the
   goldens re-baselined, once, here; the maze unmoved.
 
