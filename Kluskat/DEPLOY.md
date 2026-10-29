@@ -46,7 +46,7 @@ kubectl -n kluskat get pods                       # Running, 1/1
 kubectl -n kluskat logs deploy/kluskat | grep -m1 Startvulling
 ```
 
-The first start seeds the 65 klussen (staggered); later starts leave the list alone.
+The first start seeds the 64 klussen (staggered); later starts leave the list alone.
 
 ## On the phone
 

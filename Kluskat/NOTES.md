@@ -15,7 +15,7 @@ then `Kluskat.WebApp/Pages/Index.cshtml(.cs)`. [DEPLOY.md](DEPLOY.md) has the cl
   (everything due was skipped; "Laat ze nu toch zien" ends the skip window).
 - Beheer: list, add, edit, "gedaan op" fix-up, schrappen. No due dates shown, on purpose.
 - One-password sign-in, 365-day sliding cookie, rate-limited form, key ring in Postgres.
-- The seed: 65 klussen from the sheet (DESIGN.md §7 plus the user's answers: the three Diepe
+- The seed: 64 klussen from the sheet (DESIGN.md §7 plus the user's answers: the three Diepe
   closets are split into planken 1–3 / 4–6 / bovenkast; windows in keuken/kattenkamer/hobbykamer
   are middel, woonkamer/slaapkamer groot). Staggered on first start.
 - The cat is redrawn as a 26×22 pixel sprite (the first mock-up was "a bit MS Paint"), rendered as
@@ -117,6 +117,13 @@ celebration) and `Pages/Profiel.cshtml`._
   celebrates the same thing again instead of showing nothing.
 - An accessory the cat can no longer wear (an undo dropped the level) is silently taken off.
 - No loot drops, no reward shop, nothing that ever goes down except the streak (as agreed).
+
+### Deployed (2026-10-29)
+
+Live at https://kluskat.gemberkoekje.nl, image `kluskat:440705834b7fdf544d83fd238aa69e63d64a5112`
+(gembernodes PR #99). First start seeded 64 klussen; Let's Encrypt certificate issued; the Dev
+gallery answers 404 in production. Next deploys: push main, wait for the image, bump the tag in
+gembernodes `apps/kluskat/deployment.yaml`.
 
 ### Gotchas
 
