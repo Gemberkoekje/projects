@@ -28,8 +28,11 @@ again looking 20° west of north, at the glaciated range (48% sky, the range 2.5
 from 1500 to 1200 m above height 0) the default's ground rose 17 m, and the default and sky views now stand at 1698.5 m, 6 m above
 the eroded ground and 2 m above the incised ground CI checks. The rock-face view stands 2 m above its old place's new ground; the
 meadow view moved to (605, 6161), 2 m up, looking 240° (south-west) up a meadow with scree fans above it, and the scree-cone view
-to the same spot, looking 285° and 10° up at one of those fans; the forested crest is kept 20 m above the incised ground. Ledger
-rows from before M1.11d, from before M1.12c, and from before M1.13, measured other poses.
+to the same spot, looking 285° and 10° up at one of those fans; the forested crest is kept 20 m above the incised ground. On M1a.2's
+world (the incision's faces keep the base terrain's finer detail) the default's ground rose 18 m and the down-slope one 9 m: the
+default and sky views now stand at 1716.8 m (2 m above the incised ground, 6.5 m above the eroded), down the slope at 1560 m (3 m),
+and the pools' fog-sea and mist-lake views 2 m above the eroded ground (1502.4 and 1151.6 m), their poses kept. Ledger rows from
+before M1.11d, from before M1.12c, from before M1.13, and from before M1a.2, measured other poses or other ground.
 
 Since M1.2 both recipes pin their place and date (Zermatt, 2026-07-15), so the sun stays put when the
 defaults change: day is solar noon, 65.5° up due south. Golden hour was sunset − 60 min, 8.5° up at azimuth 292°,
@@ -451,4 +454,18 @@ full run takes about five minutes.
 ```
 powershell -File vista-views/ground/render.ps1 [-Sheets map,grooves,dots,beds,meadows]
 dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --erosion-measure --recipe vista-views/autocam/range-golden.recipe.json --seeds 42 --out <dir> --crops-camera vista-views/signoff/hero.camera.json --crops "2000,850;1300,1250"
+```
+
+## Ground that gathers its water (M1a.2)
+
+`ground/render.ps1 -Sheets m1a2` makes M1's world and M1a.2's and sets them side by side (vista-plan §10, M1a.2): M1's with M1's grid
+transfer and erosion passes (`VISTA_EROSION_SETTINGS=RefineCubic=0;RefineChannelCurves=0;RefineFaceDetail=0;DischargeSpread=0;ThermalRate=0.25`),
+each eroded and measured again by `--erosion-measure` (`measure-m1.log`, `measure-m1a2.log`: the grid's patterns, the drainage, the
+relief and the places' distances), then the hero at 640 px (`m1a-2-hero.png`), 640×360 loupes of the 4K frame of the lit middle range
+(`m1a-2-lit.png`) and of the near face at the frame's right, 130 m off and 2 EV brighter (`m1a-2-near.png`), and the ground under the
+lit middle range and the rows of dots from above at each stage (`m1a-2-ground.png`). About twelve minutes. `--erosion-measure
+--incise-only` reports the incision's patterns and writes its crops without the GPU's passes (about 50 s).
+
+```
+powershell -File vista-views/ground/render.ps1 -Sheets m1a2
 ```

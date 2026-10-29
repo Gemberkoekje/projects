@@ -14,7 +14,7 @@ and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M
 (auto camera v1, with its detail budget), M1.15 (the time and VRAM estimate), M1.16 (the preview and tweak window) and
 M1.17 (the sign-off) are done: **M1 is done** (2026-10-28), its goldens committed and passing and its hero rendered. **M1a** (the
 ground's surface, the user's call after the hero) comes before M2 (measured spectra): its seven slices are planned in §10 (**M1a plan**)
-and M1a.1 (the map) is done; what M1 found and did not need is in the parked list (§10). It sits
+and M1a.1 (the map) and M1a.2 (ground that gathers its water) are done; what M1 found and did not need is in the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -352,6 +352,15 @@ change.
   over their width at 100 m, a V 0.5, a parabola 0.71: medians 0.80, 0.62, 0.69 and 0.84 on the four seeds against 0.44–0.48
   uncarved), the relief grows and the summits nearly keep their height; the ice's water runs under it, along the ground's
   drainage, which holds (95–97% of the grid into a 1 km² channel).
+- **The grid's own patterns** (M1a.2, [`vista-log/M1a.2.md`](vista-log/M1a.2.md)): the incision comes back to the 8 m grid with a
+  continuous slope (monotone cubic along the rows, then the columns), its channels carved along their streams' lines with the
+  corners cut, and the base terrain's detail finer than the 64 m cell kept on the faces it cut (M1.11a faded it out over 25 m of
+  change, leaving bare 64 m facets with straight seams). The pipe model's water erodes over a channel's width, its discharge spread
+  twice by `[1 2 1]` before the capacity reads it: on a face falling along the grid's rows no water crosses from lane to lane, so
+  without the spread every lane of cells cut its own rill, a comb two to four cells apart. Its thermal pass runs at a tenth of
+  M1.7's rate (0.02), so the water and the talus compete instead of every steep face settling to one talus plane creased in the
+  grid's eight directions. Measured by `GridArtefacts`: the eroded world's relief along the grid's eight directions 33% → 17% (the
+  base terrain 15%), its 128 m windows rippling at 2–4 cells 7.5% → 2% (1.4%).
 - **Geometry:** a 16k² height field as triangles (~500M) does not fit in 8 GB. Because
   the camera is fixed for a still, build a **view-dependent mesh once per camera** to a
   screen-space error target, conservative for off-screen geometry that still casts
@@ -2163,6 +2172,20 @@ incised 67.5%; eroded 33.1%) and the share of 128 m windows rippling at 2–4 ce
   (32 m, about 4–8 times its 37 s) last. *Verify:* the eroded world's alignment from 33% to within a few points of the base terrain's,
   its ripple from 7.5% toward 1.4%; the drainage, relief and facet measures no worse; the hero beside M1's with loupes on the lit
   middle range and the near face (where a 64 m facet is over a thousand pixels wide); the erosion's time; the parked straight lines across flat valley floors looked for again.
+  *Status (2026-10-29): done.* The incision comes back to the grid smoothly (monotone cubic), its channels carved along curves (the
+  links' corners cut twice), the base terrain's detail finer than the 64 m cell kept on the faces it cut; the comb stayed (the
+  eroded world 24% along the grid), and its cause was not the one the plan guessed: on a face falling along the grid's rows the pipe
+  model's lanes of cells, which no water crosses, each cut a rill (tilted planes: 79% along the grid at 0°, 21% at 45°). So the
+  water erodes over a channel's width (its discharge spread twice by `[1 2 1]`, two GPU passes more a step, parity with the C#
+  reference), and the thermal pass runs at 0.02 instead of 0.25 (its octagonal talus planes held about 3 points of the alignment);
+  eight neighbours for the flow and varying rain were not needed (eight pipes alone move the comb to the diagonals). Eroded: 33.1% →
+  17.4% along the grid (the base 14.6%), rippling 7.5% → 2.0% (1.4%); the lines of high curvature running down the fall line 41.5%
+  → 23.4% of the rock's; drainage and relief no worse; the 8 m facet share 9.9% → 10.5%; the erosion 20 → 26 GPU s. The near views
+  re-placed on the new ground; eight goldens moved (re-baselined at M1a.7). *Judge this:* `m1a-2-ground.png` (from above),
+  `m1a-2-lit.png`, `m1a-2-near.png`, `m1a-2-hero.png`. *Ignore this:* the rows of dots (M1a.3), the rock's texture and the near
+  face's flatness in shade (M1a.4), the beds' bands (M1a.5), the meadows (M1a.6). *Questions:* from above, does the right-hand square
+  of each row now look like mountain ground? In the lit loupe, do the rock faces still look combed? Do the new smooth white domes on
+  the lit crest read as snow and ice, or as something else? Log: [`vista-log/M1a.2.md`](vista-log/M1a.2.md).
 - **M1a.3 — The washboard gone** (the dots). Whatever ripple M1a.2 leaves on gentle loose ground: the pipe model's deposition kept
   stable there (its rates on gentle slopes, a creep of loose material; M1.7's tuning measured again), and the rules' slope read from
   the grid's normal over a few cells, so no grid-scale wobble is cut into dots. *Verify:* the loose ground's ripple at the base
@@ -2330,12 +2353,26 @@ any of them.
   pattern. *Belongs:* M5 (grass), checked when grass geometry lands. *2026-10-28:* M1a checks first whether it is the hero's
   rows of dots. *M1a.1:* probably: the dots are the pipe model's washboard on gentle loose ground (8.6% of the loose ground's windows
   ripple at 2–4 cells), cut by the slope rules; M1a.3 looks for the banding on M1.12's meadow view once the washboard is gone.
+  *M1a.2:* the loose ground's windows rippling 8.6% → 3.4% (the base terrain 1.4%), yet the hero's rows of dots remain: M1a.3's.
 - **Folds without faults** (M1.12c): the beds bend but never break, as a height field's beds must.
   *Belongs:* unscheduled; faults and overhangs need more than a height field.
 - **Steeper, more alike slopes since the folded strata** (M1.12c): the facet measure rose from
   8.6–10.8% to 12.4–13.8%, though not at the talus angle. *Belongs:* watched at M1.17; acted on only
   if the hero render shows it. *M1a.1:* the hero's planes are the incision's 64 m facets (vista-log/M1a.1.md); M1a.2 watches the
-  facet measure as it removes them.
+  facet measure as it removes them. *M1a.2:* the 8 m facet share 9.9% → 10.5% (now at 59°, the hard rock's talus), the 64 m one
+  10.9% → 10.6%; the planes left on steep rock are the thermal pass's talus planes (the item below).
+- **Talus planes creased in the grid's eight directions** (M1a.2): the GPU erosion's thermal pass compares a cell with its eight
+  neighbours, so steep rock settles to planes at its talus that meet in creases along the grid's rows, columns and diagonals. M1a.2
+  slowed the pass (0.25 → 0.02 of the excess a step), which took about 3 points of the eroded world's relief off the grid's
+  directions (21% → 18% on a 1025² world) and the share of slopes near their talus from 21% to 14%; the rest of the 3 points
+  between the eroded world (17.4%) and the base terrain (14.6%) is mostly this. A talus that runs every way (the drops weighed by
+  direction, or a rock talus that varies from place to place) would take it. *Belongs:* M1a.4 (rock below the grid: ribs and
+  buttresses from the rock's hardness).
+- **Glacier domes on a lit crest** (M1a.2): the new ground moved today's glaciers (their solve on the 64 m grid reads the ground
+  averaged there; 7.9% → 7.6% of the grid, the thickest 297 → 275 m), and one now caps the hero's lit middle range, its surface
+  the solve's, smooth between 64 m samples, so it reads as pale rounded domes. Laid bilinearly before, it would be the same shapes
+  faceted. Real ice there would show crevasses, seracs and rock poking through. *Belongs:* the user's verdict on `m1a-2-lit.png`;
+  M7 (close-up snow and ice) otherwise.
 - **Glaciers that follow the place** (M1.13): today's glaciers are the recipe's, the same at Zermatt,
   Lofoten and Fiordland, in every season. *Decided (2026-10-25):* yes; how low glaciers reach follows
   the climate (far lower where it is cold and wet than in the Alps), so today's glaciers come from
@@ -2354,6 +2391,9 @@ any of them.
   pieces, 320 px) shows them, so they wait for M1.17's hero render. *M1a.1:* their likely cause is the incision's 64 m seams: it
   is brought back to the 8 m grid bilinearly, so its cells meet in straight creases along the coarse grid's rows and columns, plainest
   where a filled floor is otherwise flat (the incised crops of `m1a-1-grooves.png`, `m1a-1-dots.png`). *Belongs now:* M1a.2.
+  *M1a.2:* the seams are gone (the incision comes back with a continuous slope); its carved channels still show as narrow straight
+  troughs on the incised ground (`m1a-2-ground.png`, place 2), which the erosion's sediment fills; none seen in the hero's loupes.
+  Looked for again from a shoulder over a filled floor when M1a.7 renders its views.
 - **A leaner pools integrator** (M1.13b): the pools' variant costs a view with pools about 9 ns a sample before it takes a step
   (the golden-hour down-slope view 1.84× `main`, the misty ridges with a strong pool 3.1× the flat layer, over the plan's 2×):
   the march's state in fewer registers (its four wavelengths' coefficients and multiple-scattering ends live through every step),

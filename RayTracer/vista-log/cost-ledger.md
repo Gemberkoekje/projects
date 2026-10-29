@@ -38,6 +38,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.16 | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1.17 (stop 1) | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1.17 (stop 2) | 0.44 | 6.95 | 5.84 | 20.79 |
+| M1a.2 | 0.30 | 6.92 | 5.11 | 18.70 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -195,3 +196,8 @@ each), the GPU's time the same (3.96 s against 3.87); not in the ledger, which m
 M1.17's stop 2 makes the user's picks Vista's camera (5500 K, +1.5 EV, half of dusk's fall, a 0.03 margin), which acts on the PNG
 alone: the trace is unchanged and its EXRs are main's byte for byte (the eight views of `m1-17-before-after.png`, before stop 2 and
 after), so its row is stop 1's. The hero at 3840×2160 and 256 spp traced in 30.1 GPU s (about 14 ns a sample; vista-log/M1.17.md).
+M1a.2 changes the world and not the integrator: seed 42's eroded ground (the incision brought back smoothly with its faces' detail,
+the spread discharge, the slower thermal pass), and the default, sky and down-slope views lifted onto it (their poses kept, 18.3 and
+8.6 m up), so the default and down-slope rows measure other ground. The world's own cost: the GPU erosion 19.7–21.7 → 26.4 s (13–14 →
+17.6 ms a step: the discharge and its four spread passes), its state 1345 → 1473 MiB (the spread's two buffers), the incision's way
+back to the world grid 0.1–0.2 → 0.5–0.7 s on the CPU (vista-log/M1a.2.md).
