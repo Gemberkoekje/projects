@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-29, B83)
+- A navigate whose answer was lost no longer sends the same navigate on every step (B83). On 2026-10-18 at 06:45:45Z SPECTER-226's navigate from X1-QK87-X45A to X1-QK87-XF4Z went through at the API, but its connection was cancelled, so the cache kept the ship in orbit where it had left from. Every step sent the navigate again, and the API refused it 216 times in six hours, until the reset: 16 times because the ship was in transit, then 200 times because it was already at the destination. One failing step a tick never trips the circuit breaker, which counts steps a minute. Now the API adapter raises `NavigateRefusedException` (new) for those refusals (4200, 4214 in transit; 4204 already there) and for no others, and `NavigateSubCommand` then reads the ship's nav from the API (`ISpaceTradersPort.GetShipNavAsync`, new: `GET my/ships/{ship}`), with a warning, and goes on as if the navigate had answered: it stores the nav and schedules the arrival, at once for a ship that has landed, so the arrival docks it and resumes its goal.
+
+### Docs – Changed (2026-10-29, B83)
+- `PLAN.md`: B83, and where things stand on 2026-10-29. `docs/HOW_IT_WORKS.md`: a navigate refused because the ship is in transit or already there.
+
 ### Docs – Changed (2026-10-09, slice 2.19)
 - Two runs on one chart (D123), as asked on 2026-10-09: "If possible, I'd like the option to overlay 2 (weekly) runs, so I
   can compare the value curve and see if it becomes better", with "Picker + 31 days in Prometheus". Built in gembernodes

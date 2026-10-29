@@ -1735,6 +1735,12 @@ they count.
     refuelling stops when it is beyond one tank, and the fastest way where no chain of fuel markets reaches
     (D84), so the fallback is left for a ship whose fuel has run short of its plan. It leaves the ship in
     DRIFT, and the ship's next flight asks for its leg's mode, which switches it out of DRIFT (B47).
+  - A navigate the API refuses because the ship is in transit (4200, 4214) or already at the destination
+    (4204) means the cache has the ship in the wrong place: an earlier navigate went through at the API but
+    lost its answer (B83). The API adapter raises `NavigateRefusedException` for those codes only, and
+    `NavigateSubCommand` reads the ship's nav from the API instead ([API] `GET my/ships/{ship}`), with a
+    warning, then goes on as if the navigate had answered: it stores the nav, publishes `ShipInTransitEvent`
+    and schedules the arrival (at once for a ship that has landed), so the arrival docks it and resumes its goal.
 - **`WarpSubCommand`** (slice 6.31): warps a ship in orbit to a waypoint of another system ([API] warp), stores the nav and
   the fuel it answers with, publishes `ShipInTransitEvent` and schedules the arrival for the goal, as a navigation does; the
   arrival goes on as below. A refusal is the API's `WarpRefusedException`, left to `GoalWarps`.

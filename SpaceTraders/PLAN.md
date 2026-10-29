@@ -21,16 +21,15 @@
 - **Claude: mechanic.** Fixes things that don't work the way they are intended to, and nothing
   else. See "Claude's role" in `CLAUDE.md`.
 
-## Where things stand (2026-10-11)
+## Where things stand (2026-10-29)
 
-- **Running:** projects main `6d89c1d3` (projects#208: B79, the purchase order no longer waits for plans that need
-  nothing), deployed by gembernodes#95 (merged 2026-10-10 17:49Z, pod up 17:51Z). gembernodes#94 deployed slices
-  6.37–6.40 and 2.19 before it (main `9ac6d028`, merged 2026-10-09 22:37Z); gembernodes#88 raised the API's CPU and
-  memory limits (2026-10-06). The server reset at 2026-10-11 13:00Z: the bot restarted six times while the universe was
-  being reset (B23: a failed startup stops the host) and registered a new agent at 13:06:49Z, SPECTER again, home system
-  X1-KT73, with every plan on (slice 2.12). Its first contract was fulfilled at 13:50:56Z (62 IRON_ORE, 9,200 credits).
-  Read at 14:26Z: 44,813 credits, 10 ships, no open anomalies. The run before it, in X1-FJ91, stood at 242M credits on
-  2026-10-10. The next reset is expected on 2026-10-18 at 13:00Z (weekly; not yet read from the API's status).
+- **Running:** projects main `689a15b2` (projects#213: B80's alarm), deployed by gembernodes#96 on 2026-10-11. Slice
+  6.41 (projects#215, D125) is merged but not deployed. The server reset on 2026-10-18 and 2026-10-25 at 13:00Z; each
+  time the bot restarted while the universe was being reset (B23: a failed startup stops the host), registered SPECTER
+  again and fulfilled its first contract within 50 minutes. The run to 2026-10-18 ended at 99M credits and 1,004 ships,
+  the run to 2026-10-25 at 89M credits and 801 ships. Read on 2026-10-29 at 07:40Z: 9.2M credits and 176 ships, home
+  system X1-BQ86, whose gate was finished on 2026-10-28 at 10:34Z. The next reset is expected on 2026-11-01 at 13:00Z
+  (`spacetraders_server_next_reset_timestamp_seconds`).
 - **Done:** phases 0–5, phase 2's slices 2.1–2.19 and phase 6's 6.1–6.40, listed under [Phases](#phases).
 - **Still open:**
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
@@ -45,8 +44,11 @@
       SPECTER-30 on its CollectOre goal, 50 (B81); the rest single raises of traders and probes.
     - `ApiThrottled`: the API's rate limiter still answered 429 about 90 times a day (619 in the week) while the bot
       kept to its budget. B59's fix lowered them, not to none; no number yet.
-    So no loop counts as done yet. The next full period is this run's, to 2026-10-18; phase 4's last check is the same.
-  - B81 and B82, found by that check (B80's alarm is fixed; its wait is D124, yours), B17 in part, and B24 (below).
+    - The next two periods weren't clean either (read on 2026-10-29 from Loki): to 2026-10-18, 49 `ShipLeftIdle`,
+      1 `ShipStuck`, 88 `RepeatingError` and 27 `ApiThrottled`; to 2026-10-25, 407 `ShipLeftIdle` (386 of them probes
+      from 2026-10-22 to 2026-10-25, B82), 10 `ShipStuck`, 65 `RepeatingError` and 13 `ApiThrottled`.
+    So no loop counts as done yet. The next full period is this run's, to 2026-11-01; phase 4's last check is the same.
+  - B83 (found on 2026-10-29), B81 and B82 (B80's alarm is fixed; its wait is D124, yours), B17 in part, and B24 (below).
   - D79's second step: learning the price steps per good and market from the bot's own trades. Until then a trip's
     batches are estimated with the measured medians (slice 6.16).
 - **The cluster** (gembernodes):
@@ -74,6 +76,7 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B80 | **The explorers' `ShipStuck` counted the wait before their Jump goals** (found on 2026-10-11, by phase 6's check; the alarm fixed, the wait is D124).<br>• Between 04:28 and 05:03Z on 2026-10-10 each of the five explorers finished a system, then waited without a goal while the explore plan looked at the new gates and connections, one look a pass (`ExploreAtlas.NextByWays` waits while any system it reaches has a look to come). At about 05:42Z the looks were done, all five got Jump goals and moved within two minutes.<br>• `ShipStuck` raised for all five at 05:42:49Z, 40 to 76 minutes "though it has a Jump goal": its clock started at the ship's last update, before the goal.<br>• Fix: the clock starts no earlier than the goal's `StartedAt` (`ShipStuckRule`). | About 14 looks from 04:30 to 05:42Z (`systems/{systemSymbol}/waypoints/{waypointSymbol}` and `.../jump-gate`), no system fetched; 51 raises on Jump goals in the week, 12 to 17 a day from 2026-10-08 to 2026-10-11; `ShipStuckRuleTests.AGoalGivenAfterALongWait_IsNotStuck_UntilItHadTheLimit` (failed before the fix) | 6.31 (B78); the alarm fixed, merged as projects#213 (main `689a15b2`), deploy pending |
 | B81 | **The ore shuttle SPECTER-30 raises `ShipStuck` while it waits its turn** (seen on 2026-10-09, counted on 2026-10-11; not investigated yet).<br>• It waits in orbit at X1-FJ91-B44 with its CollectOre goal while the drones hand their ore to the other shuttle, SPECTER-2B; after 30 minutes without a change the rule calls it stuck.<br>• A false alarm of B74's kind if that wait is intended; a shuttle with nothing to do if it isn't. | 50 raises in the week, each cleared after up to 45 minutes | 6.18 (D83), 3.2 |
 | B82 | **Ships left idle while a plan has work they could do** (found on 2026-10-11, by phase 6's check; not investigated yet).<br>• `ShipLeftIdle` still fired 48 times after B74–B77's deploy: probes while their system's markets were due, the survey ship SPECTER-2C while targets waited, cargo ships while trade routes waited.<br>• Some came about 20 minutes after a pod start; others didn't. | 26 ProbeDeployment, 11 Survey, 11 Trading raises; e.g. 2026-10-09 19:59–20:01Z (B78's pod up at 19:38Z) and 2026-10-10 18:11Z (B79's at 17:51Z), but also 2026-10-09 23:0xZ | 3.2 |
+| B83 | **A navigate that lost its answer was sent again on every step** (found on 2026-10-29, from Loki).<br>• On 2026-10-18 at 06:45:45Z SPECTER-226's navigate from X1-QK87-X45A to X1-QK87-XF4Z failed with a cancelled connection, but the API had carried it out; the cache kept the ship in orbit at X45A.<br>• Every step sent the navigate again: 16 times the API answered that the ship was in transit, then 200 times over six hours, until the reset, that it was already at the destination. One failing step a tick never trips the circuit breaker, which counts steps a minute.<br>• Fix: those refusals (4200, 4214, 4204) become `NavigateRefusedException`; the navigate then reads the ship's nav from the API, stores it and schedules its arrival. | `@i=843e475f` for SPECTER-226, 2026-10-18 06:45:58–12:57:36Z; `LostNavigateAnswerTests` (failed before the fix) | 6.4 (`GoalFlight`); fixed in projects#218 |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
