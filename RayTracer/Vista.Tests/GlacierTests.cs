@@ -168,7 +168,17 @@ public sealed class GlacierTests
     [TestMethod]
     public void Unglaciated_Settings_KeepM1_12csWorlds()
     {
-        ErosionSettings plain = ErosionSettings.Mountains with { GlacialSteps = 0, GlacierElaMetres = 0f };
+        // M1.12c's mountains: no glaciers, and none of M1a.2's grid transfer or passes.
+        ErosionSettings plain = ErosionSettings.Mountains with
+        {
+            GlacialSteps = 0,
+            GlacierElaMetres = 0f,
+            RefineCubic = 0,
+            RefineChannelCurves = 0,
+            RefineFaceDetail = 0f,
+            DischargeSpread = 0,
+            ThermalRate = 0.25f,
+        };
         Assert.IsTrue(plain.Unglaciated);
         Assert.AreEqual("b7e5666038cc769b", plain.ContentHash().ToString("x16", CultureInfo.InvariantCulture),
             "M1.12c's mountains, so the worlds it eroded are found in the cache");

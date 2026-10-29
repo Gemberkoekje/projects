@@ -31,9 +31,10 @@ public sealed class ErosionCache
     /// The version of the erosion passes. Bump it whenever <see cref="ErosionReference"/> and the shader, or the incision before
     /// them (<see cref="StreamPower"/>), change what they compute, so worlds eroded by the old passes are not read as the new
     /// ones'. 2 (M1.11a): the stream-power incision. 3 (M1.11d): the uplift map and the rock's hardness. 4 (M1.12c): the strata's
-    /// regional dip, folds, formations and massive rock, whose shapes are code as well as settings.
+    /// regional dip, folds, formations and massive rock, whose shapes are code as well as settings. 5 (M1a.2): the incision's smooth
+    /// transfer to the world grid with its curved channels, the spread discharge, and today's glaciers laid smoothly.
     /// </summary>
-    public const int PassesVersion = 4;
+    public const int PassesVersion = 5;
 
     /// <summary>
     /// The version of the base terrain generator, for the same reason (its pinned hashes in the tests catch a change).

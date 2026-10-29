@@ -38,7 +38,7 @@ public static class StreamPower
         if (settings.IncisionSteps == 0)
             return (ground, StrataFrame.Identity, null);
         (HeightField coarse, HeightField incised, StrataFrame frame, HeightField uplift) = Coarse(recipe, seed, new WorldGrid(ground.Size, ground.CellSize), settings);
-        return (Refine(incised, coarse, ground, settings.ChannelAreaKm2), frame, uplift);
+        return (Refine(incised, coarse, ground, settings), frame, uplift);
     }
 
     /// <summary>
@@ -100,29 +100,71 @@ public static class StreamPower
 
     /// <summary>
     /// <paramref name="incised"/> brought onto the finer grid of <paramref name="fineBase"/> (whose grid it nests in, with
-    /// <paramref name="coarseBase"/> the base terrain on its own grid): upsampled, its channels of
-    /// <paramref name="channelAreaKm2"/> and more carved (<see cref="CarveLinks"/>), and the finer base terrain's detail added back
-    /// where the incision left the ground as it was.
+    /// <paramref name="coarseBase"/> the base terrain on its own grid): upsampled (<see cref="UpsampleSmooth"/>, or bilinearly by
+    /// <see cref="ErosionSettings.RefineCubic"/>), its channels of <see cref="ErosionSettings.ChannelAreaKm2"/> and more carved
+    /// (<see cref="CarveChannels"/>, or <see cref="CarveLinks"/> straight), and the finer base terrain's detail added back where the
+    /// incision left the ground as it was, and by <see cref="ErosionSettings.RefineFaceDetail"/> on the ground it cut or buried.
     /// </summary>
-    public static HeightField Refine(HeightField incised, HeightField coarseBase, HeightField fineBase, double channelAreaKm2)
+    public static HeightField Refine(HeightField incised, HeightField coarseBase, HeightField fineBase, ErosionSettings settings)
     {
         ArgumentNullException.ThrowIfNull(incised);
         ArgumentNullException.ThrowIfNull(coarseBase);
         ArgumentNullException.ThrowIfNull(fineBase);
+        ArgumentNullException.ThrowIfNull(settings);
         int factor = CoarseFactor(fineBase.Size, fineBase.CellSize, incised.CellSize);
-        float[] carved = Upsample(incised, factor);
-        CarveLinks(carved, incised, factor, channelAreaKm2);
-        float[] smooth = Upsample(coarseBase, factor);
+        Func<HeightField, int, float[]> upsample = settings.RefineCubic == 1 ? UpsampleSmooth : Upsample;
+        float[] carved = upsample(incised, factor);
+        // Each sample's distance from a carved channel; empty when the links are carved straight.
+        float[] channelMetres = [];
+        if (settings.RefineChannelCurves > 0)
+        {
+            double wall = (float)Math.Tan(settings.IncisionTalusHardDegrees * Math.PI / 180.0);
+            channelMetres = CarveChannels(carved, incised, factor, settings.ChannelAreaKm2, settings.RefineChannelCurves, wall);
+        }
+        else
+        {
+            CarveLinks(carved, incised, factor, settings.ChannelAreaKm2);
+        }
+        float[] smooth = upsample(coarseBase, factor);
         ReadOnlySpan<float> fine = fineBase.Heights;
+        var detail = new float[fine.Length];
+        for (int c = 0; c < detail.Length; c++)
+            detail[c] = fine[c] - smooth[c];
+        // The faces keep only the detail finer than the incision's cell (M1a.2): its part at the incision's own scale would move the
+        // ground the incision shaped (its ridges, and the glaciers that lie on them), where the finer part only roughens it.
+        float[] finer = settings.RefineFaceDetail > 0f ? FinerThanCell(detail, fineBase.Size, fineBase.CellSize, factor) : [];
         var heights = new float[fine.Length];
+        float face = settings.RefineFaceDetail, near = settings.RefineChannelDetailMetres;
         for (int c = 0; c < heights.Length; c++)
         {
             // The base terrain's finer detail belongs to its surface: where the incision cut that surface away or buried it, the
-            // detail goes with it (fully at DetailFadeMetres of change).
+            // detail goes with it (fully at DetailFadeMetres of change), but for the share the faces keep (M1a.2), the rock's own
+            // roughness on the faces the rivers cut; it fades in away from the channels, whose floors stay as carved.
             float kept = Math.Clamp(1f - Math.Abs(carved[c] - smooth[c]) / DetailFadeMetres, 0f, 1f);
-            heights[c] = carved[c] + (fine[c] - smooth[c]) * kept;
+            float height = carved[c] + detail[c] * kept;
+            if (finer.Length > 0)
+            {
+                float x = channelMetres.Length == 0 ? 1f : Math.Clamp(channelMetres[c] / near, 0f, 1f);
+                height += finer[c] * (1f - kept) * face * x * x * (3f - 2f * x);
+            }
+            heights[c] = height;
         }
         return new HeightField(fineBase.Size, fineBase.CellSize, heights);
+    }
+
+    /// <summary>
+    /// The part of <paramref name="field"/> (row-major on a <paramref name="size"/>² grid of <paramref name="cellSize"/> m) finer than a
+    /// cell <paramref name="factor"/> samples wide: the field less its mean over each such cell (<see cref="Glaciers.Average"/>),
+    /// brought back smoothly (<see cref="UpsampleSmooth"/>).
+    /// </summary>
+    public static float[] FinerThanCell(float[] field, int size, double cellSize, int factor)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        float[] coarse = UpsampleSmooth(Glaciers.Average(new HeightField(size, cellSize, field), factor), factor);
+        var finer = new float[field.Length];
+        for (int c = 0; c < finer.Length; c++)
+            finer[c] = field[c] - coarse[c];
+        return finer;
     }
 
     /// <summary>
@@ -351,6 +393,193 @@ public static class StreamPower
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Lowers <paramref name="fine"/> (<paramref name="coarse"/> upsampled) along the channels of the coarse surface (links from cells
+    /// draining at least <paramref name="channelAreaKm2"/>), as curves (vista-plan §10 M1a.2): each stream, from its head down to where
+    /// it joins a larger one, is the line through its coarse samples with its corners cut <paramref name="curves"/> times (Chaikin's
+    /// scheme, its ends kept), its floor falling along it from sample to sample, and the ground within a coarse cell of it lowered to
+    /// no higher than a rounded V of <paramref name="wallSlope"/> (rise over run) from that floor. So the floor falls steadily where the
+    /// interpolation would leave a saddle (see <see cref="CarveLinks"/>), without the straight eight-direction slots that the links
+    /// would carve. Returns each fine sample's distance from the nearest channel, metres (<see cref="float.MaxValue"/> beyond a coarse
+    /// cell).
+    /// </summary>
+    public static float[] CarveChannels(float[] fine, HeightField coarse, int factor, double channelAreaKm2, int curves, double wallSlope)
+    {
+        ArgumentNullException.ThrowIfNull(fine);
+        ArgumentNullException.ThrowIfNull(coarse);
+        ArgumentOutOfRangeException.ThrowIfNegative(curves);
+        int nc = coarse.Size;
+        int n = (nc - 1) * factor + 1;
+        if (fine.Length != n * n)
+            throw new ArgumentException($"Expected {n * n} fine heights, got {fine.Length}.", nameof(fine));
+        DrainageMap drainage = DrainageMap.Of(coarse);
+        int channel = (int)Math.Ceiling(channelAreaKm2 * 1e6 / drainage.CellArea);
+        bool Link(int c) => drainage.Direction[c] != DrainageMap.Outlet && drainage.Upstream[c] >= channel;
+        // Each cell's largest channel donor, the stream it continues (the first of equals, in row-major order).
+        var main = new int[nc * nc];
+        Array.Fill(main, -1);
+        for (int c = 0; c < main.Length; c++)
+        {
+            if (!Link(c))
+                continue;
+            int r = drainage.Receiver(c);
+            if (main[r] < 0 || drainage.Upstream[c] > drainage.Upstream[main[r]])
+                main[r] = c;
+        }
+        var metres = new float[n * n];
+        Array.Fill(metres, float.MaxValue);
+        double cell = coarse.CellSize / factor;
+        var stream = new List<(double X, double Z, double H)>();
+        // Every stream from its head (a channel cell no channel drains into); each channel cell belongs to one.
+        for (int head = 0; head < main.Length; head++)
+        {
+            if (!Link(head) || main[head] >= 0)
+                continue;
+            stream.Clear();
+            int c = head;
+            stream.Add(Point(c));
+            while (true)
+            {
+                int r = drainage.Receiver(c);
+                stream.Add(Point(r));
+                if (main[r] != c || !Link(r))
+                    break;
+                c = r;
+            }
+            List<(double X, double Z, double H)> curve = stream;
+            for (int k = 0; k < curves; k++)
+                curve = CutCorners(curve);
+            for (int k = 0; k + 1 < curve.Count; k++)
+                CarveSegment(fine, metres, n, cell, curve[k], curve[k + 1], factor, wallSlope, extendStart: k > 0, extendEnd: k + 2 < curve.Count);
+        }
+        return metres;
+
+        (double X, double Z, double H) Point(int c) => (c % nc * factor, c / nc * factor, coarse.Heights[c]);
+    }
+
+    /// <summary>The half-width of a carved channel's flat floor, in fine cells (<see cref="CarveChannels"/>).</summary>
+    public const double FloorHalfWidth = 0.75;
+
+    /// <summary>A polyline with each corner cut (Chaikin's scheme: points at a quarter and three quarters of every segment), its ends kept.</summary>
+    internal static List<(double X, double Z, double H)> CutCorners(List<(double X, double Z, double H)> line)
+    {
+        if (line.Count < 3)
+            return line;
+        var cut = new List<(double X, double Z, double H)>(2 * line.Count) { line[0] };
+        for (int k = 0; k + 1 < line.Count; k++)
+        {
+            (double X, double Z, double H) a = line[k], b = line[k + 1];
+            cut.Add((0.75 * a.X + 0.25 * b.X, 0.75 * a.Z + 0.25 * b.Z, 0.75 * a.H + 0.25 * b.H));
+            cut.Add((0.25 * a.X + 0.75 * b.X, 0.25 * a.Z + 0.75 * b.Z, 0.25 * a.H + 0.75 * b.H));
+        }
+        cut.Add(line[^1]);
+        return cut;
+    }
+
+    /// <summary>
+    /// Lowers the fine samples within <paramref name="reach"/> samples of the segment from <paramref name="a"/> to <paramref name="b"/>
+    /// (fine-sample coordinates and heights) to its floor plus a rounded V of <paramref name="wallSlope"/>, and keeps each sample's least
+    /// distance from a channel in <paramref name="metres"/>. At a joint with the next segment of its curve
+    /// (<paramref name="extendStart"/>, <paramref name="extendEnd"/>) the floor runs on along the segment's line through the flat floor's
+    /// width, so a sample beside the joint has the floor's height there, not the joint's; never past a stream's ends, where a steep
+    /// side stream's floor would run on into the valley it joins.
+    /// </summary>
+    private static void CarveSegment(float[] fine, float[] metres, int n, double cell, (double X, double Z, double H) a, (double X, double Z, double H) b,
+        int reach, double wallSlope, bool extendStart, bool extendEnd)
+    {
+        double dx = b.X - a.X, dz = b.Z - a.Z, length2 = dx * dx + dz * dz;
+        double run = length2 > 0.0 ? FloorHalfWidth / Math.Sqrt(length2) : 0.0;
+        double before = extendStart ? -run : 0.0, after = extendEnd ? 1.0 + run : 1.0;
+        int i0 = Math.Max((int)Math.Floor(Math.Min(a.X, b.X)) - reach, 0), i1 = Math.Min((int)Math.Ceiling(Math.Max(a.X, b.X)) + reach, n - 1);
+        int j0 = Math.Max((int)Math.Floor(Math.Min(a.Z, b.Z)) - reach, 0), j1 = Math.Min((int)Math.Ceiling(Math.Max(a.Z, b.Z)) + reach, n - 1);
+        double limit = reach * cell;
+        for (int j = j0; j <= j1; j++)
+        {
+            for (int i = i0; i <= i1; i++)
+            {
+                double along = length2 > 0.0 ? ((i - a.X) * dx + (j - a.Z) * dz) / length2 : 0.0;
+                double t = Math.Clamp(along, 0.0, 1.0);
+                double px = a.X + t * dx - i, pz = a.Z + t * dz - j;
+                double d = Math.Sqrt(px * px + pz * pz) * cell;
+                if (d > limit)
+                    continue;
+                double floor = a.H + (b.H - a.H) * Math.Clamp(along, before, after);
+                // A V with a flat floor three quarters of a fine cell to either side, so every sample a route along the curve steps
+                // through lies on the floor (no pits where the curve runs between samples), rounded over one fine cell at its foot.
+                double off = Math.Max(d - FloorHalfWidth * cell, 0.0);
+                float target = (float)(floor + wallSlope * (Math.Sqrt(off * off + cell * cell) - cell));
+                int f = j * n + i;
+                if (target < fine[f])
+                    fine[f] = target;
+                if (d < metres[f])
+                    metres[f] = (float)d;
+            }
+        }
+    }
+
+    /// <summary>
+    /// <paramref name="coarse"/> interpolated onto the grid <paramref name="factor"/> times finer over the same extent with a continuous
+    /// slope (vista-plan §10 M1a.2): monotone cubic Hermite (Fritsch and Butland's tangents) along the rows, then along the columns, so it
+    /// passes through every coarse sample, has no creases along the coarse grid's lines, and adds no hump or hollow between two samples
+    /// that the samples do not have.
+    /// </summary>
+    public static float[] UpsampleSmooth(HeightField coarse, int factor)
+    {
+        ArgumentNullException.ThrowIfNull(coarse);
+        ArgumentOutOfRangeException.ThrowIfLessThan(factor, 1);
+        int nc = coarse.Size;
+        int n = (nc - 1) * factor + 1;
+        // Each coarse row at every fine column first, then every fine column down the coarse rows.
+        var rows = new double[nc * n];
+        Parallel.For(0, nc, jc =>
+        {
+            var y = new double[nc];
+            var m = new double[nc];
+            for (int ic = 0; ic < nc; ic++)
+                y[ic] = coarse[ic, jc];
+            MonotoneTangents(y, m);
+            for (int i = 0; i < n; i++)
+                rows[jc * n + i] = Hermite(y, m, i, factor);
+        });
+        var fine = new float[n * n];
+        Parallel.For(0, n, i =>
+        {
+            var y = new double[nc];
+            var m = new double[nc];
+            for (int jc = 0; jc < nc; jc++)
+                y[jc] = rows[jc * n + i];
+            MonotoneTangents(y, m);
+            for (int j = 0; j < n; j++)
+                fine[j * n + i] = (float)Hermite(y, m, j, factor);
+        });
+        return fine;
+    }
+
+    /// <summary>
+    /// The tangents of a monotone cubic through <paramref name="y"/> (unit spacing): the harmonic mean of the two neighbouring
+    /// differences where they agree in sign, zero at an extremum, the one difference at the ends.
+    /// </summary>
+    private static void MonotoneTangents(double[] y, double[] m)
+    {
+        int last = y.Length - 1;
+        m[0] = y[1] - y[0];
+        m[last] = y[last] - y[last - 1];
+        for (int k = 1; k < last; k++)
+        {
+            double d0 = y[k] - y[k - 1], d1 = y[k + 1] - y[k];
+            m[k] = d0 * d1 <= 0.0 ? 0.0 : 2.0 * d0 * d1 / (d0 + d1);
+        }
+    }
+
+    /// <summary>The cubic Hermite through <paramref name="y"/> with tangents <paramref name="m"/> at fine sample <paramref name="i"/>, <paramref name="factor"/> to a coarse one.</summary>
+    private static double Hermite(double[] y, double[] m, int i, int factor)
+    {
+        int k = Math.Min(i / factor, y.Length - 2);
+        double t = (i - k * factor) / (double)factor;
+        double t2 = t * t, t3 = t2 * t;
+        return (2.0 * t3 - 3.0 * t2 + 1.0) * y[k] + (t3 - 2.0 * t2 + t) * m[k] + (3.0 * t2 - 2.0 * t3) * y[k + 1] + (t3 - t2) * m[k + 1];
     }
 
     /// <summary>

@@ -156,13 +156,13 @@ internal static class ErosionMeasure
                 var incisionClock = Stopwatch.StartNew();
                 (HeightField coarseBase, HeightField coarseIncised, frame, upliftField) = StreamPower.Coarse(recipe, seed, grid, settings);
                 double coarseSeconds = incisionClock.Elapsed.TotalSeconds;
-                incised = StreamPower.Refine(coarseIncised, coarseBase, ground, settings.ChannelAreaKm2);
+                incised = StreamPower.Refine(coarseIncised, coarseBase, ground, settings);
                 double incisionSeconds = incisionClock.Elapsed.TotalSeconds;
                 DrainageMap coarseBefore = DrainageMap.Of(coarseBase), coarseAfter = DrainageMap.Of(coarseIncised);
                 DrainageMap incisedDrainage = DrainageMap.Of(incised);
                 log.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                    $"seed {seed}: incision {incisionSeconds:0.00} s on the CPU ({coarseSeconds:0.00} s of it {settings.IncisionSteps} steps on the {coarseBase.Size}² × {coarseBase.CellSize} m grid); " +
-                    $"mapped back from {frame.Bottom:0} m by {frame.Scale:0.000} to the base terrain's range from {frame.Low:0} m"));
+                    $"seed {seed}: incision {incisionSeconds:0.00} s on the CPU ({coarseSeconds:0.00} s of it {settings.IncisionSteps} steps on the {coarseBase.Size}² × {coarseBase.CellSize} m grid, " +
+                    $"{incisionSeconds - coarseSeconds:0.00} s back to the world grid); mapped back from {frame.Bottom:0} m by {frame.Scale:0.000} to the base terrain's range from {frame.Low:0} m"));
                 log.WriteLine("  " + Describe("coarse base   ", DrainageStats.Measure(coarseBefore)));
                 log.WriteLine("  " + Describe("coarse incised", DrainageStats.Measure(coarseAfter)));
                 log.WriteLine("  " + Describe("incised       ", DrainageStats.Measure(incisedDrainage)));
@@ -191,7 +191,15 @@ internal static class ErosionMeasure
                     PngEncoder.Write(Path.Combine(outDir, $"seed{seed}.uplift.png"), grey, us, us, PngColor.Rgb);
                 }
                 if (inciseOnly)
+                {
+                    // M1a.2: the grid's patterns and the crops of the incision alone, without the GPU's passes.
+                    log.WriteLine("  " + Describe("base   ", GridArtefacts.Measure(ground), GridArtefacts.Measure(ground, Steep(ground)), null));
+                    log.WriteLine("  " + Describe("incised", GridArtefacts.Measure(incised), GridArtefacts.Measure(incised, Steep(incised)), null));
+                    log.WriteLine("  " + Describe("incised", ReliefStats.Measure(incised)));
+                    if (cropsCamera is not null)
+                        Crops(VistaJson.ParseCamera(File.ReadAllText(cropsCamera)), crops, cropCells, seed, ground, incised, null, outDir!, log);
                     continue;
+                }
             }
             TerrainProfile profile = TerrainProfile.For(recipe.SetPieces);
             StrataGrid strata = StrataGrid.For(RockHardness.For(seed, settings), grid.Size, grid.CellSize, frame,
@@ -308,11 +316,13 @@ internal static class ErosionMeasure
 
     /// <summary>
     /// The crops (vista-plan §10 M1a.1): for each frame pixel of <paramref name="camera"/>, the ground it sees on the eroded world, its
-    /// distance and the metres a pixel covers there, and top-down crops of the base, incised and eroded worlds around it.
+    /// distance and the metres a pixel covers there, and top-down crops of the base, incised and eroded worlds around it. Without an
+    /// eroded world (<c>--incise-only</c>, M1a.2) the pixel looks at the incised one, and only the base and incised crops are written.
     /// </summary>
     private static void Crops(CameraSpec camera, List<(double X, double Y)> pixels, int cells, ulong seed, HeightField ground, HeightField incised,
-        HeightField eroded, string outDir, TextWriter log)
+        HeightField? erodedOrNull, string outDir, TextWriter log)
     {
+        HeightField eroded = erodedOrNull ?? incised;
         var sight = new TerrainSight(eroded, null, new Atmosphere.AtmosphereModel().PlanetRadiusMetres);
         var rays = new CameraRays(camera, CropFrameWidth, CropFrameHeight);
         double pixelAngle = 2.0 * Math.Tan(0.5 * camera.VerticalFovRadians()) / CropFrameHeight;
@@ -330,11 +340,14 @@ internal static class ErosionMeasure
             double half = 0.5 * cells * ground.CellSize;
             bool Near(int c) => Math.Abs(ground.XOf(c % ground.Size) - x) <= half && Math.Abs(ground.ZOf(c / ground.Size) - z) <= half;
             GridArtefacts before = GridArtefacts.Measure(ground, Near), after = GridArtefacts.Measure(eroded, Near);
+            string last = erodedOrNull is null ? "incised" : "eroded";
             log.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"  crop {k + 1}: pixel ({px:0}, {py:0}) sees ({x:0}, {z:0}) at {t:0} m, {t * pixelAngle:0.00} m a pixel ({ground.CellSize / (t * pixelAngle):0.0} pixels a cell); " +
-                $"along the grid {before.AlignedShare:0.0%} base, {after.AlignedShare:0.0%} eroded; rippling {before.RippleShare:0.0%} base, {after.RippleShare:0.0%} eroded"));
+                $"along the grid {before.AlignedShare:0.0%} base, {after.AlignedShare:0.0%} {last}; rippling {before.RippleShare:0.0%} base, {after.RippleShare:0.0%} {last}"));
             foreach ((string stage, HeightField field) in new[] { ("base", ground), ("incised", incised), ("eroded", eroded) })
             {
+                if (stage == "eroded" && erodedOrNull is null)
+                    continue;
                 (byte[] image, int size) = DebugImages.ReliefCrop(field, x, z, cells, CropScale);
                 PngEncoder.Write(Path.Combine(outDir, $"seed{seed}.crop{k + 1}.{stage}.png"), image, size, size, PngColor.Rgb);
             }

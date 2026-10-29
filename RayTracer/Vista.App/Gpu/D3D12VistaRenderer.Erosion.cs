@@ -4,7 +4,7 @@ using Vortice.Direct3D12;
 
 namespace Vista.App.Gpu;
 
-/// <summary>One of the five passes of an erosion step (<see cref="ErosionReference"/>), for the self-test's parity checks.</summary>
+/// <summary>One of the passes of an erosion step (<see cref="ErosionReference"/>), for the self-test's parity checks.</summary>
 internal enum ErosionPass
 {
     None,
@@ -13,12 +13,15 @@ internal enum ErosionPass
     Transport,
     ThermalOut,
     ThermalApply,
+    Discharge,
+    SpreadX,
+    SpreadZ,
 }
 
 /// <summary>
 /// The GPU erosion (vista-plan §10 M1.7): <c>Shaders/VistaErosion.hlsl</c> on the renderer's device, so the world stage runs on
 /// the device before the mesh. The state lives in UAV buffers laid out as <see cref="ErosionState"/>'s; a step is five
-/// dispatches separated by UAV barriers, and steps are batched into command lists of about <see cref="ErosionBudgetSeconds"/>
+/// dispatches (since M1a.2 more when the discharge is spread) separated by UAV barriers, and steps are batched into command lists of about <see cref="ErosionBudgetSeconds"/>
 /// of GPU time each (measured as it goes, starting from one step), far below the Windows GPU timeout. The buffers live only
 /// for one erosion.
 /// </summary>
@@ -50,6 +53,8 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         Clear,       // u9
         Strata,      // u10
         Bands,       // u11
+        SpreadIn,    // u12
+        SpreadOut,   // u13
     }
 
     private ID3D12RootSignature? _erosionRootSignature;
@@ -59,6 +64,9 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
     private ID3D12PipelineState? _thermalOutPipeline;
     private ID3D12PipelineState? _thermalApplyPipeline;
     private ID3D12PipelineState? _clearPipeline;
+    private ID3D12PipelineState? _dischargePipeline;
+    private ID3D12PipelineState? _spreadXPipeline;
+    private ID3D12PipelineState? _spreadZPipeline;
 
     /// <summary>
     /// The erosion state's buffers on the device: A and B sides of the double-buffered layers, the rest, and the rock's strata
@@ -78,15 +86,17 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         public readonly ID3D12Resource Flux = create(Bytes(size, 4));
         public readonly ID3D12Resource Flow = create(Bytes(size, 2));
         public readonly ID3D12Resource Thermal = create(Bytes(size, 4));
+        // M1a.2: the spread discharge (A) and its scratch (B).
+        public readonly ID3D12Resource[] Spread = [create(Bytes(size, 1)), create(Bytes(size, 1))];
         // Each step's constants (accumulating or not) and the clear's, in their own upload buffers.
         public readonly ID3D12Resource[] Constants = new ID3D12Resource[3];
 
         /// <summary>Bytes of a buffer of <paramref name="floats"/> floats per cell, rounded up to 16 for the clear kernel.</summary>
         public static ulong Bytes(int size, int floats) => ((ulong)size * (ulong)size * (ulong)floats * sizeof(float) + 15ul) & ~15ul;
 
-        public long StateBytes => (long)(Bytes(Size, 2) * 2 + Bytes(Size, 1) * 4 + Bytes(Size, 4) * 2 + Bytes(Size, 2) + Bytes(Size, ErosionState.StrataFloats) + Bands.Description.Width);
+        public long StateBytes => (long)(Bytes(Size, 2) * 2 + Bytes(Size, 1) * 6 + Bytes(Size, 4) * 2 + Bytes(Size, 2) + Bytes(Size, ErosionState.StrataFloats) + Bands.Description.Width);
 
-        public IEnumerable<ID3D12Resource> All => Terrain.Concat(Water).Concat(Sediment).Concat([Flux, Flow, Thermal, Strata, Bands]);
+        public IEnumerable<ID3D12Resource> All => Terrain.Concat(Water).Concat(Sediment).Concat(Spread).Concat([Flux, Flow, Thermal, Strata, Bands]);
 
         public void Dispose()
         {
@@ -102,7 +112,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         var rootParameters = new[]
         {
             Cbv(0),
-            Uav(0), Uav(1), Uav(2), Uav(3), Uav(4), Uav(5), Uav(6), Uav(7), Uav(8), Uav(9), Uav(10), Uav(11),
+            Uav(0), Uav(1), Uav(2), Uav(3), Uav(4), Uav(5), Uav(6), Uav(7), Uav(8), Uav(9), Uav(10), Uav(11), Uav(12), Uav(13),
         };
         _erosionRootSignature = _device.CreateRootSignature(new RootSignatureDescription1(RootSignatureFlags.None, rootParameters));
         string source = ShaderSource.Load(ErosionShaderFile);
@@ -112,6 +122,9 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         _thermalOutPipeline = CompilePipeline(_erosionRootSignature, source, "CSThermalOut", ErosionShaderFile);
         _thermalApplyPipeline = CompilePipeline(_erosionRootSignature, source, "CSThermalApply", ErosionShaderFile);
         _clearPipeline = CompilePipeline(_erosionRootSignature, source, "CSClear", ErosionShaderFile);
+        _dischargePipeline = CompilePipeline(_erosionRootSignature, source, "CSDischarge", ErosionShaderFile);
+        _spreadXPipeline = CompilePipeline(_erosionRootSignature, source, "CSSpreadX", ErosionShaderFile);
+        _spreadZPipeline = CompilePipeline(_erosionRootSignature, source, "CSSpreadZ", ErosionShaderFile);
     }
 
     /// <inheritdoc />
@@ -192,6 +205,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         ReadInto(buffers.Flux, after.Flux);
         ReadInto(buffers.Flow, after.Flow);
         ReadInto(buffers.Thermal, after.Thermal);
+        ReadInto(buffers.Spread[0], after.Discharge);
         after.FlowSteps += flowSteps;
         after.Steps += steps;
         return after;
@@ -213,6 +227,11 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
             Upload(buffers.Sediment[1], state.Sediment);
         if (pass is ErosionPass.ThermalOut or ErosionPass.ThermalApply)
             Upload(buffers.Terrain[1], state.Terrain);
+        // The spread discharge where the pass reads it: pass 2 and the first spread read the A side, the second the B side.
+        if (pass is ErosionPass.Water or ErosionPass.SpreadX)
+            Upload(buffers.Spread[0], state.Discharge);
+        if (pass == ErosionPass.SpreadZ)
+            Upload(buffers.Spread[1], state.Discharge);
         WriteErosionConstants(buffers, settings, state.CellSize);
         int cells = state.Size * state.Size;
         Timed(PipelineOf(pass), _erosionRootSignature!, list => RecordPass(list, buffers, pass, accumulate, water: 0));
@@ -223,6 +242,8 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
             ErosionPass.Transport => [ReadFloats(buffers.Sediment[0], cells)],
             ErosionPass.ThermalOut => [ReadFloats(buffers.Thermal, cells * 4)],
             ErosionPass.ThermalApply => [ReadFloats(buffers.Terrain[0], cells * 2)],
+            ErosionPass.Discharge or ErosionPass.SpreadZ => [ReadFloats(buffers.Spread[0], cells)],
+            ErosionPass.SpreadX => [ReadFloats(buffers.Spread[1], cells)],
             _ => throw new ArgumentOutOfRangeException(nameof(pass), pass, "Unknown erosion pass."),
         };
     }
@@ -238,7 +259,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         Upload(buffers.Flux, state.Flux);
         Upload(buffers.Flow, state.Flow);
         Upload(buffers.Thermal, state.Thermal);
-        foreach (ID3D12Resource buffer in new[] { buffers.Terrain[1], buffers.Water[1], buffers.Sediment[1] })
+        foreach (ID3D12Resource buffer in new[] { buffers.Terrain[1], buffers.Water[1], buffers.Sediment[1], buffers.Spread[0], buffers.Spread[1] })
             Clear(buffers, buffer);
         return buffers;
     }
@@ -251,6 +272,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         int steps, int firstWater, int firstStep)
     {
         WriteErosionConstants(buffers, settings, cell);
+        ErosionPass[] passes = StepPasses(settings);
         double seconds = 0.0, longest = 0.0;
         int submissions = 0, water = firstWater, done = 0, batch = 1;
         while (done < steps)
@@ -264,7 +286,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
                 for (int s = 0; s < count; s++)
                 {
                     bool accumulate = firstStep + start + s >= settings.AverageFrom;
-                    foreach (ErosionPass pass in Passes)
+                    foreach (ErosionPass pass in passes)
                         RecordPass(list, buffers, pass, accumulate, w);
                     w = 1 - w;
                 }
@@ -280,7 +302,14 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         return (seconds, submissions, longest, water);
     }
 
-    private static readonly ErosionPass[] Passes = [ErosionPass.Flux, ErosionPass.Water, ErosionPass.Transport, ErosionPass.ThermalOut, ErosionPass.ThermalApply];
+    /// <summary>The passes of one step of <paramref name="settings"/>: since M1a.2 the discharge and its spreads after the flux when it is spread.</summary>
+    private static ErosionPass[] StepPasses(ErosionSettings settings) =>
+    [
+        ErosionPass.Flux,
+        .. settings.DischargeSpread == 0 ? Array.Empty<ErosionPass>() : [ErosionPass.Discharge],
+        .. Enumerable.Range(0, settings.DischargeSpread).SelectMany(_ => new[] { ErosionPass.SpreadX, ErosionPass.SpreadZ }),
+        ErosionPass.Water, ErosionPass.Transport, ErosionPass.ThermalOut, ErosionPass.ThermalApply,
+    ];
 
     private ID3D12PipelineState PipelineOf(ErosionPass pass) => pass switch
     {
@@ -289,6 +318,9 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
         ErosionPass.Transport => _transportPipeline!,
         ErosionPass.ThermalOut => _thermalOutPipeline!,
         ErosionPass.ThermalApply => _thermalApplyPipeline!,
+        ErosionPass.Discharge => _dischargePipeline!,
+        ErosionPass.SpreadX => _spreadXPipeline!,
+        ErosionPass.SpreadZ => _spreadZPipeline!,
         _ => throw new ArgumentOutOfRangeException(nameof(pass), pass, "Unknown erosion pass."),
     };
 
@@ -308,7 +340,16 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
             case ErosionPass.Water:
                 (bind[ErosionSlot.TerrainIn], bind[ErosionSlot.WaterIn], bind[ErosionSlot.SedimentIn], bind[ErosionSlot.Flux]) = (b.Terrain[0], b.Water[water], b.Sediment[0], b.Flux);
                 (bind[ErosionSlot.TerrainOut], bind[ErosionSlot.WaterOut], bind[ErosionSlot.SedimentOut], bind[ErosionSlot.Flow]) = (b.Terrain[1], b.Water[1 - water], b.Sediment[1], b.Flow);
-                (bind[ErosionSlot.Strata], bind[ErosionSlot.Bands]) = (b.Strata, b.Bands);
+                (bind[ErosionSlot.Strata], bind[ErosionSlot.Bands], bind[ErosionSlot.SpreadIn]) = (b.Strata, b.Bands, b.Spread[0]);
+                break;
+            case ErosionPass.Discharge:
+                (bind[ErosionSlot.Flux], bind[ErosionSlot.SpreadOut]) = (b.Flux, b.Spread[0]);
+                break;
+            case ErosionPass.SpreadX:
+                (bind[ErosionSlot.SpreadIn], bind[ErosionSlot.SpreadOut]) = (b.Spread[0], b.Spread[1]);
+                break;
+            case ErosionPass.SpreadZ:
+                (bind[ErosionSlot.SpreadIn], bind[ErosionSlot.SpreadOut]) = (b.Spread[1], b.Spread[0]);
                 break;
             case ErosionPass.Transport:
                 (bind[ErosionSlot.WaterIn], bind[ErosionSlot.Flux], bind[ErosionSlot.SedimentIn], bind[ErosionSlot.SedimentOut]) = (b.Water[water], b.Flux, b.Sediment[1], b.Sediment[0]);
@@ -333,7 +374,7 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
 
     private void BindErosion(ID3D12GraphicsCommandList4 list, Dictionary<ErosionSlot, ID3D12Resource> bind)
     {
-        for (ErosionSlot slot = ErosionSlot.TerrainIn; slot <= ErosionSlot.Bands; slot++)
+        for (ErosionSlot slot = ErosionSlot.TerrainIn; slot <= ErosionSlot.SpreadOut; slot++)
             list.SetComputeRootUnorderedAccessView((uint)slot, (bind.TryGetValue(slot, out ID3D12Resource? r) ? r : _dummyUav).GPUVirtualAddress);
     }
 
@@ -380,6 +421,9 @@ internal sealed partial class D3D12VistaRenderer : ITerrainEroder
 
     private void DisposeErosion()
     {
+        _spreadZPipeline?.Dispose();
+        _spreadXPipeline?.Dispose();
+        _dischargePipeline?.Dispose();
         _clearPipeline?.Dispose();
         _thermalApplyPipeline?.Dispose();
         _thermalOutPipeline?.Dispose();

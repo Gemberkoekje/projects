@@ -28,6 +28,7 @@ public sealed class ErosionState
         Flux = new float[cells * 4];
         Thermal = new float[cells * 4];
         Flow = new float[cells * 2];
+        Discharge = new float[cells];
         Strata = Interleave(strata, cells);
         Bands = strata?.Bands ?? NoBeds;
         TableScale = strata?.TableScale ?? 0f;
@@ -61,9 +62,9 @@ public sealed class ErosionState
 
     /// <summary>
     /// Floats per cell the GPU keeps: two of each double-buffered layer (ground ×2, water, sediment), the flux and thermal
-    /// moves (×4 each) and the flow sums (×2).
+    /// moves (×4 each), the flow sums (×2) and, since M1a.2, the spread discharge and its scratch.
     /// </summary>
-    public const int FloatsPerCell = 2 * 2 + 2 + 2 + 4 + 4 + 2;
+    public const int FloatsPerCell = 2 * 2 + 2 + 2 + 4 + 4 + 2 + 2;
 
     /// <summary>Samples per side.</summary>
     public int Size { get; }
@@ -88,6 +89,12 @@ public sealed class ErosionState
 
     /// <summary>Per cell, the sums of (outflow in m³/s, water depth in m) over the steps that averaged.</summary>
     public float[] Flow { get; }
+
+    /// <summary>
+    /// Per cell, the discharge per metre of width the water erodes with when the settings spread it (vista-plan §10 M1a.2,
+    /// <see cref="ErosionSettings.DischargeSpread"/>), in m²/s: this step's, once <see cref="ErosionReference.SpreadDischarge(ErosionConstants, ErosionState)"/> ran.
+    /// </summary>
+    public float[] Discharge { get; }
 
     /// <summary>Per cell, the rock's (bed-table coordinate at height 0, mottle, massive) (<see cref="StrataGrid"/>).</summary>
     public float[] Strata { get; }
@@ -115,6 +122,7 @@ public sealed class ErosionState
         Flux.CopyTo(copy.Flux, 0);
         Thermal.CopyTo(copy.Thermal, 0);
         Flow.CopyTo(copy.Flow, 0);
+        Discharge.CopyTo(copy.Discharge, 0);
         return copy;
     }
 
@@ -129,6 +137,7 @@ public sealed class ErosionState
         Flux = new float[cells * 4];
         Thermal = new float[cells * 4];
         Flow = new float[cells * 2];
+        Discharge = new float[cells];
         Strata = new float[cells * StrataFloats];
         Bands = NoBeds;
     }
@@ -156,6 +165,9 @@ public sealed class ErosionState
 ///   <item><see cref="Flux"/>: rain, then the virtual pipes' outflow to the four neighbours, accelerated by the head difference
 ///   and scaled down so no cell sends more water than it holds (Mei, Decaudin and Hu 2007). Past the grid's edge the ground
 ///   continues at the edge's slope, dry, so water leaves where the land falls away.</item>
+///   <item>Since M1a.2, when the settings spread it (<see cref="ErosionSettings.DischargeSpread"/>), <see cref="SpreadDischarge(ErosionConstants, float[], float[], float[])"/>:
+///   each cell's discharge, then spread over its neighbours' a few times along the rows and the columns, so the water erodes over
+///   a channel's width and not in lanes a cell wide.</item>
 ///   <item><see cref="Water"/>: the water after this step's inflow and outflow; the discharge per metre of width from the net
 ///   flux through the cell; the sediment capacity <c>K·sin α·√q</c> (stream power with the usual m/n of ½: steep slopes and big
 ///   rivers cut, sheet flow on a ridge barely does); erosion of the spare capacity (loose material first, then rock at its
@@ -198,12 +210,15 @@ public static class ErosionReference
         var terrainB = new float[cells * 2];
         var waterB = new float[cells];
         var sedimentB = new float[cells];
+        var scratch = new float[cells];
         ErosionConstants k = ErosionConstants.For(settings, state.Size, state.CellSize).WithStrata(state);
         for (int s = 0; s < steps; s++)
         {
             k.Accumulate = state.Steps >= settings.AverageFrom ? 1u : 0u;
             Flux(k, state.Terrain, state.Water, state.Flux);
-            Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands);
+            if (k.SpreadDischarge != 0)
+                SpreadDischarge(k, state.Flux, state.Discharge, scratch);
+            Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands, state.Discharge);
             Transport(k, state.Water, state.Flux, sedimentB, state.Sediment);
             waterB.CopyTo(state.Water, 0);
             ThermalOut(k, terrainB, state.Thermal, state.Strata, state.Bands);
@@ -225,15 +240,83 @@ public static class ErosionReference
         });
     }
 
-    /// <summary>Pass 2: water, speed, erosion or deposition, evaporation and the flow sums, from the A buffers into the B buffers.</summary>
-    public static void Water(ErosionConstants k, float[] terrain, float[] water, float[] sediment, float[] flux,
-        float[] terrainOut, float[] waterOut, float[] sedimentOut, float[] flow, float[] strata, float[] bands)
+    /// <summary>
+    /// Passes 1a–1c (vista-plan §10 M1a.2), when the settings spread the discharge (<see cref="ErosionSettings.DischargeSpread"/>):
+    /// each cell's discharge per metre of width into <paramref name="discharge"/> (<see cref="Discharge"/>), then
+    /// <see cref="ErosionConstants.SpreadDischarge"/> times a <c>[1 2 1]</c> spread along the rows and the columns
+    /// (<see cref="SpreadAlongX"/>, <see cref="SpreadAlongZ"/>, through <paramref name="scratch"/>), which pass 2 erodes with. A channel is
+    /// wider than a cell: without the spread each cell's lane of water cuts on its own, and on a face that falls along the grid's
+    /// rows or columns the lanes, which no water crosses, cut a rill each, two to four cells apart.
+    /// </summary>
+    public static void SpreadDischarge(ErosionConstants k, float[] flux, float[] discharge, float[] scratch)
+    {
+        Discharge(k, flux, discharge);
+        for (uint p = 0; p < k.SpreadDischarge; p++)
+        {
+            SpreadAlongX(k, discharge, scratch);
+            SpreadAlongZ(k, scratch, discharge);
+        }
+    }
+
+    /// <summary><see cref="SpreadDischarge(ErosionConstants, float[], float[], float[])"/> on <paramref name="state"/>'s flux, into its <see cref="ErosionState.Discharge"/>.</summary>
+    public static void SpreadDischarge(ErosionConstants k, ErosionState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        SpreadDischarge(k, state.Flux, state.Discharge, new float[state.Discharge.Length]);
+    }
+
+    /// <summary>Pass 1a: each cell's net discharge per metre of width (m²/s), from this step's flux.</summary>
+    public static void Discharge(ErosionConstants k, float[] flux, float[] discharge)
     {
         int n = (int)k.Size;
         Parallel.For(0, n, j =>
         {
             for (int i = 0; i < n; i++)
-                WaterCell(k, n, i, j, terrain, water, sediment, flux, terrainOut, waterOut, sedimentOut, flow, strata, bands);
+                discharge[j * n + i] = NetDischarge(k, n, i, j, flux);
+        });
+    }
+
+    /// <summary>Pass 1b: <paramref name="input"/> spread <c>[1 2 1] / 4</c> along the rows (the edges repeat their sample).</summary>
+    public static void SpreadAlongX(ErosionConstants k, float[] input, float[] output)
+    {
+        int n = (int)k.Size;
+        Parallel.For(0, n, j =>
+        {
+            for (int i = 0; i < n; i++)
+            {
+                int c = j * n + i;
+                output[c] = Spread(input[i > 0 ? c - 1 : c], input[c], input[i < n - 1 ? c + 1 : c]);
+            }
+        });
+    }
+
+    /// <summary>Pass 1c: <paramref name="input"/> spread <c>[1 2 1] / 4</c> along the columns.</summary>
+    public static void SpreadAlongZ(ErosionConstants k, float[] input, float[] output)
+    {
+        int n = (int)k.Size;
+        Parallel.For(0, n, j =>
+        {
+            for (int i = 0; i < n; i++)
+            {
+                int c = j * n + i;
+                output[c] = Spread(input[j > 0 ? c - n : c], input[c], input[j < n - 1 ? c + n : c]);
+            }
+        });
+    }
+
+    /// <summary>Pass 2: water, speed, erosion or deposition, evaporation and the flow sums, from the A buffers into the B buffers.</summary>
+    /// <remarks>
+    /// With <see cref="ErosionConstants.SpreadDischarge"/> the capacity reads the spread discharge in <paramref name="discharge"/>
+    /// (passes 1a–1c); without it, the cell's own, and <paramref name="discharge"/> is not read.
+    /// </remarks>
+    public static void Water(ErosionConstants k, float[] terrain, float[] water, float[] sediment, float[] flux,
+        float[] terrainOut, float[] waterOut, float[] sedimentOut, float[] flow, float[] strata, float[] bands, float[] discharge)
+    {
+        int n = (int)k.Size;
+        Parallel.For(0, n, j =>
+        {
+            for (int i = 0; i < n; i++)
+                WaterCell(k, n, i, j, terrain, water, sediment, flux, terrainOut, waterOut, sedimentOut, flow, strata, bands, discharge);
         });
     }
 
@@ -315,8 +398,25 @@ public static class ErosionReference
         flux[c * 4 + 3] = fzp * scale;
     }
 
+    // The net flow through cell (i, j), as discharge per metre of width (m²/s): WaterCell's, for pass 1a.
+    private static float NetDischarge(ErosionConstants k, int n, int i, int j, float[] flux)
+    {
+        int c = j * n + i;
+        float fxm = flux[c * 4], fxp = flux[c * 4 + 1], fzm = flux[c * 4 + 2], fzp = flux[c * 4 + 3];
+        float fromXm = i > 0 ? flux[(c - 1) * 4 + 1] : 0f;
+        float fromXp = i < n - 1 ? flux[(c + 1) * 4] : 0f;
+        float fromZm = j > 0 ? flux[(c - n) * 4 + 3] : 0f;
+        float fromZp = j < n - 1 ? flux[(c + n) * 4 + 2] : 0f;
+        float wx = 0.5f * ((fromXm - fxm) + (fxp - fromXp));
+        float wz = 0.5f * ((fromZm - fzm) + (fzp - fromZp));
+        return MathF.Sqrt(wx * wx + wz * wz) * k.InvCell;
+    }
+
+    // One tap of the [1 2 1] / 4 spread, summed in this order on both sides.
+    private static float Spread(float before, float at, float after) => (0.25f * before + 0.5f * at) + 0.25f * after;
+
     private static void WaterCell(ErosionConstants k, int n, int i, int j, float[] terrain, float[] water, float[] sediment,
-        float[] flux, float[] terrainOut, float[] waterOut, float[] sedimentOut, float[] flow, float[] strata, float[] bands)
+        float[] flux, float[] terrainOut, float[] waterOut, float[] sedimentOut, float[] flow, float[] strata, float[] bands, float[] spread)
     {
         int c = j * n + i;
         float rock = terrain[c * 2];
@@ -333,10 +433,10 @@ public static class ErosionReference
         float outflow = (fxm + fxp) + (fzm + fzp);
         float after = MathF.Max(0f, before + k.DepthPerFlux * (inflow - outflow));
 
-        // The net flow through the cell, as discharge per metre of width (m²/s).
+        // The net flow through the cell, as discharge per metre of width (m²/s); since M1a.2 spread over its neighbours' (pass 1).
         float wx = 0.5f * ((fromXm - fxm) + (fxp - fromXp));
         float wz = 0.5f * ((fromZm - fzm) + (fzp - fromZp));
-        float discharge = MathF.Sqrt(wx * wx + wz * wz) * k.InvCell;
+        float discharge = k.SpreadDischarge != 0 ? spread[c] : MathF.Sqrt(wx * wx + wz * wz) * k.InvCell;
 
         // The ground's slope: central differences inside, one-sided at the edges.
         float gxm = i > 0 ? Ground(terrain, c - 1) : ground;

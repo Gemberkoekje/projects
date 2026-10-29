@@ -4,7 +4,8 @@ namespace Vista.World;
 /// Today's glaciers on a finished world (vista-plan §4.5, §10 M1.13): the recipe's own, from its equilibrium line in the world's frame
 /// (<see cref="ErosionSettings.GlacierElaMetres"/>), so they stand whatever the place, the season and the snow slider. The steady ice of
 /// that climate (<see cref="GlacierFlow"/>) is solved on the eroded ground averaged onto the incision's grid (a glacier is hundreds of
-/// metres wide; the 8 m gullies under it do not steer it), and its surface, bilinear between those samples, is laid over the 8 m ground:
+/// metres wide; the 8 m gullies under it do not steer it), and its surface, interpolated between those samples as the incision is
+/// (<see cref="ErosionSettings.RefineCubic"/>: with a continuous slope since M1a.2, bilinear before), is laid over the 8 m ground:
 /// the ice is the height of that smooth surface above the ground, faded out where the solve's ice thins to nothing, so rock ribs stand
 /// through it and its edges meet the ground. A steady glacier's surface holds no closed hollow (its ice would flow into it), so where
 /// the laid surface does (between the solve's samples, behind a rib, at an edge) the ice fills it to its spill. The world's surface is
@@ -38,8 +39,10 @@ public static class Glaciers
         var top = new float[nc * nc];
         for (int c = 0; c < top.Length; c++)
             top[c] = coarse.Heights[c] + ice.Thickness[c];
-        float[] surface = StreamPower.Upsample(new HeightField(nc, coarse.CellSize, top), factor);
-        float[] solved = StreamPower.Upsample(new HeightField(nc, coarse.CellSize, ice.Thickness), factor);
+        // Brought to the world grid as the incision is (M1a.2): with a continuous slope, so the ice has no 64 m facets either.
+        Func<HeightField, int, float[]> upsample = settings.RefineCubic == 1 ? StreamPower.UpsampleSmooth : StreamPower.Upsample;
+        float[] surface = upsample(new HeightField(nc, coarse.CellSize, top), factor);
+        float[] solved = upsample(new HeightField(nc, coarse.CellSize, ice.Thickness), factor);
 
         float[] bed = ground.Heights.ToArray();
         float[] heights = ground.Heights.ToArray();

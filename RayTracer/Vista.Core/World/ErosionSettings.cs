@@ -49,6 +49,13 @@ public sealed record ErosionSettings
     /// <summary>The smallest slope sine the capacity sees, so water on flat ground still carries a little.</summary>
     public float MinSlope { get; init; }
 
+    /// <summary>
+    /// The times the discharge the capacity reads is spread over its neighbours' (<c>[1 2 1] / 4</c> along the rows, then the columns;
+    /// vista-plan §10 M1a.2): two spread it over about five cells, a channel's width, so the water cuts gullies that follow the fall
+    /// line instead of a rill in every lane of cells on a face that falls along the grid. 0: each cell's own, as M1.7.
+    /// </summary>
+    public int DischargeSpread { get; init; }
+
     /// <summary>The fraction of a cell's spare capacity it picks up from the ground per step.</summary>
     public float Dissolve { get; init; }
 
@@ -93,6 +100,32 @@ public sealed record ErosionSettings
 
     /// <summary>The upstream area from which a cell incises as a channel, in km²; below it a cell is hillslope.</summary>
     public float ChannelAreaKm2 { get; init; } = 0.1f;
+
+    /// <summary>
+    /// How the incision is brought back to the world grid (vista-plan §10 M1a.2, <see cref="StreamPower.Refine"/>), and today's
+    /// glaciers' surface, solved on the same grid (<see cref="Glaciers"/>): 1 interpolates them with a continuous slope
+    /// (<see cref="StreamPower.UpsampleSmooth"/>); 0 bilinearly, M1.11a's flat facets with seams.
+    /// </summary>
+    public int RefineCubic { get; init; }
+
+    /// <summary>
+    /// The corner cuts the incision's channels get before they are carved into the world grid (vista-plan §10 M1a.2,
+    /// <see cref="StreamPower.CarveChannels"/>): each smooths the eight-direction links into a curve; 0 carves M1.11a's straight links.
+    /// </summary>
+    public int RefineChannelCurves { get; init; }
+
+    /// <summary>
+    /// The share of the base terrain's finer detail kept on the ground the incision cut or buried (vista-plan §10 M1a.2), its part finer
+    /// than the incision's cell (<see cref="StreamPower.FinerThanCell"/>): 0 fades it out over <see cref="StreamPower.DetailFadeMetres"/>
+    /// of change, as M1.11a; 1 keeps all of it away from the channels.
+    /// </summary>
+    public float RefineFaceDetail { get; init; }
+
+    /// <summary>
+    /// The distance from a carved channel over which the detail <see cref="RefineFaceDetail"/> keeps fades in, metres, so the channels'
+    /// floors stay as carved.
+    /// </summary>
+    public float RefineChannelDetailMetres { get; init; } = 24f;
 
     /// <summary>
     /// The steepest slope the softest rock keeps toward the cell it drains into while the valleys incise, in degrees (the
@@ -225,6 +258,10 @@ public sealed record ErosionSettings
     public GlacierClimate PresentClimate =>
         new(GlacierElaMetres, GlacialBalanceGradient, GlacialAccumulationMetres, GlacialAblationMetres);
 
+    /// <summary>True when the incision comes back to the world grid as M1.11a brought it: bilinear, straight links, the detail faded.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool BilinearRefine => RefineCubic == 0 && RefineChannelCurves == 0 && RefineFaceDetail == 0f;
+
     /// <summary>True when the rock is M1.11d's: none of M1.12c's regional dip, folds, formations or massive regions.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool EvenStrata => StrataRegionalDipDegrees == 0f && StrataFoldMetres == 0f && StrataFormationMetres == 0f && StrataMassiveShare == 0f;
@@ -252,7 +289,13 @@ public sealed record ErosionSettings
     /// massive share (vista-plan §10 M1.12c) were chosen by the contour-line measure and sheets of seed 42 seen from the user's
     /// photo's height: dips like the hillsides' own take the beds' bands off the contours. The glaciers (vista-plan §10 M1.13) were
     /// chosen by sheets and maps of seed 42: three glacial cycles of carving with the line swinging from 1200 to 1800 m above the world's
-    /// height 0 widen the valleys the ice fills, and today's line at 1800 m keeps glaciers on the high massif and in its valleys.
+    /// height 0 widen the valleys the ice fills, and today's line at 1800 m keeps glaciers on the high massif and in its valleys. The
+    /// grid transfer, the spread discharge and the thermal rate (vista-plan §10 M1a.2) were chosen by the grid's own patterns
+    /// (<see cref="GridArtefacts"/>) on seed 42 and a 1025² world, and tilted planes: the incision brought back smoothly with the base
+    /// terrain's detail on its faces takes the incised ground's relief along the grid from 68% to 15%; the discharge spread twice turns
+    /// the comb of rills on faces that fall along the grid into gullies along the fall line (the windows rippling from 7.5% to 2%), and
+    /// a thermal rate of 0.02 lets the water and the talus compete instead of setting every steep face to one talus plane with
+    /// creases in the grid's eight directions (the relief along the grid from 21% to 18%).
     /// </remarks>
     public static ErosionSettings Mountains { get; } = new()
     {
@@ -265,18 +308,22 @@ public sealed record ErosionSettings
         Capacity = 2.0f,
         DischargeExponent = 1.0f,
         MinSlope = 0.05f,
+        DischargeSpread = 2,
         Dissolve = 0.1f,
         RockErodibility = 0.1f,
         Deposition = 0.1f,
         LooseTalusDegrees = 35.0f,
         RockTalusDegrees = 40.0f,
         RockTalusHardDegrees = 65.0f,
-        ThermalRate = 0.25f,
+        ThermalRate = 0.02f,
         AverageFrom = 750,
         IncisionSteps = 300,
         IncisionCell = 64.0f,
         IncisionRate = 0.03f,
         ChannelAreaKm2 = 0.1f,
+        RefineCubic = 1,
+        RefineChannelCurves = 2,
+        RefineFaceDetail = 1.0f,
         IncisionTalusDegrees = 35.0f,
         IncisionTalusHardDegrees = 60.0f,
         IncisionUplift = 8.0f,
@@ -319,6 +366,12 @@ public sealed record ErosionSettings
         HardErodibility = 1.0f,
         IncisionSteps = 0,
         PoolFillMetres = 0.0f,
+        // M1.7's passes until the hills' own milestone (M1a.2's spread discharge and slow thermal settle the mountains).
+        DischargeSpread = 0,
+        ThermalRate = 0.25f,
+        RefineCubic = 0,
+        RefineChannelCurves = 0,
+        RefineFaceDetail = 0.0f,
     };
 
     /// <summary>
@@ -384,6 +437,8 @@ public sealed record ErosionSettings
         Fraction(nameof(FluxDamping), FluxDamping);
         Fraction(nameof(Capacity), Capacity, float.MaxValue);
         Fraction(nameof(MinSlope), MinSlope);
+        if (DischargeSpread is < 0 or > 8)
+            errors.Add($"DischargeSpread must be in [0, 8] (got {DischargeSpread}).");
         if (!(DischargeExponent > 0f && DischargeExponent <= 2f))
             errors.Add($"DischargeExponent must be in (0, 2] (got {DischargeExponent}).");
         Fraction(nameof(Dissolve), Dissolve);
@@ -397,6 +452,10 @@ public sealed record ErosionSettings
         Positive(nameof(IncisionCell), IncisionCell);
         Fraction(nameof(IncisionRate), IncisionRate, float.MaxValue);
         Positive(nameof(ChannelAreaKm2), ChannelAreaKm2);
+        if (RefineCubic is not (0 or 1) || RefineChannelCurves < 0)
+            errors.Add($"RefineCubic must be 0 or 1 and RefineChannelCurves not negative (got {RefineCubic}, {RefineChannelCurves}).");
+        Fraction(nameof(RefineFaceDetail), RefineFaceDetail);
+        Positive(nameof(RefineChannelDetailMetres), RefineChannelDetailMetres);
         Fraction(nameof(IncisionUplift), IncisionUplift, float.MaxValue);
         Fraction(nameof(IncisionLakeFill), IncisionLakeFill);
         Fraction(nameof(PoolFillMetres), PoolFillMetres, float.MaxValue);
@@ -461,6 +520,11 @@ public sealed record ErosionSettings
                 GlacialElaMetres, GlacialElaSwingMetres, GlacialBalanceGradient, GlacialAccumulationMetres, GlacialAblationMetres, GlacialErosionMetres,
                 GlacierElaMetres,
             }.Select(BitConverter.SingleToInt32Bits)),
+            // M1a.2's grid transfer only when it is not M1.11a's, so M1.11a's transfer keeps its key.
+            .. (BilinearRefine ? [] : new[] { RefineCubic, RefineChannelCurves }),
+            .. (BilinearRefine ? [] : new[] { RefineFaceDetail, RefineChannelDetailMetres }.Select(BitConverter.SingleToInt32Bits)),
+            // M1a.2's spread discharge likewise only when it is on.
+            .. (DischargeSpread == 0 ? [] : new[] { DischargeSpread }),
         ];
         Span<byte> buffer = stackalloc byte[4];
         ulong hash = StableHash.FnvStart;
@@ -568,8 +632,11 @@ public struct ErosionConstants
     /// <summary>The largest bed-table coordinate a lookup reads (the table's last entry less 1.001).</summary>
     public float TableLast;
 
-    /// <summary>Padding to a 16-byte row.</summary>
-    public uint Pad2;
+    /// <summary>
+    /// The times the discharge is spread before pass 2 erodes with it (<see cref="ErosionSettings.DischargeSpread"/>, vista-plan §10
+    /// M1a.2); 0: each cell's own.
+    /// </summary>
+    public uint SpreadDischarge;
 
     /// <summary>Padding to a 16-byte row.</summary>
     public uint Pad3;
@@ -616,6 +683,7 @@ public struct ErosionConstants
             RockErodibilityHard = settings.RockErodibility * settings.HardErodibility,
             RockDropEdgeHard = tanHard * l,
             RockDropCornerHard = tanHard * l * diagonal,
+            SpreadDischarge = (uint)settings.DischargeSpread,
         };
     }
 

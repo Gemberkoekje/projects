@@ -8,7 +8,7 @@ namespace Vista.App.Gpu;
 /// The GPU erosion against its C# reference (vista-plan §10 M1.7 verify: "HLSL against the C# reference on a 65² grid within
 /// tolerance"). The grid is a 65² patch of the alpine range at the world grid's cell size, so its slopes are the real ones.
 /// The reference runs a few dozen steps from the bare ground to reach a state with water, sediment, flux and loose material in
-/// it; from that state each of the five passes runs once on both sides and their outputs are compared; then both run the whole
+/// it; from that state each of the five passes (since M1a.2 also the discharge's spread passes, when the settings spread it) runs once on both sides and their outputs are compared; then both run the whole
 /// schedule's first steps from the bare ground and their surfaces are compared. Differences come from float rounding alone (the
 /// GPU may fuse a multiply and an add, and its square root and division round differently), so a pass agrees to a few units in
 /// the last place, and a run of steps a little less, since erosion amplifies differences. The patch's rock has the seed's strata
@@ -49,7 +49,10 @@ internal static class ErosionParity
         int cells = Size * Size;
         bool pass = true;
 
-        foreach (ErosionPass p in new[] { ErosionPass.Flux, ErosionPass.Water, ErosionPass.Transport, ErosionPass.ThermalOut, ErosionPass.ThermalApply })
+        // Since M1a.2 the discharge's spread passes too, when the settings spread it.
+        ErosionPass[] spread = settings.DischargeSpread == 0 ? [] : [ErosionPass.Discharge, ErosionPass.SpreadX, ErosionPass.SpreadZ];
+        ErosionPass[] passes = [ErosionPass.Flux, .. spread, ErosionPass.Water, ErosionPass.Transport, ErosionPass.ThermalOut, ErosionPass.ThermalApply];
+        foreach (ErosionPass p in passes)
         {
             ErosionState cpu = warm.Clone();
             float[][] expected;
@@ -61,13 +64,28 @@ internal static class ErosionParity
                     break;
                 case ErosionPass.Water:
                     float[] terrain = new float[cells * 2], water = new float[cells], sediment = new float[cells];
-                    ErosionReference.Water(k, cpu.Terrain, cpu.Water, cpu.Sediment, cpu.Flux, terrain, water, sediment, cpu.Flow, cpu.Strata, cpu.Bands);
+                    ErosionReference.Water(k, cpu.Terrain, cpu.Water, cpu.Sediment, cpu.Flux, terrain, water, sediment, cpu.Flow, cpu.Strata, cpu.Bands, cpu.Discharge);
                     expected = [terrain, water, sediment, cpu.Flow];
                     break;
                 case ErosionPass.Transport:
                     float[] moved = new float[cells];
                     ErosionReference.Transport(k, cpu.Water, cpu.Flux, cpu.Sediment, moved);
                     expected = [moved];
+                    break;
+                case ErosionPass.Discharge:
+                    float[] discharge = new float[cells];
+                    ErosionReference.Discharge(k, cpu.Flux, discharge);
+                    expected = [discharge];
+                    break;
+                case ErosionPass.SpreadX:
+                    float[] alongX = new float[cells];
+                    ErosionReference.SpreadAlongX(k, cpu.Discharge, alongX);
+                    expected = [alongX];
+                    break;
+                case ErosionPass.SpreadZ:
+                    float[] alongZ = new float[cells];
+                    ErosionReference.SpreadAlongZ(k, cpu.Discharge, alongZ);
+                    expected = [alongZ];
                     break;
                 case ErosionPass.ThermalOut:
                     ErosionReference.ThermalOut(k, cpu.Terrain, cpu.Thermal, cpu.Strata, cpu.Bands);

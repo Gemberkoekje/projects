@@ -88,7 +88,7 @@ public sealed class StreamPowerTests
     }
 
     private const string PinnedPreparedHash = "6607fcdede7e57c0";
-    private const string PinnedFoldedPreparedHash = "28519918935bca8b";
+    private const string PinnedFoldedPreparedHash = "ec27e4a974b96d28";
 
     [TestMethod]
     public void Upsampling_KeepsTheCoarseSamples_AndInterpolatesBetweenThem()
@@ -104,6 +104,94 @@ public sealed class StreamPowerTests
         }
         float centre = (coarse[1, 1] + coarse[2, 1] + coarse[1, 2] + coarse[2, 2]) / 4f;
         Assert.AreEqual(centre, fine[6 * n + 6], 1e-4f, "the middle of a cell is its corners' mean");
+    }
+
+    [TestMethod]
+    public void SmoothUpsampling_KeepsTheCoarseSamples_AndAPlane_WithoutCreasesOrNewHumps()
+    {
+        // Through every coarse sample, like the bilinear one.
+        HeightField coarse = Field(9, 64.0, (i, j) => (float)(StableHash.Lattice(5, i, j) % 200));
+        const int factor = 8, n = 65;
+        float[] fine = StreamPower.UpsampleSmooth(coarse, factor);
+        Assert.AreEqual(n * n, fine.Length);
+        for (int j = 0; j < 9; j++)
+        {
+            for (int i = 0; i < 9; i++)
+                Assert.AreEqual(coarse[i, j], fine[j * factor * n + i * factor], 1e-3f, $"coarse sample ({i}, {j})");
+        }
+        // Between two samples it stays between them along a coarse row (monotone: no hump or hollow the samples do not have).
+        for (int j = 0; j < 9; j++)
+        {
+            for (int ic = 0; ic < 8; ic++)
+            {
+                float a = coarse[ic, j], b = coarse[ic + 1, j];
+                for (int t = 1; t < factor; t++)
+                {
+                    float v = fine[j * factor * n + ic * factor + t];
+                    Assert.IsTrue(v >= Math.Min(a, b) - 1e-3f && v <= Math.Max(a, b) + 1e-3f, $"row {j}, cell {ic}: {v} outside [{a}, {b}]");
+                }
+            }
+        }
+        // A plane comes back as itself.
+        HeightField plane = Field(9, 64.0, (i, j) => 100f + 7f * i - 3f * j);
+        float[] flat = StreamPower.UpsampleSmooth(plane, factor);
+        for (int j = 0; j < n; j++)
+        {
+            for (int i = 0; i < n; i++)
+                Assert.AreEqual(100.0 + 7.0 * i / factor - 3.0 * j / factor, flat[j * n + i], 1e-3, $"({i}, {j})");
+        }
+        // No crease along a coarse line: across a sample where a ridge bends, the bilinear slope jumps, the smooth one does not.
+        HeightField bend = Field(9, 64.0, (i, j) => 40f * i + (i > 4 ? 60f * (i - 4) : 0f));
+        float[] linear = StreamPower.Upsample(bend, factor), smooth = StreamPower.UpsampleSmooth(bend, factor);
+        double Kink(float[] f) => Math.Abs(f[4 * factor + 1] - 2.0 * f[4 * factor] + f[4 * factor - 1]);
+        Assert.IsTrue(Kink(smooth) < Kink(linear) / 4.0, $"the slope's jump at the sample: {Kink(smooth):0.00} m smooth, {Kink(linear):0.00} m bilinear");
+    }
+
+    [TestMethod]
+    public void CarvingTheChannels_TakesTheSaddlesOutOfADiagonalChannel_AlongACurve()
+    {
+        // The diagonal V-shaped valley again, smoothly upsampled: its floor has a saddle in every coarse cell all the same (a tensor
+        // product cannot follow a diagonal). Carved along its curve the floor falls steadily, the coarse samples keep their heights,
+        // and nothing farther than a coarse cell from the channel moves. Only the floor's cells drain enough to be channels (the side
+        // cells drain one to three cells each; the floor from (6, 6) down six and more).
+        const int nc = 9, factor = 4;
+        HeightField coarse = Field(nc, 64.0, (i, j) => 40f * Math.Abs(i - j) + 5f * (i + j));
+        float[] fine = StreamPower.UpsampleSmooth(coarse, factor);
+        int n = (nc - 1) * factor + 1;
+        float Floor(float[] f, int k) => f[k * n + k];
+        Assert.IsTrue(Floor(fine, 6) > Floor(fine, 8), "upsampled, the floor rises across a coarse cell (a saddle)");
+        float far = fine[2 * n + 30];
+        float[] metres = StreamPower.CarveChannels(fine, coarse, factor, channelAreaKm2: 0.02, curves: 2, wallSlope: 1.0);
+        for (int k = 1; k <= (nc - 3) * factor; k++)
+            Assert.IsTrue(Floor(fine, k) > Floor(fine, k - 1), $"the carved floor falls steadily at {k}");
+        Assert.AreEqual(coarse[2, 2], Floor(fine, 8), 1e-3f, "the coarse samples on a straight run keep their heights");
+        Assert.AreEqual(far, fine[2 * n + 30], "far from the channel nothing moves");
+        Assert.AreEqual(0f, metres[8 * n + 8], 1e-4f, "on the channel");
+        Assert.AreEqual(float.MaxValue, metres[2 * n + 30], "beyond a coarse cell");
+    }
+
+    [TestMethod]
+    public void CuttingCorners_TurnsAZigzagIntoACurve_KeepingItsEnds()
+    {
+        // A channel running east-north-east is a zigzag of east and north-east links; three cuts make it a curve that keeps its ends,
+        // stays between the zigzag's two rows of corners, passes none of its inner corners, and falls wherever the links fell.
+        var zigzag = new List<(double X, double Z, double H)>();
+        for (int k = 0; k <= 8; k++)
+            zigzag.Add((k, (k + 1) / 2, 100.0 - 5.0 * k));
+        List<(double X, double Z, double H)> curve = zigzag;
+        for (int cut = 0; cut < 3; cut++)
+            curve = StreamPower.CutCorners(curve);
+        Assert.AreEqual(zigzag[0], curve[0]);
+        Assert.AreEqual(zigzag[^1], curve[^1]);
+        for (int k = 1; k < curve.Count; k++)
+            Assert.IsTrue(curve[k].H < curve[k - 1].H, $"falls at point {k}");
+        foreach ((double x, double z, _) in curve)
+            Assert.IsTrue(z >= Math.Floor((x + 1) / 2) - 0.5 - 1e-9 && z <= Math.Ceiling((x + 1) / 2) + 1e-9, $"({x:0.00}, {z:0.00}) strays from the zigzag");
+        for (int k = 1; k < 8; k++)
+        {
+            double nearest = curve.Min(p => Math.Sqrt((p.X - zigzag[k].X) * (p.X - zigzag[k].X) + (p.Z - zigzag[k].Z) * (p.Z - zigzag[k].Z)));
+            Assert.IsTrue(nearest > 0.05, $"the curve cuts corner {k} (passes {nearest:0.000} cells from it)");
+        }
     }
 
     [TestMethod]

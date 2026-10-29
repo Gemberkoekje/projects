@@ -69,11 +69,12 @@ internal static partial class GpuSelfTest
     /// above a meadow, looking north-north-west at the range with the sky above it. <see cref="DefaultCamera.For"/>'s pose has stood on a
     /// valley floor facing a wall since M1.11a's incision; M1.11d re-placed the view (M0's pose is underground on its world), M1.12c
     /// again (M1.11d's is underground on the world its folded strata shape), and M1.13 once more (the glaciers' carving left M1.12c's
-    /// 24 m over new fill): on a meadow facing the glaciated range, 2 m above the incised ground CI checks it over.
+    /// 24 m over new fill): on a meadow facing the glaciated range, 2 m above the incised ground CI checks it over. M1a.2's finer
+    /// detail on the incision's faces raised that ground 18 m, and the view with it (6.5 m above the eroded ground).
     /// </summary>
     private static readonly CameraSpec SelfTestCamera = new()
     {
-        Position = new WorldPoint(4450.0, 1698.5, -8825.0),
+        Position = new WorldPoint(4450.0, 1716.8, -8825.0),
         YawDegrees = -20.0,
         PitchDegrees = 3.0,
     };

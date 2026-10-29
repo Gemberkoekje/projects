@@ -7,6 +7,7 @@
 #    and for the grooves and the dots the ground under the loupe from above as the world is made: the base terrain, the incision
 #    brought back to the 8 m grid, and after the pipe-model passes (Vista.App --erosion-measure --crops). Its log, measure.log, holds
 #    the grid's own patterns at each stage (GridArtefacts) and the metres a pixel covers at each place.
+# -Sheets m1a2 makes M1a.2's sheets instead (see the end of the script).
 # Build first: dotnet build Vista.App -c Release (from RayTracer/).
 param(
     [string]$Out = (Join-Path $env:TEMP 'vista-ground'),
@@ -121,4 +122,51 @@ if ($make -contains 'meadows') {
         'M1a.1 felt meadows: the 8 m rules sharpened to a hard edge and no texture at this distance' 'm1a-1-meadows.png'
 }
 
-Get-ChildItem (Join-Path $Out 'm1a-1-*.png') | ForEach-Object { '{0} {1:0} KB' -f $_.Name, ($_.Length / 1KB) }
+# M1a.2 (-Sheets m1a2): the ground that gathers its water, beside M1's. Each world is made and measured again (--erosion-measure,
+# about three minutes each): M1's with M1's grid transfer and passes (VISTA_EROSION_SETTINGS), and the shipped one. Its sheets:
+#  - m1a-2-hero.png: the hero at 640 px, M1's and M1a.2's;
+#  - m1a-2-lit.png, m1a-2-near.png: 640x360 loupes of the 4K frame, pixel for pixel: the lit middle range (place 1) and the near
+#    face at the frame's right (2 EV brighter: it lies in shade), M1's beside M1a.2's;
+#  - m1a-2-ground.png: the ground under place 1 and place 2 from above (768 m, north up): the base terrain, M1's eroded ground,
+#    M1a.2's incision brought back to the 8 m grid, and M1a.2's eroded ground.
+# measure-m1.log and measure-m1a2.log hold the grid's patterns, the drainage and relief measures and the places' distances.
+if ($make -contains 'm1a2') {
+    $m1Erosion = 'RefineCubic=0;RefineChannelCurves=0;RefineFaceDetail=0;DischargeSpread=0;ThermalRate=0.25'
+    $near = @{ X = 3200; Y = 1500; Pixel = '3520,1680' }
+    $cropPixels = "$($places.grooves.Pixel);$($places.dots.Pixel);$($near.Pixel)"
+    foreach ($stage in @(@{ Name = 'm1'; Set = $m1Erosion }, @{ Name = 'm1a2'; Set = '' })) {
+        $env:VISTA_EROSION_SETTINGS = $stage.Set
+        try {
+            $dir = Join-Path $Out "measure-$($stage.Name)"
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            & dotnet $App --erosion-measure --recipe $range --seeds 42 --out $dir --crops-camera $hero --crops $cropPixels |
+                Out-File -FilePath (Join-Path $Out "measure-$($stage.Name).log") -Encoding utf8
+            if ($LASTEXITCODE -ne 0) { throw 'Vista.App --erosion-measure failed.' }
+            Run (@('--preview') + $heroArgs + @('--width', '640', '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda', '--out', (Join-Path $Out "hero-$($stage.Name).png")))
+            foreach ($l in @(@{ Name = 'lit'; X = $places.grooves.X; Y = $places.grooves.Y; Extra = @() }, @{ Name = 'near'; X = $near.X; Y = $near.Y; Extra = @('--compensation', '3.5') })) {
+                Run (@('--preview') + $heroArgs + @('--width', '3840', '--loupe', "$($l.X),$($l.Y),640,360", '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
+                    '--out', (Join-Path $Out "loupe-$($l.Name)-$($stage.Name).png")) + $l.Extra)
+            }
+        }
+        finally {
+            $env:VISTA_EROSION_SETTINGS = ''
+        }
+    }
+    Sheet @((Join-Path $Out 'hero-m1.denoised.png'), (Join-Path $Out 'hero-m1a2.denoised.png')) @('M1', 'M1a.2') 2 `
+        'M1a.2 the hero (seed 42 · golden hour · M1''s camera): M1''s ground and the ground that gathers its water' 'm1a-2-hero.png'
+    Sheet @((Join-Path $Out 'loupe-lit-m1.denoised.png'), (Join-Path $Out 'loupe-lit-m1a2.denoised.png')) `
+        @('M1 · the lit middle range 3.8 km off · 1.2 m a pixel', 'M1a.2 · the same pixels') 2 `
+        'M1a.2 a loupe of the 4K frame pixel for pixel: the lit middle range' 'm1a-2-lit.png'
+    Sheet @((Join-Path $Out 'loupe-near-m1.denoised.png'), (Join-Path $Out 'loupe-near-m1a2.denoised.png')) `
+        @('M1 · the near face at the frame''s right 130 m off · 4 cm a pixel · +2 EV', 'M1a.2 · the same pixels') 2 `
+        'M1a.2 a loupe of the 4K frame pixel for pixel: the near face' 'm1a-2-near.png'
+    $g1 = Join-Path $Out 'measure-m1'
+    $g2 = Join-Path $Out 'measure-m1a2'
+    Sheet @((Join-Path $g2 'seed42.crop1.base.png'), (Join-Path $g1 'seed42.crop1.eroded.png'), (Join-Path $g2 'seed42.crop1.incised.png'), (Join-Path $g2 'seed42.crop1.eroded.png'),
+        (Join-Path $g2 'seed42.crop2.base.png'), (Join-Path $g1 'seed42.crop2.eroded.png'), (Join-Path $g2 'seed42.crop2.incised.png'), (Join-Path $g2 'seed42.crop2.eroded.png')) `
+        @('1 the lit middle range from above · the base terrain', 'M1: eroded · a comb of rills on 64 m facets', 'M1a.2: the incision brought back smoothly', 'M1a.2: eroded · gullies that gather the water',
+          '2 the rows of dots from above · the base terrain', 'M1: eroded · a washboard', 'M1a.2: the incision brought back smoothly', 'M1a.2: eroded') 4 `
+        'M1a.2 the ground from above (768 m · north up): M1''s and M1a.2''s' 'm1a-2-ground.png'
+}
+
+Get-ChildItem (Join-Path $Out 'm1a-*.png') | ForEach-Object { '{0} {1:0} KB' -f $_.Name, ($_.Length / 1KB) }

@@ -42,9 +42,10 @@ public sealed class ErosionReferenceTests
         for (int step = 0; step < 300; step++)
         {
             ErosionReference.Flux(k, state.Terrain, state.Water, state.Flux);
+            ErosionReference.SpreadDischarge(k, state);
             double before = state.Water.Sum(w => (double)w + k.Rain);
             double leftOverEdges = EdgeOutflow(n, state.Flux, (c, flux) => flux);
-            ErosionReference.Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands);
+            ErosionReference.Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands, state.Discharge);
             double after = waterB.Sum(w => (double)w) / k.Retain;
             worst = Math.Max(worst, Math.Abs(after - (before - k.DepthPerFlux * leftOverEdges)) / before);
             ErosionReference.Transport(k, state.Water, state.Flux, sedimentB, state.Sediment);
@@ -70,7 +71,8 @@ public sealed class ErosionReferenceTests
         for (int step = 0; step < 300; step++)
         {
             ErosionReference.Flux(k, state.Terrain, state.Water, state.Flux);
-            ErosionReference.Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands);
+            ErosionReference.SpreadDischarge(k, state);
+            ErosionReference.Water(k, state.Terrain, state.Water, state.Sediment, state.Flux, terrainB, waterB, sedimentB, state.Flow, state.Strata, state.Bands, state.Discharge);
             float[] water = state.Water;
             lost += EdgeOutflow(n, state.Flux, (c, flux) => sedimentB[c] * (flux * (k.DepthPerFlux / (water[c] + k.Rain))));
             ErosionReference.Transport(k, state.Water, state.Flux, sedimentB, state.Sediment);
@@ -127,7 +129,8 @@ public sealed class ErosionReferenceTests
         double tan70 = Math.Tan(70.0 * Math.PI / 180.0), tan40 = Math.Tan(40.0 * Math.PI / 180.0);
         var wall = new ErosionState(Field(n, cell, (i, _) => (float)(Math.Clamp(i - 12, 0, 8) * cell * tan70)));
         var slope = new ErosionState(Field(n, cell, (i, _) => (float)(Math.Clamp(i - 12, 0, 8) * cell * tan40)));
-        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains with { RockTalusDegrees = 50f, RockTalusHardDegrees = 60f }, n, cell)
+        // M1.7's thermal rate, so 2000 steps settle the wall (the shipped mountains' slower rate, M1a.2, takes longer to the same talus).
+        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains with { RockTalusDegrees = 50f, RockTalusHardDegrees = 60f, ThermalRate = 0.25f }, n, cell)
             .WithStrata(wall);
         foreach (ErosionState state in new[] { wall, slope })
         {
@@ -196,17 +199,74 @@ public sealed class ErosionReferenceTests
     [TestMethod]
     public void TheReference_IsDeterministic_AndPinned()
     {
-        // Change-detector: if this moves, every eroded world moves (and the cache's PassesVersion must change with it).
-        ErosionSettings settings = ErosionSettings.Mountains with { Iterations = 200, AverageFrom = 100 };
-        ErosionResult a = ErosionReference.Erode(Mountains(), settings);
-        ErosionResult b = ErosionReference.Erode(Mountains(), settings);
-        Assert.AreEqual(a.ContentHash(), b.ContentHash());
-        Assert.AreEqual(PinnedSurfaceHash, a.Surface.ContentHash().ToString("x16"));
-        Assert.AreEqual(PinnedResultHash, a.ContentHash().ToString("x16"));
+        // Change-detector: if this moves, every eroded world moves (and the cache's PassesVersion must change with it). M1.7's
+        // passes (no spread of the discharge, M1.7's thermal rate) keep their pin; M1a.2's have their own.
+        foreach ((ErosionSettings erosion, string surface, string result) in new[]
+        {
+            (ErosionSettings.Mountains with { DischargeSpread = 0, ThermalRate = 0.25f }, PinnedSurfaceHash, PinnedResultHash),
+            (ErosionSettings.Mountains, PinnedSpreadSurfaceHash, PinnedSpreadResultHash),
+        })
+        {
+            ErosionSettings settings = erosion with { Iterations = 200, AverageFrom = 100 };
+            ErosionResult a = ErosionReference.Erode(Mountains(), settings);
+            ErosionResult b = ErosionReference.Erode(Mountains(), settings);
+            Assert.AreEqual(a.ContentHash(), b.ContentHash());
+            Assert.AreEqual(surface, a.Surface.ContentHash().ToString("x16"), $"got {a.Surface.ContentHash():x16}");
+            Assert.AreEqual(result, a.ContentHash().ToString("x16"), $"got {a.ContentHash():x16}");
+        }
     }
 
     private const string PinnedSurfaceHash = "05c7ac89357f294b";
     private const string PinnedResultHash = "3f6a3639797cffa9";
+    private const string PinnedSpreadSurfaceHash = "78b10ec152f08795";
+    private const string PinnedSpreadResultHash = "5d0f3f3f7f21466c";
+
+    [TestMethod]
+    public void SpreadingTheDischarge_SpreadsALaneOverAChannelsWidth_AndKeepsItsTotal()
+    {
+        // Two spreads of [1 2 1] / 4 are [1 4 6 4 1] / 16 along each axis: a lane of discharge one cell wide becomes five wide.
+        const int n = 17;
+        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains with { DischargeSpread = 2 }, n, 8.0);
+        Assert.AreEqual(2u, k.SpreadDischarge);
+        var discharge = new float[n * n];
+        for (int j = 0; j < n; j++)
+            discharge[j * n + 8] = 1f;
+        var scratch = new float[n * n];
+        for (int p = 0; p < 2; p++)
+        {
+            ErosionReference.SpreadAlongX(k, discharge, scratch);
+            ErosionReference.SpreadAlongZ(k, scratch, discharge);
+        }
+        float[] expected = [1f / 16f, 4f / 16f, 6f / 16f, 4f / 16f, 1f / 16f];
+        for (int d = -2; d <= 2; d++)
+            Assert.AreEqual(expected[d + 2], discharge[8 * n + 8 + d], 1e-6f, $"{d} cells from the lane");
+        Assert.AreEqual(0f, discharge[8 * n + 5]);
+        Assert.AreEqual(n, discharge.Sum(), 1e-4f, "the total is kept");
+        Assert.AreEqual(0u, ErosionConstants.For(ErosionSettings.Mountains with { DischargeSpread = 0 }, n, 8.0).SpreadDischarge);
+    }
+
+    [TestMethod]
+    public void SpreadingTheDischarge_TurnsTheCombOnAFaceFallingAlongTheGrid_IntoGullies()
+    {
+        // A face falling 10° off the grid's rows, roughened by half a metre. Without the spread each lane of cells carries its own
+        // water, which no water crosses, and cuts its own rill: a comb two to four cells apart, along the rows (vista-plan §10
+        // M1a.2). With the discharge spread over a channel's width the water cuts gullies that follow the fall line, wider apart.
+        const int n = 129;
+        const double cell = 8.0;
+        double turn = 10.0 * Math.PI / 180.0, slope = Math.Tan(35.0 * Math.PI / 180.0);
+        HeightField face = Field(n, cell, (i, j) =>
+            (float)(3000.0 - slope * cell * (i * Math.Cos(turn) + j * Math.Sin(turn)) + (StableHash.Lattice(7, i, j) % 1000) / 1000.0 - 0.5));
+        GridArtefacts Eroded(int spread)
+        {
+            ErosionResult r = ErosionReference.Erode(face, ErosionSettings.Mountains with { Iterations = 300, PoolFillMetres = 0f, DischargeSpread = spread });
+            return GridArtefacts.Measure(r.Surface, c => c % n is > 16 and < n - 16 && c / n is > 16 and < n - 16);
+        }
+        GridArtefacts lanes = Eroded(0), spread = Eroded(2);
+        Assert.IsTrue(lanes.RippleShare > 0.5, $"without the spread a comb: {lanes.RippleShare:0.0%} of the windows ripple");
+        Assert.IsTrue(lanes.AlignedShare > 0.4, $"along the grid's rows: {lanes.AlignedShare:0.0%} of the relief");
+        Assert.IsTrue(spread.RippleShare < 0.1, $"with it no comb: {spread.RippleShare:0.0%} of the windows ripple");
+        Assert.IsTrue(spread.AlignedShare < 0.25, $"and the gullies follow the fall line: {spread.AlignedShare:0.0%} of the relief along the grid");
+    }
 
     [TestMethod]
     public void Erosion_CarvesTheMountains_AndLeavesLooseMaterialLowerDown()
@@ -284,6 +344,8 @@ public sealed class ErosionReferenceTests
         Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionSteps = -1 }).Validate().Count);
         Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionTalusDegrees = 90f }).Validate().Count);
         Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionLakeFill = 1.5f }).Validate().Count);
+        Assert.AreEqual(1, (ErosionSettings.Mountains with { RefineCubic = 2 }).Validate().Count);
+        Assert.AreEqual(1, (ErosionSettings.Mountains with { RefineFaceDetail = 1.5f }).Validate().Count);
         Assert.ThrowsExactly<ArgumentException>(() => ErosionReference.Erode(Mountains(), ErosionSettings.Mountains with { Dissolve = 2f }));
 
         Assert.AreSame(ErosionSettings.Mountains, ErosionSettings.For(TerrainProfile.Mountains));
@@ -294,6 +356,8 @@ public sealed class ErosionReferenceTests
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { IncisionSteps = 301 }).ContentHash());
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { IncisionUplift = 3f }).ContentHash());
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { IncisionLakeFill = 0.1f }).ContentHash());
+        Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { RefineFaceDetail = 0.25f }).ContentHash());
+        Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { RefineChannelCurves = 1 }).ContentHash());
 
         ErosionSettings tuned = ErosionSettings.Mountains.With("Capacity=3; Iterations=10,DischargeExponent=0.5");
         Assert.AreEqual((3f, 10, 0.5f), (tuned.Capacity, tuned.Iterations, tuned.DischargeExponent));
@@ -311,7 +375,8 @@ public sealed class ErosionReferenceTests
         Assert.AreEqual(0.25f / 64f, k.DepthPerFlux);
         Assert.AreEqual(1f - 0.8f, k.FluxKept);
         Assert.AreEqual(Math.Tan(35.0 * Math.PI / 180.0) * 8.0 * Math.Sqrt(2.0), k.LooseDropCorner, 1e-4);
-        Assert.AreEqual(0.125f, k.HalfThermalRate);
+        Assert.AreEqual(0.01f, k.HalfThermalRate);
+        Assert.AreEqual(2u, k.SpreadDischarge, "M1a.2's spread discharge");
         Assert.AreEqual(Math.Tan(40.0 * Math.PI / 180.0) * 8.0, k.RockDropEdge, 1e-4);
         Assert.AreEqual(Math.Tan(65.0 * Math.PI / 180.0) * 8.0 * Math.Sqrt(2.0), k.RockDropCornerHard, 1e-4);
         Assert.AreEqual(settings.RockErodibility * 0.25f, k.RockErodibilityHard);

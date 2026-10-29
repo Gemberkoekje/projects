@@ -1,6 +1,8 @@
 // Vista terrain erosion (vista-plan §4.3, §10 M1.7): virtual-pipe water flow with sediment transport and deposition, plus
 // thermal erosion to a talus angle, over two layers (bedrock and loose material). One step is five passes:
 //   CSFlux           rain and the outflow to the four neighbours                    (reads Terrain, Water; Flux in place)
+//   CSDischarge, CSSpreadX, CSSpreadZ (since M1a.2, when SpreadDischarge is set) the discharge spread over a channel's width
+//                                                                                    (Flux → SpreadOut; SpreadIn → SpreadOut)
 //   CSWater          water, discharge, erosion or deposition, evaporation, flow sums (Terrain, Water, Sediment, Flux → the B side)
 //   CSTransport      suspended sediment moves with the water                         (Water of the step, Flux, Sediment B → A)
 //   CSThermalOut     how much loose material and rock leaves each cell               (Terrain B → Thermal)
@@ -44,7 +46,7 @@ cbuffer ErosionConstants : register(b0)
     float RockDropCornerHard;
     float TableScale;       // bed-table entries per metre of rock height
     float TableLast;        // the largest table coordinate a lookup reads
-    uint  _pad2;
+    uint  SpreadDischarge;  // times the discharge is spread before CSWater erodes with it (M1a.2); 0: each cell's own
     uint  _pad3;
     uint  _pad4;
 };
@@ -61,6 +63,8 @@ RWStructuredBuffer<float4> Thermal     : register(u8); // (loose moved, rock mov
 RWByteAddressBuffer        ClearTarget : register(u9);
 RWStructuredBuffer<float3> Strata      : register(u10); // per cell (bed-table coordinate at height 0, mottle, massive)
 RWStructuredBuffer<float2> Bands       : register(u11); // the bed tables by stratigraphic height: (a bed's hardness, massive rock's)
+RWStructuredBuffer<float>  SpreadIn    : register(u12); // M1a.2: the discharge per metre of width, spread or being spread
+RWStructuredBuffer<float>  SpreadOut   : register(u13);
 
 float Ground(uint c)
 {
@@ -118,6 +122,53 @@ void CSFlux(uint3 tid : SV_DispatchThreadID)
     Flux[c] = float4(fxm * scale, fxp * scale, fzm * scale, fzp * scale);
 }
 
+// M1a.2: the discharge spread over a channel's width (SpreadDischarge times [1 2 1] / 4 along the rows, then the columns), which
+// CSWater erodes with: CSDischarge writes each cell's net discharge per metre of width (CSWater's own) to SpreadOut, then each
+// spread runs CSSpreadX and CSSpreadZ, SpreadIn to SpreadOut. The edges repeat their sample.
+[numthreads(8, 8, 1)]
+void CSDischarge(uint3 tid : SV_DispatchThreadID)
+{
+    uint i = tid.x, j = tid.y, n = Size;
+    if (i >= n || j >= n)
+        return;
+    uint c = j * n + i;
+    uint west = i > 0u ? c - 1u : c, east = i < n - 1u ? c + 1u : c;
+    uint south = j > 0u ? c - n : c, north = j < n - 1u ? c + n : c;
+    float4 f = Flux[c];
+    float fromXm = i > 0u ? Flux[west].y : 0.0;
+    float fromXp = i < n - 1u ? Flux[east].x : 0.0;
+    float fromZm = j > 0u ? Flux[south].w : 0.0;
+    float fromZp = j < n - 1u ? Flux[north].z : 0.0;
+    float wx = 0.5 * ((fromXm - f.x) + (f.y - fromXp));
+    float wz = 0.5 * ((fromZm - f.z) + (f.w - fromZp));
+    SpreadOut[c] = sqrt(wx * wx + wz * wz) * InvCell;
+}
+
+float Spread(float before, float at, float after)
+{
+    return (0.25 * before + 0.5 * at) + 0.25 * after;
+}
+
+[numthreads(8, 8, 1)]
+void CSSpreadX(uint3 tid : SV_DispatchThreadID)
+{
+    uint i = tid.x, j = tid.y, n = Size;
+    if (i >= n || j >= n)
+        return;
+    uint c = j * n + i;
+    SpreadOut[c] = Spread(SpreadIn[i > 0u ? c - 1u : c], SpreadIn[c], SpreadIn[i < n - 1u ? c + 1u : c]);
+}
+
+[numthreads(8, 8, 1)]
+void CSSpreadZ(uint3 tid : SV_DispatchThreadID)
+{
+    uint i = tid.x, j = tid.y, n = Size;
+    if (i >= n || j >= n)
+        return;
+    uint c = j * n + i;
+    SpreadOut[c] = Spread(SpreadIn[j > 0u ? c - n : c], SpreadIn[c], SpreadIn[j < n - 1u ? c + n : c]);
+}
+
 // q^e, with the exponents the profiles use done exactly, as the reference does them.
 float DischargeTerm(float q)
 {
@@ -149,10 +200,12 @@ void CSWater(uint3 tid : SV_DispatchThreadID)
     float outflow = (f.x + f.y) + (f.z + f.w);
     float after = max(0.0, before + DepthPerFlux * (inflow - outflow));
 
-    // The net flow through the cell, as discharge per metre of width (m²/s).
+    // The net flow through the cell, as discharge per metre of width (m²/s); since M1a.2 spread over its neighbours' (CSDischarge).
     float wx = 0.5 * ((fromXm - f.x) + (f.y - fromXp));
     float wz = 0.5 * ((fromZm - f.z) + (f.w - fromZp));
     float discharge = sqrt(wx * wx + wz * wz) * InvCell;
+    [branch] if (SpreadDischarge != 0u)
+        discharge = SpreadIn[c];
 
     // The ground's slope: central differences inside, one-sided at the edges.
     float gxm = Ground(west);

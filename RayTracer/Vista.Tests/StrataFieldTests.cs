@@ -9,7 +9,10 @@ namespace Vista.Tests;
 [TestClass]
 public sealed class StrataFieldTests
 {
-    /// <summary>M1.11d's rock: none of M1.12c's regional dip, folds, formations or massive regions, and none of M1.13's glaciers.</summary>
+    /// <summary>
+    /// M1.11d's rock: none of M1.12c's regional dip, folds, formations or massive regions, none of M1.13's glaciers, and M1.11a's grid
+    /// transfer and M1.7's passes (none of M1a.2's).
+    /// </summary>
     internal static readonly ErosionSettings Even = ErosionSettings.Mountains with
     {
         StrataRegionalDipDegrees = 0f,
@@ -18,6 +21,11 @@ public sealed class StrataFieldTests
         StrataMassiveShare = 0f,
         GlacialSteps = 0,
         GlacierElaMetres = 0f,
+        RefineCubic = 0,
+        RefineChannelCurves = 0,
+        RefineFaceDetail = 0f,
+        DischargeSpread = 0,
+        ThermalRate = 0.25f,
     };
 
     [TestMethod]
