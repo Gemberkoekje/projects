@@ -70,8 +70,25 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
 
     public async Task<NavigateActionResult> NavigateShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
     {
-        var result = await client.NavigateShipAsync(shipSymbol, waypointSymbol, cancellationToken);
+        NavigateResult result;
+        try
+        {
+            result = await client.NavigateShipAsync(shipSymbol, waypointSymbol, cancellationToken);
+        }
+        catch (SpaceTradersApiException exception) when (exception.ErrorCode is { } code && NavigateRefusedException.IsShipElsewhere(code))
+        {
+            // B83: the ship isn't where the bot stored it, and the same navigate would fail again on every step.
+            throw new NavigateRefusedException(waypointSymbol, code, exception.Message, exception);
+        }
+
         return new NavigateActionResult(MapNav(result.Nav), result.Fuel is not null ? MapFuel(result.Fuel) : null);
+    }
+
+    public async Task<NavigateActionResult> GetShipNavAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var ship = await client.GetMyShipAsync(shipSymbol, cancellationToken);
+        var nav = ship.Nav ?? throw new InvalidOperationException($"The API answered ship {shipSymbol} without its nav.");
+        return new NavigateActionResult(MapNav(nav), ship.Fuel is not null ? MapFuel(ship.Fuel) : null);
     }
 
     public async Task<NavModel> DockShipAsync(string shipSymbol, CancellationToken cancellationToken = default)

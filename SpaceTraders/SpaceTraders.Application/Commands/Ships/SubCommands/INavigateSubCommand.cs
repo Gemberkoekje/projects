@@ -37,11 +37,19 @@ public sealed class NavigateSubCommand(
         var now = TimeProvider.System.GetUtcNow();
         var ship = await ships.FindAsync(shipSymbol, cancellationToken);
 
-        var navigation = await NavigateWithFuelFallbackAsync(
-            shipSymbol,
-            destinationWaypoint,
-            ship,
-            cancellationToken);
+        (NavigateActionResult Result, string ActualDestination)? navigation;
+        try
+        {
+            navigation = await NavigateWithFuelFallbackAsync(
+                shipSymbol,
+                destinationWaypoint,
+                ship,
+                cancellationToken);
+        }
+        catch (NavigateRefusedException refused)
+        {
+            navigation = await FindShipAsync(shipSymbol, refused, cancellationToken);
+        }
 
         if (navigation is null)
         {
@@ -82,6 +90,29 @@ public sealed class NavigateSubCommand(
             origin,
             actualDestination,
             arrivalTime);
+    }
+
+    /// <summary>
+    /// B83: the API says the ship is in transit or already at the destination, so the bot stored it in the wrong place: a
+    /// navigate the API carried out lost its answer. On 2026-10-18 a cancelled connection left SPECTER-226 stored in orbit
+    /// where it had left from, and every step for six hours sent the same navigate again. The ship's nav comes from the API
+    /// instead, and the flight goes on as if the answer had come: stored, and its arrival scheduled (at once, for a ship that
+    /// has landed), so the arrival docks it and resumes its goal.
+    /// </summary>
+    private async Task<(NavigateActionResult Result, string ActualDestination)> FindShipAsync(
+        string shipSymbol,
+        NavigateRefusedException refused,
+        CancellationToken cancellationToken)
+    {
+        var found = await port.GetShipNavAsync(shipSymbol, cancellationToken);
+        logger.LogWarning(
+            "NavigateSubCommand: the API refused ship {ShipSymbol}'s flight to {Destination} (error {ErrorCode}): it is {Status} at {WaypointSymbol}, not where it was stored; its nav is taken from the API.",
+            shipSymbol,
+            refused.DestinationWaypointSymbol,
+            refused.ErrorCode,
+            found.Nav.Status,
+            found.Nav.WaypointSymbol);
+        return (found, found.Nav.WaypointSymbol);
     }
 
     private async Task<(NavigateActionResult Result, string ActualDestination)?> NavigateWithFuelFallbackAsync(

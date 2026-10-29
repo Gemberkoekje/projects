@@ -17,7 +17,17 @@ public interface ISpaceTradersPort
     /// <summary>One waypoint, as anyone can see it: its traits (once charted), and whether it is still under construction.</summary>
     Task<WaypointDataModel> GetWaypointAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Navigates a ship in orbit to a waypoint of its system. A refusal that says the ship is in transit or already at the
+    /// destination is a <see cref="NavigateRefusedException"/> (B83).
+    /// </summary>
     Task<NavigateActionResult> NavigateShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The ship's nav and fuel as the API has them now, in the shape a navigate answers with (B83): where it is, or where it
+    /// is flying to and when it arrives.
+    /// </summary>
+    Task<NavigateActionResult> GetShipNavAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
     Task<NavModel> DockShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
