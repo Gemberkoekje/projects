@@ -112,7 +112,7 @@ public static class StreamPower
         ArgumentNullException.ThrowIfNull(fineBase);
         ArgumentNullException.ThrowIfNull(settings);
         int factor = CoarseFactor(fineBase.Size, fineBase.CellSize, incised.CellSize);
-        Func<HeightField, int, float[]> upsample = settings.RefineCubic == 1 ? UpsampleSmooth : Upsample;
+        Func<HeightField, int, float[]> upsample = settings.RefineCubic switch { 1 => UpsampleSmooth, 2 => UpsampleSharp, _ => Upsample };
         float[] carved = upsample(incised, factor);
         // Each sample's distance from a carved channel; empty when the links are carved straight.
         float[] channelMetres = [];
@@ -525,7 +525,16 @@ public static class StreamPower
     /// passes through every coarse sample, has no creases along the coarse grid's lines, and adds no hump or hollow between two samples
     /// that the samples do not have.
     /// </summary>
-    public static float[] UpsampleSmooth(HeightField coarse, int factor)
+    public static float[] UpsampleSmooth(HeightField coarse, int factor) => UpsampleSmooth(coarse, factor, pointed: false);
+
+    /// <summary>
+    /// <see cref="UpsampleSmooth(HeightField, int)"/>, but with every high point along a row or a column left pointed (the M1a.2
+    /// rework): there the curve leaves the sample along each segment's own slope instead of level, so a summit or a crest the coarse
+    /// samples hold stays a point, not a rounded top a coarse cell wide. Low points stay rounded (valley floors fill with sediment).
+    /// </summary>
+    public static float[] UpsampleSharp(HeightField coarse, int factor) => UpsampleSmooth(coarse, factor, pointed: true);
+
+    private static float[] UpsampleSmooth(HeightField coarse, int factor, bool pointed)
     {
         ArgumentNullException.ThrowIfNull(coarse);
         ArgumentOutOfRangeException.ThrowIfLessThan(factor, 1);
@@ -536,50 +545,63 @@ public static class StreamPower
         Parallel.For(0, nc, jc =>
         {
             var y = new double[nc];
-            var m = new double[nc];
+            var leaving = new double[nc];
+            var arriving = new double[nc];
             for (int ic = 0; ic < nc; ic++)
                 y[ic] = coarse[ic, jc];
-            MonotoneTangents(y, m);
+            MonotoneTangents(y, leaving, arriving, pointed);
             for (int i = 0; i < n; i++)
-                rows[jc * n + i] = Hermite(y, m, i, factor);
+                rows[jc * n + i] = Hermite(y, leaving, arriving, i, factor);
         });
         var fine = new float[n * n];
         Parallel.For(0, n, i =>
         {
             var y = new double[nc];
-            var m = new double[nc];
+            var leaving = new double[nc];
+            var arriving = new double[nc];
             for (int jc = 0; jc < nc; jc++)
                 y[jc] = rows[jc * n + i];
-            MonotoneTangents(y, m);
+            MonotoneTangents(y, leaving, arriving, pointed);
             for (int j = 0; j < n; j++)
-                fine[j * n + i] = (float)Hermite(y, m, j, factor);
+                fine[j * n + i] = (float)Hermite(y, leaving, arriving, j, factor);
         });
         return fine;
     }
 
     /// <summary>
-    /// The tangents of a monotone cubic through <paramref name="y"/> (unit spacing): the harmonic mean of the two neighbouring
-    /// differences where they agree in sign, zero at an extremum, the one difference at the ends.
+    /// The tangents of a monotone cubic through <paramref name="y"/> (unit spacing), the slope a segment leaves each sample with and
+    /// the slope the one before arrives with: the harmonic mean of the two neighbouring differences where they agree in sign, the one
+    /// difference at the ends, zero at an extremum; but at a maximum, when <paramref name="pointed"/>, each segment's own difference
+    /// (a kink). Either way each segment stays between its two samples.
     /// </summary>
-    private static void MonotoneTangents(double[] y, double[] m)
+    private static void MonotoneTangents(double[] y, double[] leaving, double[] arriving, bool pointed)
     {
         int last = y.Length - 1;
-        m[0] = y[1] - y[0];
-        m[last] = y[last] - y[last - 1];
+        leaving[0] = arriving[0] = y[1] - y[0];
+        leaving[last] = arriving[last] = y[last] - y[last - 1];
         for (int k = 1; k < last; k++)
         {
             double d0 = y[k] - y[k - 1], d1 = y[k + 1] - y[k];
-            m[k] = d0 * d1 <= 0.0 ? 0.0 : 2.0 * d0 * d1 / (d0 + d1);
+            if (pointed && d0 > 0.0 && d1 < 0.0)
+            {
+                arriving[k] = d0;
+                leaving[k] = d1;
+                continue;
+            }
+            leaving[k] = arriving[k] = d0 * d1 <= 0.0 ? 0.0 : 2.0 * d0 * d1 / (d0 + d1);
         }
     }
 
-    /// <summary>The cubic Hermite through <paramref name="y"/> with tangents <paramref name="m"/> at fine sample <paramref name="i"/>, <paramref name="factor"/> to a coarse one.</summary>
-    private static double Hermite(double[] y, double[] m, int i, int factor)
+    /// <summary>
+    /// The cubic Hermite through <paramref name="y"/> at fine sample <paramref name="i"/>, <paramref name="factor"/> to a coarse one: the
+    /// segment from coarse sample <c>k</c> leaves it with <paramref name="leaving"/>[k] and arrives at <c>k + 1</c> with <paramref name="arriving"/>[k + 1].
+    /// </summary>
+    private static double Hermite(double[] y, double[] leaving, double[] arriving, int i, int factor)
     {
         int k = Math.Min(i / factor, y.Length - 2);
         double t = (i - k * factor) / (double)factor;
         double t2 = t * t, t3 = t2 * t;
-        return (2.0 * t3 - 3.0 * t2 + 1.0) * y[k] + (t3 - 2.0 * t2 + t) * m[k] + (3.0 * t2 - 2.0 * t3) * y[k + 1] + (t3 - t2) * m[k + 1];
+        return (2.0 * t3 - 3.0 * t2 + 1.0) * y[k] + (t3 - 2.0 * t2 + t) * leaving[k] + (3.0 * t2 - 2.0 * t3) * y[k + 1] + (t3 - t2) * arriving[k + 1];
     }
 
     /// <summary>

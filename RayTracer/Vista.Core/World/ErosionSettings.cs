@@ -103,8 +103,10 @@ public sealed record ErosionSettings
 
     /// <summary>
     /// How the incision is brought back to the world grid (vista-plan §10 M1a.2, <see cref="StreamPower.Refine"/>), and today's
-    /// glaciers' surface, solved on the same grid (<see cref="Glaciers"/>): 1 interpolates them with a continuous slope
-    /// (<see cref="StreamPower.UpsampleSmooth"/>); 0 bilinearly, M1.11a's flat facets with seams.
+    /// glaciers' surface, solved on the same grid (<see cref="Glaciers"/>): 2 interpolates the incision with a continuous slope but its
+    /// high points pointed (<see cref="StreamPower.UpsampleSharp"/>); 1 smoothly throughout (<see cref="StreamPower.UpsampleSmooth"/>,
+    /// which rounds every summit and crest a coarse cell wide); 0 bilinearly, M1.11a's flat facets with seams. The glaciers' surface
+    /// is smooth for 1 and 2.
     /// </summary>
     public int RefineCubic { get; init; }
 
@@ -295,7 +297,9 @@ public sealed record ErosionSettings
     /// terrain's detail on its faces takes the incised ground's relief along the grid from 68% to 15%; the discharge spread twice turns
     /// the comb of rills on faces that fall along the grid into gullies along the fall line (the windows rippling from 7.5% to 2%), and
     /// a thermal rate of 0.02 lets the water and the talus compete instead of setting every steep face to one talus plane with
-    /// creases in the grid's eight directions (the relief along the grid from 21% to 18%).
+    /// creases in the grid's eight directions (the relief along the grid from 21% to 18%). The rework (the user: "they look more like
+    /// blobs than M1") keeps the incision's high points pointed: brought back smoothly throughout, every summit and crest the coarse
+    /// samples hold came back rounded a coarse cell wide.
     /// </remarks>
     public static ErosionSettings Mountains { get; } = new()
     {
@@ -321,7 +325,7 @@ public sealed record ErosionSettings
         IncisionCell = 64.0f,
         IncisionRate = 0.03f,
         ChannelAreaKm2 = 0.1f,
-        RefineCubic = 1,
+        RefineCubic = 2,
         RefineChannelCurves = 2,
         RefineFaceDetail = 1.0f,
         IncisionTalusDegrees = 35.0f,
@@ -452,8 +456,8 @@ public sealed record ErosionSettings
         Positive(nameof(IncisionCell), IncisionCell);
         Fraction(nameof(IncisionRate), IncisionRate, float.MaxValue);
         Positive(nameof(ChannelAreaKm2), ChannelAreaKm2);
-        if (RefineCubic is not (0 or 1) || RefineChannelCurves < 0)
-            errors.Add($"RefineCubic must be 0 or 1 and RefineChannelCurves not negative (got {RefineCubic}, {RefineChannelCurves}).");
+        if (RefineCubic is not (0 or 1 or 2) || RefineChannelCurves < 0)
+            errors.Add($"RefineCubic must be 0, 1 or 2 and RefineChannelCurves not negative (got {RefineCubic}, {RefineChannelCurves}).");
         Fraction(nameof(RefineFaceDetail), RefineFaceDetail);
         Positive(nameof(RefineChannelDetailMetres), RefineChannelDetailMetres);
         Fraction(nameof(IncisionUplift), IncisionUplift, float.MaxValue);

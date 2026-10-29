@@ -88,7 +88,7 @@ public sealed class StreamPowerTests
     }
 
     private const string PinnedPreparedHash = "6607fcdede7e57c0";
-    private const string PinnedFoldedPreparedHash = "ec27e4a974b96d28";
+    private const string PinnedFoldedPreparedHash = "1bf1aa28023e629f";
 
     [TestMethod]
     public void Upsampling_KeepsTheCoarseSamples_AndInterpolatesBetweenThem()
@@ -145,6 +145,27 @@ public sealed class StreamPowerTests
         float[] linear = StreamPower.Upsample(bend, factor), smooth = StreamPower.UpsampleSmooth(bend, factor);
         double Kink(float[] f) => Math.Abs(f[4 * factor + 1] - 2.0 * f[4 * factor] + f[4 * factor - 1]);
         Assert.IsTrue(Kink(smooth) < Kink(linear) / 4.0, $"the slope's jump at the sample: {Kink(smooth):0.00} m smooth, {Kink(linear):0.00} m bilinear");
+    }
+
+    [TestMethod]
+    public void SharpUpsampling_LeavesHighPointsPointed_AndLowPointsRound()
+    {
+        // A ridge and a valley along the columns, straight-sided (0 1 2 3 2 1 0 and its mirror, 10 m a sample). The smooth upsampling
+        // rounds the ridge's top (level at the crest, above the straight sides half a cell off); the sharp one keeps it a point (the
+        // straight sides exactly), and rounds the valley's floor as the smooth one does. Both keep the samples.
+        const int factor = 8, n = 49;
+        HeightField ridge = Field(7, 64.0, (i, _) => 10f * (3 - Math.Abs(i - 3)));
+        HeightField valley = Field(7, 64.0, (i, _) => 10f * Math.Abs(i - 3));
+        float[] round = StreamPower.UpsampleSmooth(ridge, factor), sharp = StreamPower.UpsampleSharp(ridge, factor);
+        int crest = 3 * factor, half = crest + factor / 2;
+        Assert.AreEqual(30f, sharp[crest], 1e-4f);
+        Assert.AreEqual(25f, sharp[half], 1e-3f, "straight sides at the crest");
+        Assert.IsTrue(round[half] > 26f, $"the smooth one's top is rounded ({round[half]:0.00} m half a cell off)");
+        for (int i = 1; i < n; i++)
+            Assert.IsTrue(sharp[i] >= 0f && sharp[i] <= 30f, "between its samples");
+        float[] floorSmooth = StreamPower.UpsampleSmooth(valley, factor), floorSharp = StreamPower.UpsampleSharp(valley, factor);
+        Assert.AreEqual(floorSmooth[half], floorSharp[half], 1e-5f, "the valley floor rounds alike");
+        Assert.IsTrue(floorSharp[half] < 5f, "a rounded floor, below the straight sides");
     }
 
     [TestMethod]

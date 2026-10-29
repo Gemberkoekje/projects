@@ -344,7 +344,7 @@ public sealed class ErosionReferenceTests
         Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionSteps = -1 }).Validate().Count);
         Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionTalusDegrees = 90f }).Validate().Count);
         Assert.AreEqual(1, (ErosionSettings.Mountains with { IncisionLakeFill = 1.5f }).Validate().Count);
-        Assert.AreEqual(1, (ErosionSettings.Mountains with { RefineCubic = 2 }).Validate().Count);
+        Assert.AreEqual(1, (ErosionSettings.Mountains with { RefineCubic = 3 }).Validate().Count);
         Assert.AreEqual(1, (ErosionSettings.Mountains with { RefineFaceDetail = 1.5f }).Validate().Count);
         Assert.ThrowsExactly<ArgumentException>(() => ErosionReference.Erode(Mountains(), ErosionSettings.Mountains with { Dissolve = 2f }));
 
@@ -358,6 +358,7 @@ public sealed class ErosionReferenceTests
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { IncisionLakeFill = 0.1f }).ContentHash());
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { RefineFaceDetail = 0.25f }).ContentHash());
         Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { RefineChannelCurves = 1 }).ContentHash());
+        Assert.AreNotEqual(ErosionSettings.Mountains.ContentHash(), (ErosionSettings.Mountains with { RefineCubic = 1 }).ContentHash());
 
         ErosionSettings tuned = ErosionSettings.Mountains.With("Capacity=3; Iterations=10,DischargeExponent=0.5");
         Assert.AreEqual((3f, 10, 0.5f), (tuned.Capacity, tuned.Iterations, tuned.DischargeExponent));

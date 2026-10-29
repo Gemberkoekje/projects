@@ -124,14 +124,25 @@ if ($make -contains 'meadows') {
 
 # M1a.2 (-Sheets m1a2): the ground that gathers its water, beside M1's. Each world is made and measured again (--erosion-measure,
 # about three minutes each): M1's with M1's grid transfer and passes (VISTA_EROSION_SETTINGS), and the shipped one. Its sheets:
-#  - m1a-2-hero.png: the hero at 640 px, M1's and M1a.2's;
-#  - m1a-2-lit.png, m1a-2-near.png: 640x360 loupes of the 4K frame, pixel for pixel: the lit middle range (place 1) and the near
-#    face at the frame's right (2 EV brighter: it lies in shade), M1's beside M1a.2's;
+#  - m1a-2-hero.png: the hero at 640 px, M1's and M1a.2's, and the auto camera's own pick on M1a.2's world;
+#  - m1a-2-lit.png, m1a-2-near.png: 640x360 loupes of the 4K frame, pixel for pixel: the lit middle range (place 1; M1's, M1a.2's
+#    as first landed, with its rounded summits and its ice laid smooth, and M1a.2's reworked) and the near face at the frame's right
+#    (2 EV brighter: it lies in shade), M1's beside M1a.2's;
 #  - m1a-2-ground.png: the ground under place 1 and place 2 from above (768 m, north up): the base terrain, M1's eroded ground,
 #    M1a.2's incision brought back to the 8 m grid, and M1a.2's eroded ground.
 # measure-m1.log and measure-m1a2.log hold the grid's patterns, the drainage and relief measures and the places' distances.
 if ($make -contains 'm1a2') {
     $m1Erosion = 'RefineCubic=0;RefineChannelCurves=0;RefineFaceDetail=0;DischargeSpread=0;ThermalRate=0.25'
+    # M1a.2 as first landed (the review's blobs): the incision brought back smoothly throughout, its summits rounded.
+    $firstErosion = 'RefineCubic=1'
+    $env:VISTA_EROSION_SETTINGS = $firstErosion
+    try {
+        Run (@('--preview') + $heroArgs + @('--width', '3840', '--loupe', "$($places.grooves.X),$($places.grooves.Y),640,360", '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
+            '--out', (Join-Path $Out 'loupe-lit-first.png')))
+    }
+    finally {
+        $env:VISTA_EROSION_SETTINGS = ''
+    }
     $near = @{ X = 3200; Y = 1500; Pixel = '3520,1680' }
     $cropPixels = "$($places.grooves.Pixel);$($places.dots.Pixel);$($near.Pixel)"
     foreach ($stage in @(@{ Name = 'm1'; Set = $m1Erosion }, @{ Name = 'm1a2'; Set = '' })) {
@@ -143,6 +154,11 @@ if ($make -contains 'm1a2') {
                 Out-File -FilePath (Join-Path $Out "measure-$($stage.Name).log") -Encoding utf8
             if ($LASTEXITCODE -ne 0) { throw 'Vista.App --erosion-measure failed.' }
             Run (@('--preview') + $heroArgs + @('--width', '640', '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda', '--out', (Join-Path $Out "hero-$($stage.Name).png")))
+            if ($stage.Name -eq 'm1a2') {
+                # The auto camera's own pick on M1a.2's world (M1's is the hero camera itself, vista-log/M1.17.md).
+                Run (@('--preview', '--recipe', $range, '--seed', '42', '--auto-camera', '--finalists', '0', '--width', '640', '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
+                    '--out', (Join-Path $Out 'hero-auto-m1a2.png')))
+            }
             foreach ($l in @(@{ Name = 'lit'; X = $places.grooves.X; Y = $places.grooves.Y; Extra = @() }, @{ Name = 'near'; X = $near.X; Y = $near.Y; Extra = @('--compensation', '3.5') })) {
                 Run (@('--preview') + $heroArgs + @('--width', '3840', '--loupe', "$($l.X),$($l.Y),640,360", '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
                     '--out', (Join-Path $Out "loupe-$($l.Name)-$($stage.Name).png")) + $l.Extra)
@@ -152,10 +168,10 @@ if ($make -contains 'm1a2') {
             $env:VISTA_EROSION_SETTINGS = ''
         }
     }
-    Sheet @((Join-Path $Out 'hero-m1.denoised.png'), (Join-Path $Out 'hero-m1a2.denoised.png')) @('M1', 'M1a.2') 2 `
+    Sheet @((Join-Path $Out 'hero-m1.denoised.png'), (Join-Path $Out 'hero-m1a2.denoised.png'), (Join-Path $Out 'hero-auto-m1a2.denoised.png')) @('M1', 'M1a.2 · M1''s camera', 'M1a.2 · the auto camera''s pick on it') 3 `
         'M1a.2 the hero (seed 42 · golden hour · M1''s camera): M1''s ground and the ground that gathers its water' 'm1a-2-hero.png'
-    Sheet @((Join-Path $Out 'loupe-lit-m1.denoised.png'), (Join-Path $Out 'loupe-lit-m1a2.denoised.png')) `
-        @('M1 · the lit middle range 3.8 km off · 1.2 m a pixel', 'M1a.2 · the same pixels') 2 `
+    Sheet @((Join-Path $Out 'loupe-lit-m1.denoised.png'), (Join-Path $Out 'loupe-lit-first.denoised.png'), (Join-Path $Out 'loupe-lit-m1a2.denoised.png')) `
+        @('M1 · the lit middle range 3.8 km off · 1.2 m a pixel', 'M1a.2 first: summits rounded · a glacier''s smooth domes on the crest', 'M1a.2 reworked: high points pointed') 1 `
         'M1a.2 a loupe of the 4K frame pixel for pixel: the lit middle range' 'm1a-2-lit.png'
     Sheet @((Join-Path $Out 'loupe-near-m1.denoised.png'), (Join-Path $Out 'loupe-near-m1a2.denoised.png')) `
         @('M1 · the near face at the frame''s right 130 m off · 4 cm a pixel · +2 EV', 'M1a.2 · the same pixels') 2 `

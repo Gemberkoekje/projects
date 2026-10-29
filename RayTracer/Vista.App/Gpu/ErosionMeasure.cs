@@ -197,7 +197,7 @@ internal static class ErosionMeasure
                     log.WriteLine("  " + Describe("incised", GridArtefacts.Measure(incised), GridArtefacts.Measure(incised, Steep(incised)), null));
                     log.WriteLine("  " + Describe("incised", ReliefStats.Measure(incised)));
                     if (cropsCamera is not null)
-                        Crops(VistaJson.ParseCamera(File.ReadAllText(cropsCamera)), crops, cropCells, seed, ground, incised, null, outDir!, log);
+                        Crops(VistaJson.ParseCamera(File.ReadAllText(cropsCamera)), crops, cropCells, seed, ground, incised, null, [], outDir!, log);
                     continue;
                 }
             }
@@ -248,7 +248,7 @@ internal static class ErosionMeasure
             log.WriteLine("  " + Describe("eroded ", GridArtefacts.Measure(r.Surface), GridArtefacts.Measure(r.Surface, Steep(r.Surface)),
                 GridArtefacts.Measure(r.Surface, c => r.Loose[c] >= LooseMetres)));
             if (cropsCamera is not null)
-                Crops(VistaJson.ParseCamera(File.ReadAllText(cropsCamera)), crops, cropCells, seed, ground, incised, r.Surface, outDir!, log);
+                Crops(VistaJson.ParseCamera(File.ReadAllText(cropsCamera)), crops, cropCells, seed, ground, incised, r.Surface, r.Ice ?? [], outDir!, log);
             // The eroded slopes against each cell's own rock talus angle (the GPU erosion's, from the rock's hardness there).
             double tanSoft = Math.Tan(settings.RockTalusDegrees * Math.PI / 180.0), tanHard = Math.Tan(settings.RockTalusHardDegrees * Math.PI / 180.0);
             log.WriteLine("  " + Describe("eroded", ReliefStats.Measure(r.Surface, c => Math.Atan(tanSoft + (tanHard - tanSoft) * r.Hardness[c]) * 180.0 / Math.PI)));
@@ -318,9 +318,10 @@ internal static class ErosionMeasure
     /// The crops (vista-plan §10 M1a.1): for each frame pixel of <paramref name="camera"/>, the ground it sees on the eroded world, its
     /// distance and the metres a pixel covers there, and top-down crops of the base, incised and eroded worlds around it. Without an
     /// eroded world (<c>--incise-only</c>, M1a.2) the pixel looks at the incised one, and only the base and incised crops are written.
+    /// <paramref name="ice"/> is today's glaciers' thickness (empty without), whose share of each crop the line reports.
     /// </summary>
     private static void Crops(CameraSpec camera, List<(double X, double Y)> pixels, int cells, ulong seed, HeightField ground, HeightField incised,
-        HeightField? erodedOrNull, string outDir, TextWriter log)
+        HeightField? erodedOrNull, float[] ice, string outDir, TextWriter log)
     {
         HeightField eroded = erodedOrNull ?? incised;
         var sight = new TerrainSight(eroded, null, new Atmosphere.AtmosphereModel().PlanetRadiusMetres);
@@ -343,7 +344,8 @@ internal static class ErosionMeasure
             string last = erodedOrNull is null ? "incised" : "eroded";
             log.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"  crop {k + 1}: pixel ({px:0}, {py:0}) sees ({x:0}, {z:0}) at {t:0} m, {t * pixelAngle:0.00} m a pixel ({ground.CellSize / (t * pixelAngle):0.0} pixels a cell); " +
-                $"along the grid {before.AlignedShare:0.0%} base, {after.AlignedShare:0.0%} {last}; rippling {before.RippleShare:0.0%} base, {after.RippleShare:0.0%} {last}"));
+                $"along the grid {before.AlignedShare:0.0%} base, {after.AlignedShare:0.0%} {last}; rippling {before.RippleShare:0.0%} base, {after.RippleShare:0.0%} {last}; " +
+                $"ice over 5 m on {IcedShare(ice, Near):0.0%}"));
             foreach ((string stage, HeightField field) in new[] { ("base", ground), ("incised", incised), ("eroded", eroded) })
             {
                 if (stage == "eroded" && erodedOrNull is null)
@@ -352,6 +354,21 @@ internal static class ErosionMeasure
                 PngEncoder.Write(Path.Combine(outDir, $"seed{seed}.crop{k + 1}.{stage}.png"), image, size, size, PngColor.Rgb);
             }
         }
+    }
+
+    /// <summary>The share of the samples <paramref name="where"/> keeps under more than 5 m of ice (0 without ice).</summary>
+    private static double IcedShare(float[] ice, Func<int, bool> where)
+    {
+        long kept = 0, iced = 0;
+        for (int c = 0; c < ice.Length; c++)
+        {
+            if (!where(c))
+                continue;
+            kept++;
+            if (ice[c] > 5f)
+                iced++;
+        }
+        return kept > 0 ? (double)iced / kept : 0.0;
     }
 
     /// <summary>The samples of <paramref name="field"/> whose slope is at least <see cref="SteepDegrees"/>.</summary>

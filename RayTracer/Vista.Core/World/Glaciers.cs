@@ -40,7 +40,7 @@ public static class Glaciers
         for (int c = 0; c < top.Length; c++)
             top[c] = coarse.Heights[c] + ice.Thickness[c];
         // Brought to the world grid as the incision is (M1a.2): with a continuous slope, so the ice has no 64 m facets either.
-        Func<HeightField, int, float[]> upsample = settings.RefineCubic == 1 ? StreamPower.UpsampleSmooth : StreamPower.Upsample;
+        Func<HeightField, int, float[]> upsample = settings.RefineCubic != 0 ? StreamPower.UpsampleSmooth : StreamPower.Upsample;
         float[] surface = upsample(new HeightField(nc, coarse.CellSize, top), factor);
         float[] solved = upsample(new HeightField(nc, coarse.CellSize, ice.Thickness), factor);
 
