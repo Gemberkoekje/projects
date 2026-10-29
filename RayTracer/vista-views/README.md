@@ -458,7 +458,8 @@ dotnet Vista.App/bin/Release/net10.0-windows/Vista.App.dll --erosion-measure --r
 
 ## Ground that gathers its water (M1a.2)
 
-`ground/render.ps1 -Sheets m1a2` makes M1's world and M1a.2's and sets them side by side (vista-plan §10, M1a.2): M1's with M1's grid
+`ground/render.ps1 -Sheets m1a2` makes M1's world and M1a.2's and sets them side by side (vista-plan §10, M1a.2; since its rework also
+the first M1a.2's lit loupe, `RefineCubic=1`, and the auto camera's pick on M1a.2's world): M1's with M1's grid
 transfer and erosion passes (`VISTA_EROSION_SETTINGS=RefineCubic=0;RefineChannelCurves=0;RefineFaceDetail=0;DischargeSpread=0;ThermalRate=0.25`),
 each eroded and measured again by `--erosion-measure` (`measure-m1.log`, `measure-m1a2.log`: the grid's patterns, the drainage, the
 relief and the places' distances), then the hero at 640 px (`m1a-2-hero.png`), 640×360 loupes of the 4K frame of the lit middle range

@@ -353,7 +353,8 @@ change.
   uncarved), the relief grows and the summits nearly keep their height; the ice's water runs under it, along the ground's
   drainage, which holds (95–97% of the grid into a 1 km² channel).
 - **The grid's own patterns** (M1a.2, [`vista-log/M1a.2.md`](vista-log/M1a.2.md)): the incision comes back to the 8 m grid with a
-  continuous slope (monotone cubic along the rows, then the columns), its channels carved along their streams' lines with the
+  continuous slope (monotone cubic along the rows, then the columns; its high points kept pointed, a kink at each maximum, since a
+  smooth top a coarse cell wide reads as a blob), its channels carved along their streams' lines with the
   corners cut, and the base terrain's detail finer than the 64 m cell kept on the faces it cut (M1.11a faded it out over 25 m of
   change, leaving bare 64 m facets with straight seams). The pipe model's water erodes over a channel's width, its discharge spread
   twice by `[1 2 1]` before the capacity reads it: on a face falling along the grid's rows no water crosses from lane to lane, so
@@ -2181,11 +2182,16 @@ incised 67.5%; eroded 33.1%) and the share of 128 m windows rippling at 2–4 ce
   eight neighbours for the flow and varying rain were not needed (eight pipes alone move the comb to the diagonals). Eroded: 33.1% →
   17.4% along the grid (the base 14.6%), rippling 7.5% → 2.0% (1.4%); the lines of high curvature running down the fall line 41.5%
   → 23.4% of the rock's; drainage and relief no worse; the 8 m facet share 9.9% → 10.5%; the erosion 20 → 26 GPU s. The near views
-  re-placed on the new ground; eight goldens moved (re-baselined at M1a.7). *Judge this:* `m1a-2-ground.png` (from above),
-  `m1a-2-lit.png`, `m1a-2-near.png`, `m1a-2-hero.png`. *Ignore this:* the rows of dots (M1a.3), the rock's texture and the near
-  face's flatness in shade (M1a.4), the beds' bands (M1a.5), the meadows (M1a.6). *Questions:* from above, does the right-hand square
-  of each row now look like mountain ground? In the lit loupe, do the rock faces still look combed? Do the new smooth white domes on
-  the lit crest read as snow and ice, or as something else? Log: [`vista-log/M1a.2.md`](vista-log/M1a.2.md).
+  re-placed on the new ground; eight goldens moved (re-baselined at M1a.7). *Reworked (2026-10-29, the user: "they look more like
+  blobs than M1"):* the smooth transfer left every summit and crest rounded a coarse cell wide, and a glacier capped the lit crest as
+  pale domes; the incision now keeps its high points pointed (a kink at each maximum along a row or column), and the lit crest is
+  rock again (its ice by chance: parked, "Ice caps laid as smooth domes"). The grid's measures are unchanged (17.7%, 2.0%); three
+  shape measures tried did not see the blobs, so the crops now report each place's ice. *Judge this:* `m1a-2-lit.png` (M1, the first
+  M1a.2, the rework), `m1a-2-hero.png` (with the auto camera's pick on the new world), `m1a-2-ground.png`, `m1a-2-near.png`. *Ignore
+  this:* the rows of dots (M1a.3), the rock's texture and the near faces' smooth dark look in shade (M1a.4), the beds' bands (M1a.5),
+  the meadows (M1a.6). *Questions:* in the bottom loupe, do the crests read as rock, or still as blobs? Do its faces read as gullies
+  and ribs, or combed? From M1's camera the slope at the right looms: does the auto camera's pick look like a better picture of the
+  same mountains? Log: [`vista-log/M1a.2.md`](vista-log/M1a.2.md).
 - **M1a.3 — The washboard gone** (the dots). Whatever ripple M1a.2 leaves on gentle loose ground: the pipe model's deposition kept
   stable there (its rates on gentle slopes, a creep of loose material; M1.7's tuning measured again), and the rules' slope read from
   the grid's normal over a few cells, so no grid-scale wobble is cut into dots. *Verify:* the loose ground's ripple at the base
@@ -2368,11 +2374,17 @@ any of them.
   between the eroded world (17.4%) and the base terrain (14.6%) is mostly this. A talus that runs every way (the drops weighed by
   direction, or a rock talus that varies from place to place) would take it. *Belongs:* M1a.4 (rock below the grid: ribs and
   buttresses from the rock's hardness).
-- **Glacier domes on a lit crest** (M1a.2): the new ground moved today's glaciers (their solve on the 64 m grid reads the ground
-  averaged there; 7.9% → 7.6% of the grid, the thickest 297 → 275 m), and one now caps the hero's lit middle range, its surface
-  the solve's, smooth between 64 m samples, so it reads as pale rounded domes. Laid bilinearly before, it would be the same shapes
-  faceted. Real ice there would show crevasses, seracs and rock poking through. *Belongs:* the user's verdict on `m1a-2-lit.png`;
-  M7 (close-up snow and ice) otherwise.
+- **Ice caps laid as smooth domes** (M1a.2; the user's review: "they look more like blobs than M1"): today's ice is laid as the
+  solve's surface, smooth between its 64 m samples, so a cap on a crest reads as pale rounded domes. On the first M1a.2 one capped
+  the hero's lit middle range; the rework's ground moved it off (by chance: world-wide as much ice lies on 64 m crests, 16.9% of its
+  volume against 15.9%). Tried in M1a.2's rework and dropped: the solve's thickness draped over the rock (it buried crests the rock had
+  stood through: the ridge beside the hero's camera rose under 15 m of ice into the frame), and the same capped at the smooth
+  surface's thickness (no visible change). Real caps show the crest under them, cornices, crevasses and rock poking through.
+  *Belongs:* M7 (close-up snow and ice); the next view that shows a cap in its picture's subject, sooner.
+- **The hero's near ridge** (M1a.2's rework): with M1's fixed camera the ridge 130–160 m to the right rises into the frame on the
+  reworked world (metres of change that near the camera swing a sixth of the frame) and reads as a smooth dark mass; the auto
+  camera's own pick on the new world leaves it out. *Belongs:* M1a.4 (the near faces' detail), and M1a.7 (whether the sign-off's hero
+  keeps M1's camera or takes the auto camera's pick).
 - **Glaciers that follow the place** (M1.13): today's glaciers are the recipe's, the same at Zermatt,
   Lofoten and Fiordland, in every season. *Decided (2026-10-25):* yes; how low glaciers reach follows
   the climate (far lower where it is cold and wet than in the Alps), so today's glaciers come from
