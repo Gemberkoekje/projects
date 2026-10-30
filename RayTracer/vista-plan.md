@@ -1000,7 +1000,10 @@ differences in light: in a Pro-mode bracket of one sky (the 28-10 series below),
 measured^0.8), at least in the mid-tones; near black it is shakier. The phone's automatic mode also
 merges several frames (HDR) and lifts the shadows, so an automatic shot compares with a Pro-mode one only
 roughly. The phone records the white balance: automatic or manual in the standard photo data, and in Pro
-mode the manual value too, in Samsung's own data at the end of the file ("4400K").
+mode the manual value too, in Samsung's own data at the end of the file ("4400K"). *Since 2026-10-30* the user also
+shoots RAW in Pro mode (a DNG beside each JPEG: 12 bits, linear, no curve and no stretch), so brightness and colour are
+measured from the DNG where there is one; the slice asks the user for it (the user keeps them in a shared folder, whose link
+stays out of this public repository). A picture pasted into a chat loses the RAW: it arrives as an 8-bit image.
 
 *Dusk under a grey cloud layer, 27-10-2026* (a phone, through a window and a cat net, over flat land
 facing the sunset; sunset at 17:25; white balance automatic throughout, so the series compares
@@ -1052,6 +1055,14 @@ almost gone. The nearest KNMI station that measures visibility publishes the day
 | 29-10 08:20 | Automatic (HDR); the main lens, 1/7500 s, ISO 25; through the glass | Morning haze over the town, 48 minutes after sunrise, the sun 5.9° up and in the frame: each row of trees and buildings paler than the one in front; the haze glowing warm toward the sun and swallowing the detail there, the town keeping its contrast away from it; a mackerel sky and contrails, pale cream near the sun. Smudges add soft bright blobs and a small round reflection, which are not haze | M4 (the mist deck's light per direction: bright and flat toward the sun, clear away from it) |
 | 30-10 09:42 | Automatic (HDR); the main lens; through the glass | Fog with the sun hidden (15.3° up): the near trees in full autumn colour, paler a row back, the tower block a pale ghost, the buildings beyond almost gone; no horizon, fog and sky one wall; the same brightness in every direction; lavender from the automatic white balance; dirt on the glass | M4 (ground fog that reaches the camera) |
 | 30-10 09:45:55 | Pro mode, 5500 K; the main lens, 1/350 s, ISO 64; no smudges | The same fog, cleaner: nearly white with a touch of blue (light under thick cloud is bluer than 5500 K); brightest overhead and greyer toward the horizon, its light coming from above | M4 (the fog's colour and its brightness by direction) |
+| 30-10 10:14 | Pro mode, 5500 K; the main lens, 1/1000 s, ISO 64; RAW | Half an hour later (the sun 18.3° up), the fog thinner: the buildings behind the tower block now show | M4 (fog thinning; the first RAW to measure) |
+
+*Contrails at dusk, 30-10-2026* (the dusk series' west view; sunset at 17:19; Pro mode, 5500 K, with its RAW). Mostly an
+excuse to photograph pretty sky colours (the user's words), and a good one.
+
+| Photo (CET) | Camera | What it shows | Judges |
+|---|---|---|---|
+| 17:38:41 | Pro mode, 5500 K; the main lens, 1/500 s, ISO 400; RAW | 20 minutes after sunset, the sun 3.8° down: contrails and thin high streaks lit pink and orange across the sky, the low clouds at the upper left dark and unlit; a brighter, slightly more golden patch just above where the sun went down. In the phone's JPEG that patch is yellow; in the RAW (5500 K, a plain curve) it is pale peach, its hue 30° against the pinks' 14° and nothing at the top of the range: the phone pushed it to the top, where red runs out and orange slides toward yellow. The user's eyes saw no yellow | M4 (high clouds lit after sunset, the low ones dark); the display, whenever Vista's camera is re-judged (a bright orange fades toward white, as AgX does, and never slides to yellow: the RAW against the JPEG shows the difference) |
 
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
