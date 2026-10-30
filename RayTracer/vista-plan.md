@@ -990,8 +990,8 @@ date and time. The frames so far, with the slice that judges each:
 time are truth references too. They show the view from the user's home and the repository is public,
 so they are not committed, and the user keeps them under no naming scheme: **a slice that needs one asks
 the user for it** when it reaches the comparison, naming it by date, time and what it shows (below).
-The photos carry no location, so a slice that needs the sun's height also asks for the nearest town;
-its log records the sun's height, never the place. The camera's settings are listed here in case a
+The photos carry no location; the nearest town was asked in M1.17 (2026-10-28) and is not recorded,
+and each series gives the sun's heights instead. The camera's settings are listed here in case a
 pasted copy has lost them.
 
 *Reading brightness from these photos* (measured 2026-10-28). The phone's JPEGs, read as sRGB, stretch
@@ -1003,8 +1003,7 @@ roughly. The phone records the white balance: automatic or manual in the standar
 mode the manual value too, in Samsung's own data at the end of the file ("4400K").
 
 *Dusk under a grey cloud layer, 27-10-2026* (a phone, through a window and a cat net, over flat land
-facing the sunset; sunset between 17:13 and 17:25 depending on the town, so until it is asked the sun's
-height is known within about ±0.8°; white balance automatic throughout, so the series compares
+facing the sunset; sunset at 17:25; white balance automatic throughout, so the series compares
 brightness, not colour). 17:24 and 17:31 were taken in Pro mode at 16:58's settings (the main lens,
 1/180 s, ISO 125, f/1.8), so those two compare directly: the trees about 2× darker in those seven
 minutes (near black, so shaky). 16:58 itself was the automatic mode, so the drop from it is only an
@@ -1018,14 +1017,14 @@ heights* (asked in M1.17, 2026-10-28; the place is not recorded; true heights, w
 
 | Photo (CET) | Camera | What it shows | Judges |
 |---|---|---|---|
-| 16:58 | Automatic (HDR); its base frame on the main lens, 1/180 s, ISO 125, f/1.8, zoomed 1.8× | The sun 1–3° up but behind the cloud layer: the gold only in a thin clear strip on the horizon; the trees flat olive under the grey light, no shadows; the distance fading even over flat land | M4 (only what the sun reaches through the gap turns gold); M1.17 (the series' start) |
-| 17:18 | Automatic (HDR); the wide lens, f/2.2, 1/50 s, ISO 100 | Around sunset: the strip deep orange and wider; the warmth starting on the cloud's underside nearest the gap | M4 (the underside lighting from the gap's side) |
-| 17:24 | Pro mode at 16:58's settings | A few minutes later: the warm band higher up the underside, never overhead; small clouds in the gap lit along their edges and bottoms; the start of a sunbeam (a slanted shadow edge in the lit air) | M4 (lit undersides and their timing; the sunbeam); M1.17 |
-| 17:31 | Pro mode at 16:58's settings, zoomed out | About ten minutes after sunset: the warmth gone from the cloud; a thin yellow strip with red-pink cloud edges; lower ragged clouds darker than the layer behind them; the land nearly black | M4; M1.17 |
+| 16:58 | Automatic (HDR); its base frame on the main lens, 1/180 s, ISO 125, f/1.8, zoomed 1.8× | The sun 2.7° up but behind the cloud layer: the gold only in a thin clear strip on the horizon; the trees flat olive under the grey light, no shadows; the distance fading even over flat land | M4 (only what the sun reaches through the gap turns gold); M1.17 (the series' start) |
+| 17:18 | Automatic (HDR); the wide lens, f/2.2, 1/50 s, ISO 100 | Seven minutes before sunset, the sun on the horizon: the strip deep orange and wider; the warmth starting on the cloud's underside nearest the gap | M4 (the underside lighting from the gap's side) |
+| 17:24 | Pro mode at 16:58's settings | At sunset: the warm band higher up the underside, never overhead; small clouds in the gap lit along their edges and bottoms; the start of a sunbeam (a slanted shadow edge in the lit air) | M4 (lit undersides and their timing; the sunbeam); M1.17 |
+| 17:31 | Pro mode at 16:58's settings, zoomed out | Six minutes after sunset: the warmth gone from the cloud; a thin yellow strip with red-pink cloud edges; lower ragged clouds darker than the layer behind them; the land nearly black | M4; M1.17 |
 | 17:43 | Automatic; the zoom lens, f/2.4, 1/33 s, ISO 1250 (low light, several frames merged) | A cat on the balcony rail: the phone made dusk look like the afternoon, at the cost of smeared detail and a pale sky | M1.17 (the exposure question) |
 
 *Sunset under a clear sky with high streaks, 28-10-2026* (the same view; the main lens at 1.0× in Pro
-mode throughout; sunset between 17:11 and 17:23 depending on the town). Three of the six share one
+mode throughout; sunset at 17:23). Three of the six share one
 exposure, 1/12000 s, ISO 640, f/1.8, so their brightness compares directly. White balance automatic at
 17:12 and 17:21, manual at 4400 K from 17:27:57 on (recorded by the phone), so 17:21 and 17:27:57 differ
 in colour by the setting as well as the sky. 17:12 is through the closed window, whose dirty glass adds glare around the sun; the rest are
@@ -1037,11 +1036,22 @@ unlit cloud is darker than clear sky).
 
 | Photo (CET) | Camera | What it shows | Judges |
 |---|---|---|---|
-| 17:12 | The shared exposure; automatic white balance; through the glass | A few minutes before sunset, the sun in the frame setting into a low dark bank: the warm colour only around the sun; the high streaks and contrails white with yellow edges toward the sun; the sky blue almost to the horizon; at an exposure set by the sun, the land black | M1.17 (the exposure toward the sun; the clear sky's colour at sunset); M4 (high clouds still white) |
-| 17:21 | The shared exposure; automatic white balance | Around or just after sunset: the high clouds peach, gold and orange; the contrail, the highest, still white; the low bank dark grey with a red-orange fringe along its bottom near the sunset (lit from the gap's side, as on 27-10); the sky in bands: deep blue overhead, a pale greenish-blue band, orange only at the horizon | M4 (high clouds lit after sunset, the highest the whitest); M1.17 (the greenish band) |
+| 17:12 | The shared exposure; automatic white balance; through the glass | Eleven minutes before sunset, the sun in the frame setting into a low dark bank: the warm colour only around the sun; the high streaks and contrails white with yellow edges toward the sun; the sky blue almost to the horizon; at an exposure set by the sun, the land black | M1.17 (the exposure toward the sun; the clear sky's colour at sunset); M4 (high clouds still white) |
+| 17:21 | The shared exposure; automatic white balance | At sunset: the high clouds peach, gold and orange; the contrail, the highest, still white; the low bank dark grey with a red-orange fringe along its bottom near the sunset (lit from the gap's side, as on 27-10); the sky in bands: deep blue overhead, a pale greenish-blue band, orange only at the horizon | M4 (high clouds lit after sunset, the highest the whitest); M1.17 (the greenish band) |
 | 17:27:57 | The shared exposure; manual white balance | The contrail and the high cloud pink; the gold gone from the middle clouds; the low bank dark with a deep red fringe at the bottom; the sky blue-violet (partly the real violet above the glow a few minutes after sunset, partly the 4400 K setting) | M4 (the colours deepening, the low clouds losing the light first); M1.17 (the violet) |
 | 17:28:21, 17:28:39 | Manual white balance; 1/3000 s, ISO 640 (4× the light); 1/12000 s, ISO 3200 (5×, grainy) | The same sky as 17:27:57, brighter: the darkest of the three reads as night, the brighter ones as early twilight | M1.17 (the exposure question: one sky's mood set by exposure alone); the stretch above |
-| 17:46:48 | 1/90 s, ISO 400 (83× the shared exposure's light); manual white balance, 4400 K | The blue hour, the sun about 5° down: everything blue; a cloud layer over most of the sky, its thick parts darker than its thin parts and gaps (the reverse of the sunlit clouds earlier); the last colour a thin pink line on the horizon; the town's lights on | M1.17 (the blue hour's colour; the exposure question: the user raised the exposure 83× to keep the picture about as bright, which is what the meter does); M4 (clouds without sun darker than the sky) |
+| 17:46:48 | 1/90 s, ISO 400 (83× the shared exposure's light); manual white balance, 4400 K | The blue hour, 23 minutes after sunset, the sun 4.5° down: everything blue; a cloud layer over most of the sky, its thick parts darker than its thin parts and gaps (the reverse of the sunlit clouds earlier); the last colour a thin pink line on the horizon; the town's lights on | M1.17 (the blue hour's colour; the exposure question: the user raised the exposure 83× to keep the picture about as bright, which is what the meter does); M4 (clouds without sun darker than the sky) |
+
+*Haze and fog, 29 and 30-10-2026* (mornings; 29-10 looks the other way, toward the rising sun, 30-10 is the dusk series' west
+view). The fog's visibility was about a kilometre: the farthest buildings, under a kilometre off by the user's estimate, are
+almost gone. The nearest KNMI station that measures visibility publishes the day's minimum and its hour a day or two late; the
+30-10 figure goes here when it is out.
+
+| Photo (CET) | Camera | What it shows | Judges |
+|---|---|---|---|
+| 29-10 08:20 | Automatic (HDR); the main lens, 1/7500 s, ISO 25; through the glass | Morning haze over the town, 48 minutes after sunrise, the sun 5.9° up and in the frame: each row of trees and buildings paler than the one in front; the haze glowing warm toward the sun and swallowing the detail there, the town keeping its contrast away from it; a mackerel sky and contrails, pale cream near the sun. Smudges add soft bright blobs and a small round reflection, which are not haze | M4 (the mist deck's light per direction: bright and flat toward the sun, clear away from it) |
+| 30-10 09:42 | Automatic (HDR); the main lens; through the glass | Fog with the sun hidden (15.3° up): the near trees in full autumn colour, paler a row back, the tower block a pale ghost, the buildings beyond almost gone; no horizon, fog and sky one wall; the same brightness in every direction; lavender from the automatic white balance; dirt on the glass | M4 (ground fog that reaches the camera) |
+| 30-10 09:45:55 | Pro mode, 5500 K; the main lens, 1/350 s, ISO 64; no smudges | The same fog, cleaner: nearly white with a touch of blue (light under thick cloud is bluer than 5500 K); brightest overhead and greyer toward the horizon, its light coming from above | M4 (the fog's colour and its brightness by direction) |
 
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
@@ -2257,16 +2267,21 @@ shadows on the terrain, then cumulus fields with full multiple scattering checke
 (fogbows, glories). *Added 2026-10-27:* a **grey cloud layer with a clear gap** on the horizon, a very common sky that the list
 above does not name: only what the sun reaches through the gap turns gold, the rest lies
 in the layer's grey light; around sunset the layer's underside lights from the gap's side, the warmth climbing toward the
-camera for some ten minutes and then gone; sunbeams through the gap; lower ragged clouds darker than the layer at dusk. Judged
+camera from the sun at 0° to −1° and gone by −1.9°; sunbeams through the gap; lower ragged clouds darker than the layer at dusk. Judged
 against the user's dusk series (the truth references at the top of this section; the slice asks the user for the photos).
-*Added 2026-10-28:* high clouds after sunset, from the user's sunset series of 28-10-2026: white before sunset, peach and gold
-just after, pink some minutes later; the highest (a contrail) the last to colour, the low clouds the first to lose the light.
+*Added 2026-10-28:* high clouds after sunset, from the user's sunset series of 28-10-2026: white with the sun at +0.6°, peach and
+gold at −0.8°, pink at −1.7°; the highest (a contrail) the last to colour, the low clouds the first to lose the light.
+*Added 2026-10-30:* fog and haze from the user's third series: ground fog that reaches the camera, nearly white, brightest
+overhead and greyer toward the horizon, taking colour as well as contrast row by row; and morning haze bright toward the sun
+and clear away from it (the parked mist deck's light per direction, which takes this photo as its reference).
 Verify: a cold autumn dawn over a lake produces steam fog from the defaults alone; a month
 sheet at one place shows summer hazier than winter from the defaults alone; a range's foot
 fades into valley mist from the defaults of a cool, still morning; a grey layer with a gap on the horizon, at the dusk
-series' sun heights, shows the series' look: gold only in the gap before sunset, the underside warm from the gap's side
-just after, and gone some ten minutes later; high streaks over a low bank, at the sunset series' sun heights, turn white,
-then gold, then pink, while the low bank stays dark but for a red fringe.
+series' sun heights, shows the series' look: gold only in the gap at +2.7°, the underside warm from the gap's side at 0° to
+−1°, and gone by −1.9°; high streaks over a low bank, at the sunset series' sun heights, turn white, then gold, then pink,
+while the low bank stays dark but for a red fringe; a ground fog of about a kilometre's visibility, the sun hidden, shows the
+fog series' look (the nearest trees in full colour, buildings under a kilometre off almost gone, no horizon, the fog
+brightest overhead); haze with the sun 6° up is bright and flat toward the sun and keeps its contrast away from it.
 
 **M5 — Vegetation.**
 Goal: forests, and with them the north star. Deliverable: procedural tree species,
@@ -2418,7 +2433,8 @@ any of them.
 - **The mist deck's light per direction** (M1.13b): the octaves weighted by the sun's elevation and the tables' sky light leave a
   side-lit deck +10% at a 25° sun and −9% at 6° against the reference, its nearest part −26% and its far part +17%
   (vista-log/M1.13b.md). A table of the slab's Monte Carlo by sun, view and depth, or a two-stream field with its forward lobe.
-  *Belongs:* M4, with fog proper.
+  *Belongs:* M4, with fog proper. *2026-10-30:* the user's haze photo (29-10, the truth references) is its reference: bright and
+  flat toward the sun, clear away from it.
 - **The nearest faces lack detail** (the user, 2026-10-27, during M1.14): the mountain and hill faces nearest the camera (about
   100 m to 3 km) read as smooth, and "the brain assumes less detail = far away", so the whole picture loses depth. The world grid's
   8 m cell is about 37 pixels of a 4K frame at 50 mm a kilometre off (12 at 3 km); the detail below the grid (M1.12) is crests and
