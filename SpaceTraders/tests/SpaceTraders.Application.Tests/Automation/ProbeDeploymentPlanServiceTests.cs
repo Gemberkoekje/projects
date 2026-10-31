@@ -141,7 +141,7 @@ public sealed class ProbeDeploymentPlanServiceTests
 
         await RunAsync();
 
-        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_INTERCEPTOR", "X1-DC53-C39", 140_000));
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.HomeProbes, "SHIP_INTERCEPTOR", "X1-DC53-C39", 140_000));
         await _purchases.Received(1).TryPurchaseAsync("SHIP_INTERCEPTOR", "X1-DC53-C39", Arg.Any<CancellationToken>());
         await _purchases.DidNotReceive().TryPurchaseAsync("SHIP_PROBE", Arg.Any<string>(), Arg.Any<CancellationToken>());
         _state!.NextProbeShipType.Should().Be("SHIP_INTERCEPTOR");
@@ -195,11 +195,56 @@ public sealed class ProbeDeploymentPlanServiceTests
 
         await RunAsync();
 
-        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.Probes, "SHIP_PROBE", A2, 81_645));
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.HomeProbes, "SHIP_PROBE", A2, 81_645));
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
         _state!.Purchase.Should().Be(ProbePurchaseStatus.WaitingForAnotherPurchase);
         _activeGoals["SPECTER-2"].Should().BeOfType<DeployProbeGoal>();
         _log.Journal.Should().NotContain(entry => entry.EventKind == "PlanBlocked");
+    }
+
+    [Fact]
+    public async Task AHomeProbe_ComesBeforeTheJumpGatesLoads()
+    {
+        // Slice 6.44 (D127), asked on 2026-10-31: "all home probes should come before building the gates". Only a ship at a
+        // market refreshes its prices, and a market older than 30 minutes is on no route (D96). In the run of 2026-10-25 the
+        // first probe came at hour 69.6, after the gate, and X1-BQ86-K89 saw no ship for 65.9 hours.
+        await RunAsync();
+
+        ((int)_order.Of(AutomationPlan.ProbeDeployment).Tier).Should().BeLessThan((int)PurchaseTier.Construction);
+    }
+
+    [Fact]
+    public async Task AHomeMarketWithoutAProbe_ComesBeforeAShipyardThatSellsExplorersAbroad()
+    {
+        // Slice 6.44 (D127): one purchase a pass, so a home probe behind one for abroad would wait for what stands before that
+        // one in the order. Home has two probes for its three markets, and X1-MT49's M1 sells SHIP_EXPLORER (first until then, D109).
+        Abroad();
+        ShipyardAtM1(explorer: true);
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Shipyard(A2, ("SHIP_PROBE", 81_645)),
+            Shipyard(Mt49M1, ("SHIP_EXPLORER", 702_315)) with { SystemSymbol = Mt49 },
+        ]);
+        Fleet(StartingProbe(), Probe("SPECTER-5", A2));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.HomeProbes, "SHIP_PROBE", A2, 81_645));
+        _state!.NextProbeSystem.Should().Be(SystemSymbol);
+    }
+
+    [Fact]
+    public async Task AProbeBoughtForAHomeMarketsSake_StandsWithTheHomeProbes_ThoughItFliesAbroad()
+    {
+        // Slice 6.44 (D127), with B72: K2 sells home's next probe for least, jump counted, and needs one of our ships there first
+        // (D30). That first probe is bought for home's sake, so it stands where home's do.
+        Abroad();
+        Fleet(StartingProbe(), Probe("SPECTER-5", A2));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(new PurchaseNeed(PurchaseTier.HomeProbes, "SHIP_PROBE", A2, 81_645));
+        _state!.NextProbeSystem.Should().Be(Kr90);
     }
 
     [Fact]

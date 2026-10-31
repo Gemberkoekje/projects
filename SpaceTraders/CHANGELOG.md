@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-10-31, slice 6.44)
+- Every home probe comes before the jump gate's loads (D127), as asked on 2026-10-31: "all home probes should come before
+  building the gates". A new tier, `PurchaseTier.HomeProbes`, 6, stands after the cargo ships of `Trade.ShipPurchases`, so
+  `Construction` and everything after it moved up by one (`spacetraders_purchase_need_credits{position}`). Home also comes
+  before every system abroad in the probe plan's `Wants`, as one purchase a pass would otherwise leave a home probe behind
+  one for abroad. In the run of 2026-10-25 the first probe came at hour 69.6, and the home markets no ship passed went dark:
+  a market older than `Trade.MaxPriceAgeMinutes` is on no route, and only a ship there refreshes it (D96). Tests:
+  `ProbeDeploymentPlanServiceTests` `AHomeProbe_ComesBeforeTheJumpGatesLoads` and
+  `AHomeMarketWithoutAProbe_ComesBeforeAShipyardThatSellsExplorersAbroad` failed before the change.
+
+### Docs – Changed (2026-10-31, slice 6.44)
+- `PLAN.md`: D127, slice 6.44, and where things stand on 2026-10-31. `docs/HOW_IT_WORKS.md`: the order ships are bought in,
+  the probe plan's `Wants`, the fresh prices and the metric's positions.
+
 ### Code – Fixed (2026-10-29, B83)
 - A navigate whose answer was lost no longer sends the same navigate on every step (B83). On 2026-10-18 at 06:45:45Z SPECTER-226's navigate from X1-QK87-X45A to X1-QK87-XF4Z went through at the API, but its connection was cancelled, so the cache kept the ship in orbit where it had left from. Every step sent the navigate again, and the API refused it 216 times in six hours, until the reset: 16 times because the ship was in transit, then 200 times because it was already at the destination. One failing step a tick never trips the circuit breaker, which counts steps a minute. Now the API adapter raises `NavigateRefusedException` (new) for those refusals (4200, 4214 in transit; 4204 already there) and for no others, and `NavigateSubCommand` then reads the ship's nav from the API (`ISpaceTradersPort.GetShipNavAsync`, new: `GET my/ships/{ship}`), with a warning, and goes on as if the navigate had answered: it stores the nav and schedules the arrival, at once for a ship that has landed, so the arrival docks it and resumes its goal.
 

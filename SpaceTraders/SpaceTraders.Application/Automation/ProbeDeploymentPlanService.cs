@@ -38,8 +38,9 @@ public interface IProbeDeploymentPlanService
 ///   <item>while a system has more markets than probes, it buys a SHIP_PROBE for the first such system, at the shipyard where
 ///   it costs least with the antimatter of the jumps to that system counted, never where SHIP_PROBE is SCARCE (D97), as long
 ///   as the credits stay at the reserve (<c>FleetExpansion.MinCreditReserve</c>, D29), and nothing comes before it in the
-///   order ships are bought in (<see cref="IPurchaseOrder"/>, D43): home's and those of the systems within
-///   <c>Trade.MaxHaulDistance</c> jumps of home at the probe tier, the others' last (<see cref="PurchaseTier.FarProbes"/>).
+///   order ships are bought in (<see cref="IPurchaseOrder"/>, D43): home's before the jump gate's loads
+///   (<see cref="PurchaseTier.HomeProbes"/>, slice 6.44, D127), those of the systems within <c>Trade.MaxHaulDistance</c> jumps
+///   of home at the probe tier, the others' last (<see cref="PurchaseTier.FarProbes"/>).
 ///   A purchase needs one of our ships at the shipyard (D30), so a shipyard abroad counts once a probe of ours is in its
 ///   system: the first probe to arrive lets the plan buy the rest there. One bought for another system flies there at once;</item>
 ///   <item>it flies the free probes of each system (<see cref="ProbePlanner"/>): the nearest to each shipyard where a purchase
@@ -314,6 +315,8 @@ public sealed class ProbeDeploymentPlanService(
     /// The systems short of a probe, there or on its way, in the order they get one, each once at its first step (slice 6.32,
     /// D109: "Across systems"), with the tier the purchase of its next probe stands at and what the probe is for:
     /// <list type="number">
+    ///   <item>home, before every other system, at the home-probe tier (slice 6.44, D127): shipyards that sell SHIP_EXPLORER,
+    ///   other shipyards, then markets;</item>
     ///   <item>fewer probes than shipyards that sell SHIP_EXPLORER, wherever the gates reach it, at the probe tier (D111);</item>
     ///   <item>within the trade reach, at the probe tier: fewer probes than shipyards, then fewer than markets (D29, D97);</item>
     ///   <item>beyond it, at the far-probe tier: the same.</item>
@@ -323,8 +326,12 @@ public sealed class ProbeDeploymentPlanService(
     /// </summary>
     private static List<ProbeWant> Wants(Pass pass)
     {
+        bool IsHome(ServedSystem system) => system.Symbol.Equals(pass.Home, StringComparison.OrdinalIgnoreCase);
         var steps = new (Func<ServedSystem, bool> IsShort, ShipyardKind For, PurchaseTier Tier)[]
         {
+            (system => IsHome(system) && system.Probes.Count < system.ExplorerShipyards, ShipyardKind.Explorer, PurchaseTier.HomeProbes),
+            (system => IsHome(system) && system.Probes.Count < system.Shipyards, ShipyardKind.Shipyard, PurchaseTier.HomeProbes),
+            (system => IsHome(system) && system.Probes.Count < system.Markets.Count, ShipyardKind.None, PurchaseTier.HomeProbes),
             (system => system.Probes.Count < system.ExplorerShipyards, ShipyardKind.Explorer, PurchaseTier.Probes),
             (system => system.InTradeReach && system.Probes.Count < system.Shipyards, ShipyardKind.Shipyard, PurchaseTier.Probes),
             (system => system.InTradeReach && system.Probes.Count < system.Markets.Count, ShipyardKind.None, PurchaseTier.Probes),
@@ -458,7 +465,7 @@ public sealed class ProbeDeploymentPlanService(
             if (source is { Waits: false })
             {
                 // A probe for another system, whose shipyard sells this one's for least, is still bought for this one's sake.
-                var tier = want.Tier == PurchaseTier.Probes || source.For.InTradeReach ? PurchaseTier.Probes : PurchaseTier.FarProbes;
+                var tier = want.Tier == PurchaseTier.FarProbes && source.For.InTradeReach ? PurchaseTier.Probes : want.Tier;
                 return await BuyAsync(pass, source.For, source.Offer, source.Antimatter, tier, want.For, cancellationToken);
             }
 

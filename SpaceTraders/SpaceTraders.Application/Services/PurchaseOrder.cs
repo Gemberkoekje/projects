@@ -16,18 +16,19 @@ namespace SpaceTraders.Application.Services;
 ///   <item>one more surveyor for each area with mining drones that has none (D55);</item>
 ///   <item>the cargo ships of <c>Trade.ShipPurchases</c> (D21), saved up for: while one is still to buy, no probe and no
 ///   other drone is bought;</item>
+///   <item>a probe for every market of the headquarters' system (slice 6.44, D127): "all home probes should come before
+///   building the gates";</item>
 ///   <item>the jump gate's next load of materials (slice 6.6, D64), while the gate needs materials and a ship has the
 ///   construction role: no ship, but materials that are spent for good, so it keeps the credit reserve as a ship does, and
-///   the probes and further ships wait until the gate is done. In the same place, a mining drone for the gate's smelters
+///   the other probes and further ships wait until the gate is done. In the same place, a mining drone for the gate's smelters
 ///   (slice 6.25, D92), which waits while a load can be bought: "If the gate can be built, it should be built, otherwise
 ///   extra miners can be built.";</item>
 ///   <item>every explorer the explore plan wants (slice 6.30, D98, D102: one for every 10 systems left to explore), the first
-///   and every further one before the probes (slice 6.33, D113); the command ship fetches one no probe of ours can (D108);</item>
+///   and every further one before the other probes (slice 6.33, D113); the command ship fetches one no probe of ours can (D108);</item>
 ///   <item>one more cargo ship with the largest hold, once <c>Trade.ShipPurchaseIntervalMinutes</c> have passed since the trading
 ///   plan last bought one (slice 6.34, D116): "once every half hour, money permitting, a trade ship is bought, independent on
 ///   whether probes still need to be bought";</item>
-///   <item>a probe for every market (D29): home's, then those of the explored systems within the trade reach (slice 6.28,
-///   D97);</item>
+///   <item>a probe for every market of the explored systems within the trade reach (D29, slice 6.28, D97);</item>
 ///   <item>then drones by the miners' rule (D28, D32) and cargo ships with the largest hold (D112), in turn: a drone, a cargo
 ///   ship, and so on, the kind not bought last. A turn passes when the other kind has nothing to buy;</item>
 ///   <item>a probe for every market of the other explored systems (slice 6.28, D97);</item>
@@ -72,7 +73,7 @@ public sealed class PurchaseOrder(
         [AutomationPlan.Trading] = PurchaseTier.CargoShips,
         [AutomationPlan.Construction] = PurchaseTier.Construction,
         [AutomationPlan.Explore] = PurchaseTier.Explorer,
-        [AutomationPlan.ProbeDeployment] = PurchaseTier.Probes,
+        [AutomationPlan.ProbeDeployment] = PurchaseTier.HomeProbes,
     };
 
     /// <summary>
@@ -528,11 +529,20 @@ public enum PurchaseTier
     CargoShips = 5,
 
     /// <summary>
+    /// A probe for a market of the headquarters' system (D29), the last before the jump gate's loads (slice 6.44, D127). Asked on
+    /// 2026-10-31: "all home probes should come before building the gates". Only a ship at a market refreshes its prices, and a
+    /// market whose prices are older than <c>Trade.MaxPriceAgeMinutes</c> is on no route, at home too (D96): with the probes
+    /// behind the gate, the markets no ship passed went dark, and with them the trades that paid for the gate.
+    /// </summary>
+    HomeProbes = 6,
+
+    /// <summary>
     /// The jump gate's next load of materials (slice 6.6, D64): not a ship, but spent for good, so it keeps the credit
     /// reserve as one does. While the gate needs materials, everything after it waits. A mining drone for the gate's smelters
     /// stands here too (slice 6.25, D92), after a load that can be bought now (<see cref="PurchaseNeed.WaitsForMarkets"/>).
+    /// 6 until slice 6.44 (D127) put the home probes before it, which moved everything after it up by one.
     /// </summary>
-    Construction = 6,
+    Construction = 7,
 
     /// <summary>
     /// Every explorer the explore plan wants (slice 6.30, D98: "Start with one before probes"; D102: one for every 10 systems left
@@ -540,7 +550,7 @@ public enum PurchaseTier
     /// so the further ones too, which stood after the drones and cargo ships that take turns. The command ship fetches one that no
     /// probe of ours can (D108).
     /// </summary>
-    Explorer = 7,
+    Explorer = 8,
 
     /// <summary>
     /// One more cargo ship, the largest hold (D112), once <c>Trade.ShipPurchaseIntervalMinutes</c> have passed since the trading
@@ -549,27 +559,27 @@ public enum PurchaseTier
     /// to be bought." Only while D88's route has waited for it; till the half hour has passed, the next takes its turn with the
     /// drones (<see cref="Alternating"/>).
     /// </summary>
-    TimedCargoShip = 8,
+    TimedCargoShip = 9,
 
     /// <summary>
-    /// A probe, until every market has one (D29): home's, then those of the explored systems within the trade reach,
-    /// <c>Trade.MaxHaulDistance</c> jumps of home (slice 6.28, D96, D97). 8 until slice 6.34 (D116) put the cargo ship on the
-    /// clock before it.
+    /// A probe, until every market has one (D29): those of the explored systems within the trade reach,
+    /// <c>Trade.MaxHaulDistance</c> jumps of home (slice 6.28, D96, D97); home's stand at <see cref="HomeProbes"/>. 8 until
+    /// slice 6.34 (D116) put the cargo ship on the clock before it.
     /// </summary>
-    Probes = 9,
+    Probes = 10,
 
     /// <summary>
     /// A drone by the miners' rule (D28, D32), or one more cargo ship, in turn: the ship with the largest hold a shipyard within
     /// the trade reach lists, not SCARCE there (slice 6.33, D112).
     /// </summary>
-    Alternating = 10,
+    Alternating = 11,
 
     /// <summary>
     /// A probe for a market of an explored system beyond the trade reach (slice 6.28, D97): "all explored markets when money
     /// allows", last, after the drones and cargo ships that take turns. 11 until slice 6.33 (D113) moved the further explorers,
     /// which stood at 10, to <see cref="Explorer"/>, and 11 again since slice 6.34 (D116) put the cargo ship on the clock at 8.
     /// </summary>
-    FarProbes = 11,
+    FarProbes = 12,
 
     /// <summary>
     /// A miner for a system abroad (slice 6.40, D122), an ore hound where one is sold, else a mining drone (D120): one per ore a
@@ -577,7 +587,7 @@ public enum PurchaseTier
     /// done wherever there's low ore supply, not just in the home area. However, outside of the home area, mining is low
     /// priority, and should never be in the way of trading, which is generally more lucrative."
     /// </summary>
-    MiningAbroad = 12,
+    MiningAbroad = 13,
 }
 
 /// <summary>The kinds of ship that take turns once everything before them is bought (D43).</summary>

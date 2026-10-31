@@ -375,7 +375,7 @@ who fetches an explorer (slice 6.32) D108, and for every explorer before the pro
   knows, hasn't explored and reaches from home through built gates (`ExploreAtlas.SystemsLeft`): one behind a gate under
   construction counts once the gate is built. They are bought at the cheapest shipyard the gates reach that sells one
   (X1-GT9-AE7B in the reset of 2026-10-04) and doesn't have it SCARCE (slice 6.37, D121; with every one SCARCE, none is
-  needed: `ShipyardsScarce`), each at `PurchaseTier.Explorer`, before the probes: the first since slice
+  needed: `ShipyardsScarce`), each at `PurchaseTier.Explorer`, before the probes beyond home: the first since slice
   6.30 (D98), the rest since slice 6.33 (D113: "I'd like Explorers (order 10) to go in front of probes (order 8)"; until
   then they stood after the drones and cargo ships that take turns, see [the order ships are bought
   in](#the-order-ships-are-bought-in-purchaseorder-slice-610b)). The API sells a ship only where one of ours is (D30). A
@@ -683,9 +683,12 @@ Each pass:
   nearest first by jumps; then any other system a probe of ours is in, where it keeps working but none is bought. Home and
   the systems within `Trade.MaxHaulDistance` jumps of it (5, the trade reach, D96) are in the trade reach.
 - **Which system is next** (`Wants`, slice 6.32, D109: "Across systems"): each system short of a probe, there or on its
-  way, once, in this order: fewer probes than shipyards that sell `SHIP_EXPLORER`, wherever the gates reach it, at the
-  probe tier (D111); within the trade reach, at the probe tier, fewer probes than shipyards, then fewer than markets; beyond
-  it, at the far-probe tier, the same. Each step goes home first, then the nearest. A system's probes park at its shipyards
+  way, once, in this order: home, before every other system, at the home-probe tier, before the jump gate's loads (slice
+  6.44, D127: "all home probes should come before building the gates"); fewer probes than shipyards that sell
+  `SHIP_EXPLORER`, wherever the gates reach it, at the probe tier (D111); within the trade reach, at the probe tier, fewer
+  probes than shipyards, then fewer than markets; beyond it, at the far-probe tier, the same. Each step goes by the nearest
+  first. A probe bought for home's sake that flies abroad first, to a shipyard that sells home's next one for least (B72),
+  stands at the home-probe tier too. A system's probes park at its shipyards
   before they roam (below), so the counts say which still lack one.
 - **Spares** (B69, slice 6.28): a system with more probes than markets lends the free ones it would settle at no market of
   its own (`ProbePlanner.Surplus`) to the first system short of one that they can get to, before a probe is bought for it.
@@ -1117,8 +1120,9 @@ buy.
 - **Money** (D64): supplying pays nothing, so a load is judged like a ship purchase. It leaves the credit reserve
   (`BudgetPolicy`: the floor and the trading holds, D51; the dearest full hold a trader saves up for, D56; and what the
   trips on their way to buy hold back, D57), and waits for every purchase before it in the order ships are bought in:
-  the contract's drone, the surveyors, a drone per scarce mineral and area, and the cargo ships of
-  `Trade.ShipPurchases`. While the plan has a load to buy, the probes and the further drones and cargo ships wait. The
+  the contract's drone, the surveyors, a drone per scarce mineral and area, the cargo ships of `Trade.ShipPurchases`, and
+  every home probe (slice 6.44, D127). While the plan has a load to buy, the other probes and the further drones and cargo
+  ships wait. The
   mining plan's drones for the gate's smelters stand at the same place (D92: "If the gate can be built, it should be
   built, otherwise extra miners can be built."): they wait while a load can be bought now, the credits aside, and are
   bought while it waits for its markets.
@@ -1267,7 +1271,9 @@ buy.
     107,000; at 3,700 it still earns more a trip, but less an hour, and goes after A1.
   - **Fresh prices only** (D96, `Trade.MaxPriceAgeMinutes`, 30): a market whose prices are older, or that was never seen with
     prices, buys or sells on no route, at home too (`TradeMarketMap.StaleMarkets`). Its fuel still counts for the flights.
-    The market watch keeps the markets where our ships are fresh, abroad too, where the probes sit (slice 6.28).
+    The market watch keeps the markets where our ships are fresh, abroad too, where the probes sit (slice 6.28). Only a ship
+    at a market refreshes it, so a market no ship passes stays dark: no route, so no ship. Home's probes come before the jump
+    gate's loads for that reason (slice 6.44, D127).
   - **Who crosses systems**, read from D96 with D58, D65, D83 and D86: a ship whose role is trading (the trade role on the
     board; with the board off, a cargo ship), not a shuttle kept for a collection point. A drone, a builder and the survey
     ship in its spare time trade in their own system between their trips, as their own work is there; so does a shuttle
@@ -1486,25 +1492,31 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   4. `SurveyorPerArea`: one more surveyor for each area with mining drones that has none (D55: "The second
      surveyor is lower priority than the first on the buy order");
   5. `CargoShips`: the cargo ships of `Trade.ShipPurchases` (D21), saved up for;
-  6. `Construction`: no ship, but the home gate's next load of materials (slice 6.6, D64: "after the cargo ships"),
+  6. `HomeProbes`: a probe for every market of the headquarters' system (D29), the shipyards first, those that sell
+     `SHIP_EXPLORER` first of all (D109), an interceptor wherever a shipyard sells one (D119), before the gate (slice 6.44,
+     D127: "all home probes should come before building the gates"). With every shipyard that sells them SCARCE it says it
+     needs nothing, so the gate goes on (D97, D121); while it waits for one of our ships at its shipyard, the loads go on and
+     leave its price (D118). Until 6.44 the home probes stood with the others, behind the gate: in the run of 2026-10-25 the
+     first came at hour 69.6;
+  7. `Construction`: no ship, but the home gate's next load of materials (slice 6.6, D64: "after the cargo ships"),
      spent for good, so it keeps the credit reserve as a purchase does; reported with the material as the ship
      type and its market as the shipyard, worth the load with its fuel. The mining plan's drones for the gate's
      smelters stand here too (slice 6.25, D92: "Same tier as gate loads, capped. If the gate can be built, it should be
      built, otherwise extra miners can be built."): the load comes before them unless it waits for its markets
      (`PurchaseNeed.WaitsForMarkets`: SCARCE or LIMITED, D66, or another buyer there, D80), whatever the credits; they
      never hold the load back;
-  7. `Explorer`: every explorer the explore plan wants (slice 6.30, D98: "Start with one before probes"; D102), the further
+  8. `Explorer`: every explorer the explore plan wants (slice 6.30, D98: "Start with one before probes"; D102), the further
      ones too since slice 6.33 (D113: "I'd like Explorers (order 10) to go in front of probes (order 8)"); the command ship
      fetches one unless a probe of ours answers the purchase's call (slice 6.32, D108);
-  8. `TimedCargoShip`: one more cargo ship, the largest hold (D112), once a route has waited for it (D88) and
+  9. `TimedCargoShip`: one more cargo ship, the largest hold (D112), once a route has waited for it (D88) and
      `Trade.ShipPurchaseIntervalMinutes` (30) have passed since the trading plan last bought a cargo ship, or none is on
      record (slice 6.34, D116: "I would like to switch priorities between new trade ships and probes. So once every half
      hour, money permitting, a trade ship is bought, independent on whether probes still need to be bought."); till then
-     its next cargo ship takes its turn at 10;
-  9. `Probes`: a probe for every market (D29) of home and of the explored systems within the trade reach (slice 6.28,
-     D97), the shipyards first, those that sell `SHIP_EXPLORER` first of all, wherever the gates reach them (slice 6.32,
-     D109, D111); 8 until slice 6.34;
-  10. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship, the largest hold a shipyard within
+     its next cargo ship takes its turn at 11;
+  10. `Probes`: a probe for every market (D29) of the explored systems within the trade reach (slice 6.28, D97), the
+      shipyards first, those that sell `SHIP_EXPLORER` first of all, wherever the gates reach them (slice 6.32, D109, D111); 8
+      until slice 6.34, 9 until slice 6.44;
+  11. `Alternating`: drones by the miners' rule (D28, D32) and one more cargo ship, the largest hold a shipyard within
       the trade reach lists, not SCARCE there (slice 6.33, D112), in turn: the kind not bought last, so after the list's
       last cargo ship a drone, then a cargo ship, and so on (the ledger's `ShipPurchase` rows, which carry the type, and
       this process's purchases, which the ledger gets a moment later). Any drone counts, the contract's and a scarce
@@ -1512,10 +1524,11 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
       bought for its hold (`SHIP_BULK_FREIGHTER`, which the domain's `ShipType` now lists, included). A turn passes when the
       other kind has nothing to buy: no drone's first trip would serve a market short of its mineral, or a miner is free;
       no new cargo ship would have a lucrative route, or a trader has no trip. A turn that passed isn't made up later;
-  11. `FarProbes`: a probe for every market of the other explored systems (slice 6.28, D97: "all explored markets when
+  12. `FarProbes`: a probe for every market of the other explored systems (slice 6.28, D97: "all explored markets when
       money allows", "After drones/cargo"), the shipyards first (slice 6.32, D109). It was 11 until slice 6.33 moved the
-      further explorers, 10 (`MoreExplorers`), to 7 (D113), and is 11 again since slice 6.34 put `TimedCargoShip` at 8;
-  12. `MiningAbroad`: a miner for a system abroad, one per ore its fresh markets are short of (slice 6.40, D122: "outside
+      further explorers, 10 (`MoreExplorers`), to 7 (D113), 11 again since slice 6.34 put `TimedCargoShip` at 8, and 12
+      since slice 6.44;
+  13. `MiningAbroad`: a miner for a system abroad, one per ore its fresh markets are short of (slice 6.40, D122: "outside
       of the home area, mining is low priority, and should never be in the way of trading"), last of all. It takes no turn
       with the cargo ships: a drone's turn passes while only it waits.
 - **Needs** (`PurchaseNeed`, `PurchaseNeeds`, a singleton in memory): every plan that buys says on each
@@ -2379,7 +2392,7 @@ The seven pages in `src/Future` are not routed.
   | `spacetraders_agent_credits` | | The agent's credits, as cached | Every 10 s (`PrometheusMetricsService`) |
   | `spacetraders_explore_systems_left`, `spacetraders_explore_explorers_wanted` | | The systems the explore plan knows, hasn't explored and reaches from home through built gates, and the explorers it wants for them: one for every `Explore.SystemsPerExplorer`, at most `Explore.MaxExplorers` (slice 6.30, D102), as its last pass counted them | Every 10 s, from the explore plan's state |
   | `spacetraders_credit_reserve` | | The credits a ship purchase must leave (D51): `FleetExpansion.MinCreditReserve`, and `FleetExpansion.ReservePerTradingCargoUnit` for every unit the ships that trade can carry; the dearest full hold a trader saves up for (D56); and what the trade and construction trips on their way to buy hold back (D57, D64) | Every 10 s |
-  | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `SurveyorPerArea`, `CargoShips`, `Construction`, `Explorer`, `TimedCargoShip`, `Probes`, `Alternating`, `FarProbes`, `MiningAbroad`) and `position` the same as a number, 1 first (D55 put `SurveyorPerArea` at 4, so the cargo ships moved from 4 to 5; slice 6.6 put `Construction` at 6, so probes moved to 7, the turns to 8; slice 6.28 added `FarProbes` at 9; slice 6.30 put `Explorer` at 7 and `MoreExplorers` at 10, so probes moved to 8, the turns to 9 and the far probes to 11; slice 6.33 put every explorer at 7 and dropped `MoreExplorers`, so the far probes moved to 10, D113; slice 6.34 put `TimedCargoShip` at 8, so probes moved to 9, the turns to 10 and the far probes to 11, D116; slice 6.40 added `MiningAbroad` at 12, D122). Construction's series is the gate's next load: the material as `ship_type`, its market as `shipyard`, worth the load with its fuel. A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
+  | `spacetraders_purchase_need_credits` | `plan`, `tier`, `position`, `ship_type`, `shipyard` | What each plan that buys ships would buy now (slice 6.10b, D43), one series per plan, worth the ship's price as cached; `tier` is its place in the order ships are bought in (`Contract`, `Surveyor`, `Coverage`, `SurveyorPerArea`, `CargoShips`, `HomeProbes`, `Construction`, `Explorer`, `TimedCargoShip`, `Probes`, `Alternating`, `FarProbes`, `MiningAbroad`) and `position` the same as a number, 1 first (D55 put `SurveyorPerArea` at 4, so the cargo ships moved from 4 to 5; slice 6.6 put `Construction` at 6, so probes moved to 7, the turns to 8; slice 6.28 added `FarProbes` at 9; slice 6.30 put `Explorer` at 7 and `MoreExplorers` at 10, so probes moved to 8, the turns to 9 and the far probes to 11; slice 6.33 put every explorer at 7 and dropped `MoreExplorers`, so the far probes moved to 10, D113; slice 6.34 put `TimedCargoShip` at 8, so probes moved to 9, the turns to 10 and the far probes to 11, D116; slice 6.40 added `MiningAbroad` at 12, D122; slice 6.44 put `HomeProbes` at 6, so `Construction` and everything after it moved up by one, D127). Construction's series is the gate's next load: the material as `ship_type`, its market as `shipyard`, worth the load with its fuel. A plan that needs nothing has no series | Every 10 s, from `PurchaseNeeds` |
   | `spacetraders_ships` | `role`, `state` | Ships by type as cached (B25) and by `DOCKED`, `IN_ORBIT` or `IN_TRANSIT` | Every 10 s |
   | `spacetraders_ship_status_since_timestamp_seconds` | `ship`, `role`, `state`, `goal`, `reason` | One series per ship. `goal` is the goal's kind, else the assignment's type (`Contract`), else `None`; `reason` says why a goal is blocked (`runaway`). The value is when the ship entered this combination (Unix time, since the start at the latest), so `time() - …` is the time in state | Every 10 s |
   | `spacetraders_ship_info` | `ship`, `location`, `activity` | One series per ship, always 1. `location` is the waypoint and its type, such as `X1-AB-A1 (ASTEROID)`, or in transit `→` and where it goes; `activity` is what the bot has it do: its goal in a few words (`scouting`; `drifting to X1-AB-B7 to mine GOLD_ORE` for a trip's drift, slice 6.10c; `drifting to X1-AB-B7` for the survey ship's move, D54; `buying FAB_MATS at X1-AB-F49 for X1-AB-I55` and `supplying FAB_MATS to X1-AB-I55` for a construction trip, slice 6.6), else its contract work (`mining COPPER_ORE` at the contract's source, `delivering COPPER_ORE` at its destination, `on the way to …` between them), else `idle`, or `blocked (…)` | Every 10 s |
