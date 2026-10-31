@@ -52,7 +52,7 @@ public interface IExplorePlanService
 ///   most <c>Explore.MaxExplorers</c> (5; 0 for no cap): the systems it knows, hasn't explored and reaches from home through
 ///   built gates (<see cref="ExploreAtlas.SystemsLeft"/>).</item>
 ///   <item>It buys them at the cheapest shipyard the gates reach that sells one, within the credit reserve, each at
-///   <see cref="PurchaseTier.Explorer"/>, before the probes (D98; the further ones too since slice 6.33, D113). A probe of ours
+///   <see cref="PurchaseTier.Explorer"/>, before the probes beyond home (D98; the further ones too since slice 6.33, D113). A probe of ours
 ///   in the shipyard's system, or on its way there, answers the purchase's call for a ship (D30); with none, the command ship
 ///   fetches the explorer (slice 6.32, D108).</item>
 ///   <item>The explorers explore, each the nearest system no other exploring ship has taken; once there is one, the command
@@ -483,7 +483,7 @@ public sealed class ExplorePlanService(
     /// <summary>
     /// Buys the next explorer while fewer are there than wanted (slice 6.30, D98, D102), at the cheapest shipyard the gates
     /// reach that sells one, when nothing comes before it in the order ships are bought in (<see cref="IPurchaseOrder"/>): each at
-    /// <see cref="PurchaseTier.Explorer"/>, before the probes; asked on 2026-10-07 (slice 6.33, D113), "I'd like Explorers (order
+    /// <see cref="PurchaseTier.Explorer"/>, before the probes beyond home; asked on 2026-10-07 (slice 6.33, D113), "I'd like Explorers (order
     /// 10) to go in front of probes (order 8)", so the further ones no longer wait for the drones and cargo ships that take
     /// turns. <see cref="IShipPurchaseService"/> keeps the credit reserve, and calls for a ship when none of ours is at the
     /// shipyard (D30). Slice 6.32 (D108): a probe of

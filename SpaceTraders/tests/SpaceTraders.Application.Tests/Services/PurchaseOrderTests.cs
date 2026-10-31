@@ -69,6 +69,58 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task TheHomeProbes_ComeBeforeTheJumpGatesMaterials_AfterTheCargoShips_AndTheOtherProbesAfterTheGate()
+    {
+        // Slice 6.44 (D127), asked on 2026-10-31: "all home probes should come before building the gates". The gate's miners
+        // stand at the gate's place (D92), so they wait too.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_HAULER"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.HomeProbes, "SHIP_PROBE"))).Should().BeFalse();
+
+        _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+        _needs.Report(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"), DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.HomeProbes, "SHIP_PROBE"))).Should().BeTrue();
+        (await MayBuyAsync(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"))).Should().BeFalse();
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Construction, "SHIP_MINING_DRONE"))).Should().BeFalse();
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse("only home's come before the gate");
+    }
+
+    [Fact]
+    public async Task UntilTheProbePlanHasSaidWhatItNeeds_TheGatesMaterialsWait()
+    {
+        // Slice 6.44 (D127): it could need a home probe, which comes first.
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.ProbeDeployment, PurchaseNeed.None, DateTimeOffset.UtcNow - PurchaseNeeds.Lifetime - TimeSpan.FromSeconds(1));
+
+        (await MayBuyAsync(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"))).Should().BeFalse();
+
+        _needs.Report(AutomationPlan.ProbeDeployment, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Construction, Need(PurchaseTier.Construction, "FAB_MATS"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AHomeProbeThatWaitsForOneOfOurShips_LetsTheGatesMaterialsGo_WhileTheyLeaveItsPrice()
+    {
+        // Slice 6.44 (D127) with D118: a home probe at a shipyard none of our ships has reached yet (D30) holds no load back,
+        // but its price stays. A load of 200,000 and the probe's 21,322 against 221,321 spare credits doesn't.
+        var load = Need(PurchaseTier.Construction, "FAB_MATS") with { Price = 200_000 };
+        Credits(340_000 + 221_321, reserve: 340_000);
+        EveryoneSays(PurchaseNeed.None);
+        _needs.Report(AutomationPlan.ProbeDeployment, HomeProbe(), DateTimeOffset.UtcNow);
+        _calls.Call(ProbeShipyard, "SHIP_PROBE", DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Construction, load)).Should().BeFalse();
+
+        Credits(340_000 + 221_322, reserve: 340_000);
+
+        (await MayBuyAsync(AutomationPlan.Construction, load)).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task UntilAPlanThatIsOnHasSaidWhatItNeeds_NothingItCouldNeedEarlierIsPassed()
     {
         // After a start the probe plan runs before the survey, mining, siphon and trading plans; it waits for their first
@@ -478,12 +530,13 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
-    public void EachTiersNumber_IsItsPositionInTheOrder_TheCargoShipOnTheClockBeforeTheProbes()
+    public void EachTiersNumber_IsItsPositionInTheOrder_TheHomeProbesBeforeTheGate()
     {
         // The SpaceTraders dashboard shows the number as the position (spacetraders_purchase_need_credits{position}), and you
         // name the tiers by it: "Explorers (order 10) ... in front of probes (order 8)". Since slice 6.33 (D113) every explorer
         // is 7. Slice 6.34 (D116) put the cargo ship on the clock at 8, before the probes, which moved to 9, the drones and cargo
-        // ships that take turns to 10 and the far probes to 11. Slice 6.40 (D122) put the miners abroad last, at 12.
+        // ships that take turns to 10 and the far probes to 11. Slice 6.40 (D122) put the miners abroad last, at 12. Slice 6.44
+        // (D127) put the home probes at 6, before the jump gate's loads, which moved everything after them up by one.
         Enum.GetValues<PurchaseTier>().Should().Equal(
             PurchaseTier.None,
             PurchaseTier.Contract,
@@ -491,6 +544,7 @@ public sealed class PurchaseOrderTests
             PurchaseTier.Coverage,
             PurchaseTier.SurveyorPerArea,
             PurchaseTier.CargoShips,
+            PurchaseTier.HomeProbes,
             PurchaseTier.Construction,
             PurchaseTier.Explorer,
             PurchaseTier.TimedCargoShip,
@@ -498,7 +552,7 @@ public sealed class PurchaseOrderTests
             PurchaseTier.Alternating,
             PurchaseTier.FarProbes,
             PurchaseTier.MiningAbroad);
-        Enum.GetValues<PurchaseTier>().Select(tier => (int)tier).Should().Equal(Enumerable.Range(0, 13));
+        Enum.GetValues<PurchaseTier>().Select(tier => (int)tier).Should().Equal(Enumerable.Range(0, 14));
     }
 
     [Fact]
@@ -643,6 +697,8 @@ public sealed class PurchaseOrderTests
     private static PurchaseNeed Freighter() => new(PurchaseTier.TimedCargoShip, "SHIP_BULK_FREIGHTER", FreighterShipyard, 2_900_000);
 
     /// <summary>The probe waiting behind it that day.</summary>
+    private static PurchaseNeed HomeProbe() => Probe() with { Tier = PurchaseTier.HomeProbes };
+
     private static PurchaseNeed Probe() => new(PurchaseTier.Probes, "SHIP_PROBE", ProbeShipyard, 21_322);
 
     private static PurchaseRecord Bought(string ship, ShipType type, int minute) => new(ship, type, Start.AddMinutes(minute));

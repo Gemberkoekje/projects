@@ -41,11 +41,11 @@ public interface IConstructionPlanService
 ///   market whose supply isn't SCARCE or LIMITED (D66) and where no other trip is on its way to buy it (D80), bought in
 ///   batches of its trade volume (D81);</item>
 ///   <item>supplying pays nothing, so a load is judged as a ship purchase (D64): it keeps the credit reserve
-///   (<see cref="IBudgetPolicy"/>), and comes after the cargo ships in the order ships are bought in
-///   (<see cref="PurchaseTier.Construction"/>), which it tells on every pass, so probes and further ships wait until the
-///   gate is done. It says whether the load waits for its markets: then the mining plan's drones for the gate's smelters
-///   may be bought meanwhile (D92). A trip holds back what its cargo costs from the moment it starts until it buys, as a
-///   trade trip does (D57);</item>
+///   (<see cref="IBudgetPolicy"/>), and comes after the cargo ships and the home probes (slice 6.44, D127) in the order
+///   ships are bought in (<see cref="PurchaseTier.Construction"/>), which it tells on every pass, so the other probes and
+///   further ships wait until the gate is done. It says whether the load waits for its markets: then the mining plan's
+///   drones for the gate's smelters may be bought meanwhile (D92). A trip holds back what its cargo costs from the moment
+///   it starts until it buys, as a trade trip does (D57);</item>
 ///   <item>a builder that gets no load stays free, and the trading plan, which comes next, gives it a trade.</item>
 /// </list>
 /// </summary>

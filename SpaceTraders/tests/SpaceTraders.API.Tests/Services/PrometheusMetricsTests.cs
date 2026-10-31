@@ -690,8 +690,8 @@ public sealed class PrometheusMetricsServiceTests
 
         // Slice 6.6 (D64) put the jump gate's materials at 6, after the cargo ships: the probes moved to 7. Slice 6.30 (D98)
         // put the first explorer at 7: the probes moved to 8. Slice 6.34 (D116) put the cargo ship on the clock at 8: the
-        // probes moved to 9.
-        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 9, "SHIP_PROBE", "X1-AB-A2", 77_117));
+        // probes moved to 9. Slice 6.44 (D127) put the home probes at 6: the others moved to 10.
+        exported.Should().Equal(new PurchaseNeedMetricsSample("ProbeDeployment", "Probes", 10, "SHIP_PROBE", "X1-AB-A2", 77_117));
     }
 
     /// <summary>
