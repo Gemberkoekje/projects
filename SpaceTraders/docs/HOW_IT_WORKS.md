@@ -156,10 +156,11 @@ checks it. The lease is not released on shutdown.
 - **Fetches:** the agent, all ships, and for each system that has a ship, the system and its
   waypoints, with their traits and modifiers, when none are cached or any cached one lacks its
   traits (B34, fixed: until then no trait was ever stored, so nothing knew what an asteroid yields).
-  Waypoints cached already keep when they were last observed, which scouting reads. It also fetches market and shipyard data at waypoints where
-  a ship is not in transit, and the first page of contracts (20). It stores them the way the
-  other paths do: shipyards with their prices, so a purchase can read them (B28, fixed), and an
-  answer without the ships for sale leaves the cached ones (B64, fixed), and
+  Waypoints cached already keep when they were last observed, which scouting reads. It also fetches the market and the shipyard at waypoints where
+  a ship is not in transit, when the cache has no prices or listings of them (B84, fixed: until then it
+  fetched them all, which at 771 ships took 7.5 minutes and made 778 markets fresh at once, so the role
+  board's first pass took 19 minutes), and the first page of contracts (20). It stores them the way the
+  other paths do: shipyards with their prices, so a purchase can read them (B28, fixed), and
   contracts with their terms, so a restart doesn't blank the deliverables the contract plan works
   from (B31, fixed).
 - **Updates** the game state of existing ship rows (nav, fuel, cargo, mounts and so on). It

@@ -185,10 +185,12 @@ public sealed class StartupSyncServiceTests
     }
 
     [Fact]
-    public async Task StartAsync_KeepsTheCachedPricesOfAMarket_TheApiAnswersWithout()
+    public async Task StartAsync_DoesNotAskForAMarketItHasPricesFor_SoARestartLeavesThemAsOldAsTheyAre()
     {
-        // B62, seen on the cluster on 2026-10-04: a market answered without prices was stored as it came, and the cache lost
-        // the prices it had, a fuel price among them. Startup sync stores what it fetches the same way.
+        // B84, seen on the cluster on 2026-10-31: the sync fetched the market at every waypoint with a ship, cached or not. At 771
+        // ships that took 7.5 of the 9 minutes of the start, against a startup probe that gives up at 10. And it stamped them all
+        // as seen just now: the markets with fresh prices (D96) went from 168 to 778, every ship's routes were weighed across all
+        // of them, and the role board's first pass took 19 minutes.
         const string cachedGoods = "[{\"symbol\":\"FUEL\",\"tradeVolume\":180,\"supply\":\"MODERATE\",\"purchasePrice\":72,\"sellPrice\":70}]";
         var observed = new DateTimeOffset(2026, 10, 04, 19, 20, 29, TimeSpan.Zero);
         using var provider = BuildProvider();
@@ -209,24 +211,65 @@ public sealed class StartupSyncServiceTests
             await db.SaveChangesAsync();
         }
 
+        var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
+        await sync.StartAsync(CancellationToken.None);
+
+        await _apiClient.DidNotReceive().GetMarketAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await using var scope = provider.CreateAsyncScope();
+        var market = await scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>().Markets.SingleAsync(m => m.WaypointSymbol == "X1-AB-2");
+        market.TradeGoodsJson.Should().Be(cachedGoods);
+        market.LastObservedAt.Should().Be(observed, "the prices weren't seen again");
+    }
+
+    [Fact]
+    public async Task StartAsync_AsksForAMarketCachedWithoutPrices_AndStoresThem()
+    {
+        // The ship there can see them, and without prices the market is on no route.
+        var observed = new DateTimeOffset(2026, 10, 04, 19, 20, 29, TimeSpan.Zero);
+        using var provider = await WithMarketWithoutPricesAsync(observed);
         _apiClient.GetMarketAsync("X1-AB", "X1-AB-2", Arg.Any<CancellationToken>())
-            .Returns(new Market { Symbol = "X1-AB-2", Exchange = [new TradeGoodSymbol { Symbol = "FUEL" }], Imports = [], Exports = [] });
+            .Returns(new Market
+            {
+                Symbol = "X1-AB-2",
+                TradeGoods = [new TradeGood { Symbol = "FUEL", Type = "EXCHANGE", TradeVolume = 180, Supply = "MODERATE", PurchasePrice = 72, SellPrice = 70 }],
+                Imports = [],
+                Exports = [],
+                Exchange = [new TradeGoodSymbol { Symbol = "FUEL" }],
+            });
 
         var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
         await sync.StartAsync(CancellationToken.None);
 
         await using var scope = provider.CreateAsyncScope();
         var market = await scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>().Markets.SingleAsync(m => m.WaypointSymbol == "X1-AB-2");
-        market.TradeGoodsJson.Should().Be(cachedGoods, "an answer without prices says nothing about them");
-        market.LastObservedAt.Should().Be(observed, "the prices weren't seen again");
+        market.TradeGoodsJson.Should().Contain("FUEL");
+        market.LastObservedAt.Should().BeAfter(observed);
     }
 
     [Fact]
-    public async Task StartAsync_KeepsTheCachedListingsOfAShipyard_TheApiAnswersWithout()
+    public async Task StartAsync_LeavesAMarketCachedWithoutPrices_WhenTheApiAnswersWithoutThemToo()
     {
-        // B64: the API lists a shipyard's ships, with their prices, only while one of our ships is there. Startup sync
-        // stored an answer without them as it came, which wiped the listings the cache had, and with them the prices a
-        // purchase reads (B28), as an answer without prices did to a market's (B62).
+        // B62: an answer without prices is left out, as the market watch does.
+        var observed = new DateTimeOffset(2026, 10, 04, 19, 20, 29, TimeSpan.Zero);
+        using var provider = await WithMarketWithoutPricesAsync(observed);
+        _apiClient.GetMarketAsync("X1-AB", "X1-AB-2", Arg.Any<CancellationToken>())
+            .Returns(new Market { Symbol = "X1-AB-2", Exchange = [new TradeGoodSymbol { Symbol = "FUEL" }], Imports = [], Exports = [] });
+
+        var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
+        await sync.StartAsync(CancellationToken.None);
+
+        await _apiClient.Received(1).GetMarketAsync("X1-AB", "X1-AB-2", Arg.Any<CancellationToken>());
+        await using var scope = provider.CreateAsyncScope();
+        var market = await scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>().Markets.SingleAsync(m => m.WaypointSymbol == "X1-AB-2");
+        market.TradeGoodsJson.Should().BeNull();
+        market.LastObservedAt.Should().Be(observed, "the prices weren't seen");
+    }
+
+    [Fact]
+    public async Task StartAsync_DoesNotAskForAShipyardItHasListingsFor()
+    {
+        // B84, as for a market above. B64: the API lists a shipyard's ships, with their prices, only while one of our ships is
+        // there, and a purchase reads those prices from the cache (B28).
         const string cachedShips = "[{\"type\":\"SHIP_MINING_DRONE\",\"purchasePrice\":42940,\"supply\":\"MODERATE\"}]";
         var observed = new DateTimeOffset(2026, 10, 04, 19, 20, 29, TimeSpan.Zero);
         using var provider = BuildProvider();
@@ -247,16 +290,45 @@ public sealed class StartupSyncServiceTests
             await db.SaveChangesAsync();
         }
 
+        var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
+        await sync.StartAsync(CancellationToken.None);
+
+        await _apiClient.DidNotReceive().GetShipyardAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await using var scope = provider.CreateAsyncScope();
+        var shipyard = await scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>().Shipyards.SingleAsync(s => s.WaypointSymbol == "X1-AB-2");
+        shipyard.ShipsDetailJson.Should().Be(cachedShips);
+        shipyard.LastObservedAt.Should().Be(observed, "the listings weren't seen again");
+    }
+
+    [Fact]
+    public async Task StartAsync_AsksForAShipyardCachedWithoutListings_AndStoresThem()
+    {
+        // The ship there can see them, and a purchase needs their prices (B28).
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Systems.Add(new CachedSystem { AgentId = AgentId, Symbol = "X1-AB", SectorSymbol = "X1", Type = "RED_STAR" });
+            db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-2", SystemSymbol = "X1-AB", Type = "MOON", HasShipyard = true });
+            db.Shipyards.Add(new CachedShipyard { AgentId = AgentId, WaypointSymbol = "X1-AB-2", SystemSymbol = "X1-AB", ShipTypesJson = "[{\"type\":\"SHIP_MINING_DRONE\"}]" });
+            await db.SaveChangesAsync();
+        }
+
         _apiClient.GetShipyardAsync("X1-AB", "X1-AB-2", Arg.Any<CancellationToken>())
-            .Returns(new Shipyard { Symbol = "X1-AB-2", ShipTypes = [new ShipyardShipType { Type = "SHIP_MINING_DRONE" }] });
+            .Returns(new Shipyard
+            {
+                Symbol = "X1-AB-2",
+                ShipTypes = [new ShipyardShipType { Type = "SHIP_MINING_DRONE" }],
+                Ships = [new ShipyardShip { Type = "SHIP_MINING_DRONE", PurchasePrice = 42_940 }],
+            });
 
         var sync = new StartupSyncService(provider.GetRequiredService<IServiceScopeFactory>(), NullLogger<StartupSyncService>.Instance);
         await sync.StartAsync(CancellationToken.None);
 
         await using var scope = provider.CreateAsyncScope();
-        var shipyard = await scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>().Shipyards.SingleAsync(s => s.WaypointSymbol == "X1-AB-2");
-        shipyard.ShipsDetailJson.Should().Be(cachedShips, "an answer without listings says nothing about them");
-        shipyard.LastObservedAt.Should().Be(observed, "the listings weren't seen again");
+        var shipyard = await new ShipyardRepository(scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>())
+            .FindByWaypointAsync("X1-AB-2");
+        shipyard!.Ships.Should().ContainSingle(s => s.Type == "SHIP_MINING_DRONE" && s.PurchasePrice == 42_940);
     }
 
     [Fact]
@@ -412,6 +484,18 @@ public sealed class StartupSyncServiceTests
         ],
         Meta = new Meta { Total = 2, Page = 1, Limit = 20 },
     };
+
+    private async Task<ServiceProvider> WithMarketWithoutPricesAsync(DateTimeOffset observed)
+    {
+        var provider = BuildProvider();
+        await using var seedScope = provider.CreateAsyncScope();
+        var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+        db.Systems.Add(new CachedSystem { AgentId = AgentId, Symbol = "X1-AB", SectorSymbol = "X1", Type = "RED_STAR" });
+        db.Waypoints.Add(new CachedWaypoint { AgentId = AgentId, Symbol = "X1-AB-2", SystemSymbol = "X1-AB", Type = "ORBITAL_STATION", HasMarket = true });
+        db.Markets.Add(new CachedMarket { AgentId = AgentId, WaypointSymbol = "X1-AB-2", SystemSymbol = "X1-AB", ExchangeJson = "[{\"symbol\":\"FUEL\"}]", LastObservedAt = observed });
+        await db.SaveChangesAsync();
+        return provider;
+    }
 
     private ServiceProvider BuildProvider()
     {
