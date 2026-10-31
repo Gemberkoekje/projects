@@ -23,9 +23,8 @@
 
 ## Where things stand (2026-10-31)
 
-- **Running:** projects main `d37e931a` (projects#219: slice 6.44, D127), deployed by gembernodes#101 on 2026-10-31; it
-  first shows at the reset of 2026-11-01. B84 is fixed and not deployed yet. The server reset on 2026-10-18 and
-  2026-10-25 at 13:00Z; each
+- **Running:** projects main `07974c65` (projects#220: B84), deployed by gembernodes#102 on 2026-10-31. Slice 6.44 (D127),
+  deployed the same day, first shows at the reset of 2026-11-01. The server reset on 2026-10-18 and 2026-10-25 at 13:00Z; each
   time the bot restarted while the universe was being reset (B23: a failed startup stops the host), registered SPECTER
   again and fulfilled its first contract within 50 minutes. The run to 2026-10-18 ended at 99M credits and 1,004 ships,
   the run to 2026-10-25 at 89M credits and 801 ships. Read on 2026-10-29 at 07:40Z: 9.2M credits and 176 ships, home
@@ -49,8 +48,7 @@
       1 `ShipStuck`, 88 `RepeatingError` and 27 `ApiThrottled`; to 2026-10-25, 407 `ShipLeftIdle` (386 of them probes
       from 2026-10-22 to 2026-10-25, B82), 10 `ShipStuck`, 65 `RepeatingError` and 13 `ApiThrottled`.
     So no loop counts as done yet. The next full period is this run's, to 2026-11-01; phase 4's last check is the same.
-  - B84 (found on 2026-10-31), B83 (found on 2026-10-29), B81 and B82 (B80's alarm is fixed; its wait is D124, yours), B17
-    in part, and B24 (below).
+  - B83 (found on 2026-10-29), B81 and B82 (B80's alarm is fixed; its wait is D124, yours), B17 in part, and B24 (below).
   - D79's second step: learning the price steps per good and market from the bot's own trades. Until then a trip's
     batches are estimated with the measured medians (slice 6.16).
 - **The cluster** (gembernodes):
@@ -67,7 +65,7 @@
 
 ## Known issues
 
-The open bugs. The fixed ones, B1–B79 but B17 and B24, are in `docs/archive/PLAN_HISTORY.md` with their evidence and
+The open bugs. The fixed ones, B1–B79 but B17 and B24, and B84, are in `docs/archive/PLAN_HISTORY.md` with their evidence and
 fixes: look there before giving a symptom a new number. Each fix starts with a test that reproduces the misbehaviour.
 
 ### Bugs: behaviour that contradicts the code's own intent
@@ -79,7 +77,6 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B81 | **The ore shuttle SPECTER-30 raises `ShipStuck` while it waits its turn** (seen on 2026-10-09, counted on 2026-10-11; not investigated yet).<br>• It waits in orbit at X1-FJ91-B44 with its CollectOre goal while the drones hand their ore to the other shuttle, SPECTER-2B; after 30 minutes without a change the rule calls it stuck.<br>• A false alarm of B74's kind if that wait is intended; a shuttle with nothing to do if it isn't. | 50 raises in the week, each cleared after up to 45 minutes | 6.18 (D83), 3.2 |
 | B82 | **Ships left idle while a plan has work they could do** (found on 2026-10-11, by phase 6's check; not investigated yet).<br>• `ShipLeftIdle` still fired 48 times after B74–B77's deploy: probes while their system's markets were due, the survey ship SPECTER-2C while targets waited, cargo ships while trade routes waited.<br>• Some came about 20 minutes after a pod start; others didn't. | 26 ProbeDeployment, 11 Survey, 11 Trading raises; e.g. 2026-10-09 19:59–20:01Z (B78's pod up at 19:38Z) and 2026-10-10 18:11Z (B79's at 17:51Z), but also 2026-10-09 23:0xZ | 3.2 |
 | B83 | **A navigate that lost its answer was sent again on every step** (found on 2026-10-29, from Loki).<br>• On 2026-10-18 at 06:45:45Z SPECTER-226's navigate from X1-QK87-X45A to X1-QK87-XF4Z failed with a cancelled connection, but the API had carried it out; the cache kept the ship in orbit at X45A.<br>• Every step sent the navigate again: 16 times the API answered that the ship was in transit, then 200 times over six hours, until the reset, that it was already at the destination. One failing step a tick never trips the circuit breaker, which counts steps a minute.<br>• Fix: those refusals (4200, 4214, 4204) become `NavigateRefusedException`; the navigate then reads the ship's nav from the API, stores it and schedules its arrival. | `@i=843e475f` for SPECTER-226, 2026-10-18 06:45:58–12:57:36Z; `LostNavigateAnswerTests` (failed before the fix) | 6.4 (`GoalFlight`); fixed in projects#218 |
-| B84 | **A restart at a large fleet stopped the plans for half an hour** (found on 2026-10-31, at the restart that deployed slice 6.44).<br>• Startup sync fetched the market and the shipyard at every waypoint with a ship, cached or not: at 771 ships 7.5 of the start's 9 minutes, 55 of the 60 failures the startup probe allows. Past about 820 ships a restart would have been killed and repeated until the reset.<br>• It stamped them all as seen just now, so the markets with fresh prices (D96) went from 168 to 778. The role board weighs every ship's routes across the fresh markets, and that grows with their square: its first pass took 19m17s, a normal one about 2 minutes. Plans were off from 17:44:45Z to 18:13:20Z, about 29 minutes.<br>• When the stamps expired at about 18:20Z the fresh markets fell to 49, and were back at 135 at 19:00Z. | `StartupSyncService.EnsureFacilitiesForShipsAreCachedAsync`; `spacetraders_market_observed_timestamp_seconds`: 168 to 778 on 2026-10-31, 148 to 474 at the restart of 2026-10-15, which stalled the same way at 491 ships. On a made-up map of 3,000 markets a ship's routes took 345 ms at 168 fresh markets and 4.3 s at 778. | Fixed, not deployed: startup sync fetches only a market without prices or a shipyard without listings. Expected at 771 ships, not measured: about 1m40s to start and 4 minutes without plans. |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
