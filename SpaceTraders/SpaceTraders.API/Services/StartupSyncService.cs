@@ -303,6 +303,13 @@ public sealed class StartupSyncService(
             LastObservedAt = lastObservedAt,
         };
 
+    /// <summary>
+    /// The market and shipyard at each waypoint with a ship there, for those the cache has no prices or listings of: what is
+    /// cached stays as old as it is (B84). Stamping them all as seen just now would make every market with a ship at it fresh at
+    /// once (D96), and the role board weighs each ship's routes across all the fresh markets: on 2026-10-31 at 771 ships the
+    /// fetches took 7.5 minutes against a 10-minute startup probe, and the fresh markets, 168 before, were 778, which made the
+    /// role board's first pass take 19 minutes.
+    /// </summary>
     private static async Task EnsureFacilitiesForShipsAreCachedAsync(
         ISpaceTradersApiClient apiClient,
         SpaceTradersDbContext dbContext,
@@ -337,10 +344,12 @@ public sealed class StartupSyncService(
                 dbContext.Waypoints.Add(waypoint);
             }
 
-            if (waypoint.HasMarket)
+            var cachedMarket = waypoint.HasMarket
+                ? await dbContext.Markets.FindAsync([dbContext.AgentId, waypointSymbol], cancellationToken)
+                : null;
+            if (waypoint.HasMarket && cachedMarket?.TradeGoodsJson is null)
             {
                 var market = await apiClient.GetMarketAsync(systemSymbol, waypointSymbol, cancellationToken);
-                var cachedMarket = await dbContext.Markets.FindAsync([dbContext.AgentId, waypointSymbol], cancellationToken);
                 var marketValues = new CachedMarket
                 {
                     AgentId = dbContext.AgentId,
@@ -359,15 +368,17 @@ public sealed class StartupSyncService(
                 }
                 else if (market.TradeGoods is not null)
                 {
-                    // An answer without prices would wipe the cached ones, so it is left out, as the market watch does (B62).
+                    // An answer without prices says nothing new, so it is left out, as the market watch does (B62).
                     dbContext.Entry(cachedMarket).CurrentValues.SetValues(marketValues);
                 }
             }
 
-            if (waypoint.HasShipyard)
+            var cachedShipyard = waypoint.HasShipyard
+                ? await dbContext.Shipyards.FindAsync([dbContext.AgentId, waypointSymbol], cancellationToken)
+                : null;
+            if (waypoint.HasShipyard && cachedShipyard?.ShipsDetailJson is null)
             {
                 var shipyard = await apiClient.GetShipyardAsync(systemSymbol, waypointSymbol, cancellationToken);
-                var cachedShipyard = await dbContext.Shipyards.FindAsync([dbContext.AgentId, waypointSymbol], cancellationToken);
                 // The same columns an arrival writes (SpaceTradersPortAdapter): purchases read the
                 // prices from the ships.
                 var shipyardValues = new CachedShipyard
@@ -384,10 +395,8 @@ public sealed class StartupSyncService(
                 {
                     dbContext.Shipyards.Add(shipyardValues);
                 }
-                else if (shipyard.Ships is not null || cachedShipyard.ShipsDetailJson is null)
+                else
                 {
-                    // An answer without the ships for sale would wipe the cached ones, and the prices a purchase reads, so
-                    // it is left out, as the repository does (B64).
                     dbContext.Entry(cachedShipyard).CurrentValues.SetValues(shipyardValues);
                 }
             }

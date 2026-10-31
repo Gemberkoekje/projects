@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-10-31, B84)
+- A restart no longer fetches the markets and shipyards the cache already has (B84): `StartupSyncService` fetches only a
+  market without prices or a shipyard without listings, and everything else stays as old as it is. On 2026-10-31 at 771
+  ships the fetches took 7.5 of the start's 9 minutes, against a startup probe that gives up at 10, and stamped the markets as
+  seen just now: the markets with fresh prices (D96) went from 168 to 778, the role board's first pass, which weighs every
+  ship's routes across them, took 19 minutes instead of about 2, and the plans were off for 29 minutes. Tests:
+  `StartupSyncServiceTests` `StartAsync_DoesNotAskForAMarketItHasPricesFor_SoARestartLeavesThemAsOldAsTheyAre` and
+  `StartAsync_DoesNotAskForAShipyardItHasListingsFor` failed before the change.
+
+### Docs – Changed (2026-10-31, B84)
+- `PLAN.md`: B84, and slice 6.44 as deployed. `docs/HOW_IT_WORKS.md`: what startup sync fetches.
+
 ### Code – Changed (2026-10-31, slice 6.44)
 - Every home probe comes before the jump gate's loads (D127), as asked on 2026-10-31: "all home probes should come before
   building the gates". A new tier, `PurchaseTier.HomeProbes`, 6, stands after the cargo ships of `Trade.ShipPurchases`, so
