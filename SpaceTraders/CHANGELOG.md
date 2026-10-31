@@ -18,6 +18,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Docs – Changed (2026-10-31, B84)
 - `PLAN.md`: B84, and slice 6.44 as deployed. `docs/HOW_IT_WORKS.md`: what startup sync fetches.
+- `docs/archive/PLAN_HISTORY.md`: B84 moved here from `PLAN.md`, deployed, with what its restart measured at 797 ships: 1m24s
+  to start, and the plans off for 3m08s instead of about 29 minutes.
 
 ### Code – Changed (2026-10-31, slice 6.44)
 - Every home probe comes before the jump gate's loads (D127), as asked on 2026-10-31: "all home probes should come before
