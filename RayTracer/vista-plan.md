@@ -1047,8 +1047,10 @@ unlit cloud is darker than clear sky).
 
 *Haze and fog, 29 and 30-10-2026* (mornings; 29-10 looks the other way, toward the rising sun, 30-10 is the dusk series' west
 view). The fog's visibility was about a kilometre: the farthest buildings, under a kilometre off by the user's estimate, are
-almost gone. The nearest KNMI station that measures visibility publishes the day's minimum and its hour a day or two late; the
-30-10 figure goes here when it is out.
+almost gone. The nearest KNMI station that measures visibility (checked 2026-11-01; its hourly values are not served, only the
+day's extremes) had its lowest visibility of 30-10, under 100 m, between 02:00 and 03:00 CET, and its highest, 16–17 km,
+between 16:00 and 17:00: the fog was clearing through the morning, as the 10:14 photo shows, so the station says nothing
+exact about 09:45 and the user's estimate stands.
 
 | Photo (CET) | Camera | What it shows | Judges |
 |---|---|---|---|
