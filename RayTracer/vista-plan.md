@@ -1066,6 +1066,13 @@ excuse to photograph pretty sky colours (the user's words), and a good one.
 |---|---|---|---|
 | 17:38:41 | Pro mode, 5500 K; the main lens, 1/500 s, ISO 400; RAW | 20 minutes after sunset, the sun 3.8° down: contrails and thin high streaks lit pink and orange across the sky, the low clouds at the upper left dark and unlit; a brighter, slightly more golden patch just above where the sun went down. In the phone's JPEG that patch is yellow; in the RAW (5500 K, a plain curve) it is pale peach, its hue 30° against the pinks' 14° and nothing at the top of the range: the phone pushed it to the top, where red runs out and orange slides toward yellow. The user's eyes saw no yellow | M4 (high clouds lit after sunset, the low ones dark); the display, whenever Vista's camera is re-judged (a bright orange fades toward white, as AgX does, and never slides to yellow: the RAW against the JPEG shows the difference) |
 
+*Clouds before sunset, 2-11-2026* (the dusk series' west view; sunset at 17:13; Pro mode, 5500 K, with its RAW, which agrees
+with the phone's JPEG here: only a few pixels near the sun reach the top of the range).
+
+| Photo (CET) | Camera | What it shows | Judges |
+|---|---|---|---|
+| 17:04:44 | Pro mode, 5500 K; the main lens, 1/500 s, ISO 50; RAW | Nine minutes before sunset, the sun 0.3° up behind a low bank on the horizon: patchy mid-level clouds lit salmon-pink on their sides toward the sun, already before sunset; a thick dark mass on the right lit by the sky alone; the low bank's top edge glowing bright where its thin edges stand in front of the sun (silver linings); a pale cream glow near the sun, blue in the gaps | M4 (silver linings, which §5.3's clouds name; clouds lit pink before sunset; a thick cloud dark beside lit ones) |
+
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
 `Vista.App` / `Vista.Tests` in `RayTracer.slnx`; confirm which `RayTracer.Gpu` pieces
@@ -2287,6 +2294,9 @@ gold at −0.8°, pink at −1.7°; the highest (a contrail) the last to colour,
 *Added 2026-10-30:* fog and haze from the user's third series: ground fog that reaches the camera, nearly white, brightest
 overhead and greyer toward the horizon, taking colour as well as contrast row by row; and morning haze bright toward the sun
 and clear away from it (the parked mist deck's light per direction, which takes this photo as its reference).
+*Added 2026-11-02:* **silver linings** (the bright rims along a cloud's thin edges in front of the sun, which §5.3's
+design already says need multiple scattering) and mid-level clouds lit pink on their sides toward the sun before sunset,
+from the user's photo of 2-11-2026 (the truth references).
 Verify: a cold autumn dawn over a lake produces steam fog from the defaults alone; a month
 sheet at one place shows summer hazier than winter from the defaults alone; a range's foot
 fades into valley mist from the defaults of a cool, still morning; a grey layer with a gap on the horizon, at the dusk
@@ -2294,7 +2304,9 @@ series' sun heights, shows the series' look: gold only in the gap at +2.7°, the
 −1°, and gone by −1.9°; high streaks over a low bank, at the sunset series' sun heights, turn white, then gold, then pink,
 while the low bank stays dark but for a red fringe; a ground fog of about a kilometre's visibility, the sun hidden, shows the
 fog series' look (the nearest trees in full colour, buildings under a kilometre off almost gone, no horizon, the fog
-brightest overhead); haze with the sun 6° up is bright and flat toward the sun and keeps its contrast away from it.
+brightest overhead); haze with the sun 6° up is bright and flat toward the sun and keeps its contrast away from it; a low
+bank in front of a sun 0.3° up shows bright rims along its top, and the patchy clouds above it pink on their sides toward
+the sun.
 
 **M5 — Vegetation.**
 Goal: forests, and with them the north star. Deliverable: procedural tree species,
