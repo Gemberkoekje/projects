@@ -66,12 +66,13 @@ namespace Vista.Output;
 /// (<see cref="RenderInfo.Trace"/>). Schema 27 (M1.17) added the PNG's white balance and the punchy look's margin
 /// (<see cref="ImageInfo.WhiteBalanceKelvin"/>, <see cref="ImageInfo.SkyMargin"/>), and in <see cref="Exposure"/> how far the incident
 /// meter followed the light at dusk and the stops that took off (<see cref="ExposureInfo.Adaptation"/>,
-/// <see cref="ExposureInfo.AdaptationEv"/>).</para>
+/// <see cref="ExposureInfo.AdaptationEv"/>). Schema 28 (M1a.4) added <see cref="ImageInfo.RockStructure"/>, whether bare rock was shaded
+/// with its structure.</para>
 /// </summary>
 public sealed record Sidecar
 {
     /// <summary>The sidecar format version this build writes.</summary>
-    public const int CurrentSchema = 27;
+    public const int CurrentSchema = 28;
 
     /// <summary>Format version.</summary>
     public int Schema { get; init; } = CurrentSchema;
@@ -224,6 +225,9 @@ public sealed record ImageInfo(int Width, int Height, int SamplesPerPixel, int M
 
     /// <summary>How the forest's canopy scattered (schema 19, vista-plan §10 M1.12b).</summary>
     public CanopyModel Canopy { get; init; } = CanopyModel.Kernels;
+
+    /// <summary>Whether bare rock was shaded with its gullies, ribs and ledges (schema 28, vista-plan §10 M1a.4).</summary>
+    public bool RockStructure { get; init; } = true;
 
     /// <summary>Which hero wavelengths the render traced and how they weighed into colour (schema 18, vista-plan §10 M1.12a).</summary>
     public Quadrature Quadrature { get; init; } = WavelengthTable.DefaultQuadrature;

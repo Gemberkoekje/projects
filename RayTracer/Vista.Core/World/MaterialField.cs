@@ -93,6 +93,8 @@ public sealed class MaterialField
 
     private readonly uint[] _packed;
     private readonly float[] _beds;
+    private readonly float[] _ledges;
+    private readonly float[] _bedTable;
     private readonly byte[] _rock;
     private readonly byte[] _scree;
     private readonly byte[] _forest;
@@ -102,8 +104,8 @@ public sealed class MaterialField
     /// <summary>The summed-area table of the cells holding forest, (size)² entries from the corner (0, 0); empty without forest.</summary>
     private readonly int[] _canopyCells;
 
-    private MaterialField(int size, double cell, uint[] packed, float[] beds, float tableScale, byte[] rock, byte[] scree, byte[] forest, bool eroded,
-        uint noiseSeed, ForestPlacement forestPlacement, bool glaciated)
+    private MaterialField(int size, double cell, uint[] packed, float[] beds, float[] ledges, float tableScale, byte[] rock, byte[] scree, byte[] forest,
+        bool eroded, uint noiseSeed, ForestPlacement forestPlacement, bool glaciated)
     {
         Glaciated = glaciated;
         Size = size;
@@ -112,6 +114,8 @@ public sealed class MaterialField
         Origin = -0.5 * (size - 1) * cell;
         _packed = packed;
         _beds = beds;
+        _ledges = ledges;
+        _bedTable = [.. beds, .. ledges];
         TableScale = tableScale;
         _rock = rock;
         _scree = scree;
@@ -158,6 +162,18 @@ public sealed class MaterialField
     /// </summary>
     public ReadOnlySpan<float> Beds => _beds;
 
+    /// <summary>
+    /// The ledges' height per bed-table entry, m (vista-plan §10 M1a.4, <see cref="RockStructure.LedgeTable"/>), four entries a float4:
+    /// what the GPU reads after <see cref="Beds"/>.
+    /// </summary>
+    public ReadOnlySpan<float> Ledges => _ledges;
+
+    /// <summary>What the GPU's bed table holds: <see cref="Beds"/>, then <see cref="Ledges"/>.</summary>
+    public ReadOnlySpan<float> BedTable => _bedTable;
+
+    /// <summary>Bed-table entries.</summary>
+    public int TableEntries => _beds.Length / 4;
+
     /// <summary>Bed-table entries per metre of world height.</summary>
     public float TableScale { get; }
 
@@ -183,7 +199,7 @@ public sealed class MaterialField
     public double OpenSmoothGradient { get; }
 
     /// <summary>Upload size, bytes.</summary>
-    public long ByteSize => (long)_packed.Length * sizeof(uint) + (long)_beds.Length * sizeof(float);
+    public long ByteSize => (long)_packed.Length * sizeof(uint) + (long)_bedTable.Length * sizeof(float);
 
     /// <summary>
     /// The material field of the world whose surface is <paramref name="surface"/> and whose erosion left <paramref name="erosion"/>
@@ -251,7 +267,8 @@ public sealed class MaterialField
 
         bool glaciated = ice is not null;
         (byte[] rock, byte[] scree) = DetailWeights(surface, packed, beds, strata.TableScale, rules, noiseSeed, glaciated);
-        return new MaterialField(n, surface.CellSize, packed, beds, strata.TableScale, rock, scree, new byte[n * n], erosion is not null, noiseSeed,
+        float[] ledges = RockStructure.LedgeTable(beds, 1f / strata.TableScale, rules.LedgeGain, rules.LedgeMax, noiseSeed);
+        return new MaterialField(n, surface.CellSize, packed, beds, ledges, strata.TableScale, rock, scree, new byte[n * n], erosion is not null, noiseSeed,
             ForestPlacement.None, glaciated);
     }
 
@@ -301,7 +318,7 @@ public sealed class MaterialField
                 }
             });
         }
-        return new MaterialField(n, Cell, _packed, _beds, TableScale, _rock, _scree, forestBytes, Eroded, NoiseSeed, forest, Glaciated);
+        return new MaterialField(n, Cell, _packed, _beds, _ledges, TableScale, _rock, _scree, forestBytes, Eroded, NoiseSeed, forest, Glaciated);
     }
 
     /// <summary>
@@ -333,6 +350,12 @@ public sealed class MaterialField
         Sample s = At(x, z, height, TableScale, TableLast);
         return (s.Hardness, s.TintU, s.TintV, s.Table, s.Massive);
     }
+
+    /// <summary>
+    /// The ledges' height at bed-table coordinate <paramref name="table"/>, m, and its slope by the coordinate, m per entry
+    /// (<see cref="RockStructure.LedgeAt"/>).
+    /// </summary>
+    public (float Height, float Slope) LedgeAt(float table) => RockStructure.LedgeAt(_ledges, TableEntries, table);
 
     /// <summary>The detail kinds' weights at world <c>(x, z)</c>: bilinear between the samples around it, the edge's outside the grid.</summary>
     public (double Rock, double Scree, double Forest) DetailWeightsAt(double x, double z)

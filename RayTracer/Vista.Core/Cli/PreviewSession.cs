@@ -230,6 +230,7 @@ public sealed partial class PreviewSession
             RussianRouletteStart = request.RussianRouletteStart,
             Diffuse = request.Diffuse,
             Canopy = request.Canopy,
+            RockStructure = request.RockStructure,
         };
         PixelWindow window = settings.Rendered;
         if (!window.FitsIn(settings.Width, settings.Height))
@@ -428,6 +429,7 @@ public sealed partial class PreviewSession
                 RussianRouletteStart = settings.RussianRouletteStart,
                 Diffuse = settings.Diffuse,
                 Canopy = settings.Canopy,
+                RockStructure = settings.RockStructure,
                 Quadrature = request.Quadrature,
                 Wavelengths = WavelengthsInfo.Of(WavelengthTable.For(request.Quadrature)),
                 Display = request.Display,
@@ -707,6 +709,7 @@ public sealed partial class PreviewSession
                     RussianRouletteStart = request.RussianRouletteStart,
                     Diffuse = request.Diffuse,
                     Canopy = request.Canopy,
+                    RockStructure = request.RockStructure,
                 };
                 RenderOutput output = _renderer.Render(scene, settings, new HashSet<Aov> { Aov.Depth, Aov.Normal, Aov.MaterialId },
                     new BatchPlanner(fw, fh, settings.SamplesPerPixel, settings.Batching) { Feed = Stopping(cancellation) });

@@ -168,6 +168,9 @@ public sealed record PreviewRequest
     /// <summary>How the forest's canopy scatters (vista-plan §10 M1.12b): <c>--canopy kernels</c> (the default) or <c>rough</c>.</summary>
     public CanopyModel Canopy { get; init; } = CanopyModel.Kernels;
 
+    /// <summary>The rock's structure (vista-plan §10 M1a.4): <c>--rock-structure on</c> (the default) or <c>off</c>, M1a.3a's rock.</summary>
+    public bool RockStructure { get; init; } = true;
+
     /// <summary>
     /// Whether the season's snow lies above the snow slider's snowline (vista-plan §10 M1.13): <c>--snow on</c> (the default) or
     /// <c>off</c>; the world's glaciers lie either way.
@@ -221,7 +224,7 @@ public sealed record PreviewRequest
 ///           [--light-sampling mis | sunOnly] [--rr-start 2] [--denoise [--denoise-device cpu | cuda]]
 ///           [--erosion on | off] [--grid 4097x8] [--mesh view | uniform] [--mesh-error 1] [--detail on | off] [--far-field on | off]
 ///           [--materials on | off] [--diffuse orenNayar | lambert] [--quadrature blend | bins | redTail | engine]
-///           [--forest on | off] [--canopy kernels | rough] [--snow on | off] [--pools on | flat]
+///           [--forest on | off] [--canopy kernels | rough] [--rock-structure on | off] [--snow on | off] [--pools on | flat]
 ///           [--meter incident | average] [--display agx | aces] [--look punchy | base] [--compensation EV]
 ///           [--white-balance 5500K | none] [--sky-margin 0.03] [--adaptation 0.5]
 ///           [--dither on | off] [--png16] [--auto-camera [--finalists 10] [--detail-budget on | off]] [--estimate [--noise 1]]
@@ -296,6 +299,7 @@ public static class PreviewCommandLine
         "  red tail, or the engine's table (before M1.12a; every colour 1.7-4 dE off).\n" +
         "--forest on (default) | off: forest below the place's tree line, or M1.12's meadow and soil there.\n" +
         "  --canopy kernels (default) | rough: the canopy's own scattering (its crowns' shadows and hot spot), or rough diffuse ground.\n" +
+        "  --rock-structure on (default) | off: bare rock's gullies, ribs and ledges (M1a.4), or M1a.3a's smooth rock.\n" +
         "--snow on (default) | off: the season's snow above the snow slider's snowline, or none (the world's glaciers stay).\n" +
         "--pools on (default) | flat: each valley's cold pool and its mist in three dimensions, or one flat layer for every valley\n" +
         "  (M1.13a's, for comparisons).\n" +
@@ -395,7 +399,7 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--valley-haze", "--mist", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--white-balance", "--sky-margin", "--adaptation", "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists", "--detail-budget",
+        "--white-balance", "--sky-margin", "--adaptation", "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--rock-structure", "--snow", "--pools", "--finalists", "--detail-budget",
         "--noise",
     };
 
@@ -492,6 +496,7 @@ public static class PreviewCommandLine
         Quadrature quadrature = QuadratureOf(values.GetValueOrDefault("--quadrature"), problems);
         bool forest = OnOff(values.GetValueOrDefault("--forest"), "--forest", problems);
         CanopyModel canopy = CanopyOf(values.GetValueOrDefault("--canopy"), problems);
+        bool rockStructure = OnOff(values.GetValueOrDefault("--rock-structure"), "--rock-structure", problems);
         bool snow = OnOff(values.GetValueOrDefault("--snow"), "--snow", problems);
         bool pools = values.GetValueOrDefault("--pools") switch
         {
@@ -567,6 +572,7 @@ public static class PreviewCommandLine
             Quadrature = quadrature,
             Forest = forest,
             Canopy = canopy,
+            RockStructure = rockStructure,
             Snow = snow,
             Pools = pools,
             AutoCamera = autoCamera,

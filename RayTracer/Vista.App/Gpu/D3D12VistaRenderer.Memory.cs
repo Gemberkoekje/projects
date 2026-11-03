@@ -105,7 +105,7 @@ internal sealed partial class D3D12VistaRenderer
         if (mesh.Materials is { } field)
         {
             Add("materialMap", (long)field.Packed.Length * sizeof(uint), MemoryStage.Mesh);
-            Add("bedTable", (long)field.Beds.Length * sizeof(float), MemoryStage.Mesh);
+            Add("bedTable", (long)field.BedTable.Length * sizeof(float), MemoryStage.Mesh);
         }
 
         // The acceleration structures, as BuildAccelerationStructures makes them: their scratch is freed when the build ends.

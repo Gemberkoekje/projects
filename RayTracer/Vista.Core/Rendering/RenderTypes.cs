@@ -81,6 +81,12 @@ public sealed record RenderSettings
     /// rough diffuse ground at the forest's own roughness. Lambert's diffuse (<see cref="Diffuse"/>) shades it as Lambert's too.
     /// </summary>
     public CanopyModel Canopy { get; init; } = CanopyModel.Kernels;
+
+    /// <summary>
+    /// The rock's structure (vista-plan §10 M1a.4, <see cref="World.RockStructure"/>): bare rock shaded with the gullies and ribs down
+    /// its fall line, the ledges of its beds and the shadows its ribs cast. Off shades M1a.3a's rock.
+    /// </summary>
+    public bool RockStructure { get; init; } = true;
 }
 
 /// <summary>How the integrator shades the forest's canopy (vista-plan §10 M1.12b).</summary>

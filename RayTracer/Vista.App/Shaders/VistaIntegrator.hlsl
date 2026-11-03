@@ -614,6 +614,7 @@ GroundSurface SurfaceAt(Hit hit, float3 wo, uint4 idx, float footprint)
     g.Albedo = MaterialAlbedo[TerrainMaterial].xyz;
     g.Normal = hit.ShadingNormal;
     g.Id = TerrainMaterial;
+    g.Sun = 1.0;
     return g;
 }
 
@@ -1032,7 +1033,7 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 #else
                     // The disk is 6.8·10⁻⁵ sr, so its density dwarfs the bounce's and the weight is 1 to float precision.
                     float weight = LightSampling != 0u ? PowerHeuristic(SunConePdf(), bsdfScale * cosS) : 1.0;
-                    radiance += throughput * Brdf(surface, hit.ShadingNormal, toSun, wo) * (INV_PI * cosS) * sunIrradiance
+                    radiance += throughput * Brdf(surface, hit.ShadingNormal, toSun, wo) * (INV_PI * cosS * surface.Sun) * sunIrradiance
                               * SunTransmittance4(idx, GroundAltitude + height, muS) * PoolLight(hit.Position, toSun, true, idx) * weight;
 #endif
                 }
@@ -1391,9 +1392,13 @@ void CSMaterialProbe(uint3 tid : SV_DispatchThreadID)
     MatSample s;
     float slope;
     MatWeights w = MaterialWeightsAt(q.xz, q.y, n, s, slope);
-    CheckSums[3u * item] = float4(w.Rock, w.Scree, w.Soil, w.Grass);
-    CheckSums[3u * item + 1u] = float4(w.Wet, w.Stony, s.Hardness, slope);
-    CheckSums[3u * item + 2u] = float4(w.Forest, w.Snow, w.Firn, w.Ice);
+    CheckSums[4u * item] = float4(w.Rock, w.Scree, w.Soil, w.Grass);
+    CheckSums[4u * item + 1u] = float4(w.Wet, w.Stony, s.Hardness, slope);
+    CheckSums[4u * item + 2u] = float4(w.Forest, w.Snow, w.Firn, w.Ice);
+    // The rock's structure (M1a.4): the gullies' gradient with every octave whole, their floor, and the ledges' slope by the table.
+    float floorShare;
+    float2 gullies = RockGullies(q.xz, -n.xz / max(n.y, 0.05), 0.0, floorShare);
+    CheckSums[4u * item + 3u] = float4(gullies, floorShare, LedgeAt(s.Table).y);
 }
 
 // The sky distribution's sampling and pdf, for --gpu-selftest's parity with SkyDistribution: probe i reads

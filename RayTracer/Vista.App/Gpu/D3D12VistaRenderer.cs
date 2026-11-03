@@ -321,7 +321,7 @@ internal sealed partial class D3D12VistaRenderer : IVistaRenderer, IDisposable
         }
 
         IntegratorConstants constants = BaseConstants(scene, settings, frame, tables, mask, skySampling);
-        Write(_materialConstants, MaterialConstantsFor(scene, settings.Diffuse, settings.Canopy, settings.Height));
+        Write(_materialConstants, MaterialConstantsFor(scene, settings.Diffuse, settings.Canopy, settings.Height, settings.RockStructure));
         double traceSeconds = 0.0;
         double maxCostNs = 0.0;
         var pace = new DispatchPace();

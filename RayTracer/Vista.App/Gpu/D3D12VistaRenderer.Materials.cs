@@ -32,17 +32,17 @@ internal sealed partial class D3D12VistaRenderer
         if (field is null)
             return;
         _materialMap = CreateDefaultBuffer<uint>(field.Packed);
-        _bedTable = CreateDefaultBuffer<float>(field.Beds);
+        _bedTable = CreateDefaultBuffer<float>(field.BedTable);
         _materialField = field;
     }
 
     /// <summary>
     /// The material constants of <paramref name="scene"/> on a frame <paramref name="frameHeight"/> pixels high: the rules under its
     /// grass line, tree line and pole, its world's map and beds, the camera's place and pixel for the bump, rough diffuse surfaces when
-    /// <paramref name="diffuse"/> asks for them and the canopy's kernels when <paramref name="canopy"/> does; M0's single Lambert
-    /// material without a field.
+    /// <paramref name="diffuse"/> asks for them, the canopy's kernels when <paramref name="canopy"/> does and the rock's structure when
+    /// <paramref name="rockStructure"/> does (vista-plan §10 M1a.4); M0's single Lambert material without a field.
     /// </summary>
-    internal static MaterialConstants MaterialConstantsFor(VistaScene scene, DiffuseModel diffuse, CanopyModel canopy, int frameHeight)
+    internal static MaterialConstants MaterialConstantsFor(VistaScene scene, DiffuseModel diffuse, CanopyModel canopy, int frameHeight, bool rockStructure = true)
     {
         MaterialField? field = scene.Mesh.Materials;
         if (field is null)
@@ -55,6 +55,7 @@ internal sealed partial class D3D12VistaRenderer
             Mode = 1u,
             Diffuse = diffuse == DiffuseModel.OrenNayar ? 1u : 0u,
             Canopy = canopy == CanopyModel.Kernels ? 1u : 0u,
+            Structure = rockStructure ? 1u : 0u,
         };
     }
 
@@ -62,7 +63,8 @@ internal sealed partial class D3D12VistaRenderer
     /// The ground's materials at world places on the GPU (<c>CSMaterialProbe</c>), for the self-test's parity with
     /// <see cref="MaterialField.Inputs"/> and <see cref="MaterialRules.Evaluate"/>: at each place's x, z and height, with the world
     /// grid's normal there, the weights of rock, scree, soil and grass, then the wetness, the stoniness, the bed's hardness and the
-    /// slope, then the weights of the forest, the season's snow, firn and glacier ice (M1.13), twelve floats a place.
+    /// slope, then the weights of the forest, the season's snow, firn and glacier ice (M1.13), then the rock's structure (M1a.4): the
+    /// gullies' gradient with every octave whole and their floor, and the ledges' slope by the bed table; sixteen floats a place.
     /// </summary>
     public float[] RunMaterialProbe(VistaScene scene, IReadOnlyList<(float X, float Z, float Height)> places)
     {
@@ -91,13 +93,13 @@ internal sealed partial class D3D12VistaRenderer
         try
         {
             _checkDirections = CreateDefaultBuffer<float>(packed);
-            _checkSums = CreateUavBuffer((ulong)places.Count * 12 * sizeof(float));
+            _checkSums = CreateUavBuffer((ulong)places.Count * 16 * sizeof(float));
             Timed(_materialProbePipeline, _rootSignature, list =>
             {
                 BindIntegrator(list);
                 list.Dispatch((uint)((places.Count + LutGroupSize - 1) / LutGroupSize), 1, 1);
             });
-            return ReadFloats(_checkSums, places.Count * 12);
+            return ReadFloats(_checkSums, places.Count * 16);
         }
         finally
         {

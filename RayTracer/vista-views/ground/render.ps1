@@ -7,7 +7,7 @@
 #    and for the grooves and the dots the ground under the loupe from above as the world is made: the base terrain, the incision
 #    brought back to the 8 m grid, and after the pipe-model passes (Vista.App --erosion-measure --crops). Its log, measure.log, holds
 #    the grid's own patterns at each stage (GridArtefacts) and the metres a pixel covers at each place.
-# -Sheets m1a2 makes M1a.2's sheets instead, -Sheets m1a3 M1a.3's, -Sheets m1a3a M1a.3a's (see the end of the script).
+# -Sheets m1a2 makes M1a.2's sheets instead, -Sheets m1a3 M1a.3's, -Sheets m1a3a M1a.3a's, -Sheets m1a4 M1a.4's (see the end of the script).
 # Build first: dotnet build Vista.App -c Release (from RayTracer/).
 param(
     [string]$Out = (Join-Path $env:TEMP 'vista-ground'),
@@ -290,6 +290,57 @@ if ($make -contains 'm1a3a') {
         'M1a.3a today''s glaciers from above: M1a.3''s and M1a.3a''s' 'm1a-3a-ice.png'
     Sheet @((Join-Path $Out 'aerial-m1a3.denoised.png'), (Join-Path $Out 'aerial-m1a3a.denoised.png')) @('M1a.3', 'M1a.3a') 2 `
         'M1a.3a the snow-capped mountains from 4 km up at noon: the valley glaciers' 'm1a-3a-aerial.png'
+}
+
+# M1a.4 (-Sheets m1a4): the rock's structure (gullies and ribs down the fall line, the beds' ledges, the ribs' own shadows, jointed
+# blocks near the camera), beside M1a.3a's rock (--rock-structure off, which renders M1a.3a bit for bit). The world is unchanged, so
+# nothing is measured again. Its sheets:
+#  - m1a-4-hero.png: the hero from M1's camera, M1a.3a's rock and M1a.4's;
+#  - m1a-4-lit.png: the lit middle range's loupe (3.8 km off, 1.2 m a pixel), M1a.3a's above M1a.4's;
+#  - m1a-4-near.png: the near face at the frame's right (130 m off, 2 EV brighter: it lies in shade), M1a.3a's beside M1a.4's;
+#  - m1a-4-foreground.png: the shaded foreground (place 3, 1.5 km off, 2 EV brighter), M1a.3a's above M1a.4's;
+#  - m1a-4-face.png: M1.12's rock face at 10:30 in July, the frame at 480 px (at 640 the sheet passes 1 MB) and a window of its 4K
+#    frame, M1a.3a's and M1a.4's;
+#  - m1a-4-low-sun.png: the golden-hour down-slope view (the cost ledger's, the sun a few degrees up), M1a.3a's and M1a.4's: the
+#    lit near crest in its ribs' shadows.
+if ($make -contains 'm1a4') {
+    $day = Join-Path $views 'mountains-day.recipe.json'
+    $face = Join-Path $views 'materials\rock-face.camera.json'
+    $golden = Join-Path $views 'mountains-golden.recipe.json'
+    $downSlope = Join-Path $views 'down-slope.camera.json'
+    foreach ($stage in @(@{ Name = 'm1a3a'; Extra = @('--rock-structure', 'off') }, @{ Name = 'm1a4'; Extra = @() })) {
+        Run (@('--preview') + $heroArgs + @('--width', '640', '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda', '--out', (Join-Path $Out "hero-$($stage.Name).png")) + $stage.Extra)
+        foreach ($l in @(@{ Name = 'lit'; X = $places.grooves.X; Y = $places.grooves.Y; Shade = @() },
+                         @{ Name = 'near'; X = 3200; Y = 1500; Shade = @('--compensation', '3.5') },
+                         @{ Name = 'foreground'; X = $places.beds.X; Y = $places.beds.Y; Shade = @('--compensation', '3.5') })) {
+            Run (@('--preview') + $heroArgs + @('--width', '3840', '--loupe', "$($l.X),$($l.Y),640,360", '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
+                '--out', (Join-Path $Out "loupe-$($l.Name)-$($stage.Name).png")) + $l.Shade + $stage.Extra)
+        }
+        Run (@('--preview', '--recipe', $day, '--time', '10:30', '--seed', '42', '--camera', $face, '--width', '480', '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
+            '--out', (Join-Path $Out "face-$($stage.Name).png")) + $stage.Extra)
+        Run (@('--preview', '--recipe', $day, '--time', '10:30', '--seed', '42', '--camera', $face, '--width', '3840', '--loupe', '1660,491,520,292', '--spp', "$Spp",
+            '--denoise', '--denoise-device', 'cuda', '--out', (Join-Path $Out "face-loupe-$($stage.Name).png")) + $stage.Extra)
+        Run (@('--preview', '--recipe', $golden, '--seed', '42', '--camera', $downSlope, '--width', '640', '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
+            '--out', (Join-Path $Out "low-sun-$($stage.Name).png")) + $stage.Extra)
+    }
+    Sheet @((Join-Path $Out 'hero-m1a3a.denoised.png'), (Join-Path $Out 'hero-m1a4.denoised.png')) @('M1a.3a', 'M1a.4: the rock''s structure') 2 `
+        'M1a.4 the hero (seed 42 · golden hour · M1''s camera): M1a.3a''s rock and the rock''s structure' 'm1a-4-hero.png'
+    Sheet @((Join-Path $Out 'loupe-lit-m1a3a.denoised.png'), (Join-Path $Out 'loupe-lit-m1a4.denoised.png')) `
+        @('M1a.3a · the lit middle range 3.8 km off · 1.2 m a pixel', 'M1a.4 · the same pixels: gullies and ribs · the beds'' ledges · the ribs'' shadows') 1 `
+        'M1a.4 the lit middle range (a 4K loupe)' 'm1a-4-lit.png'
+    Sheet @((Join-Path $Out 'loupe-near-m1a3a.denoised.png'), (Join-Path $Out 'loupe-near-m1a4.denoised.png')) `
+        @('M1a.3a · the near face at the frame''s right 130 m off · +2 EV', 'M1a.4 · the same pixels: gullies and jointed blocks') 2 `
+        'M1a.4 the near face (a 4K loupe)' 'm1a-4-near.png'
+    Sheet @((Join-Path $Out 'loupe-foreground-m1a3a.denoised.png'), (Join-Path $Out 'loupe-foreground-m1a4.denoised.png')) `
+        @('M1a.3a · the shaded foreground 1.5 km off · +2 EV', 'M1a.4 · the same pixels') 1 `
+        'M1a.4 the shaded foreground (a 4K loupe)' 'm1a-4-foreground.png'
+    Sheet @((Join-Path $Out 'face-m1a3a.denoised.png'), (Join-Path $Out 'face-m1a4.denoised.png'), (Join-Path $Out 'face-loupe-m1a3a.denoised.png'),
+        (Join-Path $Out 'face-loupe-m1a4.denoised.png')) `
+        @('M1a.3a · M1.12''s rock face · 10:30 in July', 'M1a.4', 'M1a.3a · a 520x292 window of its 4K frame', 'M1a.4 · the same window') 2 `
+        'M1a.4 a rock face up close: M1a.3a''s rock and the rock''s structure' 'm1a-4-face.png'
+    Sheet @((Join-Path $Out 'low-sun-m1a3a.denoised.png'), (Join-Path $Out 'low-sun-m1a4.denoised.png')) `
+        @('M1a.3a · golden hour down a slope · the sun a few degrees up', 'M1a.4 · the lit crest in its ribs'' shadows') 2 `
+        'M1a.4 a low sun: the rock''s structure casts long shadows' 'm1a-4-low-sun.png'
 }
 
 Get-ChildItem (Join-Path $Out 'm1a-*.png') | ForEach-Object { '{0} {1:0} KB' -f $_.Name, ($_.Length / 1KB) }

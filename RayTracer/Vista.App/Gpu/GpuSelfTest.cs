@@ -233,7 +233,8 @@ internal static partial class GpuSelfTest
     /// its detail weights); the shader's rules (<c>CSMaterialProbe</c>) match the C# reference (<see cref="MaterialField.Inputs"/>,
     /// <see cref="MaterialRules.Evaluate"/>) at 4096 random places of the world grid, each on its ground and up to 40 m off it, within
     /// 0.002 of a weight and of the hardness and 0.02° of slope (single-precision transcendentals on both sides; the shader's arc cosine
-    /// is an approximation, worst on nearly flat ground, where a weight barely follows the slope); and the reference render shows at
+    /// is an approximation, worst on nearly flat ground, where a weight barely follows the slope); the shader's rock structure (M1a.4:
+    /// the gullies' gradient and floor, the ledges' slope) matches <see cref="RockStructure"/> there; and the reference render shows at
     /// least three materials.
     /// </summary>
     private static bool MaterialChecks(D3D12VistaRenderer renderer, Recipe recipe, ulong seed, ErosionResult eroded, MaterialField materials,
@@ -245,7 +246,7 @@ internal static partial class GpuSelfTest
             again.DetailWeightsAt(materials.Origin + u * (materials.Size - 1) * materials.Cell, materials.Origin + v * (materials.Size - 1) * materials.Cell)
             == materials.DetailWeightsAt(materials.Origin + u * (materials.Size - 1) * materials.Cell, materials.Origin + v * (materials.Size - 1) * materials.Cell)));
         bool pass = Check(log, "the material field built twice is bit-identical",
-            again.Packed.SequenceEqual(materials.Packed) && again.Beds.SequenceEqual(materials.Beds) && sameDetail
+            again.Packed.SequenceEqual(materials.Packed) && again.Beds.SequenceEqual(materials.Beds) && again.Ledges.SequenceEqual(materials.Ledges) && sameDetail
             && again.RockGradient == materials.RockGradient && again.ScreeGradient == materials.ScreeGradient
             && again.CanopyGradient == materials.CanopyGradient ? null : "the two builds differ");
 
@@ -259,15 +260,16 @@ internal static partial class GpuSelfTest
         }
         float[] gpu = renderer.RunMaterialProbe(scene, places);
         MaterialConstants k = D3D12VistaRenderer.MaterialConstantsFor(scene, DiffuseModel.OrenNayar, CanopyModel.Kernels, 1080);
-        double worstWeight = 0.0, worstHardness = 0.0, worstSlope = 0.0;
-        int forested = 0, snowy = 0, glaciated = 0;
+        double worstWeight = 0.0, worstHardness = 0.0, worstSlope = 0.0, worstLedge = 0.0;
+        var gullyErrors = new List<double>();
+        int forested = 0, snowy = 0, glaciated = 0, structured = 0;
         for (int i = 0; i < places.Count; i++)
         {
             (float x, float z, float height) = places[i];
             (float nx, float nz) = hierarchy.MapNormal(x, z);
             MaterialInputs inputs = materials.Inputs(x, z, height, nx, nz, (float)scene.GroundAltitudeMetres, k);
             MaterialWeights w = MaterialRules.Evaluate(inputs, k);
-            ReadOnlySpan<float> g = gpu.AsSpan(i * 12, 12);
+            ReadOnlySpan<float> g = gpu.AsSpan(i * 16, 16);
             foreach ((float a, float b) in new[]
             {
                 (w.Rock, g[0]), (w.Scree, g[1]), (w.Soil, g[2]), (w.Grass, g[3]), (w.Wet, g[4]), (w.Stony, g[5]), (w.Forest, g[8]), (w.Snow, g[9]),
@@ -279,7 +281,29 @@ internal static partial class GpuSelfTest
             forested += w.Forest > 0.5f ? 1 : 0;
             snowy += w.Snow > 0.5f ? 1 : 0;
             glaciated += w.Firn + w.Ice > 0.5f ? 1 : 0;
+            // The rock's structure (M1a.4): the gullies' gradient against its own size, and the ledges' slope.
+            float ny = MathF.Max(MathF.Sqrt(MathF.Max(1f - nx * nx - nz * nz, 0f)), 0.05f);
+            (_, float gx, float gz, float floor) = RockStructure.Gullies(k.NoiseSeed, x, z, -nx / ny, -nz / ny, k.StructureDepth, k.StructureCoarsest,
+                (int)k.StructureOctaves);
+            if (gx != 0f || gz != 0f)
+            {
+                structured++;
+                gullyErrors.Add(Math.Max(Math.Max(Math.Abs(gx - g[12]), Math.Abs(gz - g[13])) / (1.0 + MathF.Sqrt(gx * gx + gz * gz)), Math.Abs(floor - g[14])));
+            }
+            worstLedge = Math.Max(worstLedge, Math.Abs(materials.LedgeAt(materials.BedAt(x, z, height).Table).Slope - g[15]));
         }
+        gullyErrors.Sort();
+        double gullyTypical = gullyErrors.Count == 0 ? 0.0 : gullyErrors[(int)(0.99 * (gullyErrors.Count - 1))];
+        double gullyWorst = gullyErrors.Count == 0 ? 0.0 : gullyErrors[^1];
+        log.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"  the rock's structure at {structured} places on steep ground: gullies off by {gullyTypical:G3} (99th percentile, of 1 + their slope), at worst {gullyWorst:G3}; ledges' slope {worstLedge:G3} m an entry"));
+        // Single precision's sines and angles differ by a few ulps between the GPU and .NET, and each octave turns with the coarser
+        // ones' slope, so the differences grow down the octaves; where an octave forks its phase turns fast, so the worst place is off
+        // by more than the rest (0.26% and 7% measured, M1a.4). The ledges' slope follows the bed-table coordinate, a float near 8000
+        // whose last bit is a thousandth of an entry, times the spline's curvature (0.0018 m an entry measured).
+        pass &= Check(log, "the shader's rock structure matches the C# reference", structured >= places.Count / 20 && gullyTypical <= 5e-3
+            && gullyWorst <= 0.15 && worstLedge <= 5e-3 ? null
+            : string.Create(CultureInfo.InvariantCulture, $"{structured} places, gullies {gullyTypical:G3} / {gullyWorst:G3}, ledges {worstLedge:G3}"));
         log.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"  materials at {places.Count} places ({forested} mostly forest, {snowy} mostly snow, {glaciated} mostly glacier): worst weight {worstWeight:G3}, hardness {worstHardness:G3}, slope {worstSlope:G3}°"));
         pass &= Check(log, "the shader's material rules match the C# reference", worstWeight <= 2e-3 && worstHardness <= 2e-3 && worstSlope <= 0.02 ? null
