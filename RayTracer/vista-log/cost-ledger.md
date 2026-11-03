@@ -41,6 +41,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1a.2 | 0.30 | 6.92 | 5.11 | 18.70 |
 | M1a.3 | 0.26 | 5.74 | 4.12 | 15.55 |
 | M1a.3a | 0.25 | 5.85 | 3.96 | 15.55 |
+| M1a.4 | 0.27 | 7.14 | 5.19 | 17.73 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -210,3 +211,8 @@ world with other work on the GPU). The erosion 25.5 → 25.6 GPU s (vista-log/M1
 M1a.3a changes today's ice and not the integrator or the eroded ground: the ice thins out below the ice that feeds it (seed 42's
 glaciers 7.6% → 5.8% of the grid). Timed in turns with M1a.3's ice, two rounds each, other work holding 22–26% of the GPU: the
 ratios 0.98 / 1.02 / 0.96 / 1.00, within the noise; the row is M1a.3's scaled by them (vista-log/M1a.3a.md).
+M1a.4 changes the integrator: bare rock's structure in the shading (gullies, ribs, ledges, jointed blocks) and the shadows its ribs
+cast, marched toward the sun per camera hit; no triangle is added. Timed in turns with `main` (f858d5b6), two rounds each, the GPU
+otherwise idle: the ratios 1.08 / 1.22 / 1.31 / 1.14; the row is M1a.3a's scaled by them. The sky's 8% is the bigger shader alone;
+on the default view the march compiled in but never run cost 1.45 times `main`, without it 1.12 times, so most of the cost is the
+registers the march holds (vista-log/M1a.4.md; marching first in the shading, with the phasors' values alone, took 1.55 to 1.31).

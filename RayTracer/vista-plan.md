@@ -14,8 +14,8 @@ and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M
 (auto camera v1, with its detail budget), M1.15 (the time and VRAM estimate), M1.16 (the preview and tweak window) and
 M1.17 (the sign-off) are done: **M1 is done** (2026-10-28), its goldens committed and passing and its hero rendered. **M1a** (the
 ground's surface, the user's call after the hero) comes before M2 (measured spectra): its seven slices are planned in §10 (**M1a plan**)
-and M1a.1 (the map), M1a.2 (ground that gathers its water), M1a.3 (the washboard gone) and M1a.3a (ice caps that leave their flanks
-bare) are done; what M1 found and did not need is in the parked list (§10). It sits
+and M1a.1 (the map), M1a.2 (ground that gathers its water), M1a.3 (the washboard gone), M1a.3a (ice caps that leave their flanks
+bare) and M1a.4 (rock below the grid, in the shading) are done; what M1 found and did not need is in the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -2280,6 +2280,24 @@ incised 67.5%; eroded 33.1%) and the share of 128 m windows rippling at 2–4 ce
   cannot cast), a finer erosion tile only if those fall short. The ground within about 100 m stays M5's (grass, shrubs) and M7's
   (close-up snow). *Verify:* the hero's loupes beside M1's, the near face's among them; the metres-per-pixel measure (`--debug detail`)
   on M1.14's finalists before and after; the triangles against the 48 M ceiling; the cost ledger.
+  *Status (2026-11-03): done, in the shading; the geometry parked.* Bare rock carries structure at 4–64 m, a height over it that the
+  shader evaluates per camera hit: gullies and ribs down the fall line (phasor noise in five octaves from 64 m, each finer one running
+  down the coarser ribs' sides, so they branch; 0.09 of a wavelength deep across the face), ledges and cliff bands where the beds'
+  hardness changes (a bed harder than its neighbours steeper, a softer one a bench, and thick beds broken by a seeded variation), the
+  shadows the coarse ribs cast (marched toward the sun over the grid's ground), jointed blocks near the camera (bedding and two joint
+  sets, each block a facet, open joints dark) and debris in the gentler gully floors. The lit middle range's planes read as gullied rock;
+  the shaded foreground changes little (its bands are M1a.5's). The mesh does not carry it: its coarsest octave alone as geometry took
+  the hero's 4K mesh from 27.7 M to 47.8 M triangles and the ledges as much again (prototype branch
+  `claude/vista-m1a-4-geometry-prototype`; parked, "The rock's structure as geometry"). No triangle added; with `--rock-structure off`
+  every image is M1a.3a's bit for bit. The trace costs 1.08 / 1.22 / 1.31 / 1.14 times M1a.3a's (the ledger's sky, aerial, default and down-slope views), most of it
+  the shadows' registers; under a very low sun the down-slope golden darkens by 12% (its lit crest in its ribs' shadows). The detail
+  budget still counts by the 8 m cell; its limit is re-chosen at M1a.7. *Judge this:* `m1a-4-lit.png` (the lit middle range, M1a.3a's
+  smooth faces above, the structure below), `m1a-4-face.png` (a rock face at mid-morning, the frame and a window of it up close),
+  `m1a-4-hero.png`, `m1a-4-near.png`, `m1a-4-low-sun.png` (a sun a few degrees up). *Ignore this:* the shaded foreground's light and dark bands (M1a.5), the meadows (M1a.6), the
+  ridges' outlines against the sky, still smooth (the parked geometry), snow and ice up close (M7). *Questions:* do the lit faces read
+  as rock cut by gullies and ribs, or as scratched or combed? Up close, does the rock face look gullied, or like folds of cloth? Do the
+  dark stripes down the gullies look like the shadows of a real face in morning light? With the sun just above the horizon, is
+  the crest in front too dark? Log: [`vista-log/M1a.4.md`](vista-log/M1a.4.md).
 - **M1a.5 — Beds that read as rock** (the marble). The beds' colour tied to M1a.4's relief (a ledge's lit top and dark riser, soft beds
   under scree and soil), broken by the gullies, weathered (streaks down the fall line below hard beds), the laminae shown where a ledge
   shows them. *Verify:* the shaded foreground's loupe beside M1's; beside the webcam's lit rock (`23-08-2026-2010`, `12-10-2026-1820`)
@@ -2458,7 +2476,9 @@ any of them.
   directions (21% → 18% on a 1025² world) and the share of slopes near their talus from 21% to 14%; the rest of the 3 points
   between the eroded world (17.4%) and the base terrain (14.6%) is mostly this. A talus that runs every way (the drops weighed by
   direction, or a rock talus that varies from place to place) would take it. *Belongs:* M1a.4 (rock below the grid: ribs and
-  buttresses from the rock's hardness).
+  buttresses from the rock's hardness). *M1a.4:* the gullies and ribs in the shading break the planes' look on lit faces; the planes
+  themselves stay in the grid and its outlines. *Belongs now:* with "The rock's structure as geometry", or a talus that runs every way
+  in the erosion if the outlines show it.
 - **Ice caps laid as smooth domes** (M1a.2; the user's review: "they look more like blobs than M1"): today's ice is laid as the
   solve's surface, smooth between its 64 m samples, so a cap on a crest reads as pale rounded domes. On the first M1a.2 one capped
   the hero's lit middle range; the rework's ground moved it off (by chance: world-wide as much ice lies on 64 m crests, 16.9% of its
@@ -2480,7 +2500,8 @@ any of them.
   reworked world (metres of change that near the camera swing a sixth of the frame) and reads as a smooth dark mass; the auto
   camera's own pick on the new world leaves it out. *Belongs:* M1a.4 (the near faces' detail), and M1a.7 (whether the sign-off's hero
   keeps M1's camera or takes the auto camera's pick). *M1a.3:* with the creep the ridge shrinks back to a sliver at the frame's edge
-  (`m1a-3-hero.png`); M1a.7 still chooses the camera.
+  (`m1a-3-hero.png`); M1a.7 still chooses the camera. *M1a.4:* the sliver carries the gullies and the blocks in its shading
+  (`m1a-4-near.png`); its outline stays smooth (the parked geometry).
 - **Glaciers that follow the place** (M1.13): today's glaciers are the recipe's, the same at Zermatt,
   Lofoten and Fiordland, in every season. *Decided (2026-10-25):* yes; how low glaciers reach follows
   the climate (far lower where it is cold and wet than in the Alps), so today's glaciers come from
@@ -2535,7 +2556,23 @@ any of them.
   detail budget relaxes. Until then that budget keeps such frames out of the auto camera's picks. *Moved 2026-10-28 (the user's
   call, after the M1 hero):* into M1a, ahead of M2. *M1a.1:* the hero passes the budget (no lit bare ground past 12 pixels a cell)
   yet reads as a model at 6–7 pixels a cell, where the grid's own pattern shows; M1a.2 and M1a.3 remove that pattern, and M1a.4 is
-  this item.
+  this item. *M1a.4:* the shading and colour detail at 4–64 m on bare rock is built (gullies and ribs, ledges, their shadows, jointed
+  blocks; vista-log/M1a.4.md); the geometry is parked (the item below); the detail budget still counts by the 8 m cell, and M1a.7
+  re-chooses its limit by eye.
+- **The rock's structure as geometry** (M1a.4): the structure is the shading's alone, so the ridges' outlines against the sky stay
+  smooth and its ribs cast no shadow beyond the 46 m the shading marches (onto other ground, or from another face). Tried in M1a.4
+  (branch `claude/vista-m1a-4-geometry-prototype`): the mesh carried the gullies' coarse octaves and the ledges over bare rock, bounded
+  by region and held to 3 pixels; the hero's 4K mesh went from 27.7 M triangles to 47.8 M with the 64 m octave alone (41.6 M at 6
+  pixels), 43.9 M with the ledges alone at 12 pixels, 123 M with both octaves and the ledges, past the 48 M ceiling. The bound was the
+  cost: a worst case over a region (the ribs' curvature, the beds' steepest tilt) refines every rock face in view. *The next try:* the
+  structure sampled into the hierarchy's own grid heights, so the grid's errors are the true ones, with only the residual between the
+  samples as detail; and only where an outline needs it (the frame's near ridges and skyline). *Belongs:* before M11, whose 8K and 16K
+  show the outlines at twice and four times the pixels, or M1a.7 if the user's review asks for outlines.
+- **A leaner rock structure** (M1a.4): the structure costs 1.14–1.31 times M1a.3a's on the ledger's views with ground in them, most of it the registers its shadow march holds (compiled in but
+  never run, it cost 1.45 times on the default view; vista-log/M1a.4.md). Levers: the march's state cut further (one octave, or a
+  table of the coarse octaves' heights per cell), the shadows only where the sun is low enough to cast them long, or the march in a pass
+  of its own over the first hits. *Belongs:* the next slice that works on the trace's cost, beside "A sample costs more in dispatches
+  of several samples a pixel".
 - **A sample costs more in dispatches of several samples a pixel** (M1.15): the snow view's sample costs 5.2 ns in passes of one
   sample a pixel and 6.7 in passes of four, the aerial view's 5.0 and 5.65, with the same rays (vista-log/M1.15.md); a cheap view's
   final is planned as passes of up to 64 samples a pixel. Likely the sample loop's registers lowering the GPU's occupancy; passes of
