@@ -168,7 +168,7 @@ public sealed class GlacierTests
     [TestMethod]
     public void Unglaciated_Settings_KeepM1_12csWorlds()
     {
-        // M1.12c's mountains: no glaciers, and none of M1a.2's grid transfer or passes.
+        // M1.12c's mountains: no glaciers, and none of M1a.2's grid transfer or passes or M1a.3's creep.
         ErosionSettings plain = ErosionSettings.Mountains with
         {
             GlacialSteps = 0,
@@ -178,6 +178,7 @@ public sealed class GlacierTests
             RefineFaceDetail = 0f,
             DischargeSpread = 0,
             ThermalRate = 0.25f,
+            CreepRate = 0f,
         };
         Assert.IsTrue(plain.Unglaciated);
         Assert.AreEqual("b7e5666038cc769b", plain.ContentHash().ToString("x16", CultureInfo.InvariantCulture),

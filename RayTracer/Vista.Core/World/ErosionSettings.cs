@@ -80,6 +80,14 @@ public sealed record ErosionSettings
     /// <summary>The fraction of the excess over a talus angle that moves per step (at most 0.5 keeps neighbours from overshooting).</summary>
     public float ThermalRate { get; init; }
 
+    /// <summary>
+    /// Soil creep (vista-plan §10 M1a.3): the fraction of each metre of drop to a lower neighbour that loose material moves per step,
+    /// at any slope, with the isotropic nine-point Laplacian's weights (an edge neighbour ⅔ of it, a corner ⅙). A diffusion of the
+    /// loose ground, which damps a ripple a few cells long many times faster than the landforms: the pipe model's washboard on the
+    /// fans never grows. 0: none, as M1a.2.
+    /// </summary>
+    public float CreepRate { get; init; }
+
     /// <summary>The step from which the flow maps (discharge, water depth) average.</summary>
     public int AverageFrom { get; init; }
 
@@ -299,7 +307,10 @@ public sealed record ErosionSettings
     /// a thermal rate of 0.02 lets the water and the talus compete instead of setting every steep face to one talus plane with
     /// creases in the grid's eight directions (the relief along the grid from 21% to 18%). The rework (the user: "they look more like
     /// blobs than M1") keeps the incision's high points pointed: brought back smoothly throughout, every summit and crest the coarse
-    /// samples hold came back rounded a coarse cell wide.
+    /// samples hold came back rounded a coarse cell wide. The creep (vista-plan §10 M1a.3) was chosen by the grid's patterns on the loose
+    /// ground of seed 42's 1025² and 4097² worlds and the rows of dots' loupe: 0.03 stops the pipe model's washboard on the fans (the
+    /// loose ground's windows rippling from 3.4% to 0.4%, the base terrain 1.4%) and leaves the rock's crests nearly as they were;
+    /// 0.02 left a trace of it, 0.05 moved the crests and the loose ground more for no visible gain.
     /// </remarks>
     public static ErosionSettings Mountains { get; } = new()
     {
@@ -320,6 +331,7 @@ public sealed record ErosionSettings
         RockTalusDegrees = 40.0f,
         RockTalusHardDegrees = 65.0f,
         ThermalRate = 0.02f,
+        CreepRate = 0.03f,
         AverageFrom = 750,
         IncisionSteps = 300,
         IncisionCell = 64.0f,
@@ -370,9 +382,10 @@ public sealed record ErosionSettings
         HardErodibility = 1.0f,
         IncisionSteps = 0,
         PoolFillMetres = 0.0f,
-        // M1.7's passes until the hills' own milestone (M1a.2's spread discharge and slow thermal settle the mountains).
+        // M1.7's passes until the hills' own milestone (M1a.2's spread discharge and slow thermal and M1a.3's creep settle the mountains).
         DischargeSpread = 0,
         ThermalRate = 0.25f,
+        CreepRate = 0.0f,
         RefineCubic = 0,
         RefineChannelCurves = 0,
         RefineFaceDetail = 0.0f,
@@ -449,6 +462,8 @@ public sealed record ErosionSettings
         Fraction(nameof(RockErodibility), RockErodibility);
         Fraction(nameof(Deposition), Deposition);
         Fraction(nameof(ThermalRate), ThermalRate, 0.5f);
+        // Explicit diffusion is stable while a cell sends at most half its height's difference: the weights sum to 10/3.
+        Fraction(nameof(CreepRate), CreepRate, 0.15f);
         if (!(LooseTalusDegrees > 0f && LooseTalusDegrees < RockTalusDegrees && RockTalusDegrees <= RockTalusHardDegrees && RockTalusHardDegrees < 90f))
             errors.Add($"Talus angles must satisfy 0 < loose < soft rock ≤ hard rock < 90° (got {LooseTalusDegrees}°, {RockTalusDegrees}°, {RockTalusHardDegrees}°).");
         if (IncisionSteps < 0)
@@ -529,6 +544,8 @@ public sealed record ErosionSettings
             .. (BilinearRefine ? [] : new[] { RefineFaceDetail, RefineChannelDetailMetres }.Select(BitConverter.SingleToInt32Bits)),
             // M1a.2's spread discharge likewise only when it is on.
             .. (DischargeSpread == 0 ? [] : new[] { DischargeSpread }),
+            // M1a.3's creep likewise.
+            .. (CreepRate == 0f ? [] : new[] { BitConverter.SingleToInt32Bits(CreepRate) }),
         ];
         Span<byte> buffer = stackalloc byte[4];
         ulong hash = StableHash.FnvStart;
@@ -642,11 +659,14 @@ public struct ErosionConstants
     /// </summary>
     public uint SpreadDischarge;
 
-    /// <summary>Padding to a 16-byte row.</summary>
-    public uint Pad3;
+    /// <summary>
+    /// The creep sent toward an edge neighbour per metre of drop (<see cref="ErosionSettings.CreepRate"/> · ⅔, vista-plan §10 M1a.3);
+    /// 0: no creep.
+    /// </summary>
+    public float CreepEdge;
 
-    /// <summary>Padding to a 16-byte row.</summary>
-    public uint Pad4;
+    /// <summary>The same toward a corner neighbour (<see cref="ErosionSettings.CreepRate"/> · ⅙).</summary>
+    public float CreepCorner;
 
     /// <summary>
     /// The constants for <paramref name="settings"/> on a grid of <paramref name="size"/>² cells <paramref name="cell"/> metres
@@ -688,6 +708,8 @@ public struct ErosionConstants
             RockDropEdgeHard = tanHard * l,
             RockDropCornerHard = tanHard * l * diagonal,
             SpreadDischarge = (uint)settings.DischargeSpread,
+            CreepEdge = settings.CreepRate * (2f / 3f),
+            CreepCorner = settings.CreepRate * (1f / 6f),
         };
     }
 

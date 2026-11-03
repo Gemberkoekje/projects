@@ -7,6 +7,7 @@
 //   CSTransport      suspended sediment moves with the water                         (Water of the step, Flux, Sediment B → A)
 //   CSThermalOut     how much loose material and rock leaves each cell               (Terrain B → Thermal)
 //   CSThermalApply   each cell loses what it sent, gains its share of its neighbours' (Terrain B, Thermal → Terrain A)
+// Since M1a.3, with CreepEdge set, loose material also creeps toward every lower neighbour in the two thermal passes.
 // Since M1.11d the rock has strata (Vista.World.RockHardness): CSWater's rock erodibility and CSThermalOut's rock talus follow
 // the hardness of the rock at its current height, looked up in the bed table as the reference does (since M1.12c, faded toward
 // massive rock's where the cell's rock is massive). Plus CSClear, which
@@ -47,8 +48,8 @@ cbuffer ErosionConstants : register(b0)
     float TableScale;       // bed-table entries per metre of rock height
     float TableLast;        // the largest table coordinate a lookup reads
     uint  SpreadDischarge;  // times the discharge is spread before CSWater erodes with it (M1a.2); 0: each cell's own
-    uint  _pad3;
-    uint  _pad4;
+    float CreepEdge;        // M1a.3: loose material crept toward an edge neighbour per metre of drop; 0: no creep
+    float CreepCorner;      // the same toward a corner neighbour
 };
 
 RWStructuredBuffer<float2> TerrainIn   : register(u0); // (bedrock, loose)
@@ -59,7 +60,7 @@ RWStructuredBuffer<float2> TerrainOut  : register(u4);
 RWStructuredBuffer<float>  WaterOut    : register(u5);
 RWStructuredBuffer<float>  SedimentOut : register(u6);
 RWStructuredBuffer<float2> Flow        : register(u7); // sums of (outflow, water depth)
-RWStructuredBuffer<float4> Thermal     : register(u8); // (loose moved, rock moved, sum of the loose excess, 0)
+RWStructuredBuffer<float4> Thermal     : register(u8); // (loose moved, rock moved, sum of the loose excess, share of the creep sent)
 RWByteAddressBuffer        ClearTarget : register(u9);
 RWStructuredBuffer<float3> Strata      : register(u10); // per cell (bed-table coordinate at height 0, mottle, massive)
 RWStructuredBuffer<float2> Bands       : register(u11); // the bed tables by stratigraphic height: (a bed's hardness, massive rock's)
@@ -70,6 +71,13 @@ float Ground(uint c)
 {
     float2 t = TerrainIn[c];
     return t.x + t.y;
+}
+
+// The loose material creep sends toward a neighbour `drop` metres lower (M1a.3), before the sender's share: the isotropic
+// nine-point Laplacian's weights. 0 toward a higher neighbour, and when the creep is off.
+float CreepToward(bool corner, float drop)
+{
+    return max(0.0, drop) * (corner ? CreepCorner : CreepEdge);
 }
 
 // The hardness of the rock at height `rock` in cell c: the bed table interpolated at the rock's table coordinate, moved toward
@@ -312,7 +320,27 @@ void CSThermalOut(uint3 tid : SV_DispatchThreadID)
     precise float collapse = max(0.0, HalfThermalRate * maxRock - slide);
     precise float slid = loose - (loose - slide);
     precise float collapsed = rock - (rock - collapse);
-    Thermal[c] = float4(slid, collapsed, sum, 0.0);
+    // M1a.3: the share of its full creep the cell sends, less where it has too little loose material left after the slide. In a
+    // branch of its own, so without creep the passes compile as before and erode bit for bit as M1a.2's.
+    float share = 0.0;
+    [branch]
+    if (CreepEdge > 0.0)
+    {
+        float creepSum = 0.0;
+        [unroll]
+        for (uint q = 0u; q < 8u; q++)
+        {
+            int ni = int(i) + NeighbourI[q], nj = int(j) + NeighbourJ[q];
+            uint m = uint(clamp(nj, 0, int(n) - 1)) * n + uint(clamp(ni, 0, int(n) - 1));
+            if (ni < 0 || ni >= int(n) || nj < 0 || nj >= int(n))
+                continue;
+            precise float drop = ground - Ground(m);
+            creepSum += CreepToward(NeighbourI[q] != 0 && NeighbourJ[q] != 0, drop);
+        }
+        precise float creep = min(loose - slid, creepSum);
+        share = creepSum > 0.0 ? creep / creepSum : 0.0;
+    }
+    Thermal[c] = float4(slid, collapsed, sum, share);
 }
 
 [numthreads(8, 8, 1)]
@@ -343,7 +371,29 @@ void CSThermalApply(uint3 tid : SV_DispatchThreadID)
         gained += sent * (over / sender.z);
     }
     float4 own = Thermal[c];
-    TerrainOut[c] = float2(t.x - own.y, (t.y - own.x) + gained);
+    [branch]
+    if (CreepEdge > 0.0)
+    {
+        // M1a.3: the neighbours' creep toward this cell, and this cell's own toward them, as each computed them.
+        float crept = 0.0, creepSum = 0.0;
+        [unroll]
+        for (uint q = 0u; q < 8u; q++)
+        {
+            int ni = int(i) + NeighbourI[q], nj = int(j) + NeighbourJ[q];
+            uint m = uint(clamp(nj, 0, int(n) - 1)) * n + uint(clamp(ni, 0, int(n) - 1));
+            if (ni < 0 || ni >= int(n) || nj < 0 || nj >= int(n))
+                continue;
+            bool corner = NeighbourI[q] != 0 && NeighbourJ[q] != 0;
+            precise float drop = Ground(m) - ground;
+            crept += Thermal[m].w * CreepToward(corner, drop);
+            creepSum += CreepToward(corner, -drop);
+        }
+        precise float looseLeft = t.y - own.x;
+        precise float creep = min(own.w * creepSum, looseLeft);
+        TerrainOut[c] = float2(t.x - own.y, (looseLeft - creep) + (gained + crept));
+    }
+    else
+        TerrainOut[c] = float2(t.x - own.y, (t.y - own.x) + gained);
 }
 
 [numthreads(64, 1, 1)]

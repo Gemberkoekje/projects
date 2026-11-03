@@ -84,7 +84,10 @@ public sealed class ErosionState
     /// <summary>Outflow per cell to −x, +x, −z, +z in m³/s.</summary>
     public float[] Flux { get; }
 
-    /// <summary>Per cell, the last thermal step's (loose moved, rock moved, sum of the loose excess over the neighbours, 0).</summary>
+    /// <summary>
+    /// Per cell, the last thermal step's (loose moved, rock moved, sum of the loose excess over the neighbours, the share of its
+    /// creep the cell sent: 1 unless it ran short of loose material, 0 without creep).
+    /// </summary>
     public float[] Thermal { get; }
 
     /// <summary>Per cell, the sums of (outflow in m³/s, water depth in m) over the steps that averaged.</summary>
@@ -176,15 +179,18 @@ public sealed class ErosionState
 ///   <item><see cref="Transport"/>: suspended sediment moves with the water — each cell sends the fraction of its sediment
 ///   that its water sent — so sediment is conserved, unlike semi-Lagrangian advection.</item>
 ///   <item><see cref="ThermalOut"/>: where the ground is steeper than the loose talus angle, loose material slides; where it is
-///   steeper than the rock's talus angle (steeper for harder rock), rock collapses. Each cell works out how much leaves it.</item>
+///   steeper than the rock's talus angle (steeper for harder rock), rock collapses. Since M1a.3, with <see cref="ErosionSettings.CreepRate"/>,
+///   loose material also creeps toward every lower neighbour at any slope, in proportion to the drop. Each cell works out how much leaves it.</item>
 ///   <item><see cref="ThermalApply"/>: each cell loses what it sent and gains, as loose material, its share of what its
-///   neighbours sent, split in proportion to how far each neighbour exceeds the talus toward it.</item>
+///   neighbours sent, split in proportion to how far each neighbour exceeds the talus toward it (the creep, to how far each lies
+///   above it).</item>
 /// </list>
 /// Amounts that move between layers are made exactly representable first (<c>a − (a − x)</c>), so a transfer smaller than the
 /// rounding of a 2 km height cannot create or destroy material. The arithmetic is <see cref="float"/> in the shader's order.
 /// </summary>
 public static class ErosionReference
 {
+
     /// <summary>
     /// Runs <paramref name="settings"/> on <paramref name="ground"/> (its rock's hardness from <paramref name="strata"/>) and
     /// returns the eroded world.
@@ -536,11 +542,34 @@ public static class ErosionReference
         }
         float slide = MathF.Min(loose, k.HalfThermalRate * maxLoose);
         float collapse = MathF.Max(0f, k.HalfThermalRate * maxRock - slide);
-        thermal[c * 4] = loose - (loose - slide);
+        float slid = loose - (loose - slide);
+        thermal[c * 4] = slid;
         thermal[c * 4 + 1] = rock - (rock - collapse);
         thermal[c * 4 + 2] = sum;
-        thermal[c * 4 + 3] = 0f;
+        // M1a.3: the share of its full creep the cell sends, less where it has too little loose material left after the slide (in a
+        // branch of its own, as on the GPU, where it keeps the passes without creep compiled as before).
+        float share = 0f;
+        if (k.CreepEdge > 0f)
+        {
+            float creepSum = 0f;
+            for (int q = 0; q < 8; q++)
+            {
+                int ni = i + Di[q], nj = j + Dj[q];
+                if (ni < 0 || ni >= n || nj < 0 || nj >= n)
+                    continue;
+                float drop = ground - Ground(terrain, nj * n + ni);
+                creepSum += CreepToward(k, Di[q] != 0 && Dj[q] != 0, drop);
+            }
+            float creep = MathF.Min(loose - slid, creepSum);
+            share = creepSum > 0f ? creep / creepSum : 0f;
+        }
+        thermal[c * 4 + 3] = share;
     }
+
+    // The loose material creep sends toward a neighbour `drop` metres lower (M1a.3), before the sender's share: the isotropic
+    // nine-point Laplacian's weights, so the creep runs every way alike. 0 toward a higher neighbour, and when the creep is off.
+    private static float CreepToward(ErosionConstants k, bool corner, float drop) =>
+        MathF.Max(0f, drop) * (corner ? k.CreepCorner : k.CreepEdge);
 
     private static void ThermalApplyCell(ErosionConstants k, int n, int i, int j, float[] terrain, float[] thermal, float[] terrainOut)
     {
@@ -565,6 +594,28 @@ public static class ErosionReference
             gained += sent * (over / total);
         }
         terrainOut[c * 2] = rock - thermal[c * 4 + 1];
-        terrainOut[c * 2 + 1] = (loose - thermal[c * 4]) + gained;
+        if (k.CreepEdge > 0f)
+        {
+            // M1a.3: the neighbours' creep toward this cell, and this cell's own toward them, as each computed them.
+            float crept = 0f, creepSum = 0f;
+            for (int q = 0; q < 8; q++)
+            {
+                int ni = i + Di[q], nj = j + Dj[q];
+                if (ni < 0 || ni >= n || nj < 0 || nj >= n)
+                    continue;
+                int m = nj * n + ni;
+                bool corner = Di[q] != 0 && Dj[q] != 0;
+                float drop = Ground(terrain, m) - ground;
+                crept += thermal[m * 4 + 3] * CreepToward(k, corner, drop);
+                creepSum += CreepToward(k, corner, -drop);
+            }
+            float looseLeft = loose - thermal[c * 4];
+            float creep = MathF.Min(thermal[c * 4 + 3] * creepSum, looseLeft);
+            terrainOut[c * 2 + 1] = (looseLeft - creep) + (gained + crept);
+        }
+        else
+        {
+            terrainOut[c * 2 + 1] = (loose - thermal[c * 4]) + gained;
+        }
     }
 }

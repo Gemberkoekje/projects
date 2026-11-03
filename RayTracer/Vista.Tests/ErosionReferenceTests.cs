@@ -129,8 +129,9 @@ public sealed class ErosionReferenceTests
         double tan70 = Math.Tan(70.0 * Math.PI / 180.0), tan40 = Math.Tan(40.0 * Math.PI / 180.0);
         var wall = new ErosionState(Field(n, cell, (i, _) => (float)(Math.Clamp(i - 12, 0, 8) * cell * tan70)));
         var slope = new ErosionState(Field(n, cell, (i, _) => (float)(Math.Clamp(i - 12, 0, 8) * cell * tan40)));
-        // M1.7's thermal rate, so 2000 steps settle the wall (the shipped mountains' slower rate, M1a.2, takes longer to the same talus).
-        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains with { RockTalusDegrees = 50f, RockTalusHardDegrees = 60f, ThermalRate = 0.25f }, n, cell)
+        // M1.7's thermal rate, so 2000 steps settle the wall (the shipped mountains' slower rate, M1a.2, takes longer to the same talus);
+        // no creep, which keeps carrying the debris off the foot (M1a.3), so the wall keeps collapsing a little over its talus.
+        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains with { RockTalusDegrees = 50f, RockTalusHardDegrees = 60f, ThermalRate = 0.25f, CreepRate = 0f }, n, cell)
             .WithStrata(wall);
         foreach (ErosionState state in new[] { wall, slope })
         {
@@ -200,11 +201,12 @@ public sealed class ErosionReferenceTests
     public void TheReference_IsDeterministic_AndPinned()
     {
         // Change-detector: if this moves, every eroded world moves (and the cache's PassesVersion must change with it). M1.7's
-        // passes (no spread of the discharge, M1.7's thermal rate) keep their pin; M1a.2's have their own.
+        // passes (no spread of the discharge, M1.7's thermal rate) keep their pin; M1a.2's (no creep) and M1a.3's have their own.
         foreach ((ErosionSettings erosion, string surface, string result) in new[]
         {
-            (ErosionSettings.Mountains with { DischargeSpread = 0, ThermalRate = 0.25f }, PinnedSurfaceHash, PinnedResultHash),
-            (ErosionSettings.Mountains, PinnedSpreadSurfaceHash, PinnedSpreadResultHash),
+            (ErosionSettings.Mountains with { DischargeSpread = 0, ThermalRate = 0.25f, CreepRate = 0f }, PinnedSurfaceHash, PinnedResultHash),
+            (ErosionSettings.Mountains with { CreepRate = 0f }, PinnedSpreadSurfaceHash, PinnedSpreadResultHash),
+            (ErosionSettings.Mountains, PinnedCreepSurfaceHash, PinnedCreepResultHash),
         })
         {
             ErosionSettings settings = erosion with { Iterations = 200, AverageFrom = 100 };
@@ -220,6 +222,8 @@ public sealed class ErosionReferenceTests
     private const string PinnedResultHash = "3f6a3639797cffa9";
     private const string PinnedSpreadSurfaceHash = "78b10ec152f08795";
     private const string PinnedSpreadResultHash = "5d0f3f3f7f21466c";
+    private const string PinnedCreepSurfaceHash = "03080977a0819b27";
+    private const string PinnedCreepResultHash = "6945aaa41624277d";
 
     [TestMethod]
     public void SpreadingTheDischarge_SpreadsALaneOverAChannelsWidth_AndKeepsItsTotal()
@@ -266,6 +270,112 @@ public sealed class ErosionReferenceTests
         Assert.IsTrue(lanes.AlignedShare > 0.4, $"along the grid's rows: {lanes.AlignedShare:0.0%} of the relief");
         Assert.IsTrue(spread.RippleShare < 0.1, $"with it no comb: {spread.RippleShare:0.0%} of the windows ripple");
         Assert.IsTrue(spread.AlignedShare < 0.25, $"and the gullies follow the fall line: {spread.AlignedShare:0.0%} of the relief along the grid");
+    }
+
+    // The thermal passes alone, `steps` times, on loose ground over flat rock (no water): the creep, and the talus where it is exceeded.
+    private static ErosionState Creep(Func<int, int, float> surface, int n, float creepRate, int steps, float looseMetres = 20f)
+    {
+        var state = new ErosionState(Field(n, 8.0, (i, j) => surface(i, j) - looseMetres));
+        for (int c = 0; c < n * n; c++)
+            state.Terrain[c * 2 + 1] = looseMetres;
+        ErosionConstants k = ErosionConstants.For(ErosionSettings.Mountains with { CreepRate = creepRate }, n, 8.0).WithStrata(state);
+        var terrainB = new float[n * n * 2];
+        for (int s = 0; s < steps; s++)
+        {
+            ErosionReference.ThermalOut(k, state.Terrain, state.Thermal, state.Strata, state.Bands);
+            ErosionReference.ThermalApply(k, state.Terrain, state.Thermal, terrainB);
+            terrainB.CopyTo(state.Terrain, 0);
+        }
+        return state;
+    }
+
+    // The amplitude of cos(2π · phase(i, j)) in the ground of `state`, over the samples 8 to n − 9 a side.
+    private static double Amplitude(ErosionState state, Func<int, int, double> phase)
+    {
+        int n = state.Size;
+        double sum = 0.0, weight = 0.0;
+        for (int j = 8; j < n - 8; j++)
+        {
+            for (int i = 8; i < n - 8; i++)
+            {
+                double basis = Math.Cos(2.0 * Math.PI * phase(i, j));
+                sum += (state.Terrain[(j * n + i) * 2] + state.Terrain[(j * n + i) * 2 + 1] - 1000.0) * basis;
+                weight += basis * basis;
+            }
+        }
+        return sum / weight;
+    }
+
+    [TestMethod]
+    public void Creep_DampsARippleAFewCellsLong_ManyTimesFasterThanALandform()
+    {
+        // A washboard three cells long, along the rows or the diagonals, on a long swell (24 cells, 192 m): creep is a diffusion, which
+        // damps a wave by the square of how short it is, so the ripple goes and the swell stays (vista-plan §10 M1a.3). The 72 samples
+        // measured a side hold whole waves of both, so neither leaks into the other's measure.
+        const int n = 88;
+        foreach ((string way, Func<int, int, double> ripple) in new (string, Func<int, int, double>)[]
+        {
+            ("along the rows", (i, _) => i / 3.0),
+            ("along the diagonals", (i, j) => (i + j) / 3.0),
+        })
+        {
+            float Surface(int i, int j) => (float)(1000.0 + 2.0 * Math.Cos(2.0 * Math.PI * j / 24.0) + 0.5 * Math.Cos(2.0 * Math.PI * ripple(i, j)));
+            ErosionState before = Creep(Surface, n, 0.03f, 0), after = Creep(Surface, n, 0.03f, 60);
+            Func<int, int, double> swell = (_, j) => j / 24.0;
+            double rippleKept = Amplitude(after, ripple) / Amplitude(before, ripple), swellKept = Amplitude(after, swell) / Amplitude(before, swell);
+            Assert.IsTrue(rippleKept < 0.02, $"{way}: the ripple keeps {rippleKept:0.0%} of its height");
+            Assert.IsTrue(swellKept > 0.8, $"{way}: the swell keeps {swellKept:0.0%}");
+            ErosionState still = Creep(Surface, n, 0f, 60);
+            Assert.AreEqual(1.0, Amplitude(still, ripple) / Amplitude(before, ripple), 1e-6, $"{way}: without creep the thermal passes leave a gentle ripple alone");
+        }
+    }
+
+    [TestMethod]
+    public void Creep_MovesOnlyLooseMaterial_AndKeepsItsTotal()
+    {
+        // A rock knoll under 30 cm of loose material on flat rock, and a bare one: the loose cover creeps off the knoll and spreads,
+        // its total kept; the rock never moves, and a knoll with nothing loose on it stays as it is.
+        const int n = 33;
+        float Knoll(int i, int j) => (float)(1000.0 + 12.0 * Math.Exp(-((i - 16) * (i - 16) + (j - 16) * (j - 16)) / 18.0));
+        foreach (float cover in new[] { 0.3f, 0f })
+        {
+            ErosionState state = Creep(Knoll, n, 0.05f, 400, cover);
+            double loose = 0.0;
+            for (int j = 0; j < n; j++)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    int c = j * n + i;
+                    Assert.AreEqual(Knoll(i, j) - cover, state.Terrain[c * 2], $"cover {cover}: the rock at ({i}, {j}) moved");
+                    Assert.IsTrue(state.Terrain[c * 2 + 1] >= 0f, $"cover {cover}: loose went negative at ({i}, {j})");
+                    loose += state.Terrain[c * 2 + 1];
+                }
+            }
+            Assert.AreEqual(cover * n * n, loose, 1e-4 * n * n, $"cover {cover}: the loose material's total");
+            if (cover > 0f)
+                Assert.IsTrue(state.Terrain[(16 * n + 16) * 2 + 1] < 0.5f * cover, $"the knoll's top keeps {state.Terrain[(16 * n + 16) * 2 + 1]:0.000} m of {cover} m");
+        }
+    }
+
+    [TestMethod]
+    public void Creep_StopsTheWashboardOnTheFans()
+    {
+        // The alpine range on a small grid (2 km): without creep the pipe model lays a washboard 2–4 cells apart on the gentle loose
+        // ground below the faces, which the hero's rows of dots are cut from (vista-plan §10 M1a.1); the shipped creep stops it.
+        var grid = new WorldGrid(257, 8.0);
+        var recipe = new Recipe { SetPieces = [SetPiece.AlpineRange] };
+        GridArtefacts LooseGround(ErosionSettings settings)
+        {
+            HeightField ground = TerrainGenerator.Generate(recipe, 42, grid);
+            (HeightField coarseBase, HeightField coarseIncised, StrataFrame frame, HeightField uplift) = StreamPower.Coarse(recipe, 42, grid, settings);
+            HeightField incised = StreamPower.Refine(coarseIncised, coarseBase, ground, settings);
+            StrataGrid strata = StrataGrid.For(RockHardness.For(42, settings), grid.Size, grid.CellSize, frame, (x, z) => uplift.HeightAt(x, z));
+            ErosionResult r = ErosionReference.Erode(incised, settings, strata);
+            return GridArtefacts.Measure(r.Surface, c => r.Loose[c] >= 0.5f);
+        }
+        GridArtefacts without = LooseGround(ErosionSettings.Mountains with { CreepRate = 0f }), with = LooseGround(ErosionSettings.Mountains);
+        Assert.IsTrue(without.RippleShare > 0.05, $"without creep a washboard: {without.RippleShare:0.0%} of the loose ground's windows ripple");
+        Assert.IsTrue(with.RippleShare < 0.02, $"with it none: {with.RippleShare:0.0%}");
     }
 
     [TestMethod]

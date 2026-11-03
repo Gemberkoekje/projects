@@ -11,7 +11,7 @@ public sealed class StrataFieldTests
 {
     /// <summary>
     /// M1.11d's rock: none of M1.12c's regional dip, folds, formations or massive regions, none of M1.13's glaciers, and M1.11a's grid
-    /// transfer and M1.7's passes (none of M1a.2's).
+    /// transfer and M1.7's passes (none of M1a.2's or M1a.3's).
     /// </summary>
     internal static readonly ErosionSettings Even = ErosionSettings.Mountains with
     {
@@ -26,6 +26,7 @@ public sealed class StrataFieldTests
         RefineFaceDetail = 0f,
         DischargeSpread = 0,
         ThermalRate = 0.25f,
+        CreepRate = 0f,
     };
 
     [TestMethod]
