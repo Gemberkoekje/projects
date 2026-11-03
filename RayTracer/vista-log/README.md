@@ -45,4 +45,5 @@ slice's entry in its §10 keeps the goal, deliverable and verify, plus one statu
 | [`M1.17.md`](M1.17.md) | M1 sign-off: the look's choices, Vista's camera, the goldens and the hero |
 | [`M1a.1.md`](M1a.1.md) | The map: what makes M1's hero read as a model (M1a, the ground's surface) |
 | [`M1a.2.md`](M1a.2.md) | Ground that gathers its water: the incision brought back smoothly, the spread discharge |
+| [`M1a.3.md`](M1a.3.md) | The washboard gone: the loose ground creeps |
 | [`cost-ledger.md`](cost-ledger.md) | The cost ledger: ns per pixel-sample per slice |

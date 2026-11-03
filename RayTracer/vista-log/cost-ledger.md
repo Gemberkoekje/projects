@@ -39,6 +39,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.17 (stop 1) | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1.17 (stop 2) | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1a.2 | 0.30 | 6.92 | 5.11 | 18.70 |
+| M1a.3 | 0.26 | 5.74 | 4.12 | 15.55 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -201,3 +202,7 @@ the spread discharge, the slower thermal pass), and the default, sky and down-sl
 8.6 m up), so the default and down-slope rows measure other ground. The world's own cost: the GPU erosion 19.7–21.7 → 26.4 s (13–14 →
 17.6 ms a step: the discharge and its four spread passes), its state 1345 → 1473 MiB (the spread's two buffers), the incision's way
 back to the world grid 0.1–0.2 → 0.5–0.7 s on the CPU (vista-log/M1a.2.md).
+M1a.3 changes the world and not the integrator: the loose ground creeps (seed 42's fans smooth, the washboard gone). Measured with the
+GPU idle; M1a.2's world timed in turns with it in the same session reads 0.27 / 5.75 / 4.13 / 15.53, so the creep costs the trace
+nothing (ratios 0.95–1.00), and the fall from M1a.2's row is the idle GPU and the reworked world (M1a.2's row was taken on its first
+world with other work on the GPU). The erosion 25.5 → 25.6 GPU s (vista-log/M1a.3.md).

@@ -14,7 +14,7 @@ and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M
 (auto camera v1, with its detail budget), M1.15 (the time and VRAM estimate), M1.16 (the preview and tweak window) and
 M1.17 (the sign-off) are done: **M1 is done** (2026-10-28), its goldens committed and passing and its hero rendered. **M1a** (the
 ground's surface, the user's call after the hero) comes before M2 (measured spectra): its seven slices are planned in §10 (**M1a plan**)
-and M1a.1 (the map) and M1a.2 (ground that gathers its water) are done; what M1 found and did not need is in the parked list (§10). It sits
+and M1a.1 (the map), M1a.2 (ground that gathers its water) and M1a.3 (the washboard gone) are done; what M1 found and did not need is in the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -362,6 +362,14 @@ change.
   M1.7's rate (0.02), so the water and the talus compete instead of every steep face settling to one talus plane creased in the
   grid's eight directions. Measured by `GridArtefacts`: the eroded world's relief along the grid's eight directions 33% → 17% (the
   base terrain 15%), its 128 m windows rippling at 2–4 cells 7.5% → 2% (1.4%).
+- **Soil creep** (M1a.3, [`vista-log/M1a.3.md`](vista-log/M1a.3.md)): the loose material moves toward every lower neighbour at any
+  slope, in proportion to the drop (3% of it a step, with the isotropic nine-point Laplacian's weights), in the thermal passes: a
+  diffusion of the loose ground. The pipe model reads its capacity's slope by central differences, which never see a cell's own
+  height, so a ripple two to four cells long on gentle loose ground feels no pull back and grows where the water drops its load: a
+  washboard on the fans, which the rules cut into rows of scree, meadow and forest (the hero's rows of dots). Creep damps that ripple
+  by the square of how short it is and leaves the landforms and the rock's crests nearly alone: the loose ground's windows rippling
+  3.4% → 0.4% (the base terrain 1.4%). A slope by steepest descent fixes the cause as well, but blunts every crest (measured, not
+  shipped).
 - **Geometry:** a 16k² height field as triangles (~500M) does not fit in 8 GB. Because
   the camera is fixed for a still, build a **view-dependent mesh once per camera** to a
   screen-space error target, conservative for off-screen geometry that still casts
@@ -2227,6 +2235,20 @@ incised 67.5%; eroded 33.1%) and the share of 128 m windows rippling at 2–4 ce
   the grid's normal over a few cells, so no grid-scale wobble is cut into dots. *Verify:* the loose ground's ripple at the base
   terrain's; the dots' loupe; the parked meadow banding looked for on M1.12's meadow view. It shrinks to its checks if M1a.2 already
   removes the washboard.
+  *Status (2026-11-03): done.* The loose ground creeps (`CreepRate` 0.03: toward every lower neighbour in proportion to the drop, in
+  the thermal passes), and the washboard is gone: the loose ground's windows rippling 3.4% → 0.4% (the base terrain 1.4%), the rows
+  of dots and the lattice of dimples under them gone from the loupe; drainage, relief, facets and the materials' shares unmoved, and
+  the trace and the erosion cost the same. Its cause, measured: the capacity's slope by central differences never sees a cell's own
+  height, so a ripple a few cells long feels no pull back where the water drops its load; a slope by steepest descent fixes it too
+  but blunts every crest (not shipped). The rules' slope over a few cells was not needed (the material ids show no rows) and is not
+  built. The parked meadow banding is the grass's own bump (M5's). *But* today's glacier lies on the hero's lit crest again: its
+  highest 64 m sample stands 7 cm over the glaciers' line, where M1a.2's stood 1.6 cm under it, and a crest at the line carries no
+  ice or a full cap of domes (the parked "Ice caps laid as smooth domes", now measured). *Judge this:* `m1a-3-dots.png` (M1a.2
+  above, M1a.3 below) and `m1a-3-ground.png` (from above). *Ignore this:* the rock's texture and the near faces' smooth look (M1a.4),
+  the beds' bands (M1a.5), the meadows (M1a.6), trees (M5), and the pale domes on the lit crest (`m1a-3-lit.png`, the hero), which are
+  the question. *Questions:* in the bottom row, are the rows of dots gone? From above, does the right square of each pair look more
+  like mountain ground? The crest has pale domes again: should fixing how ice caps look come next, before the rock's detail? Log:
+  [`vista-log/M1a.3.md`](vista-log/M1a.3.md).
 - **M1a.4 — Rock below the grid** (the planes below the 8 m cell; the parked "nearest faces lack detail"). Structure by material and
   slope at every distance the hero shows rock: the near face (the slope at the frame's right, 130–170 m off, 5 cm a pixel, the 8 m cell
   150–190 pixels wide), the foreground (0.5–1.5 km, 0.15–0.5 m a pixel) and the lit middle range (3–4 km, 1–1.3 m a pixel). At 5–50 m:
@@ -2400,6 +2422,8 @@ any of them.
   rows of dots. *M1a.1:* probably: the dots are the pipe model's washboard on gentle loose ground (8.6% of the loose ground's windows
   ripple at 2–4 cells), cut by the slope rules; M1a.3 looks for the banding on M1.12's meadow view once the washboard is gone.
   *M1a.2:* the loose ground's windows rippling 8.6% → 3.4% (the base terrain 1.4%), yet the hero's rows of dots remain: M1a.3's.
+  *M1a.3:* the washboard and the rows of dots are gone (the creep), and M1.12's meadow view shows the same wavy texture before and
+  after (`m1a-3-meadow.png`): the grass's own bump at a grazing angle, not the ground. Back to M5.
 - **Folds without faults** (M1.12c): the beds bend but never break, as a height field's beds must.
   *Belongs:* unscheduled; faults and overhangs need more than a height field.
 - **Steeper, more alike slopes since the folded strata** (M1.12c): the facet measure rose from
@@ -2420,11 +2444,18 @@ any of them.
   volume against 15.9%). Tried in M1a.2's rework and dropped: the solve's thickness draped over the rock (it buried crests the rock had
   stood through: the ridge beside the hero's camera rose under 15 m of ice into the frame), and the same capped at the smooth
   surface's thickness (no visible change). Real caps show the crest under them, cornices, crevasses and rock poking through.
-  *Belongs:* M7 (close-up snow and ice); the next view that shows a cap in its picture's subject, sooner.
+  *Belongs:* M7 (close-up snow and ice); the next view that shows a cap in its picture's subject, sooner. *M1a.3:* the cap is back on
+  the hero's lit crest (`m1a-3-lit.png`), and the chance measured: the crest's highest 64 m sample stood 1.6 cm under the glaciers'
+  line on M1a.2's world and stands 7 cm over it with the creep. A crest at the line carries no ice or a full cap, nothing between:
+  once ice lies above the line its own surface lifts it into the zone where snow gathers (the small ice cap's feedback), and the
+  balance flux turns the least flux into tens of metres of slow ice (the shallow-ice thickness goes as the flux to the fifth root).
+  The solve's iterations do not change it (60 to 480: the same answer on each world). So every change of the eroded ground moves
+  caps on and off the crests at the line. The hero's subject shows one: the user's call whether it comes next (vista-log/M1a.3.md).
 - **The hero's near ridge** (M1a.2's rework): with M1's fixed camera the ridge 130–160 m to the right rises into the frame on the
   reworked world (metres of change that near the camera swing a sixth of the frame) and reads as a smooth dark mass; the auto
   camera's own pick on the new world leaves it out. *Belongs:* M1a.4 (the near faces' detail), and M1a.7 (whether the sign-off's hero
-  keeps M1's camera or takes the auto camera's pick).
+  keeps M1's camera or takes the auto camera's pick). *M1a.3:* with the creep the ridge shrinks back to a sliver at the frame's edge
+  (`m1a-3-hero.png`); M1a.7 still chooses the camera.
 - **Glaciers that follow the place** (M1.13): today's glaciers are the recipe's, the same at Zermatt,
   Lofoten and Fiordland, in every season. *Decided (2026-10-25):* yes; how low glaciers reach follows
   the climate (far lower where it is cold and wet than in the Alps), so today's glaciers come from
