@@ -52,7 +52,7 @@ cbuffer MaterialConstants : register(b3) // Vista.World.MaterialConstants
     float MatWetDepthFrom;    float MatWetDepthTo;       float MatGrassLine;       float MatGrassBand;
     float MatAspectShift;     float MatGrassNoise;       float MatGrassSlopeFrom;  float MatGrassSlopeTo;
     float MatBareFrom;        float MatBareTo;           float MatWetDarkening;    float MatPoleward;
-    uint  MatNoiseSeed;       uint  MatPad0;             uint  MatPad4;            uint  MatPad5;
+    uint  MatNoiseSeed;       uint  MatStructure;        uint  MatStructureOctaves; uint MatPad5;
     float MatBreakup1;        float MatBreakup2;         float MatTableScale;      float MatTableLast;
     float MatMapOriginX;      float MatMapOriginZ;       float MatMapCell;         uint  MatMapSize;
     float MatHardColourMid;   float MatHardColourWidth;  float MatBedBrightness;   float MatBedWarmth;
@@ -60,7 +60,7 @@ cbuffer MaterialConstants : register(b3) // Vista.World.MaterialConstants
     uint  MatDiffuse;         float MatPixelAngle;       float MatBumpFinest;      uint  MatBumpOctaves;
     float MatRoughRock;       float MatRoughScree;       float MatRoughSoil;       float MatRoughGrass;
     int   MatCamCellX;        int   MatCamCellZ;         float MatCamFracX;        float MatCamFracZ;
-    float MatStoneTilt;       float MatStoneGap;         float MatPad6;            float MatPad7;
+    float MatStoneTilt;       float MatStoneGap;         float MatStructureDepth;  float MatStructureCoarsest;
     float MatTreeLine;        float MatTreeBand;         float MatTreeAspectShift; float MatTreeNoise;
     float MatTreeEdge;        float MatTreeSlopeFrom;    float MatTreeSlopeTo;     float MatBreakup3;
     float MatClearingFrom;    float MatClearingTo;       float MatMoistLogFrom;    float MatMoistLogTo;
@@ -372,6 +372,7 @@ struct GroundSurface
     float3 Albedo; // linear-sRGB albedo, for the albedo output
     float3 Normal; // the shading normal, with the bump on a path's first surface
     uint   Id;     // the material with the largest weight
+    float  Sun;    // how much of the sun reaches past the rock's own structure (M1a.4), on a path's first surface; else 1
 };
 
 // The bump's gradient in one plane of the triplanar layout, at its octave `k` (wavelength λ): the plane's two coordinates' cells and
@@ -425,6 +426,228 @@ float3 MatStoneOctave(uint seed, int2 base, float2 local)
     uint t = PcgHash(nearest);
     float2 tilt = float2(float(t & 0xFFFFu), float(t >> 16)) * (2.0 / 65536.0) - 1.0;
     return float3(tilt, sqrt(second) - sqrt(first));
+}
+
+// ── The rock's structure (M1a.4; Vista.World.RockStructure) ──────────────────────────────────────
+
+#define RS_CELL          2.0        // RockStructure.Cell
+#define RS_KERNEL        1.1        // RockStructure.KernelRadius
+#define RS_RIB_ROUNDING  0.3        // RockStructure.RibRounding
+#define RS_SLOPE_FROM    0.47       // RockStructure.SlopeFrom
+#define RS_SLOPE_TO      0.84       // RockStructure.SlopeTo
+#define RS_SEC_MAX       4.0        // RockStructure.SecMax
+#define RS_CONTRAST_FROM 0.1        // RockStructure.ContrastFrom
+#define RS_CONTRAST_TO   0.45       // RockStructure.ContrastTo
+#define RS_SHADOW_OCTAVES 3u        // the gullies' octaves whose shadows the shading casts
+#define RS_SHADOW_STEPS   9u        // the steps toward the sun, 1.5 m and each 1.6 times the last, out to the coarsest wavelength
+
+// One octave's phasor at world point `p`: stripes of angular frequency `omega` across the fall line (`across`, a unit vector),
+// from a jittered point in each of the 3×3 cells (side `cell`) around p, each with its own phase and a radial kernel RS_KERNEL cells
+// wide (RockStructure.Phasor). The phasor Z, its real and imaginary parts' gradients, and the kernels' sum.
+void GullyPhasor(uint seed, float2 p, float omega, float cell, float2 across, out float2 z, out float2 dRe, out float2 dIm, out float weights)
+{
+    float2 f = floor(p / cell);
+    int2 c = int2(f);
+    z = 0.0;
+    dRe = 0.0;
+    dIm = 0.0;
+    weights = 0.0;
+    float inv = 1.0 / (RS_KERNEL * RS_KERNEL * cell * cell);
+    for (int j = -1; j <= 1; j++)
+    {
+        for (int i = -1; i <= 1; i++)
+        {
+            uint h = PcgHash(seed ^ PcgHash(asuint(c.x + i) ^ PcgHash(asuint(c.y + j))));
+            float2 q = (f + float2(i, j) + 0.15 + 0.7 * float2(float(h & 0xFFFFu), float(h >> 16)) * (1.0 / 65536.0)) * cell;
+            float2 r = p - q;
+            float d2 = dot(r, r) * inv;
+            if (d2 >= 1.0)
+                continue;
+            float k = 1.0 - d2;
+            float w = k * k * k;
+            float dw = -6.0 * k * k * inv;
+            float phase = omega * dot(r, across) + float(PcgHash(h) >> 8) * (6.2831853 / 16777216.0);
+            float s, co;
+            sincos(phase, s, co);
+            z += w * float2(co, s);
+            dRe += (dw * co) * r - (w * s * omega) * across;
+            dIm += (dw * s) * r + (w * co * omega) * across;
+            weights += w;
+        }
+    }
+}
+
+// The gullies and ribs down the fall line at world point `p` (m) on ground whose height gradient is `g0` (the world grid's), for a
+// pixel covering `footprint` metres along the ground (RockStructure.Gullies): MatStructureOctaves octaves from MatStructureCoarsest
+// metres down, each a phasor's stripes across the fall line shaped into a rib and a rounded gully floor, each finer octave following
+// the fall line of the grid and the coarser ones (so gullies branch into their tributaries up the slope), each fading out between four
+// and two pixels a wavelength. Returns the gradient it adds to the ground's, and in `floorShare` how far the point lies in a gully's
+// floor (0 on a rib, 1 at the floor), by the octaves' depths.
+float2 RockGullies(float2 p, float2 g0, float footprint, out float floorShare)
+{
+    floorShare = 0.0;
+    float steep = length(g0);
+    float slopeFade = MatSmoothStep(RS_SLOPE_FROM, RS_SLOPE_TO, steep);
+    if (slopeFade <= 0.0 || MatStructureDepth <= 0.0)
+        return 0.0;
+    float sec = min(sqrt(1.0 + steep * steep), RS_SEC_MAX);
+    float roundedPi = sqrt(PI * PI + RS_RIB_ROUNDING * RS_RIB_ROUNDING) - RS_RIB_ROUNDING;
+    float2 g = g0;
+    float2 added = 0.0;
+    float depthSum = 0.0;
+    float lambda = MatStructureCoarsest;
+    for (uint k = 0u; k < MatStructureOctaves; k++, lambda *= 0.5)
+    {
+        float fade = MatSmoothStep(2.0 * footprint, 4.0 * footprint, lambda);
+        if (fade <= 0.0)
+            break;
+        float len = length(g);
+        if (len < 1.0e-4)
+            break;
+        float2 across = float2(-g.y, g.x) / len;
+        float2 z, dRe, dIm;
+        float weights;
+        float omega = 6.2831853 / lambda;
+        GullyPhasor(PcgHash(MatNoiseSeed ^ (0x6A11u + k)), p, omega, RS_CELL * lambda, across, z, dRe, dIm, weights);
+        float m2 = dot(z, z);
+        if (m2 < 1.0e-12 || weights <= 0.0)
+            continue;
+        float contrast = MatSmoothStep(RS_CONTRAST_FROM, RS_CONTRAST_TO, sqrt(m2) / weights);
+        float phi = atan2(z.y, z.x);
+        float2 dPhi = (z.x * dIm - z.y * dRe) / m2;
+        // The profile 2t² − 2/3, t = 1 − u/π, u the rounded |φ| (RockStructure.Profile): a rib at φ = 0, a rounded floor at ±π.
+        float root = sqrt(phi * phi + RS_RIB_ROUNDING * RS_RIB_ROUNDING);
+        float t = 1.0 - (root - RS_RIB_ROUNDING) * (PI / roundedPi) * (1.0 / PI);
+        float profileSlope = -4.0 * t * (1.0 / PI) * (phi / root * (PI / roundedPi));
+        float amplitude = MatStructureDepth * lambda * sec * slopeFade * contrast * fade;
+        float2 grad = (amplitude * profileSlope) * dPhi;
+        added += grad;
+        g += grad;
+        float depth = MatStructureDepth * lambda * contrast * fade;
+        floorShare += depth * (1.0 - t) * (1.0 - t);
+        depthSum += depth;
+    }
+    floorShare = depthSum > 0.0 ? floorShare / depthSum : 0.0;
+    return added;
+}
+
+// The gullies' height at world point `p` on ground of height gradient `g0`, their first `octaves` octaves (RockStructure.Gullies'
+// height, every octave whole), for the shadows they cast.
+float RockGullyHeight(float2 p, float2 g0, uint octaves)
+{
+    float steep = length(g0);
+    float slopeFade = MatSmoothStep(RS_SLOPE_FROM, RS_SLOPE_TO, steep);
+    if (slopeFade <= 0.0)
+        return 0.0;
+    float sec = min(sqrt(1.0 + steep * steep), RS_SEC_MAX);
+    float roundedPi = sqrt(PI * PI + RS_RIB_ROUNDING * RS_RIB_ROUNDING) - RS_RIB_ROUNDING;
+    float2 g = g0;
+    float height = 0.0;
+    float lambda = MatStructureCoarsest;
+    for (uint k = 0u; k < octaves; k++, lambda *= 0.5)
+    {
+        float len = length(g);
+        if (len < 1.0e-4)
+            break;
+        float2 across = float2(-g.y, g.x) / len;
+        float2 z, dRe, dIm;
+        float weights;
+        float omega = 6.2831853 / lambda;
+        GullyPhasor(PcgHash(MatNoiseSeed ^ (0x6A11u + k)), p, omega, RS_CELL * lambda, across, z, dRe, dIm, weights);
+        float m2 = dot(z, z);
+        if (m2 < 1.0e-12 || weights <= 0.0)
+            continue;
+        float contrast = MatSmoothStep(RS_CONTRAST_FROM, RS_CONTRAST_TO, sqrt(m2) / weights);
+        float phi = atan2(z.y, z.x);
+        float2 dPhi = (z.x * dIm - z.y * dRe) / m2;
+        float root = sqrt(phi * phi + RS_RIB_ROUNDING * RS_RIB_ROUNDING);
+        float t = 1.0 - (root - RS_RIB_ROUNDING) * (PI / roundedPi) * (1.0 / PI);
+        float profileSlope = -4.0 * t * (1.0 / PI) * (phi / root * (PI / roundedPi));
+        float amplitude = MatStructureDepth * lambda * sec * slopeFade * contrast;
+        height += amplitude * (2.0 * t * t - 2.0 / 3.0);
+        g += (amplitude * profileSlope) * dPhi;
+    }
+    return height;
+}
+
+// How much of the sun reaches frame point `p` (world point `world`, the world grid's gradient `g0` there) past the gullies' ribs
+// toward it (vista-plan §10 M1a.4): the ground toward the sun as the grid's slope plane plus the gullies' height (their coarse
+// octaves, the grid's own fall line at each step), marched out to a wavelength of the coarsest; where it rises over the sun's ray the
+// point lies in a rib's shadow, softened over a few pixels' worth of height. The mesh casts the grid's own shadows; these are the
+// shadows of the relief the mesh leaves out.
+float RockSunShadow(float3 p, float2 world, float2 g0, float footprint)
+{
+    float sinE = dot(AtmToSun, LocalUp(p));
+    float2 toward = AtmToSun.xz;
+    float flat = length(toward);
+    if (sinE <= 0.0 || flat < 1.0e-4)
+        return 1.0;
+    toward /= flat;
+    float tanE = sinE / max(sqrt(1.0 - sinE * sinE), 1.0e-4);
+    uint octaves = min(MatStructureOctaves, RS_SHADOW_OCTAVES);
+    float here = RockGullyHeight(world, g0, octaves);
+    float lit = 1.0;
+    float r = 0.0;
+    for (uint k = 0u; k < RS_SHADOW_STEPS; k++)
+    {
+        r = r * 1.6 + 1.5;
+        float2 q = world + toward * r;
+        float2 m = OnMap(q, Map0Origin, Map0Cell, Map0Size) ? SampleMap0(q) : -g0 * rsqrt(1.0 + dot(g0, g0));
+        float2 gq = -m / max(sqrt(max(1.0 - dot(m, m), 0.0)), 0.05);
+        float rise = dot(g0, toward) * r + RockGullyHeight(q, gq, octaves) - here - r * tanE;
+        float soft = 0.02 * r + footprint;
+        lit = min(lit, MatSmoothStep(soft, -soft, rise));
+        if (r > MatStructureCoarsest)
+            break;
+    }
+    return lit;
+}
+
+// One entry of the ledge table that follows the beds in BedTable, four entries a float4.
+float LedgeEntry(uint base, uint e)
+{
+    float4 v = BedTable[base + (e >> 2)];
+    uint k = e & 3u;
+    return k == 0u ? v.x : k == 1u ? v.y : k == 2u ? v.z : v.w;
+}
+
+// The ledges' height at bed-table coordinate t (m) and its slope by the coordinate (m per entry): a Catmull–Rom spline through the
+// ledge table (RockStructure.LedgeAt).
+float2 LedgeAt(float t)
+{
+    uint entries = uint(MatTableLast) + 2u;
+    t = clamp(t, 1.0, float(entries) - 3.0);
+    uint e = uint(floor(t));
+    float f = t - float(e);
+    float p0 = LedgeEntry(entries, e - 1u), p1 = LedgeEntry(entries, e), p2 = LedgeEntry(entries, e + 1u), p3 = LedgeEntry(entries, e + 2u);
+    float a = -p0 + p2, b = 2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3, c = -p0 + 3.0 * p1 - 3.0 * p2 + p3;
+    return float2(0.5 * (2.0 * p1 + f * (a + f * (b + f * c))), 0.5 * (a + f * (2.0 * b + 3.0 * f * c)));
+}
+
+// The ledges and cliff bands the beds' hardness makes at world point `world`, on ground of height gradient `g` at bed-table
+// coordinate `t` (MatSample.Table): the gradient of the ledges' height (1 − massive)·G(t), with ∇t = TableScale·∇h + ∇offset.
+float2 RockLedges(float2 world, float2 g, float t, float massive)
+{
+    float layered = 1.0 - massive;
+    if (layered <= 0.0 || MatMapSize < 2u)
+        return 0.0;
+    float slope = LedgeAt(t).y * layered;
+    // The bed-table offset's gradient from the material map's four samples around the point.
+    float2 uv = clamp((world - float2(MatMapOriginX, MatMapOriginZ)) / MatMapCell, 0.0, float(MatMapSize - 1u));
+    uint2 c = min(uint2(uv), uint2(MatMapSize - 2u, MatMapSize - 2u));
+    float2 f = uv - float2(c);
+    uint k = c.y * MatMapSize + c.x;
+    float o00 = asfloat(MaterialMap[k].x), o10 = asfloat(MaterialMap[k + 1u].x);
+    float o01 = asfloat(MaterialMap[k + MatMapSize].x), o11 = asfloat(MaterialMap[k + MatMapSize + 1u].x);
+    float2 dOffset = float2((o10 - o00) * (1.0 - f.y) + (o11 - o01) * f.y, (o01 - o00) * (1.0 - f.x) + (o11 - o10) * f.x) / MatMapCell;
+    return slope * (MatTableScale * g + dOffset);
+}
+
+// The normal `n` (y up) with the height gradient `added` added to the ground's.
+float3 AddGradient(float3 n, float2 added)
+{
+    float2 g = float2(-n.x, -n.z) / max(n.y, 0.05) + added;
+    return normalize(float3(-g.x, 1.0, -g.y));
 }
 
 // The shading normal `ns` at frame point `p` (world offset `o` from the camera, height `height`) with the bump of weights `w` and
@@ -560,6 +783,22 @@ GroundSurface ShadeGround(float3 p, float3 ns, float3 wo, uint4 idx, float footp
     float slope;
     float3 gridNormal = GroundNormal(world, p, ns);
     MatWeights w = MaterialWeightsAt(world, height, gridNormal, s, slope);
+
+    // The rock's structure (M1a.4) on a camera hit: gullies and ribs down the fall line, then the beds' ledges on that ground, by
+    // the rules' weight of rock.
+    float floorShare = 0.0;
+    g.Sun = 1.0;
+    if (MatStructure != 0u && footprint > 0.0 && w.Rock > 0.0)
+    {
+        float along = footprint / max(abs(dot(ns, wo)), 0.15);
+        float2 g0 = -gridNormal.xz / max(gridNormal.y, 0.05);
+        float2 gullies = RockGullies(world, g0, along, floorShare);
+        float2 here = -ns.xz / max(ns.y, 0.05) + gullies;
+        float2 ledges = RockLedges(world, here, s.Table, s.Massive);
+        ns = AddGradient(ns, w.Rock * (gullies + ledges));
+        if (SunUp != 0u)
+            g.Sun = 1.0 - w.Rock * (1.0 - RockSunShadow(p, world, g0, along));
+    }
 
     // The rules blend over the 8 m maps' cells; on the ground a boundary is sharper and ragged. So the shading sharpens the blend
     // (each weight to the sixth power, then normalised: a pure material stays pure) after a fine noise (2.5 m and 0.6 m) has pushed

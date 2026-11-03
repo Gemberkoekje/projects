@@ -68,6 +68,9 @@ public sealed class TerrainHierarchy
     private readonly double[][] _kindBounds;
     private readonly float[] _analyticRadius;
 
+    /// <summary>The most the rock's structure adds to a sub-grid vertex's bound, per level (vista-plan §10 M1a.4; 0 without it).</summary>
+    private float[] _structureError = [];
+
     private TerrainHierarchy(HeightField surface, ISurfaceDetail detail, Store[] stores, float[] analyticError, double[][] kindBounds, float[] analyticRadius,
         double slopeBound, float minHeight, float maxHeight, IReadOnlyList<NormalMap> normalMaps, MaterialField? materials, double seconds)
     {
@@ -177,6 +180,13 @@ public sealed class TerrainHierarchy
         float[] d0 = surface.Heights.ToArray();
         BlendInto(d0, g0, d1, g1);
         var data = new[] { (g0, d0), (g1, d1), (g2, d2) };
+        NormalMap[] maps =
+        [
+            new NormalMap(d0, size, cell, rootOrigin + g0.Low * subUnit, rootOrigin + g0.Low * subUnit),
+            new NormalMap(d1, size, Ratio1 * cell, rootOrigin + g1.Low * subUnit, rootOrigin + g1.Low * subUnit),
+        ];
+        // A detail that follows the fall line (the rock's structure, vista-plan §10 M1a.4) reads the world grid's normals, the shader's.
+        detail.AttachNormals(maps[0]);
 
         // The stores: g0's lattice over its square and a margin, g1's likewise (inside g1's or the root's square), the root.
         int m0 = Math.Min(Margin0Cells * Sub, g0.Low - g1.Low);
@@ -199,6 +209,7 @@ public sealed class TerrainHierarchy
         (float[] analyticError, float[] analyticRadius) = AnalyticBounds(levels, rootLog, subUnit, detail, slope);
         double[][] kindBounds = KindBounds(levels, rootLog, subUnit, detail);
         float[] openError = OpenBounds(levels, rootLog, subUnit, detail, analyticError);
+        float[] structureError = StructureBounds(levels, rootLog, subUnit, detail);
 
         var builder = new Builder(stores, data, analyticError, openError, analyticRadius, root, subUnit, rootOrigin, detail);
         builder.Heights(rootLog);
@@ -206,12 +217,10 @@ public sealed class TerrainHierarchy
 
         float min = Math.Min(Math.Min(d0.Min(), d1.Min()), d2.Min());
         float max = Math.Max(Math.Max(d0.Max(), d1.Max()), d2.Max());
-        NormalMap[] maps =
-        [
-            new NormalMap(d0, size, cell, rootOrigin + g0.Low * subUnit, rootOrigin + g0.Low * subUnit),
-            new NormalMap(d1, size, Ratio1 * cell, rootOrigin + g1.Low * subUnit, rootOrigin + g1.Low * subUnit),
-        ];
-        return new TerrainHierarchy(surface, detail, stores, analyticError, kindBounds, analyticRadius, slope, min, max, maps, materials, stopwatch.Elapsed.TotalSeconds);
+        return new TerrainHierarchy(surface, detail, stores, analyticError, kindBounds, analyticRadius, slope, min, max, maps, materials, stopwatch.Elapsed.TotalSeconds)
+        {
+            _structureError = structureError,
+        };
     }
 
     // ── Levels ──────────────────────────────────────────────────────────────────────────────────────
@@ -306,7 +315,8 @@ public sealed class TerrainHierarchy
             return _analyticError[level];
         double half = ((diagonal ? 3 << t : 2 << t) - 1) * SubUnit;
         double x = WorldOf(i), z = WorldOf(j);
-        return Math.Min(RoundUp(Detail.MidpointBoundIn(EdgeLength(level), kinds, x - half, z - half, x + half, z + half)), _analyticError[level]);
+        float cap = _structureError.Length == 0 ? _analyticError[level] : RoundUp((double)_analyticError[level] + _structureError[level]);
+        return Math.Min(RoundUp(Detail.MidpointBoundIn(EdgeLength(level), kinds, x - half, z - half, x + half, z + half)), cap);
     }
 
     /// <summary>The length of the edge a vertex of level <paramref name="level"/> splits, m.</summary>
@@ -577,6 +587,19 @@ public sealed class TerrainHierarchy
         return error;
     }
 
+    /// <summary>What the rock's structure adds at most to every level's bound (<see cref="ISurfaceDetail.StructureBound"/>, vista-plan §10 M1a.4).</summary>
+    private static float[] StructureBounds(int levels, int rootLog, double subUnit, ISurfaceDetail detail)
+    {
+        var error = new float[levels];
+        for (int level = 0; level < levels; level++)
+        {
+            int t = rootLog - 1 - level / 2;
+            double s = (1 << t) * subUnit;
+            error[level] = RoundUp(detail.StructureBound(level % 2 == 0 ? 2.0 * s * Math.Sqrt(2.0) : 2.0 * s));
+        }
+        return error;
+    }
+
     /// <summary>The detail's kinds' bounds for every level's edge (<see cref="ISurfaceDetail.KindBounds"/>), for <see cref="SubGridError"/>.</summary>
     private static double[][] KindBounds(int levels, int rootLog, double subUnit, ISurfaceDetail detail)
     {
@@ -629,15 +652,18 @@ public sealed class TerrainHierarchy
         /// <summary>
         /// The detail's bound for grid-level vertex (<paramref name="i"/>, <paramref name="j"/>) of level <paramref name="level"/>
         /// (vista-plan §10 M1.12b): the bound everywhere where its box, which holds its edge and every descendant's, holds forest, and the
-        /// bound without the canopy elsewhere; a detail alike everywhere has the one.
+        /// bound without the canopy elsewhere; a detail alike everywhere has the one. Plus what the rock's structure adds in the box
+        /// (M1a.4).
         /// </summary>
         private double DetailError(int i, int j, int level, int t, bool diagonal)
         {
-            if (!_detail.Regional)
-                return _analyticError[level];
             double half = ((diagonal ? 3L << t : 2L << t) - 1) * _subUnit;
             double x = _rootOrigin + i * _subUnit, z = _rootOrigin + j * _subUnit;
-            return _detail.CanopyIn(x - half, z - half, x + half, z + half) ? _analyticError[level] : _openError[level];
+            double s = (1L << t) * _subUnit;
+            double structure = _detail.StructureBoundIn(diagonal ? 2.0 * s * Math.Sqrt(2.0) : 2.0 * s, x - half, z - half, x + half, z + half);
+            if (!_detail.Regional)
+                return _analyticError[level] + structure;
+            return (_detail.CanopyIn(x - half, z - half, x + half, z + half) ? _analyticError[level] : _openError[level]) + structure;
         }
 
         /// <summary>The root's corners, then every level from the coarsest down: a sample's height, or its edge's mean.</summary>

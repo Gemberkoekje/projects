@@ -47,6 +47,33 @@ public interface ISurfaceDetail
 
     /// <summary>Whether that kind lies anywhere in the box from world <c>(x0, z0)</c> to <c>(x1, z1)</c>.</summary>
     bool CanopyIn(double x0, double z0, double x1, double z1) => false;
+
+    /// <summary>
+    /// The detail's height at world <c>(x, z)</c> over a surface <paramref name="baseHeight"/> high there, m, and the part of it the
+    /// shader shades from the same functions, which the mesh's normals leave out (vista-plan §10 M1a.4: the rock's structure, whose
+    /// ledges follow the beds at the surface's height); a detail of position alone is its <see cref="Height"/>, none of it shaded so.
+    /// </summary>
+    (double Height, double Shaded) HeightOver(double x, double z, double baseHeight) => (Height(x, z), 0.0);
+
+    /// <summary>
+    /// Gives a detail that follows the world grid's fall line the grid's normals (<paramref name="world"/>, g0's), before any bound or
+    /// height is asked of it (vista-plan §10 M1a.4). Nothing for a detail of position alone.
+    /// </summary>
+    void AttachNormals(NormalMap world)
+    {
+    }
+
+    /// <summary>
+    /// The most a structure that stands only on some ground (vista-plan §10 M1a.4: the rock's) adds to <see cref="MidpointBoundIn"/>
+    /// for a segment <paramref name="length"/> metres long anywhere, m; it is in none of the other bounds. 0 without one.
+    /// </summary>
+    double StructureBound(double length) => 0.0;
+
+    /// <summary>
+    /// What that structure adds to the bound of a segment <paramref name="length"/> metres long in the box from world <c>(x0, z0)</c>
+    /// to <c>(x1, z1)</c>, m: never more than <see cref="StructureBound"/>, and never less in a box than in any box inside it.
+    /// </summary>
+    double StructureBoundIn(double length, double x0, double z0, double x1, double z1) => 0.0;
 }
 
 /// <summary>

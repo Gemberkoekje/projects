@@ -27,7 +27,7 @@ public sealed class WorldCache
     private PoolMap? _pools;
     private HeightField? _far;
     private TerrainHierarchy? _hierarchy;
-    private (bool Detail, bool Materials, ForestPlacement Forest)? _hierarchyKey;
+    private (bool Detail, bool Materials, ForestPlacement Forest, bool Structure)? _hierarchyKey;
     // The kept meshes, the most recently asked for first.
     private readonly List<(MeshView View, MeshSettings Settings, TerrainMesh Mesh)> _meshes = [];
 
@@ -174,13 +174,14 @@ public sealed class WorldCache
         (TerrainProfile profile, ulong seed, _, _, _) = _key!.Value;
         bool detail = settings.Kind == MeshKind.View && settings.Detail;
         ForestPlacement forest = settings.Materials ? settings.Forest : ForestPlacement.None;
-        var key = (detail, settings.Materials, forest);
+        bool structure = settings.Materials && settings.RockStructure;
+        var key = (detail, settings.Materials, forest, structure);
         if (_hierarchy is null || _hierarchyKey != key)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             MaterialField? materials = settings.Materials ? Materials(forest) : null;
             ISurfaceDetail wanted = !detail ? TerrainDetail.None
-                : materials is not null ? new MaterialDetail(seed, materials)
+                : materials is not null ? new MaterialDetail(seed, materials, structure)
                 : new TerrainDetail(seed, _world!.Surface.CellSize);
             _hierarchy = TerrainHierarchy.Build(_world!.Surface, profile, seed, wanted, materials);
             _hierarchyKey = key;

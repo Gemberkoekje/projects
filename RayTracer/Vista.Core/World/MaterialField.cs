@@ -93,6 +93,8 @@ public sealed class MaterialField
 
     private readonly uint[] _packed;
     private readonly float[] _beds;
+    private readonly float[] _ledges;
+    private readonly float[] _bedTable;
     private readonly byte[] _rock;
     private readonly byte[] _scree;
     private readonly byte[] _forest;
@@ -102,8 +104,8 @@ public sealed class MaterialField
     /// <summary>The summed-area table of the cells holding forest, (size)² entries from the corner (0, 0); empty without forest.</summary>
     private readonly int[] _canopyCells;
 
-    private MaterialField(int size, double cell, uint[] packed, float[] beds, float tableScale, byte[] rock, byte[] scree, byte[] forest, bool eroded,
-        uint noiseSeed, ForestPlacement forestPlacement, bool glaciated)
+    private MaterialField(int size, double cell, uint[] packed, float[] beds, float[] ledges, float tableScale, byte[] rock, byte[] scree, byte[] forest,
+        bool eroded, uint noiseSeed, ForestPlacement forestPlacement, bool glaciated)
     {
         Glaciated = glaciated;
         Size = size;
@@ -112,6 +114,8 @@ public sealed class MaterialField
         Origin = -0.5 * (size - 1) * cell;
         _packed = packed;
         _beds = beds;
+        _ledges = ledges;
+        _bedTable = [.. beds, .. ledges];
         TableScale = tableScale;
         _rock = rock;
         _scree = scree;
@@ -121,6 +125,7 @@ public sealed class MaterialField
         Eroded = eroded;
         Forest = forestPlacement;
         (RockGradient, ScreeGradient, SmoothGradient, CanopyGradient, OpenSmoothGradient) = Gradients(size, cell, rock, scree, forest);
+        OffsetGradient = OffsetSteepest(size, cell, packed);
     }
 
     /// <summary>Samples a side (the world grid's).</summary>
@@ -158,6 +163,18 @@ public sealed class MaterialField
     /// </summary>
     public ReadOnlySpan<float> Beds => _beds;
 
+    /// <summary>
+    /// The ledges' height per bed-table entry, m (vista-plan §10 M1a.4, <see cref="RockStructure.LedgeTable"/>), four entries a float4:
+    /// what the GPU reads after <see cref="Beds"/>.
+    /// </summary>
+    public ReadOnlySpan<float> Ledges => _ledges;
+
+    /// <summary>What the GPU's bed table holds: <see cref="Beds"/>, then <see cref="Ledges"/>.</summary>
+    public ReadOnlySpan<float> BedTable => _bedTable;
+
+    /// <summary>Bed-table entries.</summary>
+    public int TableEntries => _beds.Length / 4;
+
     /// <summary>Bed-table entries per metre of world height.</summary>
     public float TableScale { get; }
 
@@ -166,6 +183,12 @@ public sealed class MaterialField
 
     /// <summary>The steepest the rock detail's weight changes, per metre (bilinear between the samples).</summary>
     public double RockGradient { get; }
+
+    /// <summary>
+    /// How steeply the bed-table offset changes along the ground, entries per metre (bilinear between the samples; the 99.9th
+    /// percentile): how steeply the beds themselves tilt (vista-plan §10 M1a.4, the ledges' bound).
+    /// </summary>
+    public double OffsetGradient { get; }
 
     /// <summary>The steepest the scree detail's weight changes, per metre.</summary>
     public double ScreeGradient { get; }
@@ -183,7 +206,7 @@ public sealed class MaterialField
     public double OpenSmoothGradient { get; }
 
     /// <summary>Upload size, bytes.</summary>
-    public long ByteSize => (long)_packed.Length * sizeof(uint) + (long)_beds.Length * sizeof(float);
+    public long ByteSize => (long)_packed.Length * sizeof(uint) + (long)_bedTable.Length * sizeof(float);
 
     /// <summary>
     /// The material field of the world whose surface is <paramref name="surface"/> and whose erosion left <paramref name="erosion"/>
@@ -251,7 +274,8 @@ public sealed class MaterialField
 
         bool glaciated = ice is not null;
         (byte[] rock, byte[] scree) = DetailWeights(surface, packed, beds, strata.TableScale, rules, noiseSeed, glaciated);
-        return new MaterialField(n, surface.CellSize, packed, beds, strata.TableScale, rock, scree, new byte[n * n], erosion is not null, noiseSeed,
+        float[] ledges = RockStructure.LedgeTable(beds, 1f / strata.TableScale, rules.LedgeGain, rules.LedgeMax, noiseSeed);
+        return new MaterialField(n, surface.CellSize, packed, beds, ledges, strata.TableScale, rock, scree, new byte[n * n], erosion is not null, noiseSeed,
             ForestPlacement.None, glaciated);
     }
 
@@ -301,7 +325,7 @@ public sealed class MaterialField
                 }
             });
         }
-        return new MaterialField(n, Cell, _packed, _beds, TableScale, _rock, _scree, forestBytes, Eroded, NoiseSeed, forest, Glaciated);
+        return new MaterialField(n, Cell, _packed, _beds, _ledges, TableScale, _rock, _scree, forestBytes, Eroded, NoiseSeed, forest, Glaciated);
     }
 
     /// <summary>
@@ -333,6 +357,12 @@ public sealed class MaterialField
         Sample s = At(x, z, height, TableScale, TableLast);
         return (s.Hardness, s.TintU, s.TintV, s.Table, s.Massive);
     }
+
+    /// <summary>
+    /// The ledges' height at bed-table coordinate <paramref name="table"/>, m, and its slope by the coordinate, m per entry
+    /// (<see cref="RockStructure.LedgeAt"/>).
+    /// </summary>
+    public (float Height, float Slope) LedgeAt(float table) => RockStructure.LedgeAt(_ledges, TableEntries, table);
 
     /// <summary>The detail kinds' weights at world <c>(x, z)</c>: bilinear between the samples around it, the edge's outside the grid.</summary>
     public (double Rock, double Scree, double Forest) DetailWeightsAt(double x, double z)
@@ -468,6 +498,64 @@ public sealed class MaterialField
         hard += (massiveHard - hard) * massive;
         float layered = 1f - massive;
         return new Sample(loose, logArea, wet, Math.Clamp(hard + mottle, 0f, 1f), tintU * layered, tintV * layered, t, massive, hollow, ice);
+    }
+
+    /// <summary>
+    /// How steeply the offsets of <paramref name="packed"/> change between neighbouring samples, entries per metre, ×√2 (bilinear): the
+    /// 99.9th percentile over the grid, since a few samples where the strata's frame folds sharply would set it for every rock face.
+    /// </summary>
+    private static double OffsetSteepest(int size, double cell, uint[] packed)
+    {
+        // Counts by the offset's change between neighbouring samples, in steps of 1/64 entry, up to 64 entries.
+        const int Bins = 4096;
+        var counts = new long[Bins];
+        object gate = new();
+        Parallel.For(0, size - 1, j =>
+        {
+            var row = new long[Bins];
+            for (int i = 0; i < size - 1; i++)
+            {
+                float o = BitConverter.UInt32BitsToSingle(packed[Words * (j * size + i)]);
+                float right = BitConverter.UInt32BitsToSingle(packed[Words * (j * size + i + 1)]);
+                float up = BitConverter.UInt32BitsToSingle(packed[Words * ((j + 1) * size + i)]);
+                double step = Math.Max(Math.Abs(right - o), Math.Abs(up - o));
+                row[Math.Min((int)(step * 64.0), Bins - 1)]++;
+            }
+            lock (gate)
+            {
+                for (int b = 0; b < Bins; b++)
+                    counts[b] += row[b];
+            }
+        });
+        long total = counts.Sum(), wanted = (long)Math.Ceiling(0.999 * total), seen = 0;
+        int bin = 0;
+        while (bin < Bins - 1 && seen + counts[bin] < wanted)
+            seen += counts[bin++];
+        return (bin + 1) / 64.0 * Math.Sqrt(2.0) / cell;
+    }
+
+    /// <summary>
+    /// The strata at world <c>(x, z)</c> (vista-plan §10 M1a.4): the bed-table coordinate of world height 0 there and how massive the
+    /// rock is, bilinear as <see cref="BedAt"/> reads them; null away from the map, where the ground has no beds.
+    /// </summary>
+    public (float Offset, float Massive)? StrataAt(float x, float z)
+    {
+        float extent = (float)Cell * (Size - 1);
+        float ox = (float)Origin;
+        if (!(x >= ox && x <= ox + extent && z >= ox && z <= ox + extent))
+            return null;
+        float u = Math.Clamp((x - ox) / (float)Cell, 0f, Size - 1), v = Math.Clamp((z - ox) / (float)Cell, 0f, Size - 1);
+        int i = Math.Min((int)u, Size - 2), j = Math.Min((int)v, Size - 2);
+        float fu = u - i, fv = v - j;
+        int c = j * Size + i;
+        float Mix(int word, Func<uint, float> of)
+        {
+            float v00 = of(_packed[Words * c + word]), v10 = of(_packed[Words * (c + 1) + word]);
+            float v01 = of(_packed[Words * (c + Size) + word]), v11 = of(_packed[Words * (c + Size + 1) + word]);
+            float bottom = v00 + (v10 - v00) * fu, top = v01 + (v11 - v01) * fu;
+            return bottom + (top - bottom) * fv;
+        }
+        return (Mix(0, BitConverter.UInt32BitsToSingle), Mix(2, w => w & 0xFF) * (1f / 255f));
     }
 
     private (float Offset, float Loose, float Area, float Wet, float Mottle, float Massive, float Hollow, float Ice) Unpack(int c)

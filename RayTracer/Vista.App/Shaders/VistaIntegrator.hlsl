@@ -614,6 +614,7 @@ GroundSurface SurfaceAt(Hit hit, float3 wo, uint4 idx, float footprint)
     g.Albedo = MaterialAlbedo[TerrainMaterial].xyz;
     g.Normal = hit.ShadingNormal;
     g.Id = TerrainMaterial;
+    g.Sun = 1.0;
     return g;
 }
 
@@ -1032,7 +1033,7 @@ SampleResult TraceSample(uint x, uint y, uint pixelHash, uint sampleIndex)
 #else
                     // The disk is 6.8·10⁻⁵ sr, so its density dwarfs the bounce's and the weight is 1 to float precision.
                     float weight = LightSampling != 0u ? PowerHeuristic(SunConePdf(), bsdfScale * cosS) : 1.0;
-                    radiance += throughput * Brdf(surface, hit.ShadingNormal, toSun, wo) * (INV_PI * cosS) * sunIrradiance
+                    radiance += throughput * Brdf(surface, hit.ShadingNormal, toSun, wo) * (INV_PI * cosS * surface.Sun) * sunIrradiance
                               * SunTransmittance4(idx, GroundAltitude + height, muS) * PoolLight(hit.Position, toSun, true, idx) * weight;
 #endif
                 }

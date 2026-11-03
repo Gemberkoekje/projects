@@ -181,6 +181,30 @@ public sealed record MaterialRules
     /// <summary>The bump's octaves: 0.1, 0.2, 0.4, 0.8 and 1.6 m by default.</summary>
     public int BumpOctaves { get; init; } = 5;
 
+    /// <summary>
+    /// How deep the rock's gullies are (vista-plan §10 M1a.4, <see cref="RockStructure"/>): each octave's depth across the face over
+    /// its wavelength. 0: none.
+    /// </summary>
+    public float StructureDepth { get; init; } = 0.09f;
+
+    /// <summary>The coarsest gully octave's wavelength, m: the largest ribs and buttresses.</summary>
+    public float StructureCoarsestMetres { get; init; } = 64f;
+
+    /// <summary>The gully octaves the shading carries, each half the last: 64, 32, 16, 8 and 4 m by default.</summary>
+    public int StructureOctaves { get; init; } = 5;
+
+    /// <summary>
+    /// The gully octaves the mesh carries too, the coarsest first (64 and 32 m by default): the outlines and the shadows a low sun
+    /// casts. The finer ones are the shading's alone, as the bump is.
+    /// </summary>
+    public int StructureMeshOctaves { get; init; } = 2;
+
+    /// <summary>How much steeper a bed harder than the beds around it stands, per unit of hardness above their mean (<see cref="RockStructure.LedgeTable"/>).</summary>
+    public float LedgeGain { get; init; } = 2.5f;
+
+    /// <summary>The most the ledges steepen or flatten a slope, as a fraction of it.</summary>
+    public float LedgeMax { get; init; } = 0.7f;
+
     /// <summary>Bare rock's bump: ridged noise, each octave's height over its wavelength.</summary>
     public float RoughRock { get; init; } = 0.12f;
 
@@ -366,6 +390,10 @@ public sealed record MaterialRules
             errors.Add("The cover on steep slopes must be in [0, 1] and the wet darkening in [0, 1).");
         if (!(BreakupWavelengthMetres > 0f) || !(FineBreakupWavelengthMetres > 0f))
             errors.Add("The breakup noise's wavelengths must be positive.");
+        if (!(StructureDepth is >= 0f and < 0.5f) || !(StructureCoarsestMetres > 0f) || StructureOctaves is < 0 or > 8
+            || StructureMeshOctaves < 0 || StructureMeshOctaves > StructureOctaves || !(LedgeGain >= 0f) || !(LedgeMax is >= 0f and < 1f))
+            errors.Add("The gullies' depth must be in [0, 0.5), their coarsest wavelength positive, their octaves 0 to 8 with the mesh's no more, "
+                + "the ledges' gain not negative and their most in [0, 1).");
         if (!(HardColourWidth > 0f) || !(LaminaePerMetre > 0f) || !(BumpFinestMetres > 0f) || BumpOctaves is < 0 or > 8)
             errors.Add("The rock colour's width, the laminae per metre and the finest bump must be positive, and the bump's octaves 0 to 8.");
         foreach ((string name, float value) in new[]
@@ -429,6 +457,9 @@ public sealed record MaterialRules
         LaminaePerEntry = LaminaePerMetre * RockHardness.TableSpacingMetres,
         BumpFinest = BumpFinestMetres,
         BumpOctaves = (uint)BumpOctaves,
+        StructureOctaves = (uint)StructureOctaves,
+        StructureDepth = StructureDepth,
+        StructureCoarsest = StructureCoarsestMetres,
         RoughRock = RoughRock,
         RoughScree = RoughScree,
         RoughSoil = RoughSoil,
@@ -753,11 +784,11 @@ public struct MaterialConstants
     /// <summary>The material noise's seed (<see cref="MaterialNoise.SeedOf"/>).</summary>
     public uint NoiseSeed;
 
-    /// <summary>Padding to a 16-byte row.</summary>
-    public uint Pad0;
+    /// <summary>1 when the mesh carries the rock's structure and the shader shades it (vista-plan §10 M1a.4), else 0.</summary>
+    public uint Structure;
 
-    /// <summary>Padding to a 16-byte row.</summary>
-    public uint Pad4;
+    /// <summary><see cref="MaterialRules.StructureOctaves"/>.</summary>
+    public uint StructureOctaves;
 
     /// <summary>Padding to a 16-byte row.</summary>
     public uint Pad5;
@@ -855,11 +886,11 @@ public struct MaterialConstants
     /// <summary><see cref="MaterialRules.StoneGap"/>.</summary>
     public float StoneGap;
 
-    /// <summary>Padding to a 16-byte row.</summary>
-    public float Pad6;
+    /// <summary><see cref="MaterialRules.StructureDepth"/>.</summary>
+    public float StructureDepth;
 
-    /// <summary>Padding to a 16-byte row.</summary>
-    public float Pad7;
+    /// <summary><see cref="MaterialRules.StructureCoarsestMetres"/>.</summary>
+    public float StructureCoarsest;
 
     /// <summary>The tree line above sea level, m (<see cref="Weather.TreeLine"/>).</summary>
     public float TreeLine;

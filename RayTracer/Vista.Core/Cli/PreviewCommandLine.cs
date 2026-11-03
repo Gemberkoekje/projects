@@ -395,7 +395,7 @@ public static class PreviewCommandLine
         "--sliders", "--location", "--latitude", "--season", "--date", "--time", "--sun-elevation", "--altitude", "--temperature", "--humidity",
         "--snowline", "--visibility", "--valley-haze", "--mist", "--atmosphere", "--light-sampling",
         "--rr-start", "--denoise-device", "--erosion", "--grid", "--mesh", "--mesh-error", "--detail", "--far-field", "--meter", "--display", "--look", "--compensation",
-        "--white-balance", "--sky-margin", "--adaptation", "--dither", "--materials", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists", "--detail-budget",
+        "--white-balance", "--sky-margin", "--adaptation", "--dither", "--materials", "--rock-structure", "--diffuse", "--quadrature", "--forest", "--canopy", "--snow", "--pools", "--finalists", "--detail-budget",
         "--noise",
     };
 
@@ -871,6 +871,7 @@ public static class PreviewCommandLine
             ("--detail", (s, on) => s with { Detail = on }),
             ("--far-field", (s, on) => s with { FarField = on }),
             ("--materials", (s, on) => s with { Materials = on }),
+            ("--rock-structure", (s, on) => s with { RockStructure = on }),
         })
         {
             switch (values.GetValueOrDefault(option))

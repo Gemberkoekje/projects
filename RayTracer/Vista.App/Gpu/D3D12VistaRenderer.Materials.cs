@@ -32,7 +32,7 @@ internal sealed partial class D3D12VistaRenderer
         if (field is null)
             return;
         _materialMap = CreateDefaultBuffer<uint>(field.Packed);
-        _bedTable = CreateDefaultBuffer<float>(field.Beds);
+        _bedTable = CreateDefaultBuffer<float>(field.BedTable);
         _materialField = field;
     }
 
@@ -55,6 +55,7 @@ internal sealed partial class D3D12VistaRenderer
             Mode = 1u,
             Diffuse = diffuse == DiffuseModel.OrenNayar ? 1u : 0u,
             Canopy = canopy == CanopyModel.Kernels ? 1u : 0u,
+            Structure = scene.Mesh.Info.RockStructure ? 1u : 0u,
         };
     }
 

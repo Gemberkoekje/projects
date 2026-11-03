@@ -69,6 +69,12 @@ public sealed record MeshSettings
     /// <summary>Mesh the far field beyond the world grid, out to the horizon.</summary>
     public bool FarField { get; init; } = true;
 
+    /// <summary>
+    /// The rock's structure (vista-plan §10 M1a.4, <see cref="RockStructure"/>): gullies, ribs and ledges on bare rock, the mesh's
+    /// coarse part and the shader's all of it. Off renders M1a.3a's rock. It counts only with <see cref="Materials"/>.
+    /// </summary>
+    public bool RockStructure { get; init; } = true;
+
     /// <summary>Problems that make these settings unusable (empty when valid).</summary>
     public IReadOnlyList<string> Validate()
     {
@@ -142,6 +148,9 @@ public sealed record MeshInfo
 
     /// <summary>Whether the far field was meshed.</summary>
     public bool FarField { get; init; }
+
+    /// <summary>Whether bare rock carries its structure (vista-plan §10 M1a.4), which the shader then shades.</summary>
+    public bool RockStructure { get; init; }
 
     /// <summary>Triangles.</summary>
     public long Triangles { get; init; }
@@ -231,16 +240,27 @@ public static class ViewMesher
         var positions = new float[vertexCount * 3];
         bool maps = settings.Kind == MeshKind.View;
         uint[] mapNormals = maps ? new uint[vertexCount] : [];
+        // The detail the shader shades itself (the rock's structure, vista-plan §10 M1a.4) is left out of the normals: they are
+        // worked out from positions without it.
+        float[]? unshaded = detail && hierarchy.Detail.StructureBound(1000.0) > 0.0 ? new float[vertexCount * 3] : null;
         EarthFrame frame = view.Frame;
         Parallel.For(0, vertexCount, v =>
         {
             (int i, int j, float baseHeight) = refiner.Vertex(v);
             double x = hierarchy.WorldOf(i), z = hierarchy.WorldOf(j);
-            double h = baseHeight + (detail ? hierarchy.Detail.Height(x, z) : 0.0);
+            (double added, double shaded) = detail ? hierarchy.Detail.HeightOver(x, z, baseHeight) : (0.0, 0.0);
+            double h = baseHeight + added;
             Vector3D p = frame.ToFrame(x, h, z);
             positions[v * 3] = (float)p.X;
             positions[v * 3 + 1] = (float)p.Y;
             positions[v * 3 + 2] = (float)p.Z;
+            if (unshaded is not null)
+            {
+                Vector3D q = shaded != 0.0 ? frame.ToFrame(x, h - shaded, z) : p;
+                unshaded[v * 3] = (float)q.X;
+                unshaded[v * 3 + 1] = (float)q.Y;
+                unshaded[v * 3 + 2] = (float)q.Z;
+            }
             if (maps)
             {
                 (float nx, float nz) = hierarchy.MapNormal(x, z);
@@ -248,7 +268,7 @@ public static class ViewMesher
             }
         });
         uint[] indices = refiner.Indices();
-        float[] normals = Normals(positions, indices, vertexCount);
+        float[] normals = Normals(unshaded ?? positions, indices, vertexCount);
         double vertexSeconds = stopwatch.Elapsed.TotalSeconds;
 
         // What the atmosphere is built for: the heights the world can reach and how far the mesh can reach — properties of the
@@ -271,6 +291,7 @@ public static class ViewMesher
             PixelsPerRadian = view.PixelsPerRadian,
             Detail = detail,
             Materials = hierarchy.Materials is not null,
+            RockStructure = detail && hierarchy.Detail is MaterialDetail { Structure: true },
             FarField = far,
             Triangles = mesh.TriangleCount,
             DetailTriangles = refiner.DetailTriangles,
