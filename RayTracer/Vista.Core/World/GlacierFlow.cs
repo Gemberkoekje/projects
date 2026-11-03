@@ -25,8 +25,21 @@ public sealed record GlacierClimate(double ElaMetres, double BalanceGradient, do
 /// <param name="Damping">The share of the way to the new thickness each iteration moves (1: all of it).</param>
 public sealed record GlacierFlowSettings(double SteepDegrees, double SlopeFloor, double MaxThicknessMetres, double Damping)
 {
-    /// <summary>The flow of every glacier Vista makes.</summary>
+    /// <summary>The flow of the glaciers that carve (vista-plan §10 M1.13).</summary>
     public static GlacierFlowSettings Default { get; } = new(40.0, 0.02, 1200.0, 0.5);
+
+    /// <summary>The flow of today's glaciers (<see cref="Glaciers"/>): <see cref="Default"/>'s, with <see cref="ThinsDownhill"/>.</summary>
+    public static GlacierFlowSettings Present { get; } = Default with { ThinsDownhill = true };
+
+    /// <summary>
+    /// Whether the ice thins to nothing below the ice that feeds it (vista-plan §10 M1a.3a): a cell no ice flows through takes the
+    /// glacier's averaged surface up to its walls as before, but where its bed lies below the beds of the iced cells it is averaged
+    /// with, at most their mean thickness less how far below them it lies. The surface's smoothing fills a valley across to its walls,
+    /// as it should; below a cap on a summit it filled the flanks up to the cap's own level, a hundred metres and more of ice standing
+    /// downhill of the ice above it that no flux feeds (the smooth pale domes on M1a.2's first and M1a.3's lit crest). False: every
+    /// cell fills to the averaged surface, as M1.13's.
+    /// </summary>
+    public bool ThinsDownhill { get; init; }
 }
 
 /// <summary>The ice on a surface (<see cref="GlacierFlow.Solve"/>), row-major on its grid.</summary>
@@ -74,6 +87,7 @@ public sealed record IceField(float[] Thickness, float[] Flux, float[] Speed)
 /// </summary>
 public static class GlacierFlow
 {
+
     /// <summary>Glen's flow parameter for temperate ice, Pa⁻³ a⁻¹ (2.4·10⁻²⁴ Pa⁻³ s⁻¹, Cuffey and Paterson 2010).</summary>
     public const double FlowParameter = 2.4e-24 * 31_556_926.0;
 
@@ -201,7 +215,7 @@ public static class GlacierFlow
                 for (int i = 0; i < n; i++)
                 {
                     int c = j * n + i;
-                    double sum = 0.0, weights = 0.0;
+                    double sum = 0.0, weights = 0.0, beds = 0.0, own = 0.0;
                     for (int dj = -SmoothingCells; dj <= SmoothingCells; dj++)
                     {
                         int jj = j + dj;
@@ -217,10 +231,20 @@ public static class GlacierFlow
                                 continue;
                             double w = (SmoothingCells + 1 - Math.Abs(di)) * (SmoothingCells + 1 - Math.Abs(dj));
                             sum += w * (heights[k] + (double)wanted[k]);
+                            beds += w * heights[k];
+                            own += w * wanted[k];
                             weights += w;
                         }
                     }
                     double target = steep[c] || weights == 0.0 ? 0.0 : Math.Clamp(sum / weights - heights[c], 0.0, flow.MaxThicknessMetres);
+                    // Since M1a.3a (today's glaciers): below the beds of the ice that feeds it, a cell no ice flows through holds at most
+                    // that ice's thickness less how far below it lies, so the ice thins out within one thickness downhill of its source.
+                    if (flow.ThinsDownhill && !(wanted[c] > 0f) && weights > 0.0)
+                    {
+                        double below = beds / weights - heights[c];
+                        if (below > 0.0)
+                            target = Math.Min(target, Math.Max(0.0, own / weights - below));
+                    }
                     thickness[c] = (float)(thickness[c] + (target - thickness[c]) * damping);
                 }
             });

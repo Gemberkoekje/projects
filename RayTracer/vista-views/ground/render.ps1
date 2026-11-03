@@ -7,7 +7,7 @@
 #    and for the grooves and the dots the ground under the loupe from above as the world is made: the base terrain, the incision
 #    brought back to the 8 m grid, and after the pipe-model passes (Vista.App --erosion-measure --crops). Its log, measure.log, holds
 #    the grid's own patterns at each stage (GridArtefacts) and the metres a pixel covers at each place.
-# -Sheets m1a2 makes M1a.2's sheets instead, -Sheets m1a3 M1a.3's (see the end of the script).
+# -Sheets m1a2 makes M1a.2's sheets instead, -Sheets m1a3 M1a.3's, -Sheets m1a3a M1a.3a's (see the end of the script).
 # Build first: dotnet build Vista.App -c Release (from RayTracer/).
 param(
     [string]$Out = (Join-Path $env:TEMP 'vista-ground'),
@@ -241,6 +241,55 @@ if ($make -contains 'm1a3') {
     Sheet @((Join-Path $Out 'meadow-m1a2.png'), (Join-Path $Out 'meadow-m1a3.png')) `
         @('M1a.2 · M1.12''s meadow view · 10:30 in July · a 520x292 window of the 4K frame', 'M1a.3 · the same window') 2 `
         'M1a.3 the meadow up close: the parked banding looked for' 'm1a-3-meadow.png'
+}
+
+# M1a.3a (-Sheets m1a3a): today's ice thins out below the ice that feeds it, beside M1a.3 (GlacierThinning=0 through
+# VISTA_EROSION_SETTINGS). Each world is made and measured again, and its views rendered:
+#  - m1a-3a-lit.png: the lit middle range's loupe, M1a.3's (a cap's smooth pale domes over the crest's flanks) above M1a.3a's;
+#  - m1a-3a-hero.png: the hero from M1's camera, M1a.3's and M1a.3a's;
+#  - m1a-3a-ice.png: the materials from above around the main massif's glaciers (the measure's map, cropped), M1a.3's and M1a.3a's;
+#  - m1a-3a-aerial.png: the snow-capped mountains from 4 km up at noon (the cost ledger's aerial view), M1a.3's and M1a.3a's.
+if ($make -contains 'm1a3a') {
+    $cropPixels = "$($places.grooves.Pixel);$($places.dots.Pixel);3520,1680"
+    $day = Join-Path $views 'mountains-day.recipe.json'
+    $aerial = Join-Path $views 'aerial.camera.json'
+    foreach ($stage in @(@{ Name = 'm1a3'; Set = 'GlacierThinning=0' }, @{ Name = 'm1a3a'; Set = '' })) {
+        $env:VISTA_EROSION_SETTINGS = $stage.Set
+        try {
+            $dir = Join-Path $Out "measure-$($stage.Name)"
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            & dotnet $App --erosion-measure --recipe $range --seeds 42 --out $dir --crops-camera $hero --crops $cropPixels |
+                Out-File -FilePath (Join-Path $Out "measure-$($stage.Name).log") -Encoding utf8
+            if ($LASTEXITCODE -ne 0) { throw 'Vista.App --erosion-measure failed.' }
+            Run (@('--preview') + $heroArgs + @('--width', '640', '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda', '--out', (Join-Path $Out "hero-$($stage.Name).png")))
+            $p = $places.grooves
+            Run (@('--preview') + $heroArgs + @('--width', '3840', '--loupe', "$($p.X),$($p.Y),640,360", '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
+                '--debug', 'material', '--out', (Join-Path $Out "loupe-lit-$($stage.Name).png")))
+            Run @('--preview', '--recipe', $day, '--seed', '42', '--camera', $aerial, '--width', '640', '--spp', "$Spp", '--denoise', '--denoise-device', 'cuda',
+                '--out', (Join-Path $Out "aerial-$($stage.Name).png"))
+            # The main massif's glaciers from above: a square of the measure's material map (north up) around them.
+            $map = New-Object System.Drawing.Bitmap (Join-Path $dir 'seed42.materials.png')
+            $side = [int]($map.Width * 0.42)
+            $rect = New-Object System.Drawing.Rectangle ([int]($map.Width * 0.28)), ([int]($map.Height * 0.28)), $side, $side
+            $crop = $map.Clone($rect, $map.PixelFormat)
+            $crop.Save((Join-Path $Out "ice-$($stage.Name).png"), [System.Drawing.Imaging.ImageFormat]::Png)
+            $crop.Dispose()
+            $map.Dispose()
+        }
+        finally {
+            $env:VISTA_EROSION_SETTINGS = ''
+        }
+    }
+    Sheet @((Join-Path $Out 'loupe-lit-m1a3.denoised.png'), (Join-Path $Out 'loupe-lit-m1a3a.denoised.png')) `
+        @('M1a.3 · the lit middle range 3.8 km off · a cap''s smooth domes over the flanks', 'M1a.3a · the same pixels: the ice thins out below the cap') 1 `
+        'M1a.3a the lit middle range (a 4K loupe)' 'm1a-3a-lit.png'
+    Sheet @((Join-Path $Out 'hero-m1a3.denoised.png'), (Join-Path $Out 'hero-m1a3a.denoised.png')) @('M1a.3', 'M1a.3a') 2 `
+        'M1a.3a the hero (seed 42 · golden hour · M1''s camera): today''s ice as M1a.3 laid it and thinning out below its source' 'm1a-3a-hero.png'
+    Sheet @((Join-Path $Out 'ice-m1a3.png'), (Join-Path $Out 'ice-m1a3a.png')) `
+        @('M1a.3 · the main massif''s glaciers from above (blue ice · cream firn · white snow) · north up', 'M1a.3a · the same ground') 2 `
+        'M1a.3a today''s glaciers from above: M1a.3''s and M1a.3a''s' 'm1a-3a-ice.png'
+    Sheet @((Join-Path $Out 'aerial-m1a3.denoised.png'), (Join-Path $Out 'aerial-m1a3a.denoised.png')) @('M1a.3', 'M1a.3a') 2 `
+        'M1a.3a the snow-capped mountains from 4 km up at noon: the valley glaciers' 'm1a-3a-aerial.png'
 }
 
 Get-ChildItem (Join-Path $Out 'm1a-*.png') | ForEach-Object { '{0} {1:0} KB' -f $_.Name, ($_.Length / 1KB) }

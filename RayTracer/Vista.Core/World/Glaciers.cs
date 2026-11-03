@@ -34,7 +34,9 @@ public static class Glaciers
         int n = ground.Size;
         int factor = StreamPower.CoarseFactor(n, ground.CellSize, settings.IncisionCell);
         HeightField coarse = Average(ground, factor);
-        IceField ice = GlacierFlow.Solve(coarse, settings.PresentClimate, GlacierFlowSettings.Default, null, Iterations);
+        // Since M1a.3a thinning out below the ice that feeds it, so a cap leaves the flanks below it bare.
+        GlacierFlowSettings flow = settings.GlacierThinning != 0 ? GlacierFlowSettings.Present : GlacierFlowSettings.Default;
+        IceField ice = GlacierFlow.Solve(coarse, settings.PresentClimate, flow, null, Iterations);
         int nc = coarse.Size;
         var top = new float[nc * nc];
         for (int c = 0; c < top.Length; c++)

@@ -248,6 +248,13 @@ public sealed record ErosionSettings
     /// </summary>
     public float GlacierElaMetres { get; init; }
 
+    /// <summary>
+    /// Whether today's ice thins out below the ice that feeds it (vista-plan §10 M1a.3a, <see cref="GlacierFlowSettings.ThinsDownhill"/>):
+    /// 1, so a cap on a summit at the line leaves its flanks bare; 0 fills every cell to the glacier's smoothed surface, as M1.13, which
+    /// laid smooth pale domes over the flanks below a cap. The carving's glaciers keep M1.13's flow either way.
+    /// </summary>
+    public int GlacierThinning { get; init; }
+
     /// <summary>True when the world has no glaciers: neither M1.13's carving nor today's ice.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool Unglaciated => GlacialSteps == 0 && GlacierElaMetres == 0f;
@@ -310,7 +317,9 @@ public sealed record ErosionSettings
     /// samples hold came back rounded a coarse cell wide. The creep (vista-plan §10 M1a.3) was chosen by the grid's patterns on the loose
     /// ground of seed 42's 1025² and 4097² worlds and the rows of dots' loupe: 0.03 stops the pipe model's washboard on the fans (the
     /// loose ground's windows rippling from 3.4% to 0.4%, the base terrain 1.4%) and leaves the rock's crests nearly as they were;
-    /// 0.02 left a trace of it, 0.05 moved the crests and the loose ground more for no visible gain.
+    /// 0.02 left a trace of it, 0.05 moved the crests and the loose ground more for no visible gain. Today's ice thins out below
+    /// the ice that feeds it (vista-plan §10 M1a.3a): the surface's smoothing had filled the flanks below every cap at the line
+    /// with a hundred metres of ice no flux fed, the smooth pale domes on the hero's lit crest.
     /// </remarks>
     public static ErosionSettings Mountains { get; } = new()
     {
@@ -366,6 +375,7 @@ public sealed record ErosionSettings
         GlacialAblationMetres = 10.0f,
         GlacialErosionMetres = 12.0f,
         GlacierElaMetres = 1800.0f,
+        GlacierThinning = 1,
     };
 
     /// <summary>
@@ -499,6 +509,8 @@ public sealed record ErosionSettings
             errors.Add($"StrataMassiveShare must be in [0, 1) (got {StrataMassiveShare}).");
         if (GlacialSteps < 0 || GlacialCycleSteps < 1)
             errors.Add($"GlacialSteps must not be negative and GlacialCycleSteps must be positive (got {GlacialSteps}, {GlacialCycleSteps}).");
+        if (GlacierThinning is not (0 or 1))
+            errors.Add($"GlacierThinning must be 0 or 1 (got {GlacierThinning}).");
         if (GlacialSteps > 0 && IncisionSteps == 0)
             errors.Add("Glacial carving runs on the incision's grid: it needs IncisionSteps.");
         Fraction(nameof(GlacialElaSwingMetres), GlacialElaSwingMetres, float.MaxValue);
@@ -544,8 +556,9 @@ public sealed record ErosionSettings
             .. (BilinearRefine ? [] : new[] { RefineFaceDetail, RefineChannelDetailMetres }.Select(BitConverter.SingleToInt32Bits)),
             // M1a.2's spread discharge likewise only when it is on.
             .. (DischargeSpread == 0 ? [] : new[] { DischargeSpread }),
-            // M1a.3's creep likewise.
+            // M1a.3's creep likewise, and M1a.3a's thinning ice when there is ice.
             .. (CreepRate == 0f ? [] : new[] { BitConverter.SingleToInt32Bits(CreepRate) }),
+            .. (GlacierThinning == 0 || Unglaciated ? [] : new[] { GlacierThinning }),
         ];
         Span<byte> buffer = stackalloc byte[4];
         ulong hash = StableHash.FnvStart;

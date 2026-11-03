@@ -79,11 +79,14 @@ public sealed class GlacierTests
     }
 
     [TestMethod]
-    public void Ice_FillsItsValley_AcrossItsWidth()
+    [DataRow(false, DisplayName = "the carving glaciers' flow")]
+    [DataRow(true, DisplayName = "today's glaciers' flow, thinning out downhill (M1a.3a)")]
+    public void Ice_FillsItsValley_AcrossItsWidth(bool present)
     {
         HeightField vee = Vee();
         // Row 20's floor stands at 1975 m, its benches at 2125 m, both below the line: there the glacier is a tongue in its valley.
-        IceField ice = GlacierFlow.Solve(vee, Alpine with { ElaMetres = 2150.0 }, GlacierFlowSettings.Default, null, 40);
+        GlacierFlowSettings flow = present ? GlacierFlowSettings.Present : GlacierFlowSettings.Default;
+        IceField ice = GlacierFlow.Solve(vee, Alpine with { ElaMetres = 2150.0 }, flow, null, 40);
         int n = vee.Size, row = 20;
         int across = 0;
         double topHigh = double.MinValue, topLow = double.MaxValue, bedHigh = double.MinValue, bedLow = double.MaxValue;
@@ -102,6 +105,28 @@ public sealed class GlacierTests
         }
         Assert.IsTrue(across >= 5, $"ice 10 m thick across {across} cells (320 m) of the valley");
         Assert.IsTrue(topHigh - topLow < 0.75 * (bedHigh - bedLow), $"over the trough the ice's surface varies {topHigh - topLow:0} m, its bed {bedHigh - bedLow:0} m");
+    }
+
+    [TestMethod]
+    public void TodaysIce_ThinsOutBelowTheIceThatFeedsIt_SoACapLeavesItsFlanksBare()
+    {
+        // A summit 20 m over the line on a 19° cone (vista-plan §10 M1a.3a): its cap's flux is small, its ice a few metres. The surface's
+        // smoothing filled the flanks around it up to the cap's level, ice tens of metres thick that no flux feeds (M1a.3's pale domes);
+        // today's ice holds, below the ice that feeds it, at most that ice's thickness less how far below it lies.
+        const int n = 33;
+        var heights = new float[n * n];
+        for (int j = 0; j < n; j++)
+        {
+            for (int i = 0; i < n; i++)
+                heights[j * n + i] = (float)(1720.0 - 0.35 * 64.0 * Math.Sqrt((i - 16) * (i - 16) + (j - 16) * (j - 16)));
+        }
+        var summit = new HeightField(n, 64.0, heights);
+        float Unfed(IceField ice) => Enumerable.Range(0, n * n).Where(c => !(ice.Flux[c] > 0f)).Max(c => ice.Thickness[c]);
+        IceField carving = GlacierFlow.Solve(summit, Alpine, GlacierFlowSettings.Default, null, 60);
+        IceField today = GlacierFlow.Solve(summit, Alpine, GlacierFlowSettings.Present, null, 60);
+        Assert.IsTrue(Unfed(carving) > 50f, $"the carving's flow fills the flanks: {Unfed(carving):0} m of ice no flux feeds");
+        Assert.IsTrue(Unfed(today) < 10f, $"today's leaves them bare: at most {Unfed(today):0.0} m");
+        Assert.IsTrue(today.Thickness[16 * n + 16] > 5f, $"and the summit keeps its cap: {today.Thickness[16 * n + 16]:0.0} m");
     }
 
     [TestMethod]
