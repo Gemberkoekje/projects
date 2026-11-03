@@ -158,8 +158,7 @@ M1a.2's world for comparison: `$env:VISTA_EROSION_SETTINGS = 'CreepRate=0'`; M1'
 - New: `vista-log/M1a.3.md`, `vista-views/sheets/m1a-3-dots.png`, `m1a-3-ground.png`, `m1a-3-hero.png`, `m1a-3-lit.png`,
   `m1a-3-meadow.png`.
 
-*Next:* the user's call on today's ice on the lit crest (the parked "Ice caps laid as smooth domes" now, or M1a.4 — rock below the
-grid — with the cap in the hero until M7).
+*Next:* M1a.3a — ice caps that leave their flanks bare (the user, 2026-11-03: "ice caps first"; vista-plan §10), then M1a.4.
 
 *Judge this:* `m1a-3-dots.png`, the rows of dots: M1a.2 above, M1a.3 below, the beauty with the material colours beside it;
 then `m1a-3-ground.png` (from above). *Ignore this:* the rock's own texture and the near faces' smooth look (M1a.4); the light

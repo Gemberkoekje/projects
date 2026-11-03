@@ -14,7 +14,8 @@ and folded strata), M1.13 (snow and glaciers), M1.13a (the valley haze layer), M
 (auto camera v1, with its detail budget), M1.15 (the time and VRAM estimate), M1.16 (the preview and tweak window) and
 M1.17 (the sign-off) are done: **M1 is done** (2026-10-28), its goldens committed and passing and its hero rendered. **M1a** (the
 ground's surface, the user's call after the hero) comes before M2 (measured spectra): its seven slices are planned in §10 (**M1a plan**)
-and M1a.1 (the map), M1a.2 (ground that gathers its water) and M1a.3 (the washboard gone) are done; what M1 found and did not need is in the parked list (§10). It sits
+and M1a.1 (the map), M1a.2 (ground that gathers its water), M1a.3 (the washboard gone) and M1a.3a (ice caps that leave their flanks
+bare) are done; what M1 found and did not need is in the parked list (§10). It sits
 alongside the engine's own `plan.md` (the RayTracer remaining-work tracker) and
 `pinball-plan.md`, reuses the same engine foundation, but deliberately departs from the
 engine's CPU-parity convention (§9). "Vista" is a working name.
@@ -2185,8 +2186,8 @@ not a slice of M1, whose sign-off stands.)*
   M1.14's finalists before and after; the triangle ceiling (48 M) and the cost ledger; the goldens re-baselined deliberately; the maze
   unmoved.
 
-**M1a plan (proposed 2026-10-28 from M1a.1's map, for the user's yes).** Seven slices in the order below, each under the "every slice"
-rules at the top of this section. The map found the grooves and the dots to be patterns of the 8 m world grid, made by the erosion
+**M1a plan (proposed 2026-10-28 from M1a.1's map, for the user's yes).** Seven slices in the order below (and M1a.3a, added after
+M1a.3), each under the "every slice" rules at the top of this section. The map found the grooves and the dots to be patterns of the 8 m world grid, made by the erosion
 before any shading: the 64 m incision is brought back to the grid as flat facets with straight seams and the base terrain's finer detail
 faded off them, and the pipe model combs a rill every 2–4 cells down each steep facet and lays a washboard on the gentle ones. So the
 grid's fixes come first and the detail below the grid after them, and the rock's detail and the colours are tuned once, on the final
@@ -2249,6 +2250,26 @@ incised 67.5%; eroded 33.1%) and the share of 128 m windows rippling at 2–4 ce
   the question. *Questions:* in the bottom row, are the rows of dots gone? From above, does the right square of each pair look more
   like mountain ground? The crest has pale domes again: should fixing how ice caps look come next, before the rock's detail? Log:
   [`vista-log/M1a.3.md`](vista-log/M1a.3.md).
+- **M1a.3a — Ice caps that leave their flanks bare** *(added 2026-11-03, the user's call after M1a.3: "ice caps first", ahead of
+  M1a.4; it takes the parked "Ice caps laid as smooth domes" from M7 for the caps' shape, not their close-up surface)*. M1a.3 put
+  today's glacier back on the hero's lit crest as smooth pale domes (`m1a-3-lit.png`). *Cause (measured):* the ice solve smooths the
+  glacier's surface over five 64 m cells and fills every cell around its iced ones up to that surface, which fills a valley across to
+  its walls, as it should, but below a cap on a summit fills the flanks up to the cap's own level: on the lit crest, coarse cells no ice
+  flows through hold 68–144 m of ice, 150–200 m below the summit. *Deliverable:* today's ice thins out below the ice that feeds it: a
+  cell no ice flows through holds, below the beds of the iced cells around it, at most their thickness less how far below them it
+  lies (walls and flat glacier floors fill as before); a setting (`GlacierThinning`), so M1a.3's ice stays reproducible; the carving's
+  glaciers unchanged, so the world's shape is M1a.3's. Cornices, crevasses and the caps' close-up surface stay M7's. *Verify:* the lit
+  loupe beside M1a.3's (the crest's rock under a small cap or none, no domes); a summit cap on a cone leaves its flanks bare in a test,
+  and a valley glacier still fills its valley to its walls; today's glaciers from above and from the aerial view beside M1a.3's (the
+  valley glaciers' extent and the ice volume reported, the line unchanged); the goldens' moves listed; the cost ledger.
+  *Status (2026-11-03): done.* Today's ice thins out below the ice that feeds it (`GlacierThinning` 1): the lit crest's crop under
+  more than 5 m of ice 16.9% → 1.2%, the crest's rock with snow on its top, the domes gone from the hero. World-wide today's glaciers
+  7.6% → 5.8% of the grid (3.36 → 2.21 km³): the ice above the line stays, the tongues and margins lose the fill that ran downhill
+  past their flux; the line stays at 1800 m (the decision in the log). The eroded ground is M1a.3's bit for bit; the trace costs the
+  same. *Judge this:* `m1a-3a-lit.png` (M1a.3's domes above, M1a.3a below), `m1a-3a-hero.png`, `m1a-3a-ice.png` (the glaciers from
+  above). *Ignore this:* the rock's texture (M1a.4), the beds' bands (M1a.5), the meadows (M1a.6), the ice's surface up close (M7).
+  *Questions:* does the crest read as a rocky ridge with snow on it? From above, do the glaciers on the right look too small, or
+  about right? Does the hero's lit range look better without the pale shapes? Log: [`vista-log/M1a.3a.md`](vista-log/M1a.3a.md).
 - **M1a.4 — Rock below the grid** (the planes below the 8 m cell; the parked "nearest faces lack detail"). Structure by material and
   slope at every distance the hero shows rock: the near face (the slope at the frame's right, 130–170 m off, 5 cm a pixel, the 8 m cell
   150–190 pixels wide), the foreground (0.5–1.5 km, 0.15–0.5 m a pixel) and the lit middle range (3–4 km, 1–1.3 m a pixel). At 5–50 m:
@@ -2451,6 +2472,10 @@ any of them.
   balance flux turns the least flux into tens of metres of slow ice (the shallow-ice thickness goes as the flux to the fifth root).
   The solve's iterations do not change it (60 to 480: the same answer on each world). So every change of the eroded ground moves
   caps on and off the crests at the line. The hero's subject shows one: the user's call whether it comes next (vista-log/M1a.3.md).
+  *2026-11-03, the user:* "ice caps first": M1a.3a takes the caps' shape (the domes); cornices, crevasses and the close-up surface
+  stay M7's. *M1a.3a:* the domes were the solve's fill around a cap, ice no flux fed down the flanks to the cap's level; today's ice
+  now thins out below the ice that feeds it, and the lit crest shows its rock (`m1a-3a-lit.png`). Left for M7: a cap's own smooth
+  surface, cornices, crevasses, seracs.
 - **The hero's near ridge** (M1a.2's rework): with M1's fixed camera the ridge 130–160 m to the right rises into the frame on the
   reworked world (metres of change that near the camera swing a sixth of the frame) and reads as a smooth dark mass; the auto
   camera's own pick on the new world leaves it out. *Belongs:* M1a.4 (the near faces' detail), and M1a.7 (whether the sign-off's hero
@@ -2467,6 +2492,11 @@ any of them.
   range so worlds still differ. *Belongs:* M7. *The user's check:* seed 7 beside seed 42: do both read
   as alpine valleys?
 - **Cornices on ridges** (M1.13): not in M7's list of close-up snow. *Belongs:* M7.
+- **The carving's glaciers fill below their caps too** (M1a.3a): M1a.3a thins today's ice out below the ice that feeds it, but the
+  glacial carving (M1.13) keeps M1.13's flow, so at each carving step its ice still fills the flanks below caps to the caps' level;
+  the carving acts where ice slides, and that ice carries no flux of its own, so little of it carves, but some of the speed is
+  averaged onto it. Changing it changes every carved valley. *Belongs:* M7 (glaciers that follow the place), with the carving's own
+  checks.
 - **Straight lines across flat valley floors** (M1.13b): seen from a shoulder over a filled valley floor (the seed-42 world's
   southern valley at Fiordland's altitude, `pools/mist-lake`'s neighbour looking west), faint bright lines run straight toward the
   vanishing point, with or without the pools: in the terrain or its shading, not the air. *Belongs:* M1.14 (its candidate

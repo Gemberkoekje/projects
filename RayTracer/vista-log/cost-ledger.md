@@ -40,6 +40,7 @@ cost adds a row and its note here. Section references (§n) are to [`vista-plan.
 | M1.17 (stop 2) | 0.44 | 6.95 | 5.84 | 20.79 |
 | M1a.2 | 0.30 | 6.92 | 5.11 | 18.70 |
 | M1a.3 | 0.26 | 5.74 | 4.12 | 15.55 |
+| M1a.3a | 0.25 | 5.85 | 3.96 | 15.55 |
 
 M1.1 changes no pixel: the committed views trace exactly M0's rays per sample (1.00, 2.42, 2.29, 3.27),
 so the M1.1 row shows the run-to-run timing noise, about ±4%. Differences smaller than that mean nothing.
@@ -206,3 +207,6 @@ M1a.3 changes the world and not the integrator: the loose ground creeps (seed 42
 GPU idle; M1a.2's world timed in turns with it in the same session reads 0.27 / 5.75 / 4.13 / 15.53, so the creep costs the trace
 nothing (ratios 0.95–1.00), and the fall from M1a.2's row is the idle GPU and the reworked world (M1a.2's row was taken on its first
 world with other work on the GPU). The erosion 25.5 → 25.6 GPU s (vista-log/M1a.3.md).
+M1a.3a changes today's ice and not the integrator or the eroded ground: the ice thins out below the ice that feeds it (seed 42's
+glaciers 7.6% → 5.8% of the grid). Timed in turns with M1a.3's ice, two rounds each, other work holding 22–26% of the GPU: the
+ratios 0.98 / 1.02 / 0.96 / 1.00, within the noise; the row is M1a.3's scaled by them (vista-log/M1a.3a.md).
