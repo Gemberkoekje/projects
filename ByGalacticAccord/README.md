@@ -19,7 +19,8 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 ## The current build
 
 **S1 (groundwork), S2 (the browser client), S3 (possession, Sale and Haul), S4 (terms and failure), S5
-(posting, responses and haggling), S6 (information and the news) and S6b (showing a post further) are done; S7 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
+(posting, responses and haggling), S6 (information and the news), S6b (showing a post further) and S7 (ships from parts)
+are done; S8 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
 station, or in a ship's hold. Two kinds of contract move them. A **Sale** is goods wanted or for sale, handed
 over at a place; a **Haul** carries a shipper's goods from one place to another. Consumers post the Sales they
 need delivered, producers sell lots and answer what is wanted, and traders fill Sales by buying and carrying,
@@ -37,8 +38,15 @@ bulletin of prices one jump away, and beyond that only what it last saw and what
 digest of a few of yesterday's contracts, reports. A post is shown in its own system; to reach further its poster pays
 each further system's station a small fee, four times as much a jump further, and the post shows there hours or days
 later. AI actors pay a ring further each day a post sits unsold. Every actor decides on what it knows, and trusts what it last saw.
-Accord contracts leave a public record. Ships change shape in S7–S8; the foundation (the event queue, the seeded random numbers, the money primitives, the invariants and
-the soak harness) stays.
+Accord contracts leave a public record. Every **ship is built from parts**: a frame, a drive and a module or none,
+each at grade A, B or C, its stats computed from them; five combinations are the standard designs. Three factories
+make the parts from ordinary goods, a grade lower when they make do without an input. A **Build** orders a ship:
+yards bid on it, take a deposit, buy the parts with wanted Sales anyone can fill or haul, build one ship at a time and
+hand it over, its terms deciding what a substitute costs; when a part can't come in time the yard proposes more time,
+a substitute or the money back, and the client chooses. Ships also change hands by **Sale**: yards sell what they
+build on spec, traders buy when their ships are busy and sell when they are idle, and Edge Salvage buys cheap and sells
+second-hand at the frontier. Debt and insolvency come in S8; the foundation (the event queue, the seeded random
+numbers, the money primitives, the invariants and the soak harness) stays.
 
 The **Blazor WebAssembly client** runs that simulation in the browser: the schematic sector map with
 routes styled by danger and ships moving along them, the time bar (pause, 1×, 4×, 16×), the board of open
@@ -53,7 +61,10 @@ choose, and pay to show it in further systems; whoever can see it answers over g
 of offers and replies. You can also counter anyone's post on the board. The map marks each place here, near or far
 from you and fades what you know of it with age ("live", "daily …", "as of …"); The Daily Accord and the signals
 (an idle producer, a consumer running short, a price off your readings) sit beside the log, a contract you know
-only from the news says it may have been taken, and every party shows its public record.
+only from the news says it may have been taken, and every party shows its public record. You can open your
+ship's **sheet** (its parts, each stat with the parts that make it, its history), order a ship with the **build
+composer** (a design or a custom combination), read the yards' **bids** as threads and accept one, follow the Build's
+**orders tree** as the yard buys its parts, and buy a ship for sale.
 
 ## Running it
 

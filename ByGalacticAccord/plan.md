@@ -6,8 +6,8 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-10-28):** S1–S6 and S6b done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
-[S4 log](log/S4.md), [S5 log](log/S5.md), [S6 log](log/S6.md), [S6b log](log/S6b.md)); S7 is next. The UI mockup
+**Status (2026-11-05):** S1–S7 and S6b done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
+[S4 log](log/S4.md), [S5 log](log/S5.md), [S6 log](log/S6.md), [S6b log](log/S6b.md), [S7 log](log/S7.md)); S8 is next. The UI mockup
 is at <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
@@ -45,15 +45,17 @@ foundation is sound; most of the game logic on top of it changes shape.
 | The test suite is slow: the board query walks and sorts every contract ever posted, and `FindPath` runs Dijkstra per contract, per ship, per heartbeat | S1 |
 | *Found in S2:* outside the Accord the pilot pays the producer for the goods at pickup and is paid only the fee at handover, so nearly every frontier haul loses money (and AI haulers take them, since their scoring ignores the goods) | S3 (fixed: a delivered Sale pays for the goods) |
 | *Found in S2:* consumers post hauls from a producer at their own location (Helios Prime), a one-hour trip to nowhere | S3 (fixed: a Sale handed over where it is posted) |
-| *Found in S3:* AI actors pay out whatever they hold above a working capital, a sink standing in for spending, growth and failure; without it savers soak up the money supply | S7, S8 (growth and insolvency replace it) |
-| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (in part: such a Sale now ends by its terms, the producer walking away for its break fee or its buyer cancelling for the bond). S5's haggling didn't fix it (walking away rose by 40–85%): carriers' time near the goods binds, not the fee. S6's limited sight lowered walking away by 16–28%, but carriers' hours still bind. S7 (fleets that grow) |
+| *Found in S3:* AI actors pay out whatever they hold above a working capital, a sink standing in for spending, growth and failure; without it savers soak up the money supply | S7 (in part: a trader that wants a ship keeps its price back and spends it on the ship), S8 (insolvency) |
+| *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (in part: such a Sale now ends by its terms, the producer walking away for its break fee or its buyer cancelling for the bond). S5's haggling didn't fix it (walking away rose by 40–85%): carriers' time near the goods binds, not the fee. S6's limited sight lowered walking away by 16–28%, but carriers' hours still bind. S7 (fleets that grow): over ten seeds walking away fell from 3,251 to 204 a run (26–387) as the traders' fleets grew from 9 ships to about 16 |
 | *Found in S4:* filling a Sale through a carrier pays only if the player watches its haul: at the usual offer about one in seven goes untaken and the Sale is cancelled for the bond, and the player can raise an offer only by reposting it | S5 (in part: the player posts a haul at its own price and terms, and haggles with the carriers that answer). S6: a post reaches only the carriers that can see it or read of it in the news; I didn't measure the untaken share again |
 | *Found in S4:* decisions rarely reach the player, which is a payer only of the hauls it posts and the lots it buys | S5 (in part: the player can post wanted Sales and is then asked about defaults and inspections, but neither bot met a decision in 8,333 game days) |
 | *Found in S5:* the market reader rarely finds a spread worth posting for (2–7 posts in 8,333 game days) and doesn't reliably beat the board taker | S6 (fixed: the reader judges each deal's risk and the next leg, and wins 9 of 10 seeds at 1.16× the taker; buying into a spread still loses money, so that part is off) |
-| *Found in S5:* the share of signed contracts that fail or are cancelled rose from 4.3–4.8% to 6.6–7.5%, and payer default from 41–239 to 474–601 a million ticks, as haggling signs marginal deals | Open (S6: 6.3–6.5%, payer default 691–804; over ten seeds S6 is 4.5–7.0% and S6b 4.5–6.0%, payer default 467–1,201): see the questions in [`log/S5.md`](log/S5.md) |
-| *Found in S6:* a consumer doesn't see lots two jumps away, so Helios Prime, which bought its machinery as lots from Tycho, gets 66–72% of it (S5: 98–99%) | S6b (in part: a producer pays to show a lot that sits unsold further out, and Helios Prime gets 80–96% of its machinery over ten seeds; its food fell from 74–91% to 52–90%). S7's part factories sell lots too |
+| *Found in S5:* the share of signed contracts that fail or are cancelled rose from 4.3–4.8% to 6.6–7.5%, and payer default from 41–239 to 474–601 a million ticks, as haggling signs marginal deals | S7, in effect: with growing fleets 0.5–2.4% fail or are cancelled over ten seeds, payer default 185–1,072 (S6b: 4.5–6.0%, 467–1,201). S5's questions in [`log/S5.md`](log/S5.md) still stand |
+| *Found in S6:* a consumer doesn't see lots two jumps away, so Helios Prime, which bought its machinery as lots from Tycho, gets 66–72% of it (S5: 98–99%) | S6b (in part: a producer pays to show a lot that sits unsold further out, and Helios Prime gets 80–96% of its machinery over ten seeds; its food fell from 74–91% to 52–90%). S7: 99–100% of its machinery and 98–100% of its food, over ten seeds, as more ships carry |
 | *Found after S6* (in the advertising experiments): a trader whose Sale from its own storage lost its haul sent its own free ship without checking it could carry the goods (a 45-unit Fast Courier took 100 food). Plain S6 did it 5 times in a million ticks on seed 2; the soak checks invariants every 5,000 ticks, so it missed them | Fixed 2026-10-28 (`DecisionEngine.ArrangeTransport` sends its own ship only if the goods fit; `FailurePathTests.A_trader_whose_haul_goes_untaken_sends_its_own_ship_only_if_the_goods_fit`) |
-| *Found in S3:* Dust Runner Kael's armoured freighter costs more to run than it earns in this sector, and an actor can't change its fleet | S7 |
+| *Found in S3:* Dust Runner Kael's armoured freighter costs more to run than it earns in this sector, and an actor can't change its fleet | S7 (fixed in part: its running cost from its parts is ₵0.42 an hour, not ₵0.60, and an actor can sell a ship that doesn't pay to buy a cheaper one. But armour no longer makes incidents rarer, and in the busier sector Kael ends with ₵44 to ₵35,986 over ten seeds, S6b ₵46,820 to ₵51,000) |
+| *Found in S7:* once the fleets settle, ships are seldom ordered (5–13 Builds a million ticks), and no order failed upstream on ten seeds: no supply failure, substitution or cancellation on one happens in a long run. `BuildTests` drives each path | S10 (the first hour's beat 4 must make it happen) |
+| *Found in S7:* with fleets that grow, a pilot can end broke: 3 of 70 traders on ten seeds (none in S6b), each with one or two ships it can't fund work for | S8 (insolvency), S10 |
 
 ## 2. How we work
 
@@ -260,7 +262,16 @@ foundation is sound; most of the game logic on top of it changes shape.
   - Goods conservation holds through parts into ships.
   - A test per build failure path.
   - In a soak, yards complete builds and AI fleets grow and shrink.
-- **Status:** not started.
+- **Status (2026-11-05):** done. Parts are goods at grades A, B and C, ships' stats are computed from them, and three factories
+  make them from ordinary goods. Yards bid on Builds, buy the parts with wanted Sales, build one ship at a time on a 20% deposit,
+  and hand it over by the Build's substitution policy; a part that can't come in time has the yard propose more time, a
+  substitute or the refund. Ships change hands by Sale: yards' stock, traders' idle ships, Edge Salvage second-hand. Over ten
+  seeds every invariant holds (goods conservation through parts into ships among them), the traders' fleets grow from 9 ships
+  to about 16 and ships change hands 19–218 times a run, 16% more contracts are fulfilled than in S6b (all ten seeds), 1.2% fail
+  or are cancelled (S6b 5.1%), and the market reader wins all ten seeds at 1.93× the board taker. A Build is shown where its
+  poster posts it (design A.2), and an AI's ad budget is now a total per post, 1% of a ship's price. No order failed upstream in
+  the long runs: supply failures happen in the tests, not yet in the soak. The client has the ship sheet, the orders tree, the
+  build composer and the yards' bids. See [`log/S7.md`](log/S7.md).
 
 ### S8 — Consequences
 
@@ -306,7 +317,8 @@ foundation is sound; most of the game logic on top of it changes shape.
     which an AI does after a day: the board at Day 1 · 06:00 holds only Meridian's posts and the news (the browser
     check runs five game hours before anything takeable is live), and beat 2 needs Verdant's cheap food visible from
     Meridian. The seeded start has to show those posts at Meridian, or the AI has to advertise sooner.
-  - Bot players that measure beats 4–5 and the skill gap.
+  - Bot players that measure beats 4–5 and the skill gap. Since S7 a supply failure needs an upstream order to fail, which long
+    runs didn't meet: beat 4 has to be made likely (a seeded fragile parts run, or parts that come by red routes).
   - Tuning against the §17 pacing targets, with advertising's figures among the knobs (D38): the fee share and growth,
     the delays, the AI's wait and budget, and whether a jump of free reach helps the first hour. S6b's experiments
     measured each; the market reader's edge was widest with no free reach and small fees.
