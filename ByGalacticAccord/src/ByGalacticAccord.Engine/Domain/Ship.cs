@@ -78,9 +78,9 @@ public sealed record ShipCourse(IReadOnlyList<LocationId> Path, long DepartedTic
 
 /// <summary>
 /// What a ship has been committed to: load <see cref="Quantity"/> of a good at <see cref="Pickup"/> and, if
-/// there is a <see cref="Destination"/>, carry it there. The contracts it serves say what happens at each end:
-/// a Haul's pickup and delivery, a Sale bought and collected at the pickup, a Sale handed over at the
-/// destination. A job with no destination ends when the goods are loaded.
+/// there is a <see cref="Destination"/>, carry it there at <see cref="Throttle"/> (design §16.7). The contracts it serves
+/// say what happens at each end: a Haul's pickup and delivery, a Sale bought and collected at the pickup, a Sale handed
+/// over at the destination. A job with no destination ends when the goods are loaded.
 /// </summary>
 public sealed record ShipJob(
     ActorId GoodsOwner,
@@ -91,7 +91,8 @@ public sealed record ShipJob(
     LocationId? Destination,
     ContractId? Haul = null,
     ContractId? Purchase = null,
-    ContractId? Delivery = null)
+    ContractId? Delivery = null,
+    Throttle Throttle = Throttle.Cruise)
 {
     /// <summary>The contract the job is mainly for: the haul it flies, else the sale it delivers, else the one it collects; none for a ferry.</summary>
     public ContractId Main => Haul ?? Delivery ?? Purchase ?? default;

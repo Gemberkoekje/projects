@@ -15,10 +15,10 @@ namespace ByGalacticAccord.Cli;
 /// </summary>
 internal static class Soak
 {
-    public static int Run(long seed, long ticks)
+    public static int Run(long seed, long ticks, SimulationConfig? config = null)
     {
         Console.WriteLine($"== By Galactic Accord — soak run ==  seed={seed}  ticks={ticks:N0} (to {GameTime.FormatDate(ticks)})");
-        WorldHandles handles = WorldGenerator.Generate(seed, withPlayer: false);
+        WorldHandles handles = WorldGenerator.Generate(seed, withPlayer: false, config);
         SimulationContext ctx = handles.Context;
         Console.WriteLine($"World: {ctx.Actors.Count} actors, {ctx.Locations.Count} locations, {ctx.Routes.Count} routes. Baseline supply {ctx.InitialCredits}.");
         Console.WriteLine();
@@ -65,12 +65,26 @@ internal static class Soak
         Line("Faucet multiplier (monitor)", ctx.FaucetMultiplier.ToString("0.00", CultureInfo.InvariantCulture));
         Line("Government revenue (taxed)", ctx.GovernmentRevenue.ToString());
         Line("Goods sold under Sales", ctx.GoodsSold.ToString("N0", CultureInfo.InvariantCulture));
+        Line("Debt written off (insolvency)", ctx.DebtWrittenOff.ToString());
+        Console.WriteLine("Sinks by kind (design §5.1):");
+        foreach (SinkKind kind in Enum.GetValues<SinkKind>())
+        {
+            if (kind != SinkKind.None)
+            {
+                Line("  " + kind, ctx.Sunk(kind).ToString());
+            }
+        }
+
+        decimal stationIncome = ctx.ActorsOrdered.Where(a => a.Station is not null).Sum(a => a.Credits.Amount);
+        Line("  (station operators hold)", Credits.Of(stationIncome).ToString());
         Console.WriteLine();
         Line("Contracts fulfilled", ctx.ContractsFulfilled.ToString("N0", CultureInfo.InvariantCulture));
         Line("Contracts breached (performer)", ctx.ContractsBreached.ToString("N0", CultureInfo.InvariantCulture));
         Line("Contracts defaulted (payer)", ctx.ContractsDefaulted.ToString("N0", CultureInfo.InvariantCulture));
         Line("Contracts cancelled", ctx.ContractsCancelled.ToString("N0", CultureInfo.InvariantCulture));
         Line("Transit incidents", ctx.IncidentsOccurred.ToString("N0", CultureInfo.InvariantCulture));
+        Line("  by kind", string.Join(", ", Enum.GetValues<TransitIncidentKind>().Select(k => $"{k} {ctx.IncidentsByKind[(int)k].ToString("N0", CultureInfo.InvariantCulture)}")));
+        Line("Laden trips, cruise / pushed", $"{ctx.LadenTrips[(int)Throttle.Cruise].ToString("N0", CultureInfo.InvariantCulture)} / {ctx.LadenTrips[(int)Throttle.Push].ToString("N0", CultureInfo.InvariantCulture)}");
         Line("RNG draws consumed", ctx.Rng.DrawCount.ToString("N0", CultureInfo.InvariantCulture));
         Line("Journal entries recorded", ctx.Journal.TotalRecorded.ToString("N0", CultureInfo.InvariantCulture));
 
@@ -214,12 +228,28 @@ internal static class Soak
         Console.WriteLine($"   (total {ctx.Contracts.Count.ToString("N0", CultureInfo.InvariantCulture)})");
 
         Console.WriteLine();
+        Console.WriteLine("Debt and insolvency (design §5.4, §16.8):");
+        Line("  Debt warnings", ctx.DebtWarnings.ToString("N0", CultureInfo.InvariantCulture));
+        Line("  Deepest debt", ctx.DeepestDebt.Debt.Amount > 0m ? $"{ctx.DeepestDebt.Debt} ({ctx.Actor(ctx.DeepestDebt.Actor).Name})" : "none");
+        Line("  In debt at the end", ctx.ActorsOrdered.Count(a => a.InBusiness && a.Credits.Amount < 0m).ToString(CultureInfo.InvariantCulture));
+        Line("  Insolvent", ctx.Insolvencies.Count.ToString(CultureInfo.InvariantCulture));
+        foreach ((long tick, ActorId id) in ctx.Insolvencies)
+        {
+            var who = ctx.Actor(id);
+            string ended = ctx.Dissolutions.Any(d => d.Actor == id) ? $"dissolved {GameTime.FormatDate(ctx.Dissolutions.First(d => d.Actor == id).Tick)}" : "still liquidating";
+            Console.WriteLine($"     {GameTime.FormatDate(tick),-18} {who.Role,-16} {who.Name}: owed {who.DebtAtInsolvency}; {ended}");
+        }
+
+        Line("  Fire-sale ships sold", $"{ctx.FireSaleShipsSold.ToString(CultureInfo.InvariantCulture)}, to salvage {ctx.FireSaleShipsToSalvage.ToString(CultureInfo.InvariantCulture)}");
+
+        Console.WriteLine();
         Console.WriteLine("Trader solvency (idle fleets bleed running cost, design §6.5):");
         foreach (var actor in ctx.ActorsOrdered)
         {
             if (actor.MovesCargo)
             {
-                Console.WriteLine($"   {Credits.Of(actor.Credits.Amount),-12} {actor.Role,-16} {actor.Name} ({actor.Ships.Count} ship)");
+                string standing = actor.Solvency == SolvencyStatus.None ? string.Empty : $" [{actor.Solvency}]";
+                Console.WriteLine($"   {Credits.Of(actor.Credits.Amount),-12} {actor.Role,-16} {actor.Name} ({actor.Ships.Count} ship){standing}");
             }
         }
 

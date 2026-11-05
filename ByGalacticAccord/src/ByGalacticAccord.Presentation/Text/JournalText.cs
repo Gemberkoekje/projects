@@ -49,6 +49,17 @@ public static class JournalText
         RemedyChosenEntry e => Templates.Fill(
             Key("RemedyChosen." + e.Remedy, context, e.By, context.Contract(e.Contract).Performer), Facts(context, e.Contract, ("by", Name(context, e.By)))),
         ShipScrappedEntry e => Templates.Fill("ShipScrapped", ("owner", Name(context, e.Owner)), ("ship", ShipLine(context, e.Ship))),
+        DebtWarningEntry e => Templates.Fill(
+            Key("DebtWarning", context, e.Actor),
+            ("actor", Name(context, e.Actor)), ("debt", Format.Money(e.Debt)), ("assets", Format.Money(e.Assets)),
+            ("half", Format.Money(Credits.Of(e.Assets.Amount / 2m))), ("date", Format.Date(e.InsolventBy))),
+        DebtWarningLiftedEntry e => Templates.Fill(
+            Key("DebtWarningLifted", context, e.Actor), ("actor", Name(context, e.Actor)), ("debt", Format.Money(e.Debt)), ("assets", Format.Money(e.Assets))),
+        InsolventEntry e => Templates.Fill(
+            Key("Insolvent." + e.Reason, context, e.Actor), ("actor", Name(context, e.Actor)), ("debt", Format.Money(e.Debt)), ("assets", Format.Money(e.Assets))),
+        ActorDissolvedEntry e => Templates.Fill(
+            Key(e.WrittenOff.Amount > 0m ? "ActorDissolved.WrittenOff" : "ActorDissolved.LeftOver", context, e.Actor),
+            ("actor", Name(context, e.Actor)), ("raised", Format.Money(e.Raised)), ("writtenOff", Format.Money(e.WrittenOff)), ("leftOver", Format.Money(e.LeftOver))),
         _ => throw new ArgumentOutOfRangeException(nameof(entry), entry, "No template for this journal entry."),
     };
 
@@ -75,6 +86,7 @@ public static class JournalText
         SupplyFailureEntry e => e.Yard,
         RemedyChosenEntry e => e.By,
         ShipScrappedEntry e => e.Owner,
+        IActorEntry e => e.Actor,
         _ => null,
     };
 
@@ -205,11 +217,23 @@ public static class JournalText
     }
 
     // Cancelled for default by the payer, who took the bond; or at will by either party, who paid the break fee; or a Build cancelled
-    // by agreement after a supply failure.
+    // by agreement after a supply failure; or on a party's insolvency, the insolvent party named as the canceller (design §5.4).
     private static string Cancelled(SimulationContext context, ContractCancelledEntry e)
     {
         Contract contract = context.Contract(e.Contract);
         ActorId? other = contract.Other(e.By);
+        if (e.Reason == CancelReason.Insolvency)
+        {
+            return Templates.Fill(
+                Key("ContractCancelled.Insolvency." + (e.By == contract.Payer ? "Payer" : "Performer"), context, e.By, other),
+                Facts(
+                    context, e.Contract,
+                    ("by", Name(context, e.By)),
+                    ("other", other is { } party ? Name(context, party) : string.Empty),
+                    ("head", Head(context, contract)),
+                    ("paid", Format.Money(e.Paid))));
+        }
+
         string key = "ContractCancelled." + e.Reason + "." + (e.Reason == CancelReason.AtWill && e.By == contract.Payer ? "Payer." : string.Empty)
                      + Kind(contract, side: false);
         return Templates.Fill(

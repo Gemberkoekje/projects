@@ -25,23 +25,33 @@ public sealed class ActorHeartbeat : ISimEvent
 
     public void Process(SimulationContext context)
     {
-        if (!context.Actors.TryGetValue(Actor, out ActorState? actor))
+        if (!context.Actors.TryGetValue(Actor, out ActorState? actor) || actor.Solvency == SolvencyStatus.Dissolved)
         {
-            return;
+            return; // a dissolved actor is gone: its heartbeat stops
         }
 
-        // Ships cost money every day, earning or idle, whoever owns them: the player too (design §6.5). Then it looks around
-        // where it is present, and decides on what it knows (design §7, D32).
+        // Ships cost money every day, earning or idle, whoever owns them: the player too (design §6.5), and debt costs interest
+        // (design §16.8). Then it looks around where it is present, and its debt is weighed against what it owns.
         DecisionEngine.ChargeRunningCosts(context, actor);
+        Solvency.ChargeInterest(context, actor);
         Knowledge.Look(context, actor);
+        Solvency.Review(context, actor);
 
-        // The player's actor is driven by the human, not the decision engine (§4.7.3).
-        if (!actor.IsPlayer)
+        // An insolvent actor is the Accord clearing house's to sell up (design §5.4), the player's too; otherwise it decides on
+        // what it knows (design §7, D32). The player's actor is driven by the human, not the decision engine (§4.7.3).
+        if (actor.Solvency == SolvencyStatus.Liquidating)
+        {
+            Liquidation.Run(context, actor);
+        }
+        else if (!actor.IsPlayer)
         {
             DecisionEngine.Run(context, actor);
         }
 
-        context.Schedule(new ActorHeartbeat(Tick + context.Config.HeartbeatInterval, Actor));
+        if (actor.Solvency != SolvencyStatus.Dissolved)
+        {
+            context.Schedule(new ActorHeartbeat(Tick + context.Config.HeartbeatInterval, Actor));
+        }
     }
 }
 

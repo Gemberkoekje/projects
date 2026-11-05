@@ -179,8 +179,28 @@
                 {
                     <p class="blocked small muted">@Model.Blocked</p>
                 }
+                @if (Model.Push is { } push)
+                {
+                    <div class="block push" data-testid="push">
+                        <div class="line" title="@push.Note">
+                            <span class="line-label">
+                                <span class="small">@push.Title</span>
+                                <span class="xsmall muted">@push.Note</span>
+                            </span>
+                            <span class="mono small tone-@push.Tone">@push.Value</span>
+                        </div>
+                        @if (push.Trap is { } trap)
+                        {
+                            <p class="trap small tone-Loss" data-testid="trap">@trap</p>
+                        }
+                    </div>
+                }
                 <div class="actions">
-                    <button type="button" class="button primary" disabled="@(!Model.CanAccept)" @onclick="OnAccept">@Model.AcceptLabel</button>
+                    <button type="button" class="button primary" disabled="@(!Model.CanAccept)" @onclick="() => OnAccept.InvokeAsync(Throttle.Cruise)">@Model.AcceptLabel</button>
+                    @if (Model.Push is { } pushed)
+                    {
+                        <button type="button" class="button" data-testid="accept-push" disabled="@(!Model.CanAccept)" @onclick="() => OnAccept.InvokeAsync(Throttle.Push)">@pushed.AcceptLabel</button>
+                    }
                 </div>
             }
             @foreach (ContractAction action in Model.Actions)
@@ -232,7 +252,7 @@
     public string NoneText { get; set; } = string.Empty;
 
     [Parameter]
-    public EventCallback OnAccept { get; set; }
+    public EventCallback<Throttle> OnAccept { get; set; }
 
     [Parameter]
     public EventCallback<ContractCommand> OnCommand { get; set; }

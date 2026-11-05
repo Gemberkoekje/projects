@@ -181,6 +181,50 @@ public sealed record SupplyFailureEntry(long Tick, ContractId Contract, ActorId 
 public sealed record RemedyChosenEntry(long Tick, ContractId Contract, ActorId By, Remedy Remedy)
     : JournalEntry(Tick), IContractEntry;
 
+/// <summary>An entry about one actor's standing with its debts (design §16.8), not about a contract.</summary>
+public interface IActorEntry
+{
+    ActorId Actor { get; }
+}
+
+/// <summary>
+/// An actor's debt passed half of what it owns (design §16.8): it is warned. It becomes insolvent if its debt passes all of what
+/// it owns, or stays above half until <see cref="InsolventBy"/>.
+/// </summary>
+public sealed record DebtWarningEntry(long Tick, ActorId Actor, Credits Debt, Credits Assets, long InsolventBy)
+    : JournalEntry(Tick), IActorEntry;
+
+/// <summary>A warned actor's debt fell back to half of what it owns or less: the warning is lifted.</summary>
+public sealed record DebtWarningLiftedEntry(long Tick, ActorId Actor, Credits Debt, Credits Assets)
+    : JournalEntry(Tick), IActorEntry;
+
+/// <summary>Why an actor became insolvent (design §16.8).</summary>
+public enum InsolvencyReason
+{
+    /// <summary>Not said.</summary>
+    None,
+
+    /// <summary>Its debt passed all of what it owns.</summary>
+    DebtAboveAssets,
+
+    /// <summary>Its debt stayed above half of what it owns for seven days.</summary>
+    StayedAboveHalf,
+}
+
+/// <summary>
+/// An actor became insolvent (design §5.4): its posts are withdrawn, its contracts cancelled, and the Accord clearing house puts
+/// what it owns up in fire sales.
+/// </summary>
+public sealed record InsolventEntry(long Tick, ActorId Actor, Credits Debt, Credits Assets, InsolvencyReason Reason)
+    : JournalEntry(Tick), IActorEntry;
+
+/// <summary>
+/// An insolvent actor's liquidation ended and it dissolved (design §5.4): what its sales raised, the debt the clearing house
+/// wrote off, and what was left over and went to its owners.
+/// </summary>
+public sealed record ActorDissolvedEntry(long Tick, ActorId Actor, Credits Raised, Credits WrittenOff, Credits LeftOver)
+    : JournalEntry(Tick), IActorEntry;
+
 /// <summary>
 /// The append-only record of what happened. In memory, capped so long soak runs stay bounded: a ring of the last
 /// <c>cap</c> entries, oldest first. The interface reads its tail as the event log.

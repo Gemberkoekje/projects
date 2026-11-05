@@ -69,6 +69,20 @@ public sealed class TrackRecord
     internal void Default() => Defaulted++;
 
     internal void WalkedAwayAsPayer() => PayerWalkedAway++;
+
+    // Another record's counts added to this one: an actor's whole record, summed over every counterparty's memory of it.
+    internal void Add(TrackRecord other)
+    {
+        OnTime += other.OnTime;
+        Late += other.Late;
+        Short += other.Short;
+        Failed += other.Failed;
+        CancelledForDefault += other.CancelledForDefault;
+        WalkedAway += other.WalkedAway;
+        Paid += other.Paid;
+        Defaulted += other.Defaulted;
+        PayerWalkedAway += other.PayerWalkedAway;
+    }
 }
 
 /// <summary>
@@ -89,6 +103,24 @@ public sealed class Records
         _dealings.TryGetValue((observer, other), out TrackRecord? record) ? record : Empty;
 
     private static TrackRecord Empty { get; } = new();
+
+    /// <summary>
+    /// Everything <paramref name="actor"/> did on its contracts, as every counterparty remembers it, frontier ones too: the record the
+    /// legacy reads (design §10: "contracts honoured and broken").
+    /// </summary>
+    public TrackRecord WholeRecordOf(ActorId actor)
+    {
+        var whole = new TrackRecord();
+        foreach (KeyValuePair<(ActorId Observer, ActorId Other), TrackRecord> dealing in _dealings)
+        {
+            if (dealing.Key.Other == actor)
+            {
+                whole.Add(dealing.Value);
+            }
+        }
+
+        return whole;
+    }
 
     /// <summary>A contract was delivered (in full, or short and paid pro rata): its performer delivered and its payer paid.</summary>
     internal void Delivered(Contract contract, long ticksLate, bool shortDelivery)

@@ -73,9 +73,9 @@ public static partial class DecisionEngine
     /// </summary>
     public static bool WantsShip(SimulationContext context, ActorState trader)
     {
-        if (!trader.MovesCargo || trader.IsPlayer || context.CurrentTick < FleetSettleHours)
+        if (!trader.MovesCargo || trader.IsPlayer || context.CurrentTick < FleetSettleHours || trader.Solvency != SolvencyStatus.None)
         {
-            return false;
+            return false; // a trader warned for its debts doesn't grow
         }
 
         int cap = trader.Role == ActorRole.ShippingCompany ? CompanyFleetCap : PilotFleetCap;
@@ -156,13 +156,16 @@ public static partial class DecisionEngine
         }
 
         // Surplus: with more than one ship working and the fleet idle, the idlest ship that has sat free ten days goes (the dearest
-        // to run, if two are as idle). A pilot whose one ship doesn't pay sells it, to buy a cheaper one with what it fetches.
+        // to run, if two are as idle). A pilot whose one ship doesn't pay sells it, to buy a cheaper one with what it fetches. A
+        // trader in debt (design §16.8) sells its idlest free ship however busy the fleet, to pay it off: in debt it can post no
+        // bond, so it can take no work in Accord space.
+        bool warned = trader.Credits.Amount < 0m;
         int working = trader.Ships.Count(id => context.Ship(id).ListedFor is null);
         if (working == 1 && Uneconomic(context, trader))
         {
             working = 2; // it may sell its only ship
         }
-        else if (working <= 1 || FleetUtilization(context, trader) >= ShrinkBelow)
+        else if (working <= 1 || (!warned && FleetUtilization(context, trader) >= ShrinkBelow))
         {
             return;
         }
@@ -171,7 +174,7 @@ public static partial class DecisionEngine
         foreach (ShipId id in trader.Ships)
         {
             Ship ship = context.Ship(id);
-            if (!ship.IsFree || ship.HoldQuantity > 0m || context.CurrentTick - ship.FreeSince < IdleDaysToSell * GameTime.HoursPerDay)
+            if (!ship.IsFree || ship.HoldQuantity > 0m || (!warned && context.CurrentTick - ship.FreeSince < IdleDaysToSell * GameTime.HoursPerDay))
             {
                 continue;
             }

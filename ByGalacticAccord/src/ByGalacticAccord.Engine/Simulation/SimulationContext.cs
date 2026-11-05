@@ -116,6 +116,17 @@ public sealed class SimulationContext
 
     public Credits TotalSink { get; private set; } = Credits.Zero;
 
+    /// <summary>
+    /// Debt the Accord clearing house wrote off when an insolvent actor dissolved (design §5.4): credits that come back into
+    /// the supply, since the debtor's negative balance leaves with it. Credit conservation counts it.
+    /// </summary>
+    public Credits DebtWrittenOff { get; private set; } = Credits.Zero;
+
+    /// <summary>What has been destroyed through <paramref name="kind"/> (design §5.1's sinks).</summary>
+    public Credits Sunk(SinkKind kind) => Credits.Of(_sunk[(int)kind]);
+
+    private readonly decimal[] _sunk = new decimal[Enum.GetValues<SinkKind>().Length];
+
     public Credits EscrowLockedTotal { get; private set; } = Credits.Zero;
 
     public Credits EscrowReleasedTotal { get; private set; } = Credits.Zero;
@@ -645,7 +656,7 @@ public sealed class SimulationContext
     {
         if (!_producersOf.TryGetValue(good, out ActorState[]? producers))
         {
-            producers = ActorsOrdered.Where(a => a.Makes(good)).ToArray();
+            producers = ActorsOrdered.Where(a => a.Makes(good) && a.InBusiness).ToArray();
             _producersOf[good] = producers;
         }
 
@@ -706,8 +717,11 @@ public sealed class SimulationContext
         TotalFaucet += amount;
     }
 
-    /// <summary>Destroy up to <paramref name="requested"/> credits from an actor. Returns the amount actually sunk.</summary>
-    public Credits ApplySink(ActorState actor, Credits requested)
+    /// <summary>
+    /// Destroy up to <paramref name="requested"/> credits from an actor: spending it chooses (production, labour, a payout), so
+    /// never below ₵0. Returns the amount actually sunk.
+    /// </summary>
+    public Credits ApplySink(ActorState actor, Credits requested, SinkKind kind = SinkKind.None)
     {
         decimal actual = Math.Min(requested.Amount, Math.Max(0m, actor.Credits.Amount));
         if (actual <= 0m)
@@ -718,10 +732,59 @@ public sealed class SimulationContext
         var amount = Credits.Of(actual);
         actor.ForceDebit(amount);
         TotalSink += amount;
+        _sunk[(int)kind] += actual;
         return amount;
     }
 
+    /// <summary>
+    /// Destroy <paramref name="amount"/> from an actor whether or not it has it (design §16.8: running costs, fees and interest
+    /// keep charging below ₵0). What it lacks becomes debt.
+    /// </summary>
+    public void Charge(ActorState actor, Credits amount, SinkKind kind)
+    {
+        if (amount.Amount <= 0m)
+        {
+            return;
+        }
+
+        actor.ForceDebit(amount);
+        TotalSink += amount;
+        _sunk[(int)kind] += amount.Amount;
+    }
+
+    /// <summary>
+    /// Write off what an actor owes (design §5.4): its negative balance is brought back to ₵0 and booked as
+    /// <see cref="DebtWrittenOff"/>. Returns the debt written off; nothing for an actor not in debt.
+    /// </summary>
+    public Credits WriteOffDebt(ActorState actor)
+    {
+        if (actor.Credits.Amount >= 0m)
+        {
+            return Credits.Zero;
+        }
+
+        Credits debt = Credits.Of(-actor.Credits.Amount);
+        actor.Credit(debt);
+        DebtWrittenOff += debt;
+        return debt;
+    }
+
     // ---- transfers (conserve total; never touch faucet/sink) ----
+
+    /// <summary>
+    /// Move <paramref name="amount"/> whether or not the payer has it: a fee that keeps charging below ₵0 (rent, docking, design
+    /// §16.8), or a remedy the deep Accord enforces (design §3.5). What the payer lacks becomes its debt.
+    /// </summary>
+    public void TransferOwed(ActorState from, ActorState to, Credits amount)
+    {
+        if (amount.Amount <= 0m)
+        {
+            return;
+        }
+
+        from.ForceDebit(amount);
+        to.Credit(amount);
+    }
     public bool TryTransfer(ActorState from, ActorState to, Credits amount)
     {
         if (!from.TryDebit(amount))
@@ -782,6 +845,28 @@ public sealed class SimulationContext
         return true;
     }
 
+    /// <summary>
+    /// Lock a performer's bond in escrow in full, to the cent, whether or not it has it (design §16.4): what it lacks the Accord clearing
+    /// house lends, and the performer owes it (<see cref="Economy.Solvency.CanBond"/> says how far it may).
+    /// </summary>
+    public void LockBondToEscrow(Contract contract, ActorState performer, Credits amount)
+    {
+        amount = Cents(amount);
+        if (amount.Amount <= 0m)
+        {
+            return;
+        }
+
+        performer.ForceDebit(amount);
+        if (contract.EscrowHeld.Amount == 0m && !_escrowed.Contains(contract))
+        {
+            _escrowed.Add(contract);
+        }
+
+        contract.AddEscrow(amount);
+        EscrowLockedTotal += amount;
+    }
+
     public void ReleaseFromEscrow(Contract contract, ActorState payee, Credits amount)
     {
         Credits actual = CapToHeld(contract, amount);
@@ -820,6 +905,7 @@ public sealed class SimulationContext
         contract.ReleaseEscrow(actual);
         EscrowReleasedTotal += actual;
         TotalSink += actual;
+        _sunk[(int)SinkKind.Tax] += actual.Amount;
         GovernmentRevenue += actual;
     }
 
@@ -832,7 +918,7 @@ public sealed class SimulationContext
 
     public void TaxDirect(ActorState payer, Credits amount)
     {
-        Credits sunk = ApplySink(payer, amount);
+        Credits sunk = ApplySink(payer, amount, SinkKind.Tax);
         GovernmentRevenue += sunk;
     }
 
@@ -977,14 +1063,19 @@ public sealed class SimulationContext
 
     public void UnreserveStorage(StorageContract storage, GoodType good, decimal quantity) => storage.Unreserve(good, quantity);
 
-    /// <summary>Charge the rent owed on a store since it was last settled: what the renter can pay goes to the operator.</summary>
+    /// <summary>
+    /// Charge the rent owed on a store since it was last settled, to the operator: a fee that keeps charging below ₵0 (design
+    /// §16.8), so a renter that can't pay goes into debt for it.
+    /// </summary>
     public void SettleRent(StorageContract storage)
     {
         Credits due = storage.RentDue(CurrentTick);
-        Credits paid = due.Amount > 0m
-            ? TransferUpTo(Actor(storage.Renter), Actor(storage.Operator), due)
-            : Credits.Zero;
-        storage.Charged(CurrentTick, paid);
+        if (due.Amount > 0m)
+        {
+            TransferOwed(Actor(storage.Renter), Actor(storage.Operator), due);
+        }
+
+        storage.Charged(CurrentTick, due.Amount > 0m ? due : Credits.Zero);
     }
 
     private StorageContract OpenStorage(ActorState renter, LocationId location)
@@ -1078,7 +1169,7 @@ public sealed class SimulationContext
 
     internal void NoteRemedy(Remedy remedy) => _remedies[(int)remedy]++;
 
-    internal void NoteShipSold(ActorState seller, ActorState buyer)
+    internal void NoteShipSold(ActorState seller, ActorState buyer, bool fireSale)
     {
         ShipsSold++;
         if (buyer.Salvage is not null)
@@ -1089,6 +1180,56 @@ public sealed class SimulationContext
         if (seller.Salvage is not null)
         {
             ShipsSoldBySalvage++;
+        }
+
+        if (fireSale)
+        {
+            FireSaleShipsSold++;
+            if (buyer.Salvage is not null)
+            {
+                FireSaleShipsToSalvage++;
+            }
+        }
+    }
+
+    // ---- debt and insolvency (design §5.4, §16.8): telemetry ----
+
+    /// <summary>The actors that became insolvent, in order, with when.</summary>
+    public IReadOnlyList<(long Tick, ActorId Actor)> Insolvencies => _insolvencies;
+
+    private readonly List<(long Tick, ActorId Actor)> _insolvencies = new();
+
+    /// <summary>The actors whose liquidation ended, in order, with when.</summary>
+    public IReadOnlyList<(long Tick, ActorId Actor)> Dissolutions => _dissolutions;
+
+    private readonly List<(long Tick, ActorId Actor)> _dissolutions = new();
+
+    /// <summary>Ships sold in an insolvent actor's fire sale; and of them, to a salvage yard.</summary>
+    public long FireSaleShipsSold { get; private set; }
+
+    public long FireSaleShipsToSalvage { get; private set; }
+
+    /// <summary>Debt warnings recorded (design §16.8), all told.</summary>
+    public long DebtWarnings { get; private set; }
+
+    /// <summary>The deepest any actor's balance has gone, and whose.</summary>
+    public (Credits Debt, ActorId Actor) DeepestDebt { get; private set; }
+
+    internal void NoteInsolvent(ActorState actor)
+    {
+        _insolvencies.Add((CurrentTick, actor.Id));
+        _producersOf.Clear(); // an insolvent maker sells nothing more of its own making
+    }
+
+    internal void NoteDissolved(ActorState actor) => _dissolutions.Add((CurrentTick, actor.Id));
+
+    internal void NoteDebtWarning() => DebtWarnings++;
+
+    internal void NoteDebt(ActorState actor)
+    {
+        if (actor.Debt > DeepestDebt.Debt)
+        {
+            DeepestDebt = (actor.Debt, actor.Id);
         }
     }
 
@@ -1140,6 +1281,24 @@ public sealed class SimulationContext
     public long Failures(FailureKind kind) => _failures[(int)kind];
 
     public void NoteIncident() => IncidentsOccurred++;
+
+    /// <summary>Incidents by outcome (design §8.4: danger shifts them toward the severe end).</summary>
+    public IReadOnlyList<long> IncidentsByKind => _incidentsByKind;
+
+    private readonly long[] _incidentsByKind = new long[Enum.GetValues<TransitIncidentKind>().Length];
+
+    /// <summary>Laden trips by the throttle they flew at (design §16.7).</summary>
+    public IReadOnlyList<long> LadenTrips => _ladenTrips;
+
+    private readonly long[] _ladenTrips = new long[Enum.GetValues<Throttle>().Length];
+
+    internal void NoteIncident(TransitIncidentKind kind)
+    {
+        IncidentsOccurred++;
+        _incidentsByKind[(int)kind]++;
+    }
+
+    internal void NoteLadenTrip(Throttle throttle) => _ladenTrips[(int)throttle]++;
 
     public void NoteSold(decimal quantity) => GoodsSold += quantity;
 

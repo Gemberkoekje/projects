@@ -19,7 +19,8 @@ public sealed record BotReport(
     int Counters,
     int Haggles,
     int Decisions,
-    IReadOnlyList<InvariantViolation> Violations)
+    IReadOnlyList<InvariantViolation> Violations,
+    bool WentUnder = false)
 {
     /// <summary>What it gained, money in hand and its share of escrow together, a game day on average.</summary>
     public Credits PerDay => Credits.Of((EndCredits.Amount + EndEscrow.Amount - StartCredits.Amount) * GameTime.HoursPerDay / System.Math.Max(1, Ticks));
@@ -28,7 +29,8 @@ public sealed record BotReport(
 /// <summary>
 /// Runs a world with a bot as its player (design §20.3): the clock runs a few game hours at a time, as a player glances at
 /// it; any decision the terms hand the player is answered by the AI's rule, alerts are acknowledged, and the bot acts. The
-/// invariants are checked as the soak harness checks them.
+/// invariants are checked as the soak harness checks them. A bot that goes insolvent (design §10) ends its game there, as a
+/// player's would: the report says so, with what it owed.
 /// </summary>
 public static class BotRun
 {
@@ -43,7 +45,7 @@ public static class BotRun
         int decisions = 0;
         var violations = new List<InvariantViolation>();
         long nextCheck = checkEvery;
-        while (context.CurrentTick < ticks && violations.Count == 0)
+        while (context.CurrentTick < ticks && violations.Count == 0 && !session.IsOver)
         {
             RunStop stop = context.RunTo(System.Math.Min(ticks, context.CurrentTick + Glance));
             foreach (PlayerDecision decision in context.PlayerDecisions.ToList())
@@ -53,7 +55,7 @@ public static class BotRun
             }
 
             context.ClearPlayerAlerts();
-            if (stop is RunStop.ReachedTarget or RunStop.Drained)
+            if (stop is RunStop.ReachedTarget or RunStop.Drained && !session.IsOver)
             {
                 bot.Act(session);
             }
@@ -69,6 +71,6 @@ public static class BotRun
         decimal escrow = session.PlayerActiveContracts.Sum(c => c.Payer == session.Player.Id ? c.EscrowHeld.Amount - c.LockedBond.Amount : c.LockedBond.Amount);
         return new BotReport(
             bot.Name, seed, context.CurrentTick, start, session.Player.Credits, Credits.Of(escrow), bot.Deals, bot.Posts, bot.Counters,
-            session.PlayerNegotiations.Count(), decisions, violations);
+            session.PlayerNegotiations.Count(), decisions, violations, session.IsOver);
     }
 }

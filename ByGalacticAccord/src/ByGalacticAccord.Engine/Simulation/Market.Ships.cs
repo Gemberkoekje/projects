@@ -117,7 +117,8 @@ public static partial class Market
     /// Post a ship for sale where it is docked, free and empty, on the seller's package. It takes no work while posted, and
     /// changes hands the moment someone signs.
     /// </summary>
-    public static ShipSaleContract PostShipSale(SimulationContext context, ActorState seller, Ship ship, Credits price, Credits reservation, long deadline)
+    public static ShipSaleContract PostShipSale(
+        SimulationContext context, ActorState seller, Ship ship, Credits price, Credits reservation, long deadline, long? cause = null)
     {
         if (ship.Owner != seller.Id || !ship.IsFree || ship.HoldQuantity > 0m)
         {
@@ -131,7 +132,7 @@ public static partial class Market
         ship.List(sale.Id);
         context.Add(sale);
         context.Schedule(new ContractExpiryCheck(deadline, sale.Id));
-        context.Record(new ContractPostedEntry(context.CurrentTick, sale.Id, seller.Id));
+        context.Record(new ContractPostedEntry(context.CurrentTick, sale.Id, seller.Id) { Cause = cause });
         if (HagglesInGameTime(seller))
         {
             DecisionEngine.NoticePost(context, sale);

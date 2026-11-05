@@ -77,7 +77,9 @@ public static class Settlement
     /// <summary>
     /// The most the payer can collect from a performer owed <paramref name="payment"/> (design §3.5): on the frontier,
     /// only what comes off that payment; in Accord space the payment and the bond in escrow; in the deep Accord, where
-    /// the courts reach, the performer's account too.
+    /// the courts reach, everything the terms say, from the performer's account beyond escrow, into debt if it must be
+    /// (since S8, design §16.8; before, only what the account held). <paramref name="performerCredits"/> is kept for callers that
+    /// still pass it.
     /// </summary>
     public static Credits Collectable(Contract contract, Credits payment, Credits bond, Credits performerCredits)
     {
@@ -87,8 +89,11 @@ public static class Settlement
         }
 
         decimal held = payment.Amount + bond.Amount;
-        return Credits.Of(contract.Arbitrated ? held + Math.Max(0m, performerCredits.Amount) : held);
+        return Credits.Of(contract.Arbitrated ? Enforced : held);
     }
+
+    // What the deep Accord collects is bounded only by the terms (a late fee's cap, a liability's cap).
+    private const decimal Enforced = 1_000_000_000_000m;
 
     /// <summary>Whether the payer can settle <paramref name="terms"/> at handover. Accord escrow always can.</summary>
     public static bool CanPay(SimulationContext context, Contract contract, SettlementTerms terms) =>
@@ -243,8 +248,9 @@ public static class Settlement
 
         if (contract is BuildContract failedBuild)
         {
-            // The yard gives back the deposit it was paid (design §16.4): a Build that fails owes the client what it took.
-            context.TransferUpTo(performer, payer, failedBuild.DepositPaid);
+            // The yard gives back the deposit it was paid (design §16.4): a Build that fails owes the client what it took, enforced
+            // in the deep Accord even into debt, elsewhere as far as the yard can pay.
+            Collect(context, contract, performer, payer, failedBuild.DepositPaid);
         }
 
         if (contract.Arbitrated && contract is HaulContract haul && haul.Terms.Liability is { } liability)
@@ -252,7 +258,7 @@ public static class Settlement
             Credits owed = liability.For(haul.Quantity - delivered) - bond;
             if (owed.Amount > 0m)
             {
-                context.TransferUpTo(performer, payer, owed);
+                context.TransferOwed(performer, payer, owed);
             }
         }
 
@@ -300,7 +306,9 @@ public static class Settlement
         ActorState performer = context.Actor(contract.Performer!.Value);
         Credits bond = contract.LockedBond;
         Credits paid;
-        if (reason == CancelReason.ForDefault)
+        bool insolvency = reason == CancelReason.Insolvency;
+        CancelReason settleAs = SettleAs(reason, performer);
+        if (settleAs == CancelReason.ForDefault)
         {
             if (contract.UsesEscrow)
             {
@@ -311,7 +319,7 @@ public static class Settlement
             paid = bond;
             Blame(context, performer, contract, Late(context, contract));
             context.Records.CancelledForDefault(contract);
-            context.NoteFailure(FailureKind.CancelledForDefault);
+            context.NoteFailure(insolvency ? FailureKind.CancelledOnInsolvency : FailureKind.CancelledForDefault);
         }
         else
         {
@@ -330,7 +338,7 @@ public static class Settlement
             paid = Credits.Of(fromEscrow) + context.TransferUpTo(by, other, Credits.Of(fee.Amount - fromEscrow));
             Blame(context, by, contract, 0, 0.3m);
             context.Records.WalkedAway(contract, by.Id);
-            context.NoteFailure(FailureKind.CancelledAtWill);
+            context.NoteFailure(insolvency ? FailureKind.CancelledOnInsolvency : FailureKind.CancelledAtWill);
         }
 
         FreeSetAside(context, contract, performer);
@@ -339,6 +347,29 @@ public static class Settlement
         JournalEntry cancelled = context.Record(new ContractCancelledEntry(context.CurrentTick, contract.Id, by.Id, reason, paid));
         WithdrawHaulsFor(context, contract, performer, cancelled.Seq);
     }
+
+    // A remedy owed beyond escrow: the deep Accord enforces it in full, into debt if it must (design §3.5, §16.8); elsewhere the
+    // payer gets what the other has.
+    private static void Collect(SimulationContext context, Contract contract, ActorState from, ActorState to, Credits amount)
+    {
+        if (contract.Arbitrated)
+        {
+            context.TransferOwed(from, to, amount);
+        }
+        else
+        {
+            context.TransferUpTo(from, to, amount);
+        }
+    }
+
+    /// <summary>
+    /// How a cancellation settles: as its reason says, except for an insolvency (design §5.4), which cancels for default when the
+    /// performer is the insolvent party and otherwise settles as the insolvent payer walking away, its break fee to the performer.
+    /// </summary>
+    private static CancelReason SettleAs(CancelReason reason, ActorState performer) =>
+        reason != CancelReason.Insolvency ? reason
+        : performer.Solvency == Economy.SolvencyStatus.Liquidating ? CancelReason.ForDefault
+        : CancelReason.AtWill;
 
     /// <summary>
     /// End a Build by cancellation (design §3.4, §16.4). The client's balance comes back out of escrow every time; what else
@@ -353,7 +384,8 @@ public static class Settlement
         ActorState yard = context.Actor(build.Builder!.Value);
         Credits bond = build.LockedBond;
         Credits paid;
-        switch (reason)
+        bool insolvency = reason == CancelReason.Insolvency;
+        switch (SettleAs(reason, yard))
         {
             case CancelReason.ForDefault:
                 if (build.UsesEscrow)
@@ -365,7 +397,7 @@ public static class Settlement
                 paid = bond;
                 Blame(context, yard, build, Late(context, build));
                 context.Records.CancelledForDefault(build);
-                context.NoteFailure(FailureKind.CancelledForDefault);
+                context.NoteFailure(insolvency ? FailureKind.CancelledOnInsolvency : FailureKind.CancelledForDefault);
                 break;
             case CancelReason.AtWill when by.Id == client.Id:
                 if (build.UsesEscrow)
@@ -376,7 +408,7 @@ public static class Settlement
                 paid = build.DepositPaid;
                 Blame(context, client, build, 0, 0.3m);
                 context.Records.WalkedAway(build, client.Id);
-                context.NoteFailure(FailureKind.CancelledAtWill);
+                context.NoteFailure(insolvency ? FailureKind.CancelledOnInsolvency : FailureKind.CancelledAtWill);
                 break;
             case CancelReason.AtWill:
             {
@@ -477,7 +509,7 @@ public static class Settlement
             context.ReleaseFromEscrow(build, client, build.EscrowHeld);
             if (lateFee > covered)
             {
-                context.TransferUpTo(yard, client, lateFee - covered);
+                context.TransferOwed(yard, client, lateFee - covered);
             }
         }
         else if (!context.TryTransfer(client, yard, Credits.Of(Math.Max(0m, due.Amount - lateFee.Amount))))
@@ -531,7 +563,7 @@ public static class Settlement
         context.TransferShip(ship, buyer, sale.Price, sale.Id);
         sale.MarkFulfilled();
         context.NoteFulfilled();
-        context.NoteShipSold(seller, buyer);
+        context.NoteShipSold(seller, buyer, sale.FireSale);
         context.Records.Delivered(sale, 0, false);
         context.Record(new ShipHandedOverEntry(context.CurrentTick, sale.Id, seller.Id, buyer.Id, ship.Id, 0, sale.Price, Credits.Zero, Credits.Zero));
         return HandOver.Done;
@@ -701,7 +733,7 @@ public static class Settlement
             context.ReleaseFromEscrow(contract, payer, contract.EscrowHeld);
             if (terms.Penalties > covered)
             {
-                context.TransferUpTo(performer, payer, terms.Penalties - covered);
+                context.TransferOwed(performer, payer, terms.Penalties - covered); // the deep Accord enforces it, into debt if it must
             }
         }
         else

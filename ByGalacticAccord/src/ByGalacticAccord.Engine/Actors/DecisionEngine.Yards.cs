@@ -242,7 +242,7 @@ public static partial class DecisionEngine
             return;
         }
 
-        context.ApplySink(yard, profile.Labour);
+        context.ApplySink(yard, profile.Labour, SinkKind.Labour);
         job.Fitting = new ShipParts(fitted[PartSlot.Frame], fitted[PartSlot.Drive], fitted.TryGetValue(PartSlot.Module, out FittedPart module) ? module : null);
         job.AssemblyDone = context.CurrentTick + profile.AssemblyHours;
     }
@@ -443,6 +443,9 @@ public static partial class DecisionEngine
     /// A yard's ships for sale (design §6.3: stock, "the yard's asking price, haggled"): each ship it owns that nobody is waiting
     /// on goes up at its value plus half its margin, a little cheaper for each fortnight it has sat, never under half its value.
     /// </summary>
+    /// <summary>What a yard in debt asks for a ship on its lot, as a share of its value: what Edge Salvage pays (S8).</summary>
+    private const decimal InDebtLotShare = 0.45m;
+
     private static void SellLot(SimulationContext context, ActorState yard, YardProfile profile)
     {
         foreach (ShipId id in yard.Ships.ToList())
@@ -456,6 +459,12 @@ public static partial class DecisionEngine
             decimal value = ship.Stats.Value.Amount;
             decimal fortnights = (context.CurrentTick - ship.BuiltTick) / (decimal)MarkdownHours;
             decimal share = Math.Max(LotFloorShare, 1m + (profile.Margin / 2m) - (LotMarkdown * Math.Floor(fortnights)));
+            if (yard.Credits.Amount < 0m)
+            {
+                // In debt (design §16.8) it sells what it can to pay it off: down to what a salvage yard pays, which one will.
+                share = Math.Min(share, InDebtLotShare);
+            }
+
             Credits price = Credits.Of(Math.Round(value * share, 2));
             Credits reservation = Credits.Of(Math.Round(value * Math.Min(share, 0.92m), 2));
             Market.PostShipSale(context, yard, ship, price, reservation, context.CurrentTick + LotPostHours);

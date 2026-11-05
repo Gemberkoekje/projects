@@ -29,7 +29,32 @@ public sealed record SimulationConfig
     /// <summary>The Accord's tax on a contract's price, paid by the payer when it is performed in Accord space (§4.2.3).</summary>
     public decimal TaxRate { get; init; } = 0.04m;
 
+    /// <summary>What a ship pays the station operator where it docks on arrival (design §8.1), owed whether or not it can pay (§16.8).</summary>
     public Credits DockingFee { get; init; } = Credits.Of(3m);
+
+    /// <summary>
+    /// Interest on debt, a day, to the Accord clearing house (design §5.4, §16.8; the design names no rate: 0.2% doubles a debt in
+    /// about a year).
+    /// </summary>
+    public decimal DebtInterestPerDay { get; init; } = 0.002m;
+
+    /// <summary>
+    /// Pushing (design §16.7): the laden leg's speed is multiplied by this, and its incident chance by <see cref="PushIncidentFactor"/>,
+    /// or <see cref="PushHotIncidentFactor"/> for a drive that runs hot.
+    /// </summary>
+    public decimal PushSpeedFactor { get; init; } = 1.25m;
+
+    /// <summary>How much likelier an incident is when a ship pushes (design §16.7).</summary>
+    public decimal PushIncidentFactor { get; init; } = 1.5m;
+
+    /// <summary>How much likelier an incident is when a ship whose drive runs hot pushes (design §16.7).</summary>
+    public decimal PushHotIncidentFactor { get; init; } = 2m;
+
+    /// <summary>
+    /// How far a route's danger shifts the incident table toward its severe end (design §16.7): the roll r becomes
+    /// r^(1 / (1 + shift × danger)), so on a red route (danger 0.42) a total loss is about twice as likely as on a safe one.
+    /// </summary>
+    public decimal IncidentDangerShift { get; init; } = 2m;
 
     /// <summary>The most counter-offers a haggle runs to before the side that would make the next walks away (design §16.5).</summary>
     public int NegotiationMaxRounds { get; init; } = 6;
@@ -84,6 +109,23 @@ public sealed record SimulationConfig
 
     /// <summary>The same for a Build or a ship for sale, whose prices are far higher than goods' (plan S7, D38).</summary>
     public decimal AdAssetBudgetShare { get; init; } = 0.01m;
+
+    /// <summary>
+    /// Measurement knobs (plan S8, D38): whether traders, and station operators, pay out what they hold above their working capital (a
+    /// sink, <see cref="Actors.DecisionEngine.WorkingCapital"/>). Off, they keep it: the plan's hope that growth and insolvency would
+    /// regulate money instead. Both on in the game; the soak harness's <c>--keep</c> turns them off.
+    /// </summary>
+    public bool TradersPayOut { get; init; } = true;
+
+    /// <inheritdoc cref="TradersPayOut"/>
+    public bool StationsPayOut { get; init; } = true;
+
+    /// <summary>
+    /// Whether the Accord clearing house lends a performer the bond it lacks, while its debt stays within half of what it owns
+    /// (<see cref="Economy.Solvency.CanBond"/>). Off, a bond is paid in cash: the measurement S8 compared it with (the soak harness's
+    /// <c>--cash-bonds</c>).
+    /// </summary>
+    public bool BondsOnCredit { get; init; } = true;
 
     /// <summary>The most a consumer keeps in hand, in days of income; the rest goes on things outside the sector (a sink).</summary>
     public decimal ConsumerSavingsDays { get; init; } = 90m;

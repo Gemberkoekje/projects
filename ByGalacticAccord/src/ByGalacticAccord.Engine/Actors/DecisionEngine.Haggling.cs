@@ -20,8 +20,11 @@ namespace ByGalacticAccord.Engine.Actors;
 /// </summary>
 public static partial class DecisionEngine
 {
-    /// <summary>A ship's (or an actor's) take on a contract at an offer: its utility (design §4.3), the least price its costs allow, and when it would arrive.</summary>
-    private readonly record struct Take(decimal Utility, decimal Floor, long Arrival);
+    /// <summary>
+    /// A ship's (or an actor's) take on a contract at an offer: its utility (design §4.3), the least price its costs allow, when it
+    /// would arrive, and the throttle it would fly at (design §16.7).
+    /// </summary>
+    private readonly record struct Take(decimal Utility, decimal Floor, long Arrival, Throttle Throttle = Throttle.Cruise);
 
     /// <summary>How an AI actor would perform what it agrees to.</summary>
     internal enum PlanKind
@@ -48,7 +51,7 @@ public static partial class DecisionEngine
         BuyShip,
     }
 
-    internal sealed record Plan(PlanKind Kind, Ship? Ship = null, FillSource? Source = null, Holding? Receipt = null);
+    internal sealed record Plan(PlanKind Kind, Ship? Ship = null, FillSource? Source = null, Holding? Receipt = null, Throttle Throttle = Throttle.Cruise);
 
     /// <summary>
     /// What an AI actor would agree to on a contract, if offered terms: its reservation (the most it would pay, or the least it
@@ -81,7 +84,7 @@ public static partial class DecisionEngine
     /// else, where an AI poster would pay more than it posted, the closed-form haggle (design §3.6) between the least the
     /// trader would take and the most the poster would pay. Null if there is no deal. The player haggles in game time instead.
     /// </summary>
-    private static (Offer Offer, decimal Utility)? Price(SimulationContext context, ActorState trader, Contract contract, Offer posted, Func<decimal, Take?> takeAt)
+    private static (Offer Offer, decimal Utility, Throttle Throttle)? Price(SimulationContext context, ActorState trader, Contract contract, Offer posted, Func<decimal, Take?> takeAt)
     {
         if (takeAt(posted.Price.Amount) is not { } asPosted)
         {
@@ -91,7 +94,7 @@ public static partial class DecisionEngine
         decimal threshold = Threshold(trader);
         if (Margin(asPosted, posted.Price.Amount, threshold) >= 0m)
         {
-            return (posted, asPosted.Utility);
+            return (posted, asPosted.Utility, asPosted.Throttle);
         }
 
         decimal ceiling = PosterReservation(context, contract);
@@ -107,7 +110,7 @@ public static partial class DecisionEngine
             return null;
         }
 
-        return takeAt(price) is { } at && Margin(at, price, threshold) >= 0m ? (posted with { Price = Credits.Of(price) }, at.Utility) : null;
+        return takeAt(price) is { } at && Margin(at, price, threshold) >= 0m ? (posted with { Price = Credits.Of(price) }, at.Utility, at.Throttle) : null;
     }
 
     /// <summary>
@@ -305,7 +308,7 @@ public static partial class DecisionEngine
     }
 
     /// <summary>Whether an actor's habits (design §4.1) make it answer a kind of post: carriers take hauls; producers and carriers fill wanted Sales; consumers buy lots.</summary>
-    private static bool Answers(ActorState actor, Contract post) => !actor.IsPlayer && post switch
+    private static bool Answers(ActorState actor, Contract post) => !actor.IsPlayer && actor.InBusiness && post switch
     {
         HaulContract => actor.MovesCargo && actor.Ships.Count > 0,
         SaleContract { Side: SaleSide.Wanted } wanted => actor.Makes(wanted.Good) || (actor.MovesCargo && actor.Ships.Count > 0),
@@ -322,7 +325,7 @@ public static partial class DecisionEngine
     public static void Respond(SimulationContext context, ActorState actor, Contract post)
     {
         Offer posted = Offer.Of(post);
-        if (!post.IsOpen || context.NegotiationWith(post.Id, actor.Id) is not null || QuoteFor(context, actor, post, posted) is not { } quote)
+        if (!post.IsOpen || !actor.InBusiness || context.NegotiationWith(post.Id, actor.Id) is not null || QuoteFor(context, actor, post, posted) is not { } quote)
         {
             return;
         }
@@ -359,6 +362,11 @@ public static partial class DecisionEngine
     /// </summary>
     public static void Reply(SimulationContext context, ActorState ai, Negotiation thread)
     {
+        if (!ai.InBusiness || !thread.IsOpen)
+        {
+            return;
+        }
+
         Answer answer = Prospect(context, ai, thread);
         long hours = context.CurrentTick - thread.Latest.Tick;
         Contract contract = context.Contract(thread.Contract);
@@ -466,9 +474,9 @@ public static partial class DecisionEngine
             }
 
             case PlanKind.FillWithShip:
-                return Market.SignAgreed(contract, offer, () => Market.FillWithShip(context, ai, (SaleContract)contract, price, plan.Ship!, plan.Source!));
+                return Market.SignAgreed(contract, offer, () => Market.FillWithShip(context, ai, (SaleContract)contract, price, plan.Ship!, plan.Source!, plan.Throttle));
             case PlanKind.TakeHaul:
-                return Market.SignAgreed(contract, offer, () => Market.TakeHaul(context, ai, (HaulContract)contract, plan.Ship!, price));
+                return Market.SignAgreed(contract, offer, () => Market.TakeHaul(context, ai, (HaulContract)contract, plan.Ship!, price, plan.Throttle));
             case PlanKind.BuyLot:
             {
                 Signing signed = Market.SignAgreed(contract, offer, () => Market.BuyLot(context, ai, (SaleContract)contract, price, plan.Receipt!.Value));
@@ -617,7 +625,8 @@ public static partial class DecisionEngine
 
             if (best is null || reservation < best.Reservation.Amount)
             {
-                best = new Quote(Credits.Of(reservation), Pays: false, terms, new Plan(PlanKind.TakeHaul, ship));
+                Throttle throttle = HaulTake(context, trader, ship, haul, terms with { Price = Credits.Of(reservation) })?.Throttle ?? Throttle.Cruise;
+                best = new Quote(Credits.Of(reservation), Pays: false, terms, new Plan(PlanKind.TakeHaul, ship, Throttle: throttle));
             }
         }
 
@@ -655,7 +664,8 @@ public static partial class DecisionEngine
 
                 if (best is null || reservation < best.Reservation.Amount)
                 {
-                    best = new Quote(Credits.Of(reservation), Pays: false, terms, new Plan(PlanKind.FillWithShip, ship, source));
+                    Throttle throttle = FillTake(context, trader, ship, wanted, source, terms with { Price = Credits.Of(reservation) })?.Throttle ?? Throttle.Cruise;
+                    best = new Quote(Credits.Of(reservation), Pays: false, terms, new Plan(PlanKind.FillWithShip, ship, source, Throttle: throttle));
                 }
             }
         }

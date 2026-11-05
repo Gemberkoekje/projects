@@ -139,6 +139,12 @@ public abstract class Contract
         }
     }
 
+    /// <summary>
+    /// A fire sale (design §5.4): posted by the Accord clearing house to sell an insolvent actor's goods or ships, and shown in
+    /// every system at once, free (<see cref="Simulation.Liquidation"/>).
+    /// </summary>
+    public bool FireSale { get; internal set; }
+
     /// <summary>When its poster last paid to show it further; its posting, if never.</summary>
     public long LastAdvertised { get; private set; }
 
@@ -208,7 +214,7 @@ public abstract class Contract
 
     public string Region { get; private set; }
 
-    /// <summary>The bond the performer actually locked: at most its <see cref="PerformanceBond"/>, at most its cash then.</summary>
+    /// <summary>The bond the performer locked at signing: its <see cref="PerformanceBond"/> in full (since S8; nothing outside the Accord).</summary>
     public Credits LockedBond { get; private set; }
 
     /// <summary>Whether enforcement here locks escrow (Accord reach) or is reputation-only (the frontier).</summary>

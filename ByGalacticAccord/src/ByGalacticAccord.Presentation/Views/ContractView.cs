@@ -87,7 +87,14 @@ public sealed record ContractViewModel(
     string OrdersTitle = "",
     IReadOnlyList<OrderLine>? Orders = null,
     ShipId? Ship = null,
-    string ShipLabel = "");
+    string ShipLabel = "",
+    PushChoice? Push = null);
+
+/// <summary>
+/// The other throttle a deal can be flown at (design §8.4, §16.7): pushed, when it arrives, whether that is on time, how much likelier an
+/// incident is than at cruise, and the take-home pushed; <see cref="Trap"/> when only pushing makes the deadline (design §13's trap).
+/// </summary>
+public sealed record PushChoice(string Title, string Note, string Value, Tone Tone, string AcceptLabel, string? Trap);
 
 /// <summary>Builds the contract panel and words the outcomes of the player's commands.</summary>
 public static class ContractView
@@ -113,6 +120,7 @@ public static class ContractView
         Tone statusTone = Tone.Muted;
         bool canAccept = false;
         string? blocked = null;
+        PushChoice? push = null;
 
         var actions = new List<ContractAction>();
         var threads = new List<ThreadViewModel>();
@@ -151,6 +159,7 @@ public static class ContractView
             {
                 Estimate(session, contract, e, lines, schedule, uncertain);
                 (takeHome, takeTone, takeHomeNote) = Total(session, contract, e);
+                push = Push(session, contract, e, canAccept);
             }
 
             if (contract is SaleContract { Side: SaleSide.Wanted } wanted)
@@ -209,7 +218,35 @@ public static class ContractView
             actions, Templates.Get("Contract.Why"), why, whyEnd,
             Templates.Get(contract.PostedBy == session.Player.Id ? "Contract.Answers" : "Contract.Haggle"), threads,
             Templates.Get("Contract.Counter"), counter, counterBlocked,
-            Templates.Get("Orders.Title"), ShipView.Orders(session, contract), shipLink, Templates.Get("Ship.Open"));
+            Templates.Get("Orders.Title"), ShipView.Orders(session, contract), shipLink, Templates.Get("Ship.Open"), push);
+    }
+
+    /// <summary>
+    /// The deal pushed (design §16.7), beside the estimate at cruise: when it would arrive, on time or how late, the incident odds
+    /// against cruise's (doubled for a drive that runs hot), and what it takes home. Null with nothing to push.
+    /// </summary>
+    private static PushChoice? Push(GameSession session, Contract contract, DealEstimate cruise, bool canAccept)
+    {
+        if (DealEstimate.Pushed(session.Context, session.Player, session.PlayerShip, contract) is not { } pushed)
+        {
+            return null;
+        }
+
+        string timing = pushed.TicksLate > 0
+            ? Templates.Fill("Throttle.Late", ("late", Format.Duration(pushed.TicksLate)))
+            : Templates.Get("Throttle.OnTime");
+        string note = Templates.Fill(
+            "Throttle.Push.Note",
+            ("arrival", Format.Date(pushed.ArrivalTick)), ("timing", timing), ("odds", Format.Percent(pushed.IncidentOdds)),
+            ("cruise", Format.Percent(cruise.IncidentOdds)), ("hot", cruise.Ship.Stats.RunsHot ? Templates.Get("Throttle.Push.Note.Hot") : string.Empty));
+        string? trap = DealEstimate.OnTimeOnlyPushed(cruise, pushed)
+            ? Templates.Fill(
+                "Throttle.Trap", ("late", Format.Duration(cruise.TicksLate)), ("fee", Format.Money(cruise.LateFee)),
+                ("band", Templates.Danger(pushed.Band)), ("odds", Format.Percent(pushed.IncidentOdds)))
+            : null;
+        return new PushChoice(
+            Templates.Get("Throttle.Push"), note, Format.Money(pushed.TakeHome), pushed.TakeHome.Amount >= 0m ? Tone.Gain : Tone.Loss,
+            Templates.Get(canAccept ? "Action.Push" : "Action.Push"), trap);
     }
 
     /// <summary>
@@ -403,6 +440,9 @@ public static class ContractView
                 return Templates.Fill("Block.CannotAfford", ("cost", Format.Money(cost)), ("credits", Format.Money(session.Player.Credits)));
             }
 
+            case DealBlock.CannotBond:
+                return Templates.Fill(
+                    "Block.CannotBond", ("bond", Format.Money(Credits.Of(PlayerActions.BondFor(contract)))), ("credits", Format.Money(session.Player.Credits)));
             case DealBlock.TooLate:
                 return Templates.Get("Block.TooLate");
             case DealBlock.BadOffer:
@@ -614,17 +654,20 @@ public static class ContractView
 
         if (e.Laden is { } laden)
         {
+            // The table as this route's danger shifts it (design §16.7): the odds are at cruise; pushing is the choice beside them.
+            decimal shift = context.Config.IncidentDangerShift;
+            decimal danger = laden.MaxDanger;
             uncertain.Add(new InfoLine(
                 Templates.Get("Uncertain.Incident"),
                 Templates.Fill(
                     "Uncertain.Incident.Note",
-                    ("band", Templates.Danger(laden.Band)), ("danger", Format.Percent(laden.MaxDanger)),
-                    ("delay", Format.Percent(IncidentResolver.Share(TransitIncidentKind.MinorDelay))),
-                    ("damage", Format.Percent(IncidentResolver.Share(TransitIncidentKind.CargoDamage))),
-                    ("partial", Format.Percent(IncidentResolver.Share(TransitIncidentKind.PartialLoss))),
-                    ("costs", Format.Percent(IncidentResolver.Share(TransitIncidentKind.CreditCost))),
-                    ("total", Format.Percent(IncidentResolver.Share(TransitIncidentKind.TotalLoss)))),
-                Format.Percent(e.IncidentOdds), Tone.Plain));
+                    ("band", Templates.Danger(laden.Band)), ("danger", Format.Percent(danger)),
+                    ("delay", Format.Percent(IncidentResolver.Share(TransitIncidentKind.MinorDelay, danger, shift))),
+                    ("damage", Format.Percent(IncidentResolver.Share(TransitIncidentKind.CargoDamage, danger, shift))),
+                    ("partial", Format.Percent(IncidentResolver.Share(TransitIncidentKind.PartialLoss, danger, shift))),
+                    ("costs", Format.Percent(IncidentResolver.Share(TransitIncidentKind.CreditCost, danger, shift))),
+                    ("total", Format.Percent(IncidentResolver.Share(TransitIncidentKind.TotalLoss, danger, shift)))),
+                Format.Percent(e.IncidentOdds), laden.Band == DangerBand.Red ? Tone.Warn : Tone.Plain));
         }
 
         if (!session.Sight.CanSee(contract) && context.News.ReportedOpenAt(contract.Id) is { } reported)

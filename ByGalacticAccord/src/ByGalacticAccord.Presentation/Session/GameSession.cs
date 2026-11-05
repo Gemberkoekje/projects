@@ -85,8 +85,21 @@ public sealed class GameSession
     /// <summary>The ship the player flies. Slice 1 starts with one.</summary>
     public Ship PlayerShip => Context.Ship(Player.Ships[0]);
 
+    /// <summary>
+    /// Whether the game is over (design §10): the player is insolvent. The world stops for it here; the clearing house would go on
+    /// selling up its ships and goods, but the player sees only its legacy (<see cref="Views.LegacyView"/>).
+    /// </summary>
+    public bool IsOver => !Player.InBusiness;
+
     public void SetSpeed(ClockSpeed speed)
     {
+        if (IsOver)
+        {
+            Speed = ClockSpeed.Paused;
+            Revision++;
+            return; // the game is over: nothing runs again
+        }
+
         if (speed != ClockSpeed.Paused && Context.HasPlayerDecisions)
         {
             Revision++;
@@ -106,7 +119,7 @@ public sealed class GameSession
     /// <summary>Advance by a frame's worth of real time. Returns true if the simulation moved to a later tick.</summary>
     public bool Advance(double realSeconds)
     {
-        if (Speed == ClockSpeed.Paused || realSeconds <= 0)
+        if (Speed == ClockSpeed.Paused || realSeconds <= 0 || IsOver)
         {
             return false;
         }
@@ -119,7 +132,7 @@ public sealed class GameSession
         }
 
         RunStop stop = Context.RunTo(target);
-        if (stop is RunStop.PlayerAlert or RunStop.PlayerDecision)
+        if (stop is RunStop.PlayerAlert or RunStop.PlayerDecision || IsOver)
         {
             Speed = ClockSpeed.Paused;
             _clock = Context.CurrentTick;
@@ -130,20 +143,30 @@ public sealed class GameSession
     }
 
     /// <summary>
-    /// Take an open contract as posted, through the same checks and market commands an AI actor uses: carry a haul,
-    /// fill a delivered Sale (buying the goods at the source the check picks), or buy a lot and collect it.
-    /// </summary>
-    /// <summary>
     /// A check aid (the client's <c>?credits=</c>, like <c>?bench=</c>): the player is given <paramref name="credits"/> more, booked as
     /// income (the faucet), so the money invariants hold. Lets the browser check order a ship before the player could have earned one.
+    /// A negative amount is charged (a sink), and may put the player in debt: the check uses it to reach insolvency and the legacy.
     /// </summary>
     public void Grant(Credits credits)
     {
-        Context.ApplyFaucet(Player, credits);
+        if (credits.Amount >= 0m)
+        {
+            Context.ApplyFaucet(Player, credits);
+        }
+        else
+        {
+            Context.Charge(Player, Credits.Of(-credits.Amount), SinkKind.None);
+        }
+
         Revision++;
     }
 
-    public DealOutcome Accept(ContractId id)
+    /// <summary>
+    /// Take an open contract as posted, through the same checks and market commands an AI actor uses: carry a haul,
+    /// fill a delivered Sale (buying the goods at the source the check picks), or buy a lot and collect it. A haul or a fill
+    /// flies its laden leg at <paramref name="throttle"/> (design §16.7).
+    /// </summary>
+    public DealOutcome Accept(ContractId id, Throttle throttle = Throttle.Cruise)
     {
         DealOutcome outcome;
         switch (Context.Contract(id))
@@ -151,14 +174,14 @@ public sealed class GameSession
             case HaulContract haul:
             {
                 PlayerActions.HaulFeasibility check = PlayerActions.CheckHaul(Context, Player, haul);
-                outcome = check.Ok ? new DealOutcome(DealBlock.None, PlayerActions.TakeHaul(Context, Player, haul, check.Ship!)) : new DealOutcome(check.Block, null);
+                outcome = check.Ok ? new DealOutcome(DealBlock.None, PlayerActions.TakeHaul(Context, Player, haul, check.Ship!, throttle)) : new DealOutcome(check.Block, null);
                 break;
             }
 
             case SaleContract { Side: SaleSide.Wanted } wanted:
             {
                 PlayerActions.FillFeasibility check = PlayerActions.CheckFill(Context, Player, wanted);
-                outcome = check.Ok ? new DealOutcome(DealBlock.None, PlayerActions.Fill(Context, Player, wanted, check.Ship!, check.Source!)) : new DealOutcome(check.Block, null);
+                outcome = check.Ok ? new DealOutcome(DealBlock.None, PlayerActions.Fill(Context, Player, wanted, check.Ship!, check.Source!, throttle)) : new DealOutcome(check.Block, null);
                 break;
             }
 

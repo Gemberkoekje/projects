@@ -15,7 +15,8 @@ public sealed record LogViewModel(string Title, string Empty, IReadOnlyList<LogL
 /// <summary>
 /// The captain's log (design §11.4): the journal's entries about contracts the player can see, newest
 /// first, each worded by its template. The faucet adjustments are the economy's own bookkeeping and never
-/// shown; others' routine (lots nobody bought, withdrawn posts, storage) is left out.
+/// shown; others' routine (lots nobody bought, withdrawn posts, storage) is left out. Of the entries about an
+/// actor's debts (S8), the player sees its own, and anyone's insolvency and dissolution.
 /// </summary>
 public static class LogView
 {
@@ -29,6 +30,18 @@ public static class LogView
         for (int i = entries.Count - 1; i >= 0 && lines.Count < max; i--)
         {
             JournalEntry entry = entries[i];
+            if (entry is IActorEntry about)
+            {
+                // Debt is an actor's own business; an insolvency and a dissolution the Accord publishes (design §5.4).
+                bool own = about.Actor == session.Player.Id;
+                if (own || entry is InsolventEntry or ActorDissolvedEntry)
+                {
+                    lines.Add(new LogLine(Format.Date(entry.Tick), JournalText.Describe(context, entry), own, null));
+                }
+
+                continue;
+            }
+
             if (JournalText.ContractOf(entry) is not { } id)
             {
                 continue;

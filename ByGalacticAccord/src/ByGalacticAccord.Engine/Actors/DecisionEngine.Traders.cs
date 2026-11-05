@@ -21,8 +21,8 @@ public static partial class DecisionEngine
         Fill,
     }
 
-    /// <summary>One thing a free ship could do, scored: take a haul, or fill a delivered Sale from a source, on an offer.</summary>
-    private readonly record struct TraderOption(OptionKind Kind, Contract Contract, Offer Offer, FillSource? Source, decimal Utility);
+    /// <summary>One thing a free ship could do, scored: take a haul, or fill a delivered Sale from a source, on an offer, at a throttle.</summary>
+    private readonly record struct TraderOption(OptionKind Kind, Contract Contract, Offer Offer, FillSource? Source, decimal Utility, Throttle Throttle);
 
     /// <summary>
     /// Trader heartbeat (design §4.1): each free ship takes the best of the hauls and delivered Sales it can see; goods
@@ -136,7 +136,7 @@ public static partial class DecisionEngine
             return null;
         }
 
-        return new TraderOption(OptionKind.Haul, haul, deal.Offer, null, deal.Utility);
+        return new TraderOption(OptionKind.Haul, haul, deal.Offer, null, deal.Utility, deal.Throttle);
     }
 
     private static TraderOption? ScoreFill(SimulationContext context, ActorState trader, Ship ship, SaleContract wanted, FillSource source)
@@ -148,15 +148,27 @@ public static partial class DecisionEngine
             return null;
         }
 
-        return new TraderOption(OptionKind.Fill, wanted, deal.Offer, source, deal.Utility);
+        return new TraderOption(OptionKind.Fill, wanted, deal.Offer, source, deal.Utility, deal.Throttle);
     }
 
     /// <summary>
     /// What a ship taking a haul on <paramref name="offer"/> is worth to the trader (design §4.3), and the least fee its costs
-    /// allow; null if it can't do it on those terms: no room, no route, arriving past the grace, or goods the shipper would
-    /// refuse. The terms are the offer's, rebuilt from its price as an agreed counter would be.
+    /// allow, at the better throttle (design §16.7: pushing beats a late fee and risks the cargo); null if it can't do it on those
+    /// terms at either: no room, no route, arriving past the grace, or goods the shipper would refuse. The terms are the offer's,
+    /// rebuilt from its price as an agreed counter would be.
     /// </summary>
-    private static Take? HaulTake(SimulationContext context, ActorState trader, Ship ship, HaulContract haul, Offer offer)
+    private static Take? HaulTake(SimulationContext context, ActorState trader, Ship ship, HaulContract haul, Offer offer) =>
+        Better(HaulTake(context, trader, ship, haul, offer, Throttle.Cruise), HaulTake(context, trader, ship, haul, offer, Throttle.Push), offer.Deadline);
+
+    // An AI pushes to beat a late fee (design §8.4): only when at cruise it would be late, or past its grace, and pushing is worth more.
+    // On time at cruise, it doesn't risk the cargo to be early.
+    private static Take? Better(Take? cruise, Take? push, long deadline) =>
+        push is not { } p ? cruise
+        : cruise is not { } c ? p
+        : c.Arrival > deadline && p.Utility > c.Utility ? p
+        : c;
+
+    private static Take? HaulTake(SimulationContext context, ActorState trader, Ship ship, HaulContract haul, Offer offer, Throttle throttle)
     {
         if (haul.Quantity > ship.FreeSpace || context.FindPath(haul.Origin, haul.Destination) is not { } laden
             || context.FindPath(ship.Location, haul.Origin) is not { } repo)
@@ -166,11 +178,16 @@ public static partial class DecisionEngine
 
         ShipStats cls = ship.Stats;
         long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.Speed);
-        long ladenTicks = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.Speed));
+        long ladenTicks = Throttles.LadenTicks(context.Config, laden.DistanceTicks, cls, throttle);
         decimal running = cls.RunningCostPerTick.Amount * (repoTicks + ladenTicks);
         decimal pilotMin = PriceModel.PilotMinimumFee(cls, laden.DistanceTicks, laden.MaxDanger, trader.Personality).Amount
                            + (cls.RunningCostPerTick.Amount * repoTicks);
         ContractTerms terms = TermsOn(haul, offer);
+        if (haul.UsesEscrow && !Solvency.CanBond(context, trader, Math.Round(terms.Bond.Amount, 2)))
+        {
+            return null; // it can't lock its whole bond (design §16.4), not even on the clearing house's credit
+        }
+
         long arrival = context.CurrentTick + repoTicks + ladenTicks;
         if (arrival > offer.Deadline + terms.GraceHours)
         {
@@ -197,16 +214,22 @@ public static partial class DecisionEngine
         long late = Math.Max(0, arrival - offer.Deadline);
         decimal lateFee = terms.LateFee?.PenaltyFor(late).Amount ?? 0m;
         decimal refund = fee * (terms.Warranty?.RefundFraction(quality) ?? 0m);
-        decimal profit = fee - running - context.Config.DockingFee.Amount - lateFee - refund - TermsRisk(context, trader, haul.UsesEscrow, terms, fee, ship, laden);
-        return new Take(Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks), pilotMin, arrival);
+        decimal profit = fee - running - context.Config.DockingFee.Amount - lateFee - refund - TermsRisk(context, trader, haul.UsesEscrow, terms, fee, ship, laden, throttle);
+        return new Take(Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks), pilotMin, arrival, throttle);
     }
 
     /// <summary>
     /// What a ship filling a delivered wanted Sale from a source on <paramref name="offer"/> is worth to the trader, and the
-    /// least price its costs allow: the goods, a carrier's margin on the trip, and what the terms will certainly take back.
-    /// Null if it can't on those terms: no room, no route, too dear for its purse, past the grace, or goods the buyer would reject.
+    /// least price its costs allow: the goods, a carrier's margin on the trip, and what the terms will certainly take back; at the
+    /// better throttle. Null if it can't on those terms at either: no room, no route, too dear for its purse, past the grace, or
+    /// goods the buyer would reject.
     /// </summary>
-    private static Take? FillTake(SimulationContext context, ActorState trader, Ship ship, SaleContract wanted, FillSource source, Offer offer)
+    private static Take? FillTake(SimulationContext context, ActorState trader, Ship ship, SaleContract wanted, FillSource source, Offer offer) =>
+        Better(
+            FillTake(context, trader, ship, wanted, source, offer, Throttle.Cruise), FillTake(context, trader, ship, wanted, source, offer, Throttle.Push),
+            offer.Deadline);
+
+    private static Take? FillTake(SimulationContext context, ActorState trader, Ship ship, SaleContract wanted, FillSource source, Offer offer, Throttle throttle)
     {
         LocationId pickup = source.Kind == FillSourceKind.Aboard ? ship.Location : source.At;
         if (context.FindPath(pickup, wanted.Place) is not { } laden || context.FindPath(ship.Location, pickup) is not { } repo)
@@ -222,8 +245,13 @@ public static partial class DecisionEngine
 
         ShipStats cls = ship.Stats;
         ContractTerms terms = TermsOn(wanted, offer);
+        if (pickup == wanted.Place && throttle == Throttle.Push)
+        {
+            return null; // handed over where it is: nothing to push
+        }
+
         long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.Speed);
-        long ladenTicks = pickup == wanted.Place ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.Speed));
+        long ladenTicks = pickup == wanted.Place ? 0 : Throttles.LadenTicks(context.Config, laden.DistanceTicks, cls, throttle);
         long arrival = context.CurrentTick + repoTicks + ladenTicks;
         if (arrival > offer.Deadline + terms.GraceHours)
         {
@@ -232,9 +260,10 @@ public static partial class DecisionEngine
 
         decimal purchase = source.PurchasePrice.Amount;
         decimal purchaseTax = purchase * Terms.TaxRate(context, context.Location(pickup).Reach);
-        if (trader.Credits.Amount < purchase + purchaseTax)
+        decimal bondNeeded = wanted.UsesEscrow ? Math.Round(terms.Bond.Amount, 2) : 0m;
+        if (!Solvency.CanBond(context, trader, bondNeeded, purchase + purchaseTax))
         {
-            return null;
+            return null; // the goods in cash, then its whole bond (design §16.4)
         }
 
         // The goods' quality now, decayed over the laden leg in this hold.
@@ -256,9 +285,9 @@ public static partial class DecisionEngine
 
         // The trader's floor covers the goods, a carrier's margin on the trip, and what the terms will certainly take back.
         decimal floor = ((purchase + purchaseTax + transportMin + docking + lateFee) / Math.Max(0.01m, 1m - refundShare)) + 1m;
-        decimal risk = ladenTicks > 0 ? TermsRisk(context, trader, wanted.UsesEscrow, terms, price, ship, laden) : 0m;
+        decimal risk = ladenTicks > 0 ? TermsRisk(context, trader, wanted.UsesEscrow, terms, price, ship, laden, throttle) : 0m;
         decimal profit = price - purchase - purchaseTax - running - docking - lateFee - (price * refundShare) - risk;
-        return new Take(Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks), floor, arrival);
+        return new Take(Utility(trader, profit, laden.MaxDanger, repoTicks + ladenTicks), floor, arrival, ladenTicks > 0 ? throttle : Throttle.None);
     }
 
     private static decimal SourceQuality(SimulationContext context, ActorState trader, Ship ship, GoodType good, FillSource source) => source.Kind switch
@@ -274,17 +303,19 @@ public static partial class DecisionEngine
     /// fails a strict contract outright and otherwise costs its share and any cargo liability; a delay can push it past
     /// a short grace. Weighted by the incident odds and by how much the trader minds risk.
     /// </summary>
-    private static decimal TermsRisk(SimulationContext context, ActorState trader, bool usesEscrow, ContractTerms terms, decimal price, Ship ship, RoutePlan laden)
+    private static decimal TermsRisk(
+        SimulationContext context, ActorState trader, bool usesEscrow, ContractTerms terms, decimal price, Ship ship, RoutePlan laden, Throttle throttle)
     {
-        decimal odds = Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Stats.IncidentChance, 0m, 1m);
-        decimal bond = usesEscrow ? Math.Min(terms.Bond.Amount, Math.Max(0m, trader.Credits.Amount)) : 0m;
+        decimal odds = Throttles.IncidentOdds(context.Config, laden.MaxDanger, ship.Stats, throttle);
+        decimal shift = context.Config.IncidentDangerShift;
+        decimal bond = usesEscrow ? terms.Bond.Amount : 0m;
         decimal partial = terms.Partial == PartialDelivery.Failure
             ? price + bond
             : (price * 0.2m) + ((terms.Liability?.Cap.Amount ?? 0m) * 0.2m);
         decimal delay = terms.GraceHours < 18 ? bond * 0.5m : 0m;
-        decimal expected = odds * ((IncidentResolver.Share(TransitIncidentKind.PartialLoss) * partial)
-                                   + (IncidentResolver.Share(TransitIncidentKind.TotalLoss) * (price + bond))
-                                   + (IncidentResolver.Share(TransitIncidentKind.MinorDelay) * delay));
+        decimal expected = odds * ((IncidentResolver.Share(TransitIncidentKind.PartialLoss, laden.MaxDanger, shift) * partial)
+                                   + (IncidentResolver.Share(TransitIncidentKind.TotalLoss, laden.MaxDanger, shift) * (price + bond))
+                                   + (IncidentResolver.Share(TransitIncidentKind.MinorDelay, laden.MaxDanger, shift) * delay));
         return expected * (1.5m - trader.Personality.RiskTolerance);
     }
 
@@ -303,8 +334,8 @@ public static partial class DecisionEngine
     {
         Offer offer = option.Offer;
         Signing signed = option.Kind == OptionKind.Haul
-            ? Market.SignAgreed(option.Contract, offer, () => Market.TakeHaul(context, trader, (HaulContract)option.Contract, ship, offer.Price))
-            : Market.SignAgreed(option.Contract, offer, () => Market.FillWithShip(context, trader, (SaleContract)option.Contract, offer.Price, ship, option.Source!));
+            ? Market.SignAgreed(option.Contract, offer, () => Market.TakeHaul(context, trader, (HaulContract)option.Contract, ship, offer.Price, option.Throttle))
+            : Market.SignAgreed(option.Contract, offer, () => Market.FillWithShip(context, trader, (SaleContract)option.Contract, offer.Price, ship, option.Source!, option.Throttle));
         NoteHaggled(context, option.Contract, signed);
         return signed;
     }
@@ -385,7 +416,8 @@ public static partial class DecisionEngine
 
                 decimal price = deal.Offer.Price.Amount;
                 decimal budget = price - purchase - purchaseTax - storage - (price * refundShare);
-                bool affordable = trader.Credits.Amount >= purchase + purchaseTax + (fee.Amount * 3m) + 300m;
+                decimal bond = wanted.UsesEscrow ? Math.Round(TermsOn(wanted, deal.Offer).Bond.Amount, 2) : 0m;
+                bool affordable = Solvency.CanBond(context, trader, bond, purchase + purchaseTax + (fee.Amount * 3m) + 300m);
                 if (affordable && HaulAffordable(fee, budget) && deal.Utility > bestUtility)
                 {
                     best = wanted;
@@ -414,7 +446,11 @@ public static partial class DecisionEngine
         }
     }
 
-    /// <summary>Goods a trader has had in storage for a while, with nothing planned for them, go up for sale where they are.</summary>
+    /// <summary>
+    /// Goods an actor has had in storage for a while, with nothing planned for them, go up for sale where they are, and are written off
+    /// if nobody takes them: a trader's leftovers, or a producer's or factory's goods set down far from home when a sale fell through
+    /// (since S8: their rent keeps charging into debt, so nobody keeps them for ever).
+    /// </summary>
     private static void SellOff(SimulationContext context, ActorState trader)
     {
         foreach (StorageContract storage in context.StoragesOf(trader.Id).ToList())

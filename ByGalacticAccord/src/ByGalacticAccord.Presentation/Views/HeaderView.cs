@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
+using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
 using ByGalacticAccord.Presentation.Session;
 using ByGalacticAccord.Presentation.Text;
@@ -12,8 +13,9 @@ namespace ByGalacticAccord.Presentation.Views;
 public sealed record SpeedButton(ClockSpeed Speed, string Label, bool On);
 
 /// <summary>
-/// The time bar and the player's position (design §11.3): speed controls, the date, credits, what is
-/// locked in escrow, what the fleet costs to run, where the ship is, and any alert that stopped the clock.
+/// The time bar and the player's position (design §11.3): speed controls, the date, credits (or debt, with what it costs and
+/// where insolvency starts, design §5.4, §16.8), what is locked in escrow, what the fleet costs to run, where the ship is, a
+/// warning while the player's debt is above half of what it owns, and any alert that stopped the clock.
 /// </summary>
 public sealed record HeaderViewModel(
     string Title,
@@ -33,7 +35,9 @@ public sealed record HeaderViewModel(
     string Fleet,
     string AlertTitle,
     IReadOnlyList<string> Alerts,
-    string ResumeLabel);
+    string ResumeLabel,
+    Tone CreditsTone = Tone.Plain,
+    string? Warning = null);
 
 public static class HeaderView
 {
@@ -69,15 +73,27 @@ public static class HeaderView
             alerts.Add(JournalText.Describe(context, alert));
         }
 
+        ActorState player = session.Player;
+        bool inDebt = player.Credits.Amount < 0m;
+        Credits assets = inDebt || player.Solvency != SolvencyStatus.None ? Solvency.Assets(context, player) : Credits.Zero;
+        string creditsTip = inDebt
+            ? Templates.Fill(
+                "Header.Debt.Tip", ("debt", Format.Money(player.Debt)), ("rate", Format.Percent(context.Config.DebtInterestPerDay)),
+                ("interest", Format.MoneyCents(Credits.Of(player.Debt.Amount * context.Config.DebtInterestPerDay))), ("assets", Format.Money(assets)),
+                ("half", Format.Money(Credits.Of(assets.Amount / 2m))))
+            : Templates.Get("Header.Credits.Tip");
+        string? warning = player.Solvency == SolvencyStatus.Warned && player.WarnedSince is { } since
+            ? Templates.Fill("Header.Warning", ("date", Format.Date(since + Solvency.WarnedHoursLimit)), ("half", Format.Money(Credits.Of(assets.Amount / 2m))))
+            : null;
         return new HeaderViewModel(
             Templates.Get("Header.Title"),
             Templates.Fill("Header.Who", ("role", Templates.Role(session.Player.Role)), ("location", location)),
             speeds,
             Format.Date(session.Now),
             speedNote,
-            Templates.Get("Header.Credits"),
+            Templates.Get(inDebt ? "Header.Debt" : "Header.Credits"),
             Format.Money(session.Player.Credits),
-            Templates.Get("Header.Credits.Tip"),
+            creditsTip,
             Templates.Get("Header.Escrow"),
             Format.Money(escrow),
             Templates.Get("Header.Escrow.Tip"),
@@ -87,7 +103,9 @@ public static class HeaderView
             Fleet(session, ship, shipClass),
             Templates.Get("Alert.Title"),
             alerts,
-            Templates.Get("Alert.Resume"));
+            Templates.Get("Alert.Resume"),
+            inDebt ? Tone.Loss : Tone.Plain,
+            warning);
     }
 
     private static string Fleet(GameSession session, Ship ship, string shipClass)

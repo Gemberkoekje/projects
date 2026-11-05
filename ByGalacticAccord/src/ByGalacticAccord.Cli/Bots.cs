@@ -23,7 +23,7 @@ internal static class Bots
             var watch = Stopwatch.StartNew();
             BotReport report = BotRun.Run(bot, seed, ticks);
             Console.WriteLine(
-                $"   {report.Bot,-14} {report.StartCredits,9} {report.EndCredits,10} {report.EndEscrow,8} {report.PerDay,8} {report.Deals,6} {report.Posts,6} {report.Counters,9} {report.Haggles,8} {report.Decisions,9} {watch.Elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture),8}");
+                $"   {report.Bot,-14} {report.StartCredits,9} {report.EndCredits,10} {report.EndEscrow,8} {report.PerDay,8} {report.Deals,6} {report.Posts,6} {report.Counters,9} {report.Haggles,8} {report.Decisions,9} {watch.Elapsed.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture),8}{(report.WentUnder ? $"  went under {GameTime.FormatDate(report.Ticks)}" : string.Empty)}");
             foreach (InvariantViolation violation in report.Violations)
             {
                 Console.WriteLine($"     INVARIANT VIOLATION [{violation.Name}] {violation.Detail}");

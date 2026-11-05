@@ -14,7 +14,11 @@
         <span class="muted small">@Model.SpeedNote</span>
     </div>
     <div class="timebar-money mono">
-        <span class="money-item" title="@Model.CreditsTip"><span class="muted">@Model.CreditsLabel</span><strong data-testid="credits">@Model.Credits</strong></span>
+        <span class="money-item" title="@Model.CreditsTip"><span class="muted">@Model.CreditsLabel</span><strong class="tone-@Model.CreditsTone" data-testid="credits">@Model.Credits</strong></span>
+        @if (Model.Warning is { } warning)
+        {
+            <span class="money-item warning tone-Warn small" data-testid="debt-warning">@warning</span>
+        }
         <span class="money-item" title="@Model.EscrowTip"><span class="muted">@Model.EscrowLabel</span><span>@Model.Escrow</span></span>
         <span class="money-item" title="@Model.RunningTip"><span class="muted">@Model.RunningLabel</span><span class="tone-Loss">@Model.Running</span></span>
         <label class="theme small">

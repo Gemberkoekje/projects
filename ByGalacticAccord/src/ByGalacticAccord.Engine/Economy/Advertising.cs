@@ -96,6 +96,18 @@ public static class Advertising
             contract.ShowAt(place, contract.PostedTick);
         }
 
+        // What an actor in debt sells (goods for sale, a ship) the Accord clearing house, its creditor, shows in every system, free
+        // (plan S8): a debtor can't pay to show it, and its creditor wants it sold. A fire sale is shown everywhere as well (Liquidation).
+        if (Market.PosterSells(contract) && context.Actor(contract.PostedBy).Credits.Amount < 0m)
+        {
+            foreach (LocationId location in context.Locations.Keys.OrderBy(l => l.Value))
+            {
+                contract.ShowAt(location, contract.PostedTick);
+            }
+
+            return;
+        }
+
         int free = context.Config.AdFreeJumps;
         if (free <= 0)
         {
@@ -151,7 +163,7 @@ public static class Advertising
             if (fee.Amount > 0m)
             {
                 ActorState? board = context.StationOperatorAt(location);
-                bool paid = board is not null ? context.TryTransfer(poster, board, fee) : context.ApplySink(poster, fee).Amount >= fee.Amount;
+                bool paid = board is not null ? context.TryTransfer(poster, board, fee) : context.ApplySink(poster, fee, SinkKind.AdFee).Amount >= fee.Amount;
                 if (!paid)
                 {
                     break; // can't happen: the total was checked above

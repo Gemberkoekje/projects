@@ -13,7 +13,15 @@ switch (mode)
         long ticks = args.Length > 1 && long.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long t)
             ? t
             : 200_000L;
-        return Soak.Run(seed, ticks);
+        // --keep traders|stations|both: those actors keep what they hold above their working capital (plan S8's payout measurement).
+        string keep = ArgValue(args, "--keep", "none", s => s.ToLowerInvariant());
+        var config = new ByGalacticAccord.Engine.Simulation.SimulationConfig
+        {
+            TradersPayOut = keep is not ("traders" or "both"),
+            StationsPayOut = keep is not ("stations" or "both"),
+            BondsOnCredit = !System.Array.Exists(args, a => string.Equals(a, "--cash-bonds", StringComparison.OrdinalIgnoreCase)),
+        };
+        return Soak.Run(seed, ticks, config);
 
     case "bots":
         long botTicks = args.Length > 1 && long.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long b)
@@ -45,7 +53,9 @@ static void PrintHelp()
     Console.WriteLine("By Galactic Accord — soak harness");
     Console.WriteLine();
     Console.WriteLine("Usage:");
-    Console.WriteLine("  soak  [ticks] [--seed N]    Run headless, print economy telemetry, assert invariants (default).");
+    Console.WriteLine("  soak  [ticks] [--seed N] [--keep traders|stations|both]");
+    Console.WriteLine("                              Run headless, print economy telemetry, assert invariants (default); --keep: those actors keep their surplus.");
+    Console.WriteLine("        [--cash-bonds]        Bonds in cash only: the clearing house lends none (S8's measurement).");
     Console.WriteLine("  bots  [ticks] [--seed N]    Play the world with each bot as its player, assert invariants, compare them (default 200,000).");
     Console.WriteLine("  fingerprint [ticks] [--seed N]  Print the state fingerprint after a headless run (default 20,000).");
     Console.WriteLine("  help                        Show this help.");

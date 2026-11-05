@@ -20,6 +20,12 @@ public enum DealBlock
     CannotAfford,
     TooLate,
 
+    /// <summary>
+    /// The performer's bond must be locked in escrow in full (design §16.4), and the player can't: not even on the Accord clearing house's
+    /// credit, which lends a bond only while the debt stays within half of what the player owns.
+    /// </summary>
+    CannotBond,
+
     /// <summary>A counter-offer with no price, or a deadline already past.</summary>
     BadOffer,
 
@@ -183,12 +189,17 @@ public static class PlayerActions
             return new HaulFeasibility(DealBlock.TooLarge, ship);
         }
 
+        if (!Solvency.CanBond(context, player, BondFor(haul)))
+        {
+            return new HaulFeasibility(DealBlock.CannotBond, ship);
+        }
+
         return new HaulFeasibility(ship.IsFree ? DealBlock.None : DealBlock.NoFreeShip, ship);
     }
 
-    /// <summary>Take a haul as posted.</summary>
-    public static Signing TakeHaul(SimulationContext context, ActorState player, HaulContract haul, Ship ship) =>
-        Market.TakeHaul(context, player, haul, ship, haul.OfferedPrice);
+    /// <summary>Take a haul as posted, flying it at <paramref name="throttle"/> (design §16.7).</summary>
+    public static Signing TakeHaul(SimulationContext context, ActorState player, HaulContract haul, Ship ship, Throttle throttle = Throttle.Cruise) =>
+        Market.TakeHaul(context, player, haul, ship, haul.OfferedPrice, throttle);
 
     /// <summary>
     /// Can the player fill this delivered Sale? The source is the one a trader would pick: its own goods if it has them,
@@ -243,12 +254,20 @@ public static class PlayerActions
             return new FillFeasibility(DealBlock.CannotAfford, ship, best);
         }
 
+        if (!Solvency.CanBond(context, player, BondFor(wanted), purchase))
+        {
+            return new FillFeasibility(DealBlock.CannotBond, ship, best);
+        }
+
         return new FillFeasibility(ship.IsFree ? DealBlock.None : DealBlock.NoFreeShip, ship, best);
     }
 
-    /// <summary>Fill a delivered Sale as posted, from the source the check chose.</summary>
-    public static Signing Fill(SimulationContext context, ActorState player, SaleContract wanted, Ship ship, FillSource source) =>
-        Market.FillWithShip(context, player, wanted, wanted.OfferedPrice, ship, source);
+    /// <summary>The bond a performer must lock in full to sign <paramref name="contract"/> (design §16.4): its terms' bond in Accord space, nothing outside it.</summary>
+    public static decimal BondFor(Contract contract) => contract.UsesEscrow ? Math.Round(contract.PerformanceBond.Amount, 2) : 0m;
+
+    /// <summary>Fill a delivered Sale as posted, from the source the check chose, its laden leg at <paramref name="throttle"/>.</summary>
+    public static Signing Fill(SimulationContext context, ActorState player, SaleContract wanted, Ship ship, FillSource source, Throttle throttle = Throttle.Cruise) =>
+        Market.FillWithShip(context, player, wanted, wanted.OfferedPrice, ship, source, throttle);
 
     /// <summary>Can the player buy this lot as posted and collect it with a ship?</summary>
     public static BuyFeasibility CheckBuy(SimulationContext context, ActorState player, SaleContract lot)

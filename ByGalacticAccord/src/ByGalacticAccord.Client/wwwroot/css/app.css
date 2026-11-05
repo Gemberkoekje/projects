@@ -359,3 +359,14 @@ a:hover { color: var(--accent-hover); }
     .timebar-money { gap: 10px; }
     .log-line .when, .why-line .when, .bid .when { flex-basis: 78px; }
 }
+
+/* The legacy (design §10): the whole screen, once insolvency has ended the game. */
+.legacy { max-width: 960px; margin: 24px auto; display: flex; flex-direction: column; gap: 14px; padding: 24px 28px; }
+.legacy-title { margin: 0; font-size: 1.6rem; font-weight: 600; }
+.legacy-ending { margin: 0; font-size: 1.05rem; color: var(--loss); }
+.legacy-columns { display: flex; flex-wrap: wrap; gap: 14px 24px; }
+.legacy-columns > .block { flex: 1 1 260px; min-width: 0; }
+.legacy-ship { margin-bottom: 10px; }
+.legacy-ship > p { margin: 0 0 4px; }
+.push .trap { margin: 6px 0 0; }
+.timebar-money .warning { font-weight: 600; }

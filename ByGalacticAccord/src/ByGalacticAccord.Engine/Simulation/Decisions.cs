@@ -107,4 +107,10 @@ public enum FailureKind
 
     /// <summary>A Build cancelled by agreement after a supply-failure proposal: refund and compensation.</summary>
     CancelledOnSupplyFailure,
+
+    /// <summary>A contract cancelled because a party became insolvent (design §16.3): for default against it, or its break fee paid.</summary>
+    CancelledOnInsolvency,
+
+    /// <summary>An actor became insolvent (design §16.3): its assets liquidated, its contracts cancelled.</summary>
+    Insolvency,
 }

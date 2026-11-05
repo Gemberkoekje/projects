@@ -47,6 +47,27 @@ public sealed class ActorState
 
     public Credits Credits { get; private set; }
 
+    /// <summary>What it owes the Accord clearing house: its balance below ₵0 (design §5.4); nothing while it is in credit.</summary>
+    public Credits Debt => Credits.Amount < 0m ? Credits.Of(-Credits.Amount) : Credits.Zero;
+
+    /// <summary>How it stands with its debts (design §16.8): solvent, warned, being liquidated, or dissolved.</summary>
+    public SolvencyStatus Solvency { get; internal set; }
+
+    /// <summary>Since when its debt has stayed above half what it owns; null while it hasn't.</summary>
+    public long? WarnedSince { get; internal set; }
+
+    /// <summary>When it became insolvent; null if it never has.</summary>
+    public long? InsolventSince { get; internal set; }
+
+    /// <summary>What it owed when it became insolvent.</summary>
+    public Credits DebtAtInsolvency { get; internal set; }
+
+    /// <summary>The journal entry of its latest debt warning, or of its insolvency: the cause of what follows from it.</summary>
+    public long? SolvencyEntry { get; internal set; }
+
+    /// <summary>Whether it is still in business: it acts, posts and signs. An insolvent actor is liquidated and then gone.</summary>
+    public bool InBusiness => Solvency is SolvencyStatus.None or SolvencyStatus.Warned;
+
     public bool IsPlayer { get; init; }
 
     public ProducerProfile? Producer { get; init; }

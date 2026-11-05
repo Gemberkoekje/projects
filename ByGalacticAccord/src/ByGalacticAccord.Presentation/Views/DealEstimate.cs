@@ -21,7 +21,8 @@ public enum DealKind
 /// and their tax, running costs, docking, a warranty refund the trip's length makes certain, a late fee the arrival
 /// time makes certain). The incident odds stay separate, as the uncertain input. It never collapses into one
 /// "expected value". For a lot the player buys there is no income: the take-home is the cost, negative. Filled through
-/// a carrier, the player's ship isn't used: the costs are the goods and the haul fee, each with its tax.
+/// a carrier, the player's ship isn't used: the costs are the goods and the haul fee, each with its tax. A haul or a fill
+/// is estimated at a <see cref="Throttle"/> (design §16.7): pushing shortens the laden leg and raises the incident odds.
 /// </summary>
 public sealed record DealEstimate(
     DealKind Kind,
@@ -46,7 +47,8 @@ public sealed record DealEstimate(
     decimal IncidentOdds,
     FillSource? Source,
     Credits HaulFee = default,
-    Credits HaulTax = default)
+    Credits HaulTax = default,
+    Throttle Throttle = Throttle.Cruise)
 {
     public Credits TakeHome => Income - Goods - GoodsTax - Running - Docking - QualityRefund - LateFee - HaulFee - HaulTax;
 
@@ -69,19 +71,37 @@ public sealed record DealEstimate(
 
     public DangerBand Band => Laden?.Band ?? Repositioning?.Band ?? DangerBand.Green;
 
-    /// <summary>The estimate for taking <paramref name="contract"/> with the player's ship, from where and when the ship is next free.</summary>
-    public static DealEstimate? For(SimulationContext context, ActorState player, Ship ship, Contract contract) => contract switch
+    /// <summary>
+    /// The estimate for taking <paramref name="contract"/> with the player's ship, from where and when the ship is next free, flying its
+    /// laden leg at <paramref name="throttle"/>.
+    /// </summary>
+    public static DealEstimate? For(SimulationContext context, ActorState player, Ship ship, Contract contract, Throttle throttle = Throttle.Cruise) => contract switch
     {
-        HaulContract haul => ForHaul(context, player, ship, haul),
+        HaulContract haul => ForHaul(context, player, ship, haul, throttle),
         SaleContract { Side: SaleSide.Wanted } wanted => PlayerActions.CheckFill(context, player, wanted).Source is { } source
-            ? ForFill(context, player, ship, wanted, source)
+            ? ForFill(context, player, ship, wanted, source, throttle)
             : null,
         SaleContract { Side: SaleSide.ForSale } lot => ForLot(context, player, ship, lot),
         _ => null,
     };
 
+    /// <summary>
+    /// The same deal pushed (design §16.7), when there is a laden leg to push: null for a lot, a Sale handed over on the spot, or
+    /// anything not estimated at all.
+    /// </summary>
+    public static DealEstimate? Pushed(SimulationContext context, ActorState player, Ship ship, Contract contract) =>
+        contract is HaulContract or SaleContract { Side: SaleSide.Wanted } && For(context, player, ship, contract, Throttle.Push) is { Laden: not null } pushed
+            ? pushed
+            : null;
+
+    /// <summary>
+    /// Whether pushing is what makes a deal on time (design §13's trap: "a deadline the freighter can only meet by pushing"): late at
+    /// cruise, on time pushed.
+    /// </summary>
+    public static bool OnTimeOnlyPushed(DealEstimate cruise, DealEstimate? pushed) => cruise.TicksLate > 0 && pushed is { TicksLate: 0 };
+
     /// <summary>Carry a haul: the fee, less the trip's running costs and docking, and what the terms will certainly take back.</summary>
-    public static DealEstimate? ForHaul(SimulationContext context, ActorState player, Ship ship, HaulContract haul)
+    public static DealEstimate? ForHaul(SimulationContext context, ActorState player, Ship ship, HaulContract haul, Throttle throttle = Throttle.Cruise)
     {
         (LocationId startAt, long startTick) = Market.NextFree(context, ship);
         if (context.FindPath(haul.Origin, haul.Destination) is not { } laden || Leg(context, ship, startAt, haul.Origin) is not { } repo)
@@ -89,7 +109,7 @@ public sealed record DealEstimate(
             return null;
         }
 
-        long ladenTicks = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed));
+        long ladenTicks = Throttles.LadenTicks(context.Config, laden.DistanceTicks, ship.Stats, throttle);
         Credits fee = haul.OfferedPrice;
 
         // The warranty judges what the hold does to the goods: their quality on arrival as a share of what it was when loaded.
@@ -99,14 +119,15 @@ public sealed record DealEstimate(
         decimal arrived = new Cargo(haul.Good, 1m, loaded).Decayed(ladenTicks, ship.Preservation).Quality;
         decimal quality = loaded <= 0m ? 1m : arrived / loaded;
         Credits refund = Credits.Of(fee.Amount * (haul.Warranty?.RefundFraction(quality) ?? 0m));
-        Credits bond = haul.UsesEscrow ? Credits.Of(Math.Min(haul.PerformanceBond.Amount, Math.Max(0m, player.Credits.Amount))) : Credits.Zero;
+        Credits bond = Credits.Of(PlayerActions.BondFor(haul));
         long arrival = startTick + repo.Ticks + ladenTicks;
         (long late, Credits lateFee) = Late(haul, arrival, fee - refund, bond, player.Credits);
 
         return new DealEstimate(
             DealKind.Haul, ship, startAt, startTick, haul.Origin, repo.Plan, repo.Ticks, laden, ladenTicks,
             fee, Credits.Zero, Credits.Zero, RunningFor(ship, repo.Ticks + ladenTicks), context.Config.DockingFee,
-            quality, refund, late, lateFee, bond, Odds(context, ship, laden), null);
+            quality, refund, late, lateFee, bond, Throttles.IncidentOdds(context.Config, laden.MaxDanger, ship.Stats, throttle), null,
+            Throttle: throttle);
     }
 
     /// <summary>
@@ -114,7 +135,7 @@ public sealed record DealEstimate(
     /// fetching and carrying them, docking, and what the terms will certainly take back. Goods already at the place are
     /// handed over at once.
     /// </summary>
-    public static DealEstimate? ForFill(SimulationContext context, ActorState player, Ship ship, SaleContract wanted, FillSource source)
+    public static DealEstimate? ForFill(SimulationContext context, ActorState player, Ship ship, SaleContract wanted, FillSource source, Throttle throttle = Throttle.Cruise)
     {
         (LocationId startAt, long startTick) = Market.NextFree(context, ship);
         LocationId pickup = source.Kind == FillSourceKind.Aboard ? ship.Location : source.At;
@@ -125,7 +146,7 @@ public sealed record DealEstimate(
 
         // At the place already, from storage or the hold: handed over on signing. Otherwise a trip, however short.
         bool onTheSpot = pickup == wanted.Place && source.Kind is FillSourceKind.Storage or FillSourceKind.Aboard;
-        long ladenTicks = onTheSpot ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed));
+        long ladenTicks = onTheSpot ? 0 : Throttles.LadenTicks(context.Config, laden.DistanceTicks, ship.Stats, throttle);
         Credits goods = source.PurchasePrice;
         Credits goodsTax = Credits.Of(goods.Amount * Terms.TaxRate(context, context.Location(pickup).Reach));
 
@@ -140,16 +161,15 @@ public sealed record DealEstimate(
 
         Credits price = wanted.OfferedPrice;
         Credits refund = Credits.Of(price.Amount * (wanted.Warranty?.RefundFraction(quality) ?? 0m));
-        Credits bond = wanted.UsesEscrow
-            ? Credits.Of(Math.Min(wanted.PerformanceBond.Amount, Math.Max(0m, player.Credits.Amount - goods.Amount - goodsTax.Amount)))
-            : Credits.Zero;
+        Credits bond = Credits.Of(PlayerActions.BondFor(wanted));
         long arrival = startTick + repo.Ticks + ladenTicks;
         (long late, Credits lateFee) = Late(wanted, arrival, price - refund, bond, player.Credits - goods - goodsTax);
 
         return new DealEstimate(
             DealKind.Fill, ship, startAt, startTick, pickup, repo.Plan, repo.Ticks, onTheSpot ? null : laden, ladenTicks,
             price, goods, goodsTax, RunningFor(ship, repo.Ticks + ladenTicks), onTheSpot ? Credits.Zero : context.Config.DockingFee,
-            quality, refund, late, lateFee, bond, onTheSpot ? 0m : Odds(context, ship, laden), source);
+            quality, refund, late, lateFee, bond, onTheSpot ? 0m : Throttles.IncidentOdds(context.Config, laden.MaxDanger, ship.Stats, throttle), source,
+            Throttle: onTheSpot ? Throttle.None : throttle);
     }
 
     /// <summary>Buy a lot and collect it: the price, its tax, and the running cost of getting there. Nothing to deliver.</summary>
@@ -183,7 +203,7 @@ public sealed record DealEstimate(
 
         Credits goodsTax = Credits.Of(source.PurchasePrice.Amount * Terms.TaxRate(context, context.Location(source.At).Reach));
         Credits haulTax = Credits.Of(check.Fee.Amount * wanted.TaxRate);
-        Credits bond = wanted.UsesEscrow ? Credits.Of(Math.Min(wanted.PerformanceBond.Amount, Math.Max(0m, player.Credits.Amount - source.PurchasePrice.Amount - goodsTax.Amount))) : Credits.Zero;
+        Credits bond = Credits.Of(PlayerActions.BondFor(wanted));
         return new DealEstimate(
             DealKind.Broker, ship, source.At, context.CurrentTick, source.At, null, 0, laden, laden.DistanceTicks,
             wanted.OfferedPrice, source.PurchasePrice, goodsTax, Credits.Zero, Credits.Zero,
@@ -203,10 +223,6 @@ public sealed record DealEstimate(
     }
 
     private static Credits RunningFor(Ship ship, long hours) => Credits.Of(ship.Stats.RunningCostPerTick.Amount * hours);
-
-    // The engine's incident chance: one check on the laden trip, at its worst leg (TransitIncidentCheck).
-    private static decimal Odds(SimulationContext context, Ship ship, RoutePlan laden) =>
-        Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Stats.IncidentChance, 0m, 1m);
 
     // A late fee the arrival makes certain, limited as Settlement limits it: by what the jurisdiction can collect.
     private static (long Late, Credits Fee) Late(Contract contract, long arrival, Credits due, Credits bond, Credits credits)

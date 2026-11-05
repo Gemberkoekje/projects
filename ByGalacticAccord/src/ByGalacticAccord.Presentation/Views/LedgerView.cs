@@ -36,10 +36,23 @@ public static class LedgerView
         HeaderViewModel header = HeaderView.Build(session);
         var money = new List<LedgerLine>
         {
-            new(header.CreditsLabel, header.CreditsTip, header.Credits, Tone.Plain),
+            new(header.CreditsLabel, header.CreditsTip, header.Credits, header.CreditsTone),
             new(header.EscrowLabel, header.EscrowTip, header.Escrow, Tone.Plain),
             new(header.RunningLabel, header.RunningTip, header.Running, Tone.Loss),
         };
+
+        // In debt (design §5.4, §16.8): what it costs a day, and what the player owns against it, where insolvency starts.
+        ActorState player = session.Player;
+        if (player.Credits.Amount < 0m)
+        {
+            Credits assets = Engine.Economy.Solvency.Assets(context, player);
+            money.Add(new LedgerLine(
+                Templates.Get("Ledger.Interest"), Templates.Fill("Ledger.Interest.Note", ("rate", Format.Percent(context.Config.DebtInterestPerDay))),
+                Templates.Fill("PerDay", ("amount", Format.MoneyCents(Credits.Of(-player.Debt.Amount * context.Config.DebtInterestPerDay)))), Tone.Loss));
+            money.Add(new LedgerLine(
+                Templates.Get("Ledger.Assets"), header.Warning ?? Templates.Fill("Ledger.Assets.Note", ("half", Format.Money(Credits.Of(assets.Amount / 2m)))),
+                Format.Money(assets), header.Warning is null ? Tone.Plain : Tone.Warn));
+        }
 
         return new LedgerViewModel(
             Templates.Get("Ledger.Title"),

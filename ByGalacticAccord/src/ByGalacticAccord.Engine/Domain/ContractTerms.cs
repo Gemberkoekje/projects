@@ -29,6 +29,12 @@ public enum CancelReason
 
     /// <summary>By agreement after a supply-failure proposal (design §3.4, §16.2): the client took the refund and compensation.</summary>
     SupplyFailure,
+
+    /// <summary>
+    /// A party became insolvent (design §5.4, §16.3). An insolvent performer is cancelled for default: escrow back to the payer and
+    /// its bond forfeited. An insolvent payer walks away: its break fee goes to the performer.
+    /// </summary>
+    Insolvency,
 }
 
 /// <summary>Who cancelled a contract, why, and what it cost them (the bond forfeited, or the break fee paid).</summary>

@@ -1,4 +1,5 @@
 using System;
+using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Economy;
 using ByGalacticAccord.Engine.Simulation;
@@ -66,16 +67,20 @@ public sealed class ShipDeparted : ISimEvent
 
         RoutePlan laden = context.FindPath(Job.Pickup, destination)
                           ?? throw new InvalidOperationException("A laden job has no route to its destination.");
-        long travel = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed));
+        long travel = Throttles.LadenTicks(context.Config, laden.DistanceTicks, ship.Stats, Job.Throttle);
         long midRoute = Tick + Math.Max(1, travel / 2);
         long scheduledArrival = Tick + travel;
 
         ship.DepartLaden(Tick, ShipCourse.Along(laden, Tick, travel));
+        context.NoteLadenTrip(Job.Throttle);
         context.Schedule(new TransitIncidentCheck(midRoute, Ship, Job, scheduledArrival, laden.MaxDanger));
     }
 }
 
-/// <summary>The danger-weighted probabilistic check (§6.3). Fires an incident or proceeds clean to arrival.</summary>
+/// <summary>
+/// The danger-weighted check mid-route (design §8.4): the odds from the route's danger, the ship's reliability and the throttle
+/// (<see cref="Throttles.IncidentOdds"/>). Fires an incident or proceeds clean to arrival.
+/// </summary>
 public sealed class TransitIncidentCheck : ISimEvent
 {
     private readonly decimal _danger;
@@ -106,10 +111,10 @@ public sealed class TransitIncidentCheck : ISimEvent
             return;
         }
 
-        decimal probability = context.Config.IncidentProbabilityScale * _danger * ship.Stats.IncidentChance;
+        decimal probability = Throttles.IncidentOdds(context.Config, _danger, ship.Stats, Job.Throttle);
         if (context.Rng.Chance(probability))
         {
-            TransitIncident incident = IncidentResolver.Resolve(context.Rng, _danger, ship.Stats);
+            TransitIncident incident = IncidentResolver.Resolve(context.Rng, _danger, ship.Stats, context.Config.IncidentDangerShift);
             context.Schedule(new TransitIncidentOccurred(Tick, Ship, Job, _scheduledArrival, incident));
         }
         else
@@ -172,14 +177,14 @@ public sealed class TransitIncidentOccurred : ISimEvent
                 });
                 break;
             case TransitIncidentKind.CreditCost:
-                context.ApplySink(context.Actor(ship.Owner), _incident.CreditCost);
+                context.Charge(context.Actor(ship.Owner), _incident.CreditCost, SinkKind.Incident);
                 break;
             case TransitIncidentKind.MinorDelay:
             default:
                 break;
         }
 
-        context.NoteIncident();
+        context.NoteIncident(_incident.Kind);
         ship.Record(new ShipRecord(Tick, ShipEventKind.Incident, Contract: Job.Main, At: ship.Location, Incident: _incident.Kind));
         ship.DelayArrival(_incident.DelayTicks);
         JournalEntry entry = context.Record(new IncidentEntry(Tick, Job.Main, ship.Owner, _incident));
@@ -223,9 +228,26 @@ public sealed class ShipArrived : ISimEvent
         }
 
         ship.Arrive(Tick, destination);
-        context.ApplySink(context.Actor(ship.Owner), context.Config.DockingFee);
+        Dock(context, context.Actor(ship.Owner), destination);
         Settlement.Unload(context, ship, Job);
         ship.FinishJob(Tick);
         Knowledge.LookAt(context, context.Actor(ship.Owner), destination);
+    }
+
+    /// <summary>
+    /// A ship docking pays the station operator there its fee (design §8.1), owed whether or not its owner can pay (design §16.8);
+    /// where no operator takes it, the fee is destroyed.
+    /// </summary>
+    public static void Dock(SimulationContext context, ActorState owner, LocationId at)
+    {
+        Credits fee = context.Config.DockingFee;
+        if (context.StationOperatorAt(at) is { } station && station.Id != owner.Id)
+        {
+            context.TransferOwed(owner, station, fee);
+        }
+        else
+        {
+            context.Charge(owner, fee, SinkKind.Docking);
+        }
     }
 }

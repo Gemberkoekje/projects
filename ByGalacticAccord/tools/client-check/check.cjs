@@ -259,6 +259,17 @@ async function main() {
         results.push(`info  the contract taken is seen ${takeableSeen === 'ad' ? 'where its poster advertised it' : 'live in its own system'}`);
         await page.screenshot({ path: path.join(shots, '02-contract.png'), fullPage: true });
 
+        // 2a. The throttle (plan S8, design §16.7): a deal with a laden leg says what pushing it does, with a button to take it pushed.
+        const push = page.locator('.contract-panel [data-testid="push"]');
+        if (await push.count() > 0) {
+            const pushNote = (await push.locator('.xsmall').first().textContent()).trim();
+            check(pushNote.startsWith('Pushing the laden leg') && await page.locator('.contract-panel [data-testid="accept-push"]').count() === 1,
+                `the contract says what pushing does, and offers to take it pushed ("${pushNote.slice(0, 90)}…")`);
+            await page.locator('.contract-panel').screenshot({ path: path.join(shots, '19-push.png') });
+        } else {
+            results.push('info  the contract taken is handed over on the spot: nothing to push');
+        }
+
         // 2b. A contract the player knows of only from the news says so, and that it may have been taken since.
         const fromNews = page.locator('.board-row[data-seen="news"]');
         if (await fromNews.count() > 0) {
@@ -490,6 +501,38 @@ async function main() {
         } else {
             results.push('info  no bid waited on the player to accept');
         }
+
+        // 6c. Consequences (plan S8): debt below ₵0 in the header and the ledger, the warning above half of what the player owns, and
+        //     insolvency ending the game on the legacy screen. The ?credits check aid charges the player into debt.
+        await page.goto(`${base}/?seed=${SEED}&credits=-6000`); // owes ₵3,000 against an ₵8,000 freighter
+        await page.waitForSelector('.screen[data-ready="true"]');
+        const debtShown = (await page.textContent('[data-testid="credits"]')).trim();
+        const debtClass = await page.getAttribute('[data-testid="credits"]', 'class');
+        const ledgerText = await page.textContent('[data-testid="ledger"]');
+        check(debtShown.startsWith('−₵') && (debtClass || '').includes('tone-Loss') && ledgerText.includes('Interest on your debt') && ledgerText.includes('You own'),
+            `debt shows in the header and the ledger, with its interest and what you own (${debtShown})`);
+        await page.locator('[data-testid="ledger"]').screenshot({ path: path.join(shots, '20-debt.png') });
+
+        await page.goto(`${base}/?seed=${SEED}&credits=-8000`); // owes ₵5,000: more than half
+        await page.waitForSelector('.screen[data-ready="true"]');
+        await page.click('button[data-speed="X4"]');
+        await page.waitForSelector('[data-testid="debt-warning"]', { timeout: 30000 });
+        const warning = (await page.textContent('[data-testid="debt-warning"]')).trim();
+        const warnAlert = (await page.textContent('.alert')).trim();
+        check(warning.startsWith('Insolvent by') && warnAlert.includes('more than half'), `the warning stops the clock and stays in the time bar ("${warning}")`);
+        await page.screenshot({ path: path.join(shots, '21-warning.png'), fullPage: true });
+
+        await page.goto(`${base}/?seed=${SEED}&credits=-12000`); // owes ₵9,000: more than everything
+        await page.waitForSelector('.screen[data-ready="true"]');
+        await page.click('button[data-speed="X4"]');
+        await page.waitForSelector('[data-testid="legacy"]', { timeout: 30000 });
+        const ending = (await page.textContent('[data-testid="legacy-ending"]')).trim();
+        const legacyShips = await page.locator('[data-testid="legacy-ships"] .legacy-ship').count();
+        check(ending.startsWith('You are insolvent') && legacyShips === 1, `insolvency ends the game on the legacy screen ("${ending.slice(0, 80)}…")`);
+        check(await page.locator('.screen[data-over="true"] button[data-speed]').count() === 0, 'the legacy has no clock: the game is over');
+        await page.screenshot({ path: path.join(shots, '22-legacy.png'), fullPage: true });
+        await page.goto(`${base}/?seed=${SEED}`); // back to a game in progress for the theme and the phone
+        await page.waitForSelector('.screen[data-ready="true"]');
 
         // 7. The light theme uses the same layout from the other token set.
         await page.selectOption('.theme select', 'light');

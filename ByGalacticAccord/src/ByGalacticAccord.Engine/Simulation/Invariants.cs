@@ -26,19 +26,23 @@ public static class Invariants
         CheckEscrow(context, violations);
         CheckGoods(context, violations);
         CheckActiveContracts(context, violations);
+        CheckDissolved(context, violations);
         return violations;
     }
 
-    /// <summary>total_credits == initial + Σfaucet − Σsink (§5.6).</summary>
+    /// <summary>
+    /// total_credits == initial + Σfaucet − Σsink + Σwritten off (design §20.2). Since S8 a balance may be negative, and the
+    /// debt an insolvent actor leaves when it dissolves is written off (design §5.4).
+    /// </summary>
     private static void CheckCreditConservation(SimulationContext context, List<InvariantViolation> violations)
     {
-        decimal expected = context.InitialCredits.Amount + context.TotalFaucet.Amount - context.TotalSink.Amount;
+        decimal expected = context.InitialCredits.Amount + context.TotalFaucet.Amount - context.TotalSink.Amount + context.DebtWrittenOff.Amount;
         decimal actual = context.TotalCredits().Amount;
         if (Math.Abs(expected - actual) > Epsilon)
         {
             violations.Add(new InvariantViolation(
                 "CreditConservation",
-                $"expected {expected}, actual {actual} (initial {context.InitialCredits.Amount}, faucet {context.TotalFaucet.Amount}, sink {context.TotalSink.Amount})."));
+                $"expected {expected}, actual {actual} (initial {context.InitialCredits.Amount}, faucet {context.TotalFaucet.Amount}, sink {context.TotalSink.Amount}, written off {context.DebtWrittenOff.Amount})."));
         }
     }
 
@@ -155,6 +159,24 @@ public static class Invariants
             if (ship.Hold.Any(l => l.Quantity < 0m) || ship.HoldQuantity > ship.CargoCapacity + Epsilon)
             {
                 violations.Add(new InvariantViolation("Hold", $"{ship.Id} carries {ship.HoldQuantity} in a hold of {ship.CargoCapacity}."));
+            }
+        }
+    }
+
+    /// <summary>A dissolved actor (design §5.4) holds nothing: no money, no debt, no ships, no goods, no storage, no contracts.</summary>
+    private static void CheckDissolved(SimulationContext context, List<InvariantViolation> violations)
+    {
+        foreach (ActorState actor in context.Actors.Values)
+        {
+            if (actor.Solvency != Economy.SolvencyStatus.Dissolved)
+            {
+                continue;
+            }
+
+            if (actor.Credits.Amount != 0m || actor.Ships.Count > 0 || Goods.All.Any(g => actor.Stock(g) != 0m)
+                || context.StoragesOf(actor.Id).Any() || context.LiveContractsOf(actor.Id).Any())
+            {
+                violations.Add(new InvariantViolation("Dissolved", $"{actor.Name} is dissolved and still holds {actor.Credits}, {actor.Ships.Count} ships, or goods or contracts."));
             }
         }
     }

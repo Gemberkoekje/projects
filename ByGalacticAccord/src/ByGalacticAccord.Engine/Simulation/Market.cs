@@ -17,6 +17,12 @@ public enum Signing
 
     /// <summary>An offer was accepted, but the side that would perform it could no longer do what it offered.</summary>
     CannotPerform,
+
+    /// <summary>The performer couldn't lock its whole bond in escrow (design §16.4): it may not sign on a part of one.</summary>
+    CannotBond,
+
+    /// <summary>The taker is insolvent (design §5.4): it signs nothing.</summary>
+    Insolvent,
 }
 
 /// <summary>Where a seller gets the goods to fill a Sale.</summary>
@@ -68,8 +74,8 @@ public static partial class Market
     /// </summary>
     public static SaleContract PostSale(
         SimulationContext context, ActorState poster, SaleSide side, GoodType good, decimal quantity, LocationId place,
-        Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package = null, decimal lateFeeScale = 1m) =>
-        PostSale(context, poster, side, good, quantity, place, price, reservation, deadline, holding, package, lateFeeScale, atTheDoor: false);
+        Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package = null, decimal lateFeeScale = 1m, long? cause = null) =>
+        PostSale(context, poster, side, good, quantity, place, price, reservation, deadline, holding, package, lateFeeScale, atTheDoor: false, cause: cause);
 
     /// <summary>
     /// A yard orders a part for a Build (or for a ship on spec, <paramref name="build"/> null): a wanted Sale of one part
@@ -84,7 +90,7 @@ public static partial class Market
     private static SaleContract PostSale(
         SimulationContext context, ActorState poster, SaleSide side, GoodType good, decimal quantity, LocationId place,
         Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package, decimal lateFeeScale, bool atTheDoor,
-        BuildContract? forBuild = null)
+        BuildContract? forBuild = null, long? cause = null)
     {
         Location location = context.Location(place);
         decimal? stored = side == SaleSide.ForSale && holding.Kind == HoldingKind.Storage
@@ -109,7 +115,7 @@ public static partial class Market
 
         context.Add(sale);
         context.Schedule(new ContractExpiryCheck(deadline, sale.Id));
-        context.Record(new ContractPostedEntry(context.CurrentTick, sale.Id, poster.Id) { Cause = forBuild?.LastEntry });
+        context.Record(new ContractPostedEntry(context.CurrentTick, sale.Id, poster.Id) { Cause = cause ?? forBuild?.LastEntry });
         if (side == SaleSide.Wanted && (atTheDoor || !HagglesInGameTime(poster)))
         {
             DecisionEngine.AnswerAtOnce(context, sale);
@@ -126,7 +132,7 @@ public static partial class Market
     /// Whether an actor's offers go back and forth over game time (design §3.6). AI actors haggle among themselves in
     /// closed form, at once; the player, a human, reads replies as they come and answers them.
     /// </summary>
-    public static bool HagglesInGameTime(ActorState actor) => actor.IsPlayer;
+    public static bool HagglesInGameTime(ActorState actor) => actor.IsPlayer && actor.InBusiness;
 
     /// <summary>
     /// Post a Haul of the shipper's goods from where they wait to <paramref name="destination"/>, on the shipper's package
@@ -226,6 +232,19 @@ public static partial class Market
     public static bool CanFund(Contract contract, ActorState payer, Credits price) =>
         !contract.UsesEscrow || payer.Credits.Amount >= price.Amount * (1m + contract.TaxRate);
 
+    /// <summary>
+    /// Whether a seller filling <paramref name="wanted"/> from <paramref name="source"/> has the goods' price and tax in cash (bought from
+    /// a producer) and can then lock its whole bond (design §16.4, <see cref="Solvency.CanBond"/>), before it buys anything.
+    /// </summary>
+    public static bool CanBond(SimulationContext context, ActorState seller, SaleContract wanted, FillSource source)
+    {
+        decimal goods = source.Kind == FillSourceKind.Producer
+            ? source.PurchasePrice.Amount * (1m + Terms.TaxRate(context, context.Location(source.At).Reach))
+            : 0m;
+        decimal bond = wanted.UsesEscrow ? Math.Round(wanted.PerformanceBond.Amount, 2) : 0m;
+        return Solvency.CanBond(context, seller, bond, goods);
+    }
+
     /// <summary>Whether a shipper could fund a haul to <paramref name="destination"/> at <paramref name="fee"/>: its escrow in the Accord, or paying at handover outside it.</summary>
     public static bool CanFundHaul(SimulationContext context, ActorState shipper, LocationId origin, LocationId destination, Credits fee) =>
         context.FindPath(origin, destination) is not null
@@ -300,7 +319,7 @@ public static partial class Market
     }
 
     /// <summary>The carrier takes a haul: it signs, and its ship goes to the pickup.</summary>
-    public static Signing TakeHaul(SimulationContext context, ActorState carrier, HaulContract haul, Ship ship, Credits fee)
+    public static Signing TakeHaul(SimulationContext context, ActorState carrier, HaulContract haul, Ship ship, Credits fee, Throttle throttle = Throttle.Cruise)
     {
         Signing signed = Sign(context, haul, carrier, fee);
         if (signed != Signing.Signed)
@@ -309,7 +328,7 @@ public static partial class Market
         }
 
         haul.Assign(ship.Id);
-        Dispatch(context, ship, new ShipJob(haul.Shipper, haul.Good, haul.Quantity, haul.Origin, PickupSource.Haul, haul.Destination, Haul: haul.Id));
+        Dispatch(context, ship, new ShipJob(haul.Shipper, haul.Good, haul.Quantity, haul.Origin, PickupSource.Haul, haul.Destination, Haul: haul.Id, Throttle: throttle));
         AwaitPerformance(context, haul);
         return Signing.Signed;
     }
@@ -350,7 +369,8 @@ public static partial class Market
     /// storage or hold), carry them to the place, and hand them over there. Goods already at the place are handed
     /// over at once.
     /// </summary>
-    public static Signing FillWithShip(SimulationContext context, ActorState seller, SaleContract wanted, Credits price, Ship ship, FillSource source)
+    public static Signing FillWithShip(
+        SimulationContext context, ActorState seller, SaleContract wanted, Credits price, Ship ship, FillSource source, Throttle throttle = Throttle.Cruise)
     {
         if (!wanted.IsOpen || wanted.Side != SaleSide.Wanted)
         {
@@ -360,6 +380,11 @@ public static partial class Market
         if (!CanFund(wanted, context.Actor(wanted.PostedBy), price))
         {
             return Signing.PayerCannotFund;
+        }
+
+        if (!CanBond(context, seller, wanted, source))
+        {
+            return Signing.CannotBond;
         }
 
         LocationId pickup = source.Kind == FillSourceKind.Aboard ? ship.Location : source.At;
@@ -412,7 +437,7 @@ public static partial class Market
             FillSourceKind.Storage => PickupSource.Storage,
             _ => PickupSource.Aboard,
         };
-        Dispatch(context, ship, new ShipJob(seller.Id, wanted.Good, wanted.Quantity, pickup, how, wanted.Place, Purchase: purchase?.Id, Delivery: wanted.Id));
+        Dispatch(context, ship, new ShipJob(seller.Id, wanted.Good, wanted.Quantity, pickup, how, wanted.Place, Purchase: purchase?.Id, Delivery: wanted.Id, Throttle: throttle));
         return Signing.Signed;
     }
 
@@ -439,6 +464,11 @@ public static partial class Market
         if (!CanFund(wanted, context.Actor(wanted.PostedBy), price))
         {
             return Signing.PayerCannotFund;
+        }
+
+        if (!CanBond(context, seller, wanted, source))
+        {
+            return Signing.CannotBond;
         }
 
         Holding from;
@@ -544,7 +574,7 @@ public static partial class Market
         long ladenTicks = 0;
         if (job.Destination is { } destination && context.FindPath(job.Pickup, destination) is { } plan)
         {
-            ladenTicks = Math.Max(1, PriceModel.TravelTicks(plan.DistanceTicks, ship.Stats.Speed));
+            ladenTicks = Throttles.LadenTicks(context.Config, plan.DistanceTicks, ship.Stats, job.Throttle);
         }
 
         return (end, pickup + ladenTicks);
@@ -625,6 +655,11 @@ public static partial class Market
             return NotOpen(context, taker, contract);
         }
 
+        if (!taker.InBusiness)
+        {
+            return Signing.Insolvent;
+        }
+
         ActorState payer = contract switch
         {
             SaleContract { Side: SaleSide.ForSale } => taker,
@@ -634,6 +669,16 @@ public static partial class Market
         if (!CanFund(contract, payer, price))
         {
             return Signing.PayerCannotFund;
+        }
+
+        // The performer locks its whole bond (design §16.4; before S8 a broke one signed on what it had, even ₵0): what it lacks the
+        // clearing house lends, while its debt stays within half of what it owns (Solvency.CanBond); past that, it doesn't sign.
+        ActorState bonded = PosterSells(contract) ? context.Actor(contract.PostedBy) : taker;
+        decimal deposit = contract is BuildContract ? BuildContract.DepositFor(price).Amount : 0m;
+        decimal bondDue = Math.Round(contract.PerformanceBond.Amount, 2);
+        if (contract.UsesEscrow && bondDue > 0m && !Solvency.CanBond(context, bonded, bondDue - deposit))
+        {
+            return Signing.CannotBond;
         }
 
         if (context.News.WasReportedOpen(contract.Id) && !Visibility.Of(context, taker).CanSee(contract))
@@ -657,8 +702,8 @@ public static partial class Market
         {
             ActorState performer = context.Actor(contract.Performer!.Value);
             context.LockToEscrow(contract, payer, contract.EscrowedPart(price) + contract.Tax);
-            Credits bond = Credits.Of(Math.Min(contract.PerformanceBond.Amount, Math.Floor(Math.Max(0m, performer.Credits.Amount) * 100m) / 100m));
-            context.LockToEscrow(contract, performer, bond);
+            Credits bond = Credits.Of(Math.Round(contract.PerformanceBond.Amount, 2));
+            context.LockBondToEscrow(contract, performer, bond);
             contract.SetLockedBond(bond);
         }
 

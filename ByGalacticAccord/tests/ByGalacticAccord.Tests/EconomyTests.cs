@@ -40,8 +40,13 @@ public sealed class EconomyTests
     {
         SimulationContext context = TestWorld.RunHeadless(seed, 1_000_000);
 
-        var buildOnly = new[] { FailureKind.SupplyFailure, FailureKind.Substituted, FailureKind.CancelledOnSupplyFailure };
-        foreach (FailureKind kind in System.Enum.GetValues<FailureKind>().Except(buildOnly))
+        // A long run meets no Build failure (BuildTests drives them), and an insolvency is rare by design (S8: "some fail, not en
+        // masse"; ConsequenceTests drives them, and Some_ai_actors_fail_and_their_ships_resell_but_not_en_masse looks for them).
+        var rare = new[]
+        {
+            FailureKind.SupplyFailure, FailureKind.Substituted, FailureKind.CancelledOnSupplyFailure, FailureKind.CancelledOnInsolvency, FailureKind.Insolvency,
+        };
+        foreach (FailureKind kind in System.Enum.GetValues<FailureKind>().Except(rare))
         {
             Assert.True(context.Failures(kind) > 0, $"No {kind} in a million ticks of seed {seed}.");
         }
@@ -76,6 +81,28 @@ public sealed class EconomyTests
             .Count(s => s.Status == ContractStatus.Fulfilled && context.Actor(s.Seller).MovesCargo);
         Assert.True(soldByTraders > 0, $"No trader sold a ship (seed {seed}).");
         Assert.True(context.ShipsSold > 0);
+        context.AssertSound();
+    }
+
+    /// <summary>
+    /// Plan S8's check: over a long run some AI actors go insolvent and their ships resell (in a fire sale, here to Edge Salvage), but not
+    /// en masse: a few in a run, most of the traders still trading, and every insolvent actor liquidated and dissolved. On seeds where
+    /// the ten-seed survey saw failures (2: a pilot; 6: two pilots).
+    /// </summary>
+    [Theory]
+    [Trait(TestWorld.Category, TestWorld.Soak)]
+    [InlineData(2L)]
+    [InlineData(6L)]
+    public void Some_ai_actors_fail_and_their_ships_resell_but_not_en_masse(long seed)
+    {
+        SimulationContext context = TestWorld.RunHeadless(seed, 1_000_000);
+
+        Assert.InRange(context.Insolvencies.Count, 1, 3);
+        Assert.True(context.FireSaleShipsSold >= 1, $"No fire-sale ship resold on seed {seed}.");
+        Assert.All(context.Insolvencies, i => Assert.Contains(context.Dissolutions, d => d.Actor == i.Actor || context.Actor(i.Actor).InsolventSince > context.CurrentTick - Liquidation.LongestHours));
+        Assert.True(context.ActorsOrdered.Count(a => a.MovesCargo && a.InBusiness) >= 5, "Most of the seven traders still trade.");
+        Assert.True(context.ActorsOrdered.Where(a => a.Producer is not null || a.Factory is not null || a.Yard is not null).All(a => a.InBusiness),
+            "No producer, factory or yard fails on these seeds.");
         context.AssertSound();
     }
 

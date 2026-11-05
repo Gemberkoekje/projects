@@ -6,6 +6,12 @@
 {
     <BenchPanel Seed="_seed" Ticks="benchTicks" />
 }
+else if (_session is not null && _legacy is not null)
+{
+    <div class="screen" data-ready="@(_ready ? "true" : null)" data-tick="@_session.Now" data-over="true">
+        <LegacyPanel Model="_legacy" OnNewGame="NewGame" />
+    </div>
+}
 else if (_session is not null)
 {
     <div class="screen" data-ready="@(_ready ? "true" : null)" data-tick="@_session.Now">
@@ -64,6 +70,9 @@ else if (_session is not null)
 
     private readonly CancellationTokenSource _stop = new();
     private GameSession? _session;
+
+    // The legacy, once insolvency has ended the game (design §10).
+    private LegacyViewModel? _legacy;
     private long _seed = 20260619;
     private long? _benchTicks;
     private bool _ready;
@@ -114,8 +123,9 @@ else if (_session is not null)
         // The world has run for a day and a few hours before the player looks at it, so the board has posts.
         _session = new GameSession(_seed, startTick: ByGalacticAccord.Engine.Simulation.GameTime.At(1, 6));
 
-        // A check aid: ?credits=N gives the player that much more to start with, so the browser check can order a ship.
-        if (query.TryGetValue("credits", out string? credits) && decimal.TryParse(credits, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal c) && c > 0m)
+        // A check aid: ?credits=N gives the player that much more to start with, so the browser check can order a ship; a negative N puts
+        // it that far in debt, so the check can reach insolvency and the legacy.
+        if (query.TryGetValue("credits", out string? credits) && decimal.TryParse(credits, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal c) && c != 0m)
         {
             _session.Grant(Credits.Of(c));
         }
@@ -164,10 +174,19 @@ else if (_session is not null)
         }
     }
 
+    // A fresh game: the page loads again, with its query.
+    private void NewGame() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+
     private void Rebuild()
     {
         if (_session is null)
         {
+            return;
+        }
+
+        if (_session.IsOver)
+        {
+            _legacy ??= LegacyView.Build(_session); // insolvency ends the game (design §10): only its story is left
             return;
         }
 
@@ -233,7 +252,7 @@ else if (_session is not null)
         Rebuild();
     }
 
-    private void Accept()
+    private void Accept(Throttle throttle)
     {
         if (_session is null || _selected is not { } id)
         {
@@ -241,7 +260,7 @@ else if (_session is not null)
         }
 
         var contract = _session.Context.Contract(id);
-        DealOutcome outcome = _session.Accept(id);
+        DealOutcome outcome = _session.Accept(id, throttle);
         _outcome = ContractView.OutcomeText(_session, contract, outcome);
         Rebuild();
     }

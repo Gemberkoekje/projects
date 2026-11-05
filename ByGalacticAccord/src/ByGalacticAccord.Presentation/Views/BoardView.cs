@@ -145,6 +145,12 @@ public static class BoardView
     /// </summary>
     public static (string? Seen, Age Age) Seen(GameSession session, Contract contract, Sight sight)
     {
+        if (contract.FireSale && contract.IsOpen)
+        {
+            // An insolvent actor's goods or ship, sold by the Accord clearing house and shown everywhere (design §5.4).
+            return (Templates.Fill("Board.Seen.FireSale", ("seller", session.Context.Actor(contract.PostedBy).Name)), Age.Live);
+        }
+
         if (sight.CanSee(contract))
         {
             // Seen only where it is shown beyond its own places: its poster paid to show it there (design §7.1, D38).
@@ -180,7 +186,12 @@ public static class BoardView
 
         if (estimate.TicksLate > 0)
         {
-            return (Templates.Fill("Board.Note.Late", ("late", Format.Duration(estimate.TicksLate))), Tone.Warn);
+            // Late at cruise: say so, and whether only pushing makes it (design §13's trap: the push and its odds are the rest of the story).
+            return DealEstimate.OnTimeOnlyPushed(estimate, DealEstimate.Pushed(session.Context, session.Player, session.PlayerShip, contract)) is var only && only
+                ? (Templates.Fill(
+                    "Board.Note.PushOnly", ("late", Format.Duration(estimate.TicksLate)),
+                    ("odds", Format.Percent(DealEstimate.Pushed(session.Context, session.Player, session.PlayerShip, contract)!.IncidentOdds))), Tone.Loss)
+                : (Templates.Fill("Board.Note.Late", ("late", Format.Duration(estimate.TicksLate))), Tone.Warn);
         }
 
         if (contract.Warranty is { RejectBelow: { } floor } warranty && warranty.Rejectable(estimate.ArrivalQuality))

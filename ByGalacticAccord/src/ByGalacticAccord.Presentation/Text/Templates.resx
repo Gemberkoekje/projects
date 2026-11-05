@@ -573,6 +573,9 @@
   <data name="Board.Note.Late" xml:space="preserve">
     <value>Arrives {late} after the deadline</value>
   </data>
+  <data name="Board.Note.PushOnly" xml:space="preserve">
+    <value>{late} late at cruise; on time only if you push, with an incident {odds} likely</value>
+  </data>
   <data name="Board.Note.Refund" xml:space="preserve">
     <value>{good} arrives {quality} fresh: {refund} back under the warranty</value>
   </data>
@@ -799,6 +802,27 @@
   <data name="Party.Role" xml:space="preserve">
     <value>{role} · {location}</value>
   </data>
+  <data name="Action.Push" xml:space="preserve">
+    <value>Take it and push</value>
+  </data>
+  <data name="Throttle.Push" xml:space="preserve">
+    <value>Pushed</value>
+  </data>
+  <data name="Throttle.Push.Note" xml:space="preserve">
+    <value>Pushing the laden leg: arrives {arrival}, {timing}. An incident is likelier: {odds}, against {cruise} at cruise{hot}.</value>
+  </data>
+  <data name="Throttle.Push.Note.Hot" xml:space="preserve">
+    <value> (the drive runs hot)</value>
+  </data>
+  <data name="Throttle.OnTime" xml:space="preserve">
+    <value>on time</value>
+  </data>
+  <data name="Throttle.Late" xml:space="preserve">
+    <value>{late} late</value>
+  </data>
+  <data name="Throttle.Trap" xml:space="preserve">
+    <value>At cruise it arrives {late} late, for a late fee of {fee}. Only pushing makes the deadline, on a {band} route, with an incident {odds} likely.</value>
+  </data>
   <data name="Action.Accept" xml:space="preserve">
     <value>Accept as posted</value>
   </data>
@@ -873,6 +897,9 @@
   </data>
   <data name="Block.CannotAfford" xml:space="preserve">
     <value>You would pay {cost} for the goods, and you have {credits}.</value>
+  </data>
+  <data name="Block.CannotBond" xml:space="preserve">
+    <value>The terms want your bond of {bond} in escrow, all of it. You have {credits}, and the Accord clearing house lends a bond only while your debt stays within half of what you own.</value>
   </data>
   <data name="Outcome.Signed.Haul.Here" xml:space="preserve">
     <value>Signed for {price}. Your {shipClass} loads at {origin} and leaves as soon as the clock runs.</value>
@@ -2804,5 +2831,146 @@
   </data>
   <data name="Orders.Build.You" xml:space="preserve">
     <value>Your {ship}, with {yard}.</value>
+  </data>
+  <data name="ContractCancelled.Insolvency.Performer" xml:space="preserve">
+    <value>{by} is insolvent, so its contract with {other} is cancelled for default ({head}), and {other} took its bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.Insolvency.Performer.You" xml:space="preserve">
+    <value>You are insolvent, so your contract with {other} is cancelled for default ({head}), and {other} took your bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.Insolvency.Performer.ToYou" xml:space="preserve">
+    <value>{by} is insolvent, so its contract with you is cancelled for default ({head}), and you took its bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.Insolvency.Payer" xml:space="preserve">
+    <value>{by} is insolvent, so its contract with {other} is cancelled ({head}), and {other} got its break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.Insolvency.Payer.You" xml:space="preserve">
+    <value>You are insolvent, so your contract with {other} is cancelled ({head}), and {other} got your break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.Insolvency.Payer.ToYou" xml:space="preserve">
+    <value>{by} is insolvent, so its contract with you is cancelled ({head}), and you got its break fee of {paid}.</value>
+  </data>
+  <data name="DebtWarning" xml:space="preserve">
+    <value>{actor} owes {debt}, more than half of the {assets} it owns: insolvent by {date} unless its debt falls to {half} or less.</value>
+  </data>
+  <data name="DebtWarning.You" xml:space="preserve">
+    <value>You owe {debt}, more than half of the {assets} you own. Unless your debt falls to {half} or less, you are insolvent by {date}.</value>
+  </data>
+  <data name="DebtWarningLifted" xml:space="preserve">
+    <value>{actor}'s debt of {debt} is back to half of the {assets} it owns or less: the warning is lifted.</value>
+  </data>
+  <data name="DebtWarningLifted.You" xml:space="preserve">
+    <value>Your debt of {debt} is back to half of the {assets} you own or less: the warning is lifted.</value>
+  </data>
+  <data name="Insolvent.DebtAboveAssets" xml:space="preserve">
+    <value>{actor} is insolvent: it owes {debt}, more than the {assets} it owns. Its contracts are cancelled, and the Accord clearing house sells what it owns.</value>
+  </data>
+  <data name="Insolvent.DebtAboveAssets.You" xml:space="preserve">
+    <value>You are insolvent: you owe {debt}, more than the {assets} you own. Your contracts are cancelled, and the Accord clearing house sells your ships and goods.</value>
+  </data>
+  <data name="Insolvent.StayedAboveHalf" xml:space="preserve">
+    <value>{actor} is insolvent: it has owed more than half of what it owns for seven days ({debt} against {assets}). Its contracts are cancelled, and the Accord clearing house sells what it owns.</value>
+  </data>
+  <data name="Insolvent.StayedAboveHalf.You" xml:space="preserve">
+    <value>You are insolvent: you have owed more than half of what you own for seven days ({debt} against {assets}). Your contracts are cancelled, and the Accord clearing house sells your ships and goods.</value>
+  </data>
+  <data name="Insolvent.None" xml:space="preserve">
+    <value>{actor} is insolvent, owing {debt} against {assets}.</value>
+  </data>
+  <data name="Insolvent.None.You" xml:space="preserve">
+    <value>You are insolvent, owing {debt} against {assets}.</value>
+  </data>
+  <data name="ActorDissolved.WrittenOff" xml:space="preserve">
+    <value>{actor} is dissolved: its fire sales raised {raised}, and the clearing house wrote off the {writtenOff} it still owed.</value>
+  </data>
+  <data name="ActorDissolved.WrittenOff.You" xml:space="preserve">
+    <value>You are dissolved: your fire sales raised {raised}, and the clearing house wrote off the {writtenOff} you still owed.</value>
+  </data>
+  <data name="ActorDissolved.LeftOver" xml:space="preserve">
+    <value>{actor} is dissolved: its fire sales raised {raised}, and the {leftOver} left over went to its owners.</value>
+  </data>
+  <data name="ActorDissolved.LeftOver.You" xml:space="preserve">
+    <value>You are dissolved: your fire sales raised {raised}, and the {leftOver} left over went to you.</value>
+  </data>
+  <data name="Header.Debt" xml:space="preserve">
+    <value>Debt</value>
+  </data>
+  <data name="Header.Debt.Tip" xml:space="preserve">
+    <value>You owe the Accord clearing house {debt}, at {rate} a day ({interest} a day). You own {assets}: you are insolvent if your debt passes that, or stays above {half} for seven days.</value>
+  </data>
+  <data name="Header.Warning" xml:space="preserve">
+    <value>Insolvent by {date} unless your debt falls to {half}</value>
+  </data>
+  <data name="Ledger.Interest" xml:space="preserve">
+    <value>Interest on your debt</value>
+  </data>
+  <data name="Ledger.Interest.Note" xml:space="preserve">
+    <value>The Accord clearing house charges {rate} a day.</value>
+  </data>
+  <data name="Ledger.Assets" xml:space="preserve">
+    <value>You own</value>
+  </data>
+  <data name="Ledger.Assets.Note" xml:space="preserve">
+    <value>Your ships, goods and money in escrow, at value. Owe more than half of it, {half}, for seven days, or more than all of it, and you are insolvent.</value>
+  </data>
+  <data name="Board.Seen.FireSale" xml:space="preserve">
+    <value>Fire sale: {seller} is insolvent, and the Accord clearing house sells what it owned</value>
+  </data>
+  <data name="Legacy.Title" xml:space="preserve">
+    <value>Your story</value>
+  </data>
+  <data name="Legacy.Ending" xml:space="preserve">
+    <value>You are insolvent, owing {debt}.</value>
+  </data>
+  <data name="Legacy.Span" xml:space="preserve">
+    <value>{days} in business, to {date}.</value>
+  </data>
+  <data name="Legacy.Record" xml:space="preserve">
+    <value>Contracts honoured and broken</value>
+  </data>
+  <data name="Legacy.Record.None" xml:space="preserve">
+    <value>You signed no contract that ended.</value>
+  </data>
+  <data name="Legacy.Record.Performed" xml:space="preserve">
+    <value>You performed {total}: {onTime} on time, {late} late ({short} of them short), {failed} failed, {cancelled} cancelled for your default, {walked} walked away from.</value>
+  </data>
+  <data name="Legacy.Record.Paid" xml:space="preserve">
+    <value>You paid for {total}: {paid} paid in full, {defaulted} not paid, {walked} walked away from.</value>
+  </data>
+  <data name="Legacy.Cascade" xml:space="preserve">
+    <value>How it came to this</value>
+  </data>
+  <data name="Legacy.Markets" xml:space="preserve">
+    <value>Markets you moved</value>
+  </data>
+  <data name="Legacy.Markets.None" xml:space="preserve">
+    <value>You delivered nothing anyone wanted.</value>
+  </data>
+  <data name="Legacy.Market" xml:space="preserve">
+    <value>{quantity} {good} to {place}</value>
+  </data>
+  <data name="Legacy.Rivals" xml:space="preserve">
+    <value>Companies you outlasted</value>
+  </data>
+  <data name="Legacy.Rivals.None" xml:space="preserve">
+    <value>No one else went under before you.</value>
+  </data>
+  <data name="Legacy.Rival" xml:space="preserve">
+    <value>{name}, {role}, insolvent {date}</value>
+  </data>
+  <data name="Legacy.Ships" xml:space="preserve">
+    <value>The ships you flew</value>
+  </data>
+  <data name="Legacy.Ship.Yours" xml:space="preserve">
+    <value>Yours to the end; the Accord clearing house sells it now.</value>
+  </data>
+  <data name="Legacy.Ship.Sold" xml:space="preserve">
+    <value>Now {owner}'s.</value>
+  </data>
+  <data name="Legacy.Ship.Scrapped" xml:space="preserve">
+    <value>Broken up.</value>
+  </data>
+  <data name="Legacy.NewGame" xml:space="preserve">
+    <value>Start again</value>
   </data>
 </root>

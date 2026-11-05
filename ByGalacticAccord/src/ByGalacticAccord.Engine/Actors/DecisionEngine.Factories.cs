@@ -44,6 +44,7 @@ public static partial class DecisionEngine
         }
 
         ArrangeTransport(context, factory);
+        SellOff(context, factory);
     }
 
     // A part is done once its hours are up: it goes into stock.
@@ -94,7 +95,7 @@ public static partial class DecisionEngine
             return;
         }
 
-        context.ApplySink(factory, labour);
+        context.ApplySink(factory, labour, SinkKind.Labour);
         foreach (RecipeInput input in recipe.Inputs)
         {
             if (!missing.Contains(input))

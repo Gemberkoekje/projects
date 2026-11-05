@@ -1,0 +1,77 @@
+@* The legacy (design §10): insolvency ends the game, and the story is told from the player's record. *@
+<section class="panel legacy" data-testid="legacy">
+    <h1 class="legacy-title">@Model.Title</h1>
+    <p class="legacy-ending" data-testid="legacy-ending">@Model.Ending</p>
+    <p class="small muted">@Model.Span</p>
+
+    @if (Model.Cascade.Count > 0)
+    {
+        <div class="block" data-testid="legacy-cascade">
+            <h3 class="block-title">@Model.CascadeTitle</h3>
+            <ol class="why">
+                @foreach (LogLine line in Model.Cascade)
+                {
+                    <li class="why-line">
+                        <span class="when mono xsmall muted">@line.When</span>
+                        <span class="small">@line.Text</span>
+                    </li>
+                }
+            </ol>
+        </div>
+    }
+
+    <div class="legacy-columns">
+        <div class="block" data-testid="legacy-record">
+            <h3 class="block-title">@Model.RecordTitle</h3>
+            @foreach (string line in Model.Record)
+            {
+                <p class="small">@line</p>
+            }
+        </div>
+        <div class="block" data-testid="legacy-markets">
+            <h3 class="block-title">@Model.MarketsTitle</h3>
+            @foreach (string line in Model.Markets)
+            {
+                <p class="small">@line</p>
+            }
+        </div>
+        <div class="block" data-testid="legacy-rivals">
+            <h3 class="block-title">@Model.RivalsTitle</h3>
+            @foreach (string line in Model.Rivals)
+            {
+                <p class="small">@line</p>
+            }
+        </div>
+    </div>
+
+    <div class="block" data-testid="legacy-ships">
+        <h3 class="block-title">@Model.ShipsTitle</h3>
+        @foreach (LegacyShip ship in Model.Ships)
+        {
+            <div class="legacy-ship">
+                <p class="small"><strong>@ship.Name</strong> <span class="muted">@ship.Fate</span></p>
+                <ol class="why">
+                    @foreach (HistoryLine line in ship.History)
+                    {
+                        <li class="why-line">
+                            <span class="when mono xsmall muted">@line.When</span>
+                            <span class="small">@line.Text</span>
+                        </li>
+                    }
+                </ol>
+            </div>
+        }
+    </div>
+
+    <div class="actions">
+        <button type="button" class="button primary" @onclick="OnNewGame">@Model.NewGame</button>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public LegacyViewModel Model { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnNewGame { get; set; }
+}

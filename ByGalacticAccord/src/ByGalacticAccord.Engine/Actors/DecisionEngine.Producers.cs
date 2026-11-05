@@ -42,6 +42,7 @@ public static partial class DecisionEngine
         SellDelivered(context, producer, profile);
         ArrangeTransport(context, producer);
         PostLot(context, producer, profile);
+        SellOff(context, producer);
     }
 
     private static void Produce(SimulationContext context, ActorState producer, ProducerProfile profile)
@@ -53,7 +54,7 @@ public static partial class DecisionEngine
         }
 
         decimal output = Math.Min(room, profile.OutputPerHeartbeat);
-        Credits paid = context.ApplySink(producer, Credits.Of(profile.UnitProductionCost.Amount * output));
+        Credits paid = context.ApplySink(producer, Credits.Of(profile.UnitProductionCost.Amount * output), SinkKind.Production);
         if (paid.Amount <= 0m && producer.Credits.Amount <= 0m)
         {
             return; // can't afford to produce

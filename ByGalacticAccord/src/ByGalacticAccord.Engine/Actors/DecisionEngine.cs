@@ -63,7 +63,7 @@ public static partial class DecisionEngine
         }
 
         Advertising.AdvertiseUnsold(context, actor);
-        if (actor.Role != ActorRole.Government)
+        if (actor.Role != ActorRole.Government && PaysOut(context.Config, actor))
         {
             PayOut(context, actor);
         }
@@ -114,26 +114,35 @@ public static partial class DecisionEngine
         return Credits.Of(decimal.MaxValue);
     }
 
+    // Whether an actor pays out its surplus: every AI actor in the game; traders or station operators may be told to keep it (measuring).
+    private static bool PaysOut(SimulationConfig config, ActorState actor) =>
+        actor.MovesCargo ? config.TradersPayOut : actor.Station is null || config.StationsPayOut;
+
     // Money above an actor's working capital leaves the sector.
     private static void PayOut(SimulationContext context, ActorState actor)
     {
         decimal surplus = actor.Credits.Amount - WorkingCapital(context, actor).Amount;
         if (surplus > 0m)
         {
-            context.ApplySink(actor, Credits.Of(surplus));
+            context.ApplySink(actor, Credits.Of(surplus), SinkKind.PayOut);
         }
     }
 
     /// <summary>
     /// Running costs drain whether or not a ship is earning (design §6.5): the sink that gates fleet size. A ship laid up while it is
-    /// up for sale costs a quarter as much (<see cref="LaidUpShare"/>), whoever owns it.
+    /// up for sale costs a quarter as much (<see cref="LaidUpShare"/>), whoever owns it. They keep charging below ₵0 (design §16.8):
+    /// an owner that can't pay goes into debt.
     /// </summary>
-    public static void ChargeRunningCosts(SimulationContext context, ActorState owner)
+    public static void ChargeRunningCosts(SimulationContext context, ActorState owner) =>
+        ChargeRunningCosts(context, owner, context.Config.HeartbeatInterval);
+
+    /// <summary>Running costs for <paramref name="hours"/> of every ship an actor owns (a heartbeat's, unless a test says otherwise).</summary>
+    public static void ChargeRunningCosts(SimulationContext context, ActorState owner, long hours)
     {
         foreach (ShipId shipId in owner.Ships)
         {
             Ship ship = context.Ship(shipId);
-            context.ApplySink(owner, Credits.Of(RunningCost(ship) * context.Config.HeartbeatInterval));
+            context.Charge(owner, Credits.Of(RunningCost(ship) * hours), SinkKind.RunningCost);
         }
     }
 
@@ -150,7 +159,7 @@ public static partial class DecisionEngine
         foreach (ActorId id in context.Location(wanted.Place).Residents)
         {
             ActorState resident = context.Actor(id);
-            if (!resident.IsPlayer && resident.Makes(wanted.Good) && TryAnswer(context, resident, wanted))
+            if (!resident.IsPlayer && resident.InBusiness && resident.Makes(wanted.Good) && TryAnswer(context, resident, wanted))
             {
                 return;
             }

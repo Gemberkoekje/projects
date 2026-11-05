@@ -53,18 +53,22 @@ public sealed class InvariantTests
     public void Escrow_reconciles_and_is_never_negative_over_250k_ticks(long seed) =>
         AssertEscrowReconciles(TestWorld.RunHeadless(seed, 250_000));
 
+    /// <summary>
+    /// Since S8 a balance may go below ₵0 (design §16.8): only an actor still in business owes anything, a dissolved one holds nothing,
+    /// and every insolvent actor was recorded as such.
+    /// </summary>
     [Theory]
     [InlineData(7L)]
     [InlineData(20260619L)]
-    public void No_actor_ever_goes_into_negative_credits(long seed) =>
-        AssertNoNegativeCredits(TestWorld.RunHeadless(seed, TestWorld.FastTicks));
+    public void Only_actors_in_business_owe_and_a_dissolved_actor_holds_nothing(long seed) =>
+        AssertDebtIsInBusiness(TestWorld.RunHeadless(seed, TestWorld.FastTicks));
 
     [Theory]
     [Trait(TestWorld.Category, TestWorld.Soak)]
     [InlineData(7L)]
     [InlineData(20260619L)]
-    public void No_actor_ever_goes_into_negative_credits_over_250k_ticks(long seed) =>
-        AssertNoNegativeCredits(TestWorld.RunHeadless(seed, 250_000));
+    public void Only_actors_in_business_owe_and_a_dissolved_actor_holds_nothing_over_250k_ticks(long seed) =>
+        AssertDebtIsInBusiness(TestWorld.RunHeadless(seed, 250_000));
 
     private static void AssertInvariantsHold(long seed, long ticks, long checkpointEvery)
     {
@@ -80,7 +84,7 @@ public sealed class InvariantTests
 
     private static void AssertCreditSupplyConserved(SimulationContext context)
     {
-        decimal expected = context.InitialCredits.Amount + context.TotalFaucet.Amount - context.TotalSink.Amount;
+        decimal expected = context.InitialCredits.Amount + context.TotalFaucet.Amount - context.TotalSink.Amount + context.DebtWrittenOff.Amount;
         decimal actual = context.TotalCredits().Amount;
 
         // Credit movements are exact decimal arithmetic; conservation should hold to the cent.
@@ -101,12 +105,22 @@ public sealed class InvariantTests
         }
     }
 
-    private static void AssertNoNegativeCredits(SimulationContext context)
+    private static void AssertDebtIsInBusiness(SimulationContext context)
     {
         foreach (var actor in context.ActorsOrdered)
         {
-            Assert.True(actor.Credits.Amount >= 0m, $"{actor.Name} is at {actor.Credits}.");
+            if (actor.Solvency == Engine.Economy.SolvencyStatus.Dissolved)
+            {
+                Assert.True(actor.Credits.Amount == 0m && actor.Ships.Count == 0, $"{actor.Name} is dissolved and still holds {actor.Credits}, {actor.Ships.Count} ships.");
+            }
+
+            if (actor.InsolventSince is not null)
+            {
+                Assert.Contains(context.Insolvencies, i => i.Actor == actor.Id);
+            }
         }
+
+        Assert.Empty(Invariants.Check(context));
     }
 
     private static string Describe(long seed, long tick, IReadOnlyList<InvariantViolation> violations)
