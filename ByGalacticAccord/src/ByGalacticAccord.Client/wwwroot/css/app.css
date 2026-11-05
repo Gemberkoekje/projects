@@ -334,6 +334,16 @@ a:hover { color: var(--accent-hover); }
 .link-text { border: none; background: none; padding: 0; text-align: left; cursor: pointer; line-height: 1.4; }
 .link-text:hover { text-decoration: underline; }
 
+/* ---- ships (design §6): the sheet, a Build's orders, a spec's stats ---- */
+.ship-panel { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.ship-panel > p { margin: 0; }
+.stat-why { margin: 0 0 4px; line-height: 1.35; }
+.orders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.order-line { border-top: 1px solid var(--divider); padding: 4px 0; overflow-wrap: anywhere; }
+.order-line.depth-1 { padding-left: 12px; }
+.order-line.depth-2 { padding-left: 24px; }
+.order-line.depth-3 { padding-left: 36px; }
+
 /* ---- the speed probe ---- */
 .bench { max-width: 720px; margin: 24px auto; display: flex; flex-direction: column; gap: 8px; }
 .fingerprint { word-break: break-all; color: var(--muted); }

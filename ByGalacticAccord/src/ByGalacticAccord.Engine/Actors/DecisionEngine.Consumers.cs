@@ -45,7 +45,7 @@ public static partial class DecisionEngine
                 continue;
             }
 
-            PostWanted(context, consumer, demand, deficit);
+            PostWanted(context, consumer, demand.Good, deficit, Willingness(consumer, demand.Good, demand.TargetStock).Amount);
         }
     }
 
@@ -197,17 +197,18 @@ public static partial class DecisionEngine
 
     /// <summary>
     /// Post a delivered wanted Sale for what is short (design §4.1). The price sits between what the cheapest
-    /// producer asks, as the consumer knows it (design §7, D32: live at home, else as last read), and what the goods are
-    /// worth to the consumer, which is its hidden reservation. With a producer at home it is a local sale, answered at once.
+    /// producer asks, as the buyer knows it (design §7, D32: live at home, else as last read), and what the goods are
+    /// worth to the buyer (<paramref name="unitWorth"/> a unit), which is its hidden reservation. With a producer at home it is
+    /// a local sale, answered at once. Consumers buy what they use this way, and factories their inputs.
     /// </summary>
-    private static void PostWanted(SimulationContext context, ActorState consumer, ConsumerDemand demand, decimal quantity)
+    private static void PostWanted(SimulationContext context, ActorState consumer, GoodType good, decimal quantity, decimal unitWorth)
     {
         ActorState? source = null;
         decimal bestAsk = decimal.MaxValue;
         decimal sourceAsk = 0m;
         long hours = 0;
         Sight sight = Visibility.Of(context, consumer);
-        foreach (ActorState producer in context.ProducersOf(demand.Good))
+        foreach (ActorState producer in context.ProducersOf(good))
         {
             if (Knowledge.ReadingOf(context, consumer, producer, sight) is not { } reading || reading.CurrentStock is < 1m
                 || Hours(context, producer.Home, consumer.Home) is not { } h)
@@ -237,7 +238,7 @@ public static partial class DecisionEngine
 
         bool local = source.Home == consumer.Home;
         decimal goods = sourceAsk * quantity;
-        decimal worth = Willingness(consumer, demand.Good, demand.TargetStock).Amount * quantity;
+        decimal worth = unitWorth * quantity;
         decimal budget = worth - goods;
         if (budget <= (local ? 0m : 1m))
         {
@@ -246,7 +247,7 @@ public static partial class DecisionEngine
 
         // Its offer: the goods plus a share of the spread, learnt from its own posts (taken within a day, it offers less
         // of the spread next time; expired, more). A local sale needs no carrier and is offered just over the ask.
-        PriceMemory memory = consumer.Prices(new PriceKey(PriceKind.Wanted, demand.Good), 0.45m);
+        PriceMemory memory = consumer.Prices(new PriceKey(PriceKind.Wanted, good), 0.45m);
         decimal share = local ? 0m : memory.Next(context, onQuickTake: 0.85m, onExpiry: 1.3m, min: 0.1m, max: 1m);
         decimal price = Math.Round(local ? Math.Min(worth, goods * 1.05m) : goods + (budget * share), 2);
         if (consumer.Credits.Amount < price * (1m + Terms.TaxRate(context, context.Location(consumer.Home).Reach)))
@@ -255,11 +256,11 @@ public static partial class DecisionEngine
         }
 
         // Terms no carrier could meet from the cheapest source only deter sellers: it relaxes them to what a standard hold meets.
-        TermPackage package = Terms.Meetable(Terms.PackageFor(consumer), demand.Good, new Cargo(demand.Good, 1m, 1m).Decayed(hours, 0m).Quality);
+        TermPackage package = Terms.Meetable(Terms.PackageFor(consumer), good, new Cargo(good, 1m, 1m).Decayed(hours, 0m).Quality);
 
         long deadline = local ? context.CurrentTick + 48 : context.CurrentTick + (hours * 2) + 80;
         SaleContract posted = Market.PostSale(
-            context, consumer, SaleSide.Wanted, demand.Good, quantity, consumer.Home,
+            context, consumer, SaleSide.Wanted, good, quantity, consumer.Home,
             Credits.Of(price), Credits.Of(Math.Round(worth, 2)), deadline, Holding.StockAt(consumer.Home), package);
         if (!local)
         {

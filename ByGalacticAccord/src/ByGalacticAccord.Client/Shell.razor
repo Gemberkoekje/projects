@@ -45,9 +45,14 @@ else if (_session is not null)
                 {
                     <ComposerPanel Model="_composer" Draft="_draft" Outcome="@_composerOutcome" OnChange="ChangeDraft" OnPost="Post" OnClose="CloseComposer" />
                 }
+                @if (_shipSheet is not null)
+                {
+                    <ShipPanel Model="_shipSheet" ForSaleLabel="@Templates.Get("Ship.ForSale.Open")" OnSelect="Select" OnClose="CloseShip" />
+                }
                 <ContractPanel Model="_contract" Outcome="@_outcome" NoneText="@Templates.Get("Contract.None")" OnAccept="Accept" OnCommand="Command" OnSelect="Select"
-                               OnAcceptOffer="AcceptOffer" OnDecline="Decline" OnCounter="args => Counter(args.Thread, args.Offer)" OnAdvertise="Advertise" />
-                <LedgerPanel Model="_ledger" OnSelect="Select" OnAction="Act" />
+                               OnAcceptOffer="AcceptOffer" OnDecline="Decline" OnCounter="args => Counter(args.Thread, args.Offer)" OnAdvertise="Advertise"
+                               OnSelectShip="SelectShip" />
+                <LedgerPanel Model="_ledger" OnSelect="Select" OnAction="Act" OnSelectShip="SelectShip" />
             </div>
         </div>
     </div>
@@ -67,6 +72,11 @@ else if (_session is not null)
 
     private ContractId? _selected;
     private string? _outcome;
+
+    // The ship sheet, while one is open (design §6.4).
+    private ShipId? _selectedShip;
+    private ShipId? _builtShip;
+    private ShipSheetModel? _shipSheet;
 
     // View models, rebuilt only when the session's revision or the selection changes.
     private long _builtRevision = -1;
@@ -103,6 +113,12 @@ else if (_session is not null)
 
         // The world has run for a day and a few hours before the player looks at it, so the board has posts.
         _session = new GameSession(_seed, startTick: ByGalacticAccord.Engine.Simulation.GameTime.At(1, 6));
+
+        // A check aid: ?credits=N gives the player that much more to start with, so the browser check can order a ship.
+        if (query.TryGetValue("credits", out string? credits) && decimal.TryParse(credits, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal c) && c > 0m)
+        {
+            _session.Grant(Credits.Of(c));
+        }
         Rebuild();
     }
 
@@ -155,8 +171,10 @@ else if (_session is not null)
             return;
         }
 
-        if (_builtRevision != _session.Revision || _builtSelection != _selected)
+        if (_builtRevision != _session.Revision || _builtSelection != _selected || _builtShip != _selectedShip)
         {
+            _shipSheet = _selectedShip is { } ship ? ShipView.Build(_session, ship) : null;
+            _builtShip = _selectedShip;
             _header = HeaderView.Build(_session);
             _board = BoardView.Build(_session);
             _map = MapView.Build(_session, _selected);
@@ -200,6 +218,18 @@ else if (_session is not null)
     {
         _outcome = null;
         _selected = id;
+        Rebuild();
+    }
+
+    private void SelectShip(ShipId id)
+    {
+        _selectedShip = id;
+        Rebuild();
+    }
+
+    private void CloseShip()
+    {
+        _selectedShip = null;
         Rebuild();
     }
 
@@ -273,7 +303,11 @@ else if (_session is not null)
             return;
         }
 
-        _draft = _draft is { } before && before.Kind != draft.Kind ? ComposerView.Default(_session, draft.Kind) : draft;
+        _draft = _draft is { } before && before.Kind != draft.Kind
+            ? ComposerView.Default(_session, draft.Kind)
+            : _draft is { Spec: { } was } prior && draft.Spec is { } spec && spec != was
+                ? ComposerView.WithSpec(_session.Context, draft with { Spec = was }, spec) // a new spec re-prices a draft still at the old one's value
+                : draft;
         _composerOutcome = null;
         _builtRevision = -1;
         Rebuild();

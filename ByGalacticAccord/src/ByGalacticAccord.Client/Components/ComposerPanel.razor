@@ -17,20 +17,62 @@
                 }
             </select>
         </label>
-        <label class="field">
-            <span class="xsmall muted">@Model.GoodLabel</span>
-            <select value="@Draft.Good" @onchange="e => Change(Draft with { Good = Enum.Parse<GoodType>((string)e.Value!) })" data-field="good">
-                @foreach (Choice<GoodType> choice in Model.Goods)
-                {
-                    <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
-                }
-            </select>
-        </label>
-        <label class="field">
-            <span class="xsmall muted">@Model.QuantityLabel</span>
-            <input class="mono" type="number" min="1" step="1" inputmode="numeric" value="@Number(Draft.Quantity)"
-                   @onchange="e => Change(Draft with { Quantity = Parse(e.Value) })" data-field="quantity" />
-        </label>
+        @if (Model.IsBuild && Draft.Spec is { } spec)
+        {
+            <label class="field">
+                <span class="xsmall muted">@Model.DesignLabel</span>
+                <select value="@(Model.Design?.ToString() ?? "custom")" @onchange="e => ChangeDesign((string)e.Value!)" data-field="design">
+                    @foreach (Choice<Design?> choice in Model.Designs!)
+                    {
+                        <option @key="choice.Label" value="@(choice.Value?.ToString() ?? "custom")">@choice.Label</option>
+                    }
+                </select>
+            </label>
+            <label class="field">
+                <span class="xsmall muted">@Model.FrameLabel</span>
+                <select value="@spec.Frame.Kind" @onchange="e => Change(Draft with { Spec = spec with { Frame = spec.Frame with { Kind = Enum.Parse<PartKind>((string)e.Value!) } } })" data-field="frame">
+                    @foreach (Choice<PartKind> choice in Model.Frames!)
+                    {
+                        <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                    }
+                </select>
+            </label>
+            <label class="field">
+                <span class="xsmall muted">@Model.DriveLabel</span>
+                <select value="@spec.Drive.Kind" @onchange="e => Change(Draft with { Spec = spec with { Drive = spec.Drive with { Kind = Enum.Parse<PartKind>((string)e.Value!) } } })" data-field="drive">
+                    @foreach (Choice<PartKind> choice in Model.Drives!)
+                    {
+                        <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                    }
+                </select>
+            </label>
+            <label class="field">
+                <span class="xsmall muted">@Model.ModuleLabel</span>
+                <select value="@(spec.Module?.Kind.ToString() ?? "none")" @onchange="e => ChangeModule(spec, (string)e.Value!)" data-field="module">
+                    @foreach (Choice<PartKind?> choice in Model.Modules!)
+                    {
+                        <option @key="choice.Label" value="@(choice.Value?.ToString() ?? "none")">@choice.Label</option>
+                    }
+                </select>
+            </label>
+        }
+        else
+        {
+            <label class="field">
+                <span class="xsmall muted">@Model.GoodLabel</span>
+                <select value="@Draft.Good" @onchange="e => Change(Draft with { Good = Enum.Parse<GoodType>((string)e.Value!) })" data-field="good">
+                    @foreach (Choice<GoodType> choice in Model.Goods)
+                    {
+                        <option @key="choice.Value" value="@choice.Value">@choice.Label</option>
+                    }
+                </select>
+            </label>
+            <label class="field">
+                <span class="xsmall muted">@Model.QuantityLabel</span>
+                <input class="mono" type="number" min="1" step="1" inputmode="numeric" value="@Number(Draft.Quantity)"
+                       @onchange="e => Change(Draft with { Quantity = Parse(e.Value) })" data-field="quantity" />
+            </label>
+        }
         <label class="field">
             <span class="xsmall muted">@Model.PlaceLabel</span>
             <select value="@Draft.Place.Value" @onchange="e => Change(Draft with { Place = new LocationId(long.Parse((string)e.Value!, System.Globalization.CultureInfo.InvariantCulture)) })" data-field="place">
@@ -87,6 +129,19 @@
     </div>
 
     <p class="small">@Model.KindNote</p>
+    @if (Model.SpecStats is { Count: > 0 } stats)
+    {
+        <div class="block" data-testid="composer-spec">
+            @foreach (StatLine stat in stats)
+            {
+                <div class="line" title="@stat.Explanation">
+                    <span class="small">@stat.Label</span>
+                    <span class="mono small">@stat.Value</span>
+                </div>
+                <p class="xsmall muted stat-why">@stat.Explanation</p>
+            }
+        </div>
+    }
     <p class="small muted" data-testid="composer-reference">@Model.Reference</p>
     @if (Model.Stored is not null)
     {
@@ -143,6 +198,13 @@
     public EventCallback OnClose { get; set; }
 
     private Task Change(ComposerDraft draft) => OnChange.InvokeAsync(draft);
+
+    // A design fills in its parts; custom keeps the parts as they are, to change one by one.
+    private Task ChangeDesign(string value) =>
+        Enum.TryParse(value, out Design design) ? Change(Draft with { Spec = Designs.Parts(design) }) : Task.CompletedTask;
+
+    private Task ChangeModule(ShipParts spec, string value) =>
+        Change(Draft with { Spec = spec with { Module = Enum.TryParse(value, out PartKind kind) ? new FittedPart(kind, spec.Frame.Grade) : null } });
 
     // Ticking a system adds it to where the post is shown when it goes up; unticking takes it off.
     private Task Toggle(LocationId at)

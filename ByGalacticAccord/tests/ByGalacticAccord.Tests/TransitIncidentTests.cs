@@ -12,7 +12,7 @@ public sealed class TransitIncidentTests
     {
         var rngA = new DeterministicRandom(777L);
         var rngB = new DeterministicRandom(777L);
-        ShipClassInfo light = ShipClasses.Info(ShipType.LightFreighter);
+        ShipStats light = Designs.Stats(Design.LightFreighter);
 
         TransitIncident a = IncidentResolver.Resolve(rngA, 0.3m, light);
         TransitIncident b = IncidentResolver.Resolve(rngB, 0.3m, light);
@@ -23,8 +23,8 @@ public sealed class TransitIncidentTests
     [Fact]
     public void Armed_freighter_suffers_milder_incidents_than_a_fast_courier()
     {
-        ShipClassInfo armed = ShipClasses.Info(ShipType.ArmedFreighter);   // severity 0.5
-        ShipClassInfo courier = ShipClasses.Info(ShipType.FastCourier);    // severity 1.4
+        ShipStats armed = Designs.Stats(Design.ArmouredFreighter);   // severity 0.625
+        ShipStats courier = Designs.Stats(Design.FastCourier);    // severity 1.43
 
         decimal armedTotal = 0m;
         decimal courierTotal = 0m;
@@ -52,7 +52,7 @@ public sealed class TransitIncidentTests
 
     private static decimal SampleCreditCost(decimal danger)
     {
-        ShipClassInfo light = ShipClasses.Info(ShipType.LightFreighter);
+        ShipStats light = Designs.Stats(Design.LightFreighter);
         decimal total = 0m;
         for (long seed = 0; seed < 2000; seed++)
         {

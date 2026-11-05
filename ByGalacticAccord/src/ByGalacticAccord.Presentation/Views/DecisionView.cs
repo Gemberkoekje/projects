@@ -33,6 +33,12 @@ public static class DecisionView
     {
         SimulationContext context = session.Context;
         Contract contract = context.Contract(decision.Contract);
+        if (contract is BuildContract build && decision.Kind != DecisionKind.CancelForDefault)
+        {
+            (string buildText, IReadOnlyList<DecisionOption> buildOptions) = ShipView.BuildDecision(session, decision, build);
+            return new DecisionPrompt(decision, contract.Id, Templates.Get("Decision.Title"), buildText, buildOptions);
+        }
+
         string performer = context.Actor(contract.Performer!.Value).Name;
         (GoodType good, decimal quantity, LocationId place, LocationId destination) = contract switch
         {

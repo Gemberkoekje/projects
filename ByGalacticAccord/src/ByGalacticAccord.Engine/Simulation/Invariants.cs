@@ -74,12 +74,54 @@ public static class Invariants
         foreach (GoodType good in Goods.All)
         {
             decimal produced = context.GoodsProduced(good);
-            decimal accounted = context.GoodsConsumed(good) + context.GoodsHeld(good) + context.GoodsLost(good);
+            decimal accounted = context.GoodsConsumed(good) + context.GoodsHeld(good) + context.GoodsLost(good) + context.GoodsBuiltIn(good);
             if (Math.Abs(produced - accounted) > 0.01m)
             {
                 violations.Add(new InvariantViolation(
                     "GoodsConservation",
-                    $"{good}: produced {produced}, accounted {accounted} (consumed {context.GoodsConsumed(good)}, held {context.GoodsHeld(good)}, lost {context.GoodsLost(good)})."));
+                    $"{good}: produced {produced}, accounted {accounted} (consumed {context.GoodsConsumed(good)}, held {context.GoodsHeld(good)}, lost {context.GoodsLost(good)}, built in {context.GoodsBuiltIn(good)})."));
+            }
+        }
+
+        // Every part built in is in a ship: the ships' parts, counted by good, are exactly what the ledger says was built in.
+        var fitted = new Dictionary<GoodType, decimal>();
+        foreach (Ship ship in context.Ships.Values)
+        {
+            if (ship.BuiltBy is null || ship.Scrapped)
+            {
+                continue; // the sector's starting ships were never built from parts in this world; a scrapped ship's parts are written off
+            }
+
+            foreach (FittedPart part in ship.Parts.All)
+            {
+                fitted[part.Good] = fitted.GetValueOrDefault(part.Good) + 1m;
+            }
+        }
+
+        foreach (GoodType good in ShipPart.Goods)
+        {
+            if (fitted.GetValueOrDefault(good) != context.GoodsBuiltIn(good))
+            {
+                violations.Add(new InvariantViolation("PartsInShips", $"{good}: {fitted.GetValueOrDefault(good)} in ships, {context.GoodsBuiltIn(good)} built in."));
+            }
+        }
+
+        foreach (Ship ship in context.Ships.Values)
+        {
+            if (!ship.Scrapped && !context.Actor(ship.Owner).Ships.Contains(ship.Id))
+            {
+                violations.Add(new InvariantViolation("ShipOwner", $"{ship.Id} belongs to {ship.Owner}, whose fleet doesn't list it."));
+            }
+        }
+
+        foreach (ActorState actor in context.Actors.Values)
+        {
+            foreach (ShipId id in actor.Ships)
+            {
+                if (context.Ship(id).Owner != actor.Id)
+                {
+                    violations.Add(new InvariantViolation("ShipOwner", $"{actor.Name} lists {id}, which belongs to {context.Ship(id).Owner}."));
+                }
             }
         }
 
@@ -117,6 +159,17 @@ public static class Invariants
         }
     }
 
+    // A signed Build is in its yard's queue or its current job, or built and waiting on the client's inspection.
+    private static bool Building(SimulationContext context, BuildContract build)
+    {
+        if (build.Ship is not null)
+        {
+            return true;
+        }
+
+        return context.Actor(build.Builder!.Value).Works.Has(build.Id);
+    }
+
     /// <summary>
     /// No orphan contracts (design §20.2): every signed Haul is flown by a ship whose job it is, and every signed Sale
     /// is being performed or has a default check coming (its handover waits on goods that are set aside or on their way).
@@ -140,6 +193,12 @@ public static class Invariants
                     break;
                 case SaleContract sale when sale.Reserved is null && !Market.UnderWay(context, sale):
                     violations.Add(new InvariantViolation("OrphanContract", $"{sale.Id} is signed with no goods set aside and nothing on its way."));
+                    break;
+                case BuildContract build when !Building(context, build):
+                    violations.Add(new InvariantViolation("OrphanContract", $"{build.Id} is signed and no yard is building it."));
+                    break;
+                case ShipSaleContract sale:
+                    violations.Add(new InvariantViolation("OrphanContract", $"{sale.Id} is signed and not handed over."));
                     break;
             }
         }

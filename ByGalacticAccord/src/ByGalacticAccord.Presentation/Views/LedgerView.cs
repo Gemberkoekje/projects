@@ -12,7 +12,7 @@ namespace ByGalacticAccord.Presentation.Views;
 public sealed record LedgerAction(string Label, GoodType Good, bool Store);
 
 /// <summary>One line of the ledger: what it is, where or why, and its figure.</summary>
-public sealed record LedgerLine(string Label, string Detail, string Value, Tone Tone, LedgerAction? Action = null, ContractId? Contract = null);
+public sealed record LedgerLine(string Label, string Detail, string Value, Tone Tone, LedgerAction? Action = null, ContractId? Contract = null, ShipId? Ship = null);
 
 /// <summary>
 /// The ledger (design §11.2: "how am I doing?", §11.3): the player's money, what it owns and where (design §16.1: in a
@@ -57,6 +57,17 @@ public static class LedgerView
         SimulationContext context = session.Context;
         ActorState player = session.Player;
         var lines = new List<LedgerLine>();
+
+        // Its ships first (design §6): each opens its sheet.
+        foreach (ShipId id in player.Ships)
+        {
+            Ship ship = context.Ship(id);
+            string state = ship.ListedFor is not null ? "Ledger.Ship.ForSale" : ship.IsFree ? "Ledger.Ship.Free" : "Ledger.Ship.Busy";
+            lines.Add(new LedgerLine(
+                JournalText.ShipLine(context, id), Templates.Fill(state, ("place", context.Location(ship.Course?.To ?? ship.Location).Name)),
+                Templates.Fill("Ledger.Base", ("value", Format.Money(ship.Stats.Value))), Tone.Muted, Ship: id));
+        }
+
         foreach (ShipId id in player.Ships)
         {
             Ship ship = context.Ship(id);
@@ -66,7 +77,7 @@ public static class LedgerView
             {
                 Cargo goods = lot.At(context.CurrentTick, ship.Preservation).Cargo;
                 string detail = Templates.Fill(
-                    ship.IsFree ? "Ledger.Hold.Docked" : "Ledger.Hold.Moving", ("shipClass", Templates.ShipClass(ship.Type)), ("where", where));
+                    ship.IsFree ? "Ledger.Hold.Docked" : "Ledger.Hold.Moving", ("shipClass", Templates.ShipName(ship)), ("where", where));
                 lines.Add(new LedgerLine(
                     Goods(goods), Fresh(detail, goods), Worth(goods), Tone.Muted,
                     canStore ? new LedgerAction(Templates.Fill("Ledger.Store", ("place", where)), goods.Good, Store: true) : null));
@@ -105,6 +116,7 @@ public static class LedgerView
             {
                 HaulContract when paying => "Ledger.Role.Shipping",
                 HaulContract => "Ledger.Role.Carrying",
+                BuildContract => "Ledger.Role.Ordering",
                 SaleContract when paying => "Ledger.Role.Buying",
                 _ => "Ledger.Role.Selling",
             });

@@ -89,7 +89,7 @@ public sealed record DealEstimate(
             return null;
         }
 
-        long ladenTicks = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier));
+        long ladenTicks = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed));
         Credits fee = haul.OfferedPrice;
 
         // The warranty judges what the hold does to the goods: their quality on arrival as a share of what it was when loaded.
@@ -125,7 +125,7 @@ public sealed record DealEstimate(
 
         // At the place already, from storage or the hold: handed over on signing. Otherwise a trip, however short.
         bool onTheSpot = pickup == wanted.Place && source.Kind is FillSourceKind.Storage or FillSourceKind.Aboard;
-        long ladenTicks = onTheSpot ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier));
+        long ladenTicks = onTheSpot ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed));
         Credits goods = source.PurchasePrice;
         Credits goodsTax = Credits.Of(goods.Amount * Terms.TaxRate(context, context.Location(pickup).Reach));
 
@@ -199,14 +199,14 @@ public sealed record DealEstimate(
             return (null, 0);
         }
 
-        return context.FindPath(from, to) is { } plan ? (plan, PriceModel.TravelTicks(plan.DistanceTicks, ship.Class.SpeedMultiplier)) : null;
+        return context.FindPath(from, to) is { } plan ? (plan, PriceModel.TravelTicks(plan.DistanceTicks, ship.Stats.Speed)) : null;
     }
 
-    private static Credits RunningFor(Ship ship, long hours) => Credits.Of(ship.Class.RunningCostPerTick.Amount * hours);
+    private static Credits RunningFor(Ship ship, long hours) => Credits.Of(ship.Stats.RunningCostPerTick.Amount * hours);
 
     // The engine's incident chance: one check on the laden trip, at its worst leg (TransitIncidentCheck).
     private static decimal Odds(SimulationContext context, Ship ship, RoutePlan laden) =>
-        Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Class.IncidentChanceModifier, 0m, 1m);
+        Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Stats.IncidentChance, 0m, 1m);
 
     // A late fee the arrival makes certain, limited as Settlement limits it: by what the jurisdiction can collect.
     private static (long Late, Credits Fee) Late(Contract contract, long arrival, Credits due, Credits bond, Credits credits)

@@ -25,9 +25,10 @@ public sealed class JournalTests
 
         foreach (Contract contract in context.Contracts.Values)
         {
-            // Going into default is a step on the way, not an ending: a contract may pass through it and still be delivered.
+            // Going into default is a step on the way, not an ending: a contract may pass through it and still be delivered. So
+            // are a Build's supply failures, the remedies chosen, and the ship's being built before it is handed over.
             List<string> kinds = byContract[contract.Id]
-                .Where(e => e is not IncidentEntry and not ContractInDefaultEntry)
+                .Where(e => e is not IncidentEntry and not ContractInDefaultEntry and not SupplyFailureEntry and not RemedyChosenEntry and not ShipBuiltEntry)
                 .Select(e => e.GetType().Name.Replace("Entry", string.Empty))
                 .ToList();
             if (contract is StorageContract storage)
@@ -36,7 +37,12 @@ public sealed class JournalTests
                 continue;
             }
 
-            string delivered = contract is HaulContract ? "HaulDelivered" : "GoodsHandedOver";
+            string delivered = contract switch
+            {
+                HaulContract => "HaulDelivered",
+                BuildContract or ShipSaleContract => "ShipHandedOver",
+                _ => "GoodsHandedOver",
+            };
             string[] expected = contract.Status switch
             {
                 ContractStatus.Open => new[] { "ContractPosted" },

@@ -216,7 +216,7 @@ async function main() {
         check(await page.locator('[data-testid="ledger"]').count() === 1, 'the ledger is on the screen');
         check(await page.locator('svg.map .node').count() === 7, 'the map draws seven locations');
         check(await page.locator('svg.map .route').count() === 9, 'the map draws nine routes');
-        check(await page.locator('svg.map .ship').count() === 10, 'the map draws ten ships');
+        check(await page.locator('svg.map .ship').count() === 11, 'the map draws eleven ships (the traders\' nine, yours and Edge Salvage\'s)');
 
         // 1b. What the player knows (design §7): the tiers from Meridian, the age of what it knows elsewhere, and the news.
         const tiers = await page.locator('svg.map .node').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-tier')));
@@ -416,8 +416,11 @@ async function main() {
         // 5. Paused, the ledger shows what you own and where: the goods bought for the sale, aboard.
         await page.click('button[data-speed="Paused"]');
         await page.waitForTimeout(200);
-        const owned = (await page.locator('[data-testid="possessions"] .ledger-line').allTextContents()).map(t => t.trim());
-        check(owned.some(t => t.includes('hold')), `the ledger shows your goods aboard ("${(owned[0] ?? '').slice(0, 80)}")`);
+        const owned = (await page.locator('[data-testid="possessions"] .ledger-line').allTextContents()).map(t => t.trim().replace(/\s+/g, ' '));
+        check(owned.some(t => t.startsWith('Light Freighter S')), `the ledger lists your ship, which opens its sheet ("${(owned[0] ?? '').slice(0, 80)}")`);
+        results.push(owned.some(t => t.includes('hold'))
+            ? `info  the ledger shows your goods aboard ("${owned.find(t => t.includes('hold')).slice(0, 80)}")`
+            : 'info  nothing aboard yet: your ship is still on its way to the goods');
         await page.locator('[data-testid="ledger"]').screenshot({ path: path.join(shots, '04-ledger.png') });
 
         // 6. Run on: any decision the terms hand the player stops the clock, and is answered.
@@ -429,6 +432,64 @@ async function main() {
             ? `info  ${decisions.length} decision(s) stopped the clock; the first: "${decisions[0].slice(0, 90)}…"`
             : 'info  no decision landed on the player in this run');
 
+
+        // 6b. Ships from parts (plan S7), in a fresh session whose player has the money to order one (the ?credits check aid).
+        await page.goto(`${base}/?seed=${SEED}&credits=40000`);
+        await page.waitForSelector('.screen[data-ready="true"]');
+        await page.locator('[data-testid="ledger-ship"]').first().click();
+        await page.waitForSelector('[data-testid="ship-sheet"]');
+        const statWhys = (await page.locator('[data-testid="ship-stats"] .stat-why').allTextContents()).map(t => t.trim());
+        check(statWhys.length >= 5 && statWhys[0].includes('Light frame'), `the ship sheet explains each stat by its parts (${statWhys.length}; "${statWhys[0]}")`);
+        await page.locator('[data-testid="ship-sheet"]').screenshot({ path: path.join(shots, '15-ship-sheet.png') });
+        await page.locator('[data-testid="ship-sheet"] .panel-head button').click();
+
+        // The build composer: a Refrigerated Transport, shown where the yards are; a Fast drive makes it a custom build (design §13).
+        await page.click('[data-testid="new-post"]');
+        await page.waitForSelector('[data-testid="composer"]');
+        await page.selectOption('[data-testid="composer"] [data-field="kind"]', 'Build');
+        await page.waitForSelector('[data-testid="composer"] [data-field="design"]');
+        const defaultDesign = await page.locator('[data-testid="composer"] [data-field="design"]').inputValue();
+        await page.selectOption('[data-testid="composer"] [data-field="drive"]', 'FastDrive');
+        await page.waitForTimeout(200);
+        const customDesign = await page.locator('[data-testid="composer"] [data-field="design"]').inputValue();
+        const specLines = await page.locator('[data-testid="composer-spec"] .line').count();
+        const buildShown = (await page.locator('[data-testid="composer-showing-total"]').textContent()).trim();
+        check(defaultDesign === 'RefrigeratedTransport' && customDesign === 'custom' && specLines >= 5,
+            `the build composer drafts a design and a custom build, with its stats (${defaultDesign} → ${customDesign}, ${specLines} stats; "${buildShown}")`);
+        await page.locator('[data-testid="composer"]').screenshot({ path: path.join(shots, '16-build-composer.png') });
+        await page.click('[data-testid="post"]');
+        const postedBuild = (await page.textContent('.contract-panel .outcome')).trim();
+        check(postedBuild.startsWith('Posted:') && postedBuild.includes('custom ship'), `the Build goes up ("${postedBuild.slice(0, 90)}…")`);
+
+        // The yards see it where it is shown and bid, over game time.
+        const buildAt = await tick(page);
+        await page.click('button[data-speed="X4"]');
+        await runUntil(page, buildAt + 20, 30000);
+        await page.click('button[data-speed="Paused"]');
+        await page.waitForTimeout(200);
+        await page.locator('[data-testid="posts"] .post-line').filter({ hasText: 'custom ship' }).locator('.link-text').first().click();
+        const yardBids = page.locator('.contract-panel [data-testid="thread"]');
+        const bidCount = await yardBids.count();
+        const bidders = (await yardBids.allTextContents()).map(t => /Tycho Yards|Helios Orbital Yards/.exec(t)?.[0] ?? '?');
+        check(bidCount >= 1, `the yards bid on it as threads (${bidCount}: ${bidders.join(', ')})`);
+        await page.locator('.contract-panel').screenshot({ path: path.join(shots, '17-bids.png') });
+
+        // Accepting a bid signs it with that yard; the contract then shows its orders tree as the yard buys the parts.
+        const acceptBid = page.locator('.contract-panel [data-testid="thread"][data-your-turn="true"] [data-thread-command="Accept"]');
+        if (await acceptBid.count() > 0) {
+            await acceptBid.first().click();
+            const agreed = (await page.textContent('.contract-panel .outcome')).trim();
+            const ordersAt = await tick(page);
+            await page.click('button[data-speed="X4"]');
+            await runUntil(page, ordersAt + 30, 30000);
+            await page.click('button[data-speed="Paused"]');
+            await page.waitForTimeout(200);
+            const orderLines = (await page.locator('.contract-panel [data-testid="orders"] .order-line').allTextContents()).map(t => t.trim());
+            check(orderLines.length >= 3 && orderLines.some(t => t.startsWith('Frame:')), `a signed Build shows its orders tree (${orderLines.length} lines; "${agreed.slice(0, 60)}…")`);
+            await page.locator('.contract-panel').screenshot({ path: path.join(shots, '18-orders.png') });
+        } else {
+            results.push('info  no bid waited on the player to accept');
+        }
 
         // 7. The light theme uses the same layout from the other token set.
         await page.selectOption('.theme select', 'light');

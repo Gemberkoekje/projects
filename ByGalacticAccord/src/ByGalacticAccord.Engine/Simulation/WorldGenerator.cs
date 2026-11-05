@@ -80,6 +80,44 @@ public static class WorldGenerator
         AddConsumer(context, halcyon, "Halcyon Crew", income: 50m, rng,
             (GoodType.Ore, 6m, 105m));
 
+        // ---- part factories (design §15.1, §15.4): each makes its parts from ordinary goods, at grade A ----
+        AddFactory(context, tycho, "Tycho Frameworks", rng,
+            new PartRecipe(PartKind.LightFrame, new[] { new RecipeInput(GoodType.Ore, 40m), new RecipeInput(GoodType.Parts, 20m) }, Hours: 48, StockCap: 2m),
+            new PartRecipe(PartKind.BulkFrame, new[] { new RecipeInput(GoodType.Ore, 160m), new RecipeInput(GoodType.Parts, 80m) }, Hours: 120, StockCap: 1m),
+            new PartRecipe(PartKind.CourierFrame, new[] { new RecipeInput(GoodType.Ore, 20m), new RecipeInput(GoodType.Parts, 30m) }, Hours: 48, StockCap: 1m));
+        AddFactory(context, meridian, "Meridian Drive Works", rng,
+            new PartRecipe(PartKind.StandardDrive, new[] { new RecipeInput(GoodType.Machinery, 12m), new RecipeInput(GoodType.Fuel, 30m) }, Hours: 48, StockCap: 2m),
+            new PartRecipe(PartKind.FastDrive, new[] { new RecipeInput(GoodType.Machinery, 24m), new RecipeInput(GoodType.Fuel, 50m) }, Hours: 96, StockCap: 1m));
+        AddFactory(context, halcyon, "Halcyon Modules", rng,
+            new PartRecipe(PartKind.RefrigerationUnit, new[] { new RecipeInput(GoodType.Parts, 40m), new RecipeInput(GoodType.Machinery, 20m) }, Hours: 72, StockCap: 1m),
+            new PartRecipe(PartKind.ArmourPlating, new[] { new RecipeInput(GoodType.Parts, 30m), new RecipeInput(GoodType.Machinery, 20m), new RecipeInput(GoodType.Ore, 120m) }, Hours: 96, StockCap: 1m),
+            new PartRecipe(PartKind.CargoPod, new[] { new RecipeInput(GoodType.Parts, 30m), new RecipeInput(GoodType.Machinery, 6m) }, Hours: 24, StockCap: 1m));
+
+        // ---- shipyards and the salvage yard (design §15.5) ----
+        // Tycho Yards: cheap and quick, lenient by habit, next door to the frame maker. Helios Orbital Yards: dearer and slower,
+        // strict by habit, in the deep Accord. Each builds one ship at a time and, idle, a standard design on spec.
+        AddYard(context, tycho, "Tycho Yards", rng, new YardProfile(
+            AssemblyHours: 5 * 24, Labour: Credits.Of(1_200m), Margin: 0.12m, Habit: TermPackage.Lenient, LotLimit: 1,
+            SpecDesigns: new[] { Design.LightFreighter }));
+        AddYard(context, heliosPrime, "Helios Orbital Yards", rng, new YardProfile(
+            AssemblyHours: 8 * 24, Labour: Credits.Of(1_800m), Margin: 0.25m, Habit: TermPackage.Strict, LotLimit: 1,
+            SpecDesigns: new[] { Design.RefrigeratedTransport, Design.LightFreighter }));
+
+        // Edge Salvage doesn't build: it buys ships others sell and sells them second-hand. It starts with a worn Refrigerated
+        // Transport on its lot, its frame a grade down (design §13: cheap, unarmoured, a frontier sale with no escrow).
+        var salvage = new ActorState(context.NextActorId(), "Edge Salvage", ActorRole.Salvage, edge.Id, RandomPersonality(rng), Credits.Of(30_000m))
+        {
+            Salvage = new SalvageProfile(BuyShare: 0.45m, AskShare: 0.75m, FloorShare: 0.50m, LotLimit: 3),
+        };
+        context.Add(salvage);
+        edge.AddResident(salvage.Id);
+        var worn = new Ship(
+            context.NextShipId(),
+            Designs.Parts(Design.RefrigeratedTransport).With(PartSlot.Frame, new FittedPart(PartKind.LightFrame, Grade.B)),
+            salvage.Id, edge.Id, createdTick: 0);
+        context.Add(worn);
+        salvage.AddShip(worn.Id);
+
         // ---- government (tax sink, §4.2.3) ----
         var government = new ActorState(context.NextActorId(), "Helios Accord Authority", ActorRole.Government, heliosPrime.Id, Personality.Balanced, Credits.Of(1000m));
         context.Add(government);
@@ -87,19 +125,19 @@ public static class WorldGenerator
 
         // ---- AI haulers ----
         AddHauler(context, "Coreward Logistics", ActorRole.ShippingCompany, meridian.Id, Credits.Of(40000m), rng,
-            (ShipType.LightFreighter, meridian.Id), (ShipType.RefrigeratedTransport, heliosPrime.Id));
+            (Design.LightFreighter, meridian.Id), (Design.RefrigeratedTransport, heliosPrime.Id));
         AddHauler(context, "Foundry Freightways", ActorRole.ShippingCompany, tycho.Id, Credits.Of(40000m), rng,
-            (ShipType.BulkHauler, tycho.Id), (ShipType.LightFreighter, halcyon.Id));
+            (Design.BulkHauler, tycho.Id), (Design.LightFreighter, halcyon.Id));
         AddHauler(context, "Juno Okafor", ActorRole.IndependentPilot, verdant.Id, Credits.Of(9000m), rng,
-            (ShipType.LightFreighter, verdant.Id));
+            (Design.LightFreighter, verdant.Id));
         AddHauler(context, "Sable Vance", ActorRole.IndependentPilot, halcyon.Id, Credits.Of(9000m), rng,
-            (ShipType.FastCourier, halcyon.Id));
+            (Design.FastCourier, halcyon.Id));
         AddHauler(context, "Dust Runner Kael", ActorRole.IndependentPilot, rustBelt.Id, Credits.Of(11000m), rng,
-            (ShipType.ArmedFreighter, rustBelt.Id));
+            (Design.ArmouredFreighter, rustBelt.Id));
         AddHauler(context, "Pell Mirza", ActorRole.IndependentPilot, meridian.Id, Credits.Of(9000m), rng,
-            (ShipType.LightFreighter, heliosPrime.Id));
+            (Design.LightFreighter, heliosPrime.Id));
         AddHauler(context, "Otto Reyes", ActorRole.IndependentPilot, tycho.Id, Credits.Of(9000m), rng,
-            (ShipType.LightFreighter, tycho.Id));
+            (Design.LightFreighter, tycho.Id));
 
         // ---- the player ----
         ActorId? playerId = null;
@@ -111,7 +149,7 @@ public static class WorldGenerator
             };
             context.Add(player);
             meridian.AddResident(player.Id);
-            var ship = new Ship(context.NextShipId(), ShipType.LightFreighter, player.Id, meridian.Id, createdTick: 0);
+            var ship = new Ship(context.NextShipId(), Design.LightFreighter, player.Id, meridian.Id, createdTick: 0);
             context.Add(ship);
             player.AddShip(ship.Id);
             context.PlayerActorId = player.Id;
@@ -174,6 +212,42 @@ public static class WorldGenerator
         loc.AddResident(actor.Id);
     }
 
+    /// <summary>What a factory keeps above its parts' cost as its margin (design §5.2).</summary>
+    public const decimal FactoryMargin = 0.25m;
+
+    private static void AddFactory(SimulationContext context, Location loc, string name, DeterministicRandom rng, params PartRecipe[] recipes)
+    {
+        var profile = new FactoryProfile(Grade.A, recipes, FactoryMargin);
+        var actor = new ActorState(context.NextActorId(), name, ActorRole.Factory, loc.Id, RandomPersonality(rng), context.Config.FactoryReserve)
+        {
+            Factory = profile,
+        };
+        context.Add(actor);
+
+        // It starts with one of each part it makes, and half its inputs: counted as produced, so the goods ledger balances.
+        foreach (PartRecipe recipe in recipes)
+        {
+            context.Produce(actor, ShipPart.GoodOf(recipe.Kind, profile.Quality), 1m);
+        }
+
+        foreach (GoodType input in profile.Inputs)
+        {
+            context.Produce(actor, input, System.Math.Floor(profile.InputTarget(input) * 0.5m));
+        }
+
+        loc.AddResident(actor.Id);
+    }
+
+    private static void AddYard(SimulationContext context, Location loc, string name, DeterministicRandom rng, YardProfile profile)
+    {
+        var actor = new ActorState(context.NextActorId(), name, ActorRole.Shipyard, loc.Id, RandomPersonality(rng), context.Config.YardReserve)
+        {
+            Yard = profile,
+        };
+        context.Add(actor);
+        loc.AddResident(actor.Id);
+    }
+
     private static void AddConsumer(
         SimulationContext context, Location loc, string name, decimal income, DeterministicRandom rng,
         params (GoodType Good, decimal Rate, decimal Target)[] demands)
@@ -204,12 +278,12 @@ public static class WorldGenerator
 
     private static void AddHauler(
         SimulationContext context, string name, ActorRole role, LocationId home, Credits credits, DeterministicRandom rng,
-        params (ShipType Type, LocationId At)[] ships)
+        params (Design Type, LocationId At)[] ships)
     {
         var actor = new ActorState(context.NextActorId(), name, role, home, RandomPersonality(rng), credits);
         context.Add(actor);
         context.Location(home).AddResident(actor.Id);
-        foreach ((ShipType type, LocationId at) in ships)
+        foreach ((Design type, LocationId at) in ships)
         {
             var ship = new Ship(context.NextShipId(), type, actor.Id, at, createdTick: 0);
             context.Add(ship);

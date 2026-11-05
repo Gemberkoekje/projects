@@ -8,8 +8,11 @@ public enum DecisionKind
     /// <summary>The counterparty is in default: cancel (escrow back, its bond taken) or keep waiting.</summary>
     CancelForDefault,
 
-    /// <summary>Goods handed over below the warranty's floor: accept them with the refund, or reject them.</summary>
+    /// <summary>Goods handed over below the warranty's floor, or a ship built outside the Build's policy: accept with the refund, or reject.</summary>
     Inspection,
+
+    /// <summary>A yard can't get a part for a Build in time (design §3.4): more time, a substitute, or the refund.</summary>
+    SupplyFailure,
 }
 
 /// <summary>An answer to a decision.</summary>
@@ -26,6 +29,15 @@ public enum DecisionChoice
 
     /// <summary>Reject the goods: they stay the seller's, and the sale fails.</summary>
     Reject,
+
+    /// <summary>A supply failure: wait longer, with compensation.</summary>
+    Extend,
+
+    /// <summary>A supply failure: take a part a grade lower, at a discount, sooner.</summary>
+    Substitute,
+
+    /// <summary>A supply failure: cancel, with the deposit and escrow back and compensation.</summary>
+    TakeRefund,
 }
 
 /// <summary>
@@ -37,9 +49,12 @@ public enum DecisionChoice
 public sealed record PlayerDecision(DecisionKind Kind, ContractId Contract, long RaisedTick, long Entry, decimal Quantity = 0m, decimal Quality = 1m)
 {
     /// <summary>The choices it offers, in the order the interface shows them.</summary>
-    public DecisionChoice[] Choices => Kind == DecisionKind.CancelForDefault
-        ? new[] { DecisionChoice.Cancel, DecisionChoice.Wait }
-        : new[] { DecisionChoice.Accept, DecisionChoice.Reject };
+    public DecisionChoice[] Choices => Kind switch
+    {
+        DecisionKind.CancelForDefault => new[] { DecisionChoice.Cancel, DecisionChoice.Wait },
+        DecisionKind.SupplyFailure => new[] { DecisionChoice.Extend, DecisionChoice.Substitute, DecisionChoice.TakeRefund },
+        _ => new[] { DecisionChoice.Accept, DecisionChoice.Reject },
+    };
 }
 
 /// <summary>
@@ -83,4 +98,13 @@ public enum FailureKind
 
     /// <summary>Nobody took a post before its deadline.</summary>
     Expired,
+
+    /// <summary>A yard couldn't get a part in time and proposed remedies (design §3.4).</summary>
+    SupplyFailure,
+
+    /// <summary>A ship handed over with parts below the grade ordered, priced down by the Build's policy.</summary>
+    Substituted,
+
+    /// <summary>A Build cancelled by agreement after a supply-failure proposal: refund and compensation.</summary>
+    CancelledOnSupplyFailure,
 }

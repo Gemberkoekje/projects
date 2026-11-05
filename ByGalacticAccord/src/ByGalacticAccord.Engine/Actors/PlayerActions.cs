@@ -30,12 +30,17 @@ public enum DealBlock
     RoundsRanOut,
 }
 
-/// <summary>What the player posts (design §3.6): a wanted Sale delivered into its storage, a lot of its stored goods, or a haul of them.</summary>
+/// <summary>
+/// What the player posts (design §3.6): a wanted Sale delivered into its storage, a lot of its stored goods, or a haul of them;
+/// a Build for a ship (design §6.3); or one of its ships for sale.
+/// </summary>
 public enum PostKind
 {
     Wanted,
     Lot,
     Haul,
+    Build,
+    Ship,
 }
 
 /// <summary>Why the player can't post a contract as drafted. The interface words each one (design §11.5).</summary>
@@ -50,6 +55,9 @@ public enum PostBlock
     SamePlace,
     NoRoute,
     CannotAfford,
+
+    /// <summary>A Build with no parts named, or a ship for sale that isn't the player's, free and empty.</summary>
+    NoShip,
 }
 
 /// <summary>
@@ -57,7 +65,9 @@ public enum PostBlock
 /// <see cref="Destination"/>), its first offer (price, deadline, package and late fee), and where else to show it, for a fee
 /// (<see cref="ShowAt"/>, design §7.1, D38).
 /// </summary>
-public sealed record PostDraft(PostKind Kind, GoodType Good, decimal Quantity, LocationId Place, LocationId? Destination, Offer Offer, IReadOnlyList<LocationId>? ShowAt = null)
+public sealed record PostDraft(
+    PostKind Kind, GoodType Good, decimal Quantity, LocationId Place, LocationId? Destination, Offer Offer, IReadOnlyList<LocationId>? ShowAt = null,
+    ShipParts? Spec = null, ShipId? Ship = null)
 {
     /// <summary>The post's places: a Sale's place, or a haul's origin and destination.</summary>
     public IReadOnlyList<LocationId> Places => Destination is { } to && Kind == PostKind.Haul ? new[] { Place, to } : new[] { Place };
@@ -94,6 +104,9 @@ public static class PlayerActions
 {
     /// <summary>The longest a post may run: thirty days.</summary>
     public const long LongestPost = 30 * 24;
+
+    /// <summary>The longest a Build may run: ninety days (design §17: a custom build takes two to four weeks).</summary>
+    public const long LongestBuild = 90 * 24;
 
     /// <summary>Whether the player can take a haul, and with which ship from where.</summary>
     public sealed record HaulFeasibility(DealBlock Block, Ship? Ship)
@@ -205,8 +218,8 @@ public static class PlayerActions
                 continue;
             }
 
-            long hours = PriceModel.TravelTicks(repo.DistanceTicks, ship.Class.SpeedMultiplier) + PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier);
-            decimal cost = source.PurchasePrice.Amount + (ship.Class.RunningCostPerTick.Amount * hours);
+            long hours = PriceModel.TravelTicks(repo.DistanceTicks, ship.Stats.Speed) + PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed);
+            decimal cost = source.PurchasePrice.Amount + (ship.Stats.RunningCostPerTick.Amount * hours);
             if (cost < bestCost)
             {
                 best = source;
@@ -402,20 +415,36 @@ public static class PlayerActions
             return PostBlock.BadPrice;
         }
 
-        if (offer.Deadline <= context.CurrentTick || offer.Deadline > context.CurrentTick + LongestPost)
+        long longest = draft.Kind == PostKind.Build ? LongestBuild : LongestPost;
+        if (offer.Deadline <= context.CurrentTick || offer.Deadline > context.CurrentTick + longest)
         {
             return PostBlock.BadDeadline;
-        }
-
-        if (context.StationOperatorAt(draft.Place) is null)
-        {
-            return PostBlock.NoStation;
         }
 
         decimal showing = draft.ShowFee(context).Amount;
         if (player.Credits.Amount < showing)
         {
             return PostBlock.CannotAfford;
+        }
+
+        if (draft.Kind == PostKind.Build)
+        {
+            // Yards are in Accord space: the client must be able to pay the deposit, and lock the balance and the tax, when one signs.
+            return draft.Spec is null ? PostBlock.NoShip
+                : player.Credits.Amount - showing < offer.Price.Amount * (1m + context.Config.TaxRate) ? PostBlock.CannotAfford : PostBlock.None;
+        }
+
+        if (draft.Kind == PostKind.Ship)
+        {
+            return draft.Ship is { } id && context.Ships.TryGetValue(id, out Ship? ship) && ship.Owner == player.Id && ship.IsFree && ship.HoldQuantity <= 0m
+                   && ship.Location == draft.Place && player.Ships.Count > 1
+                ? PostBlock.None
+                : PostBlock.NoShip;
+        }
+
+        if (context.StationOperatorAt(draft.Place) is null)
+        {
+            return PostBlock.NoStation;
         }
 
         if (draft.Kind == PostKind.Wanted)
@@ -468,6 +497,9 @@ public static class PlayerActions
             PostKind.Lot => Market.PostSale(
                 context, player, SaleSide.ForSale, draft.Good, draft.Quantity, draft.Place, offer.Price, offer.Price, offer.Deadline,
                 Holding.StorageAt(draft.Place), offer.Package, offer.LateFeeScale),
+            PostKind.Build => Market.PostBuild(
+                context, player, draft.Spec!, draft.Place, offer.Price, offer.Price, offer.Deadline, offer.Package, offer.LateFeeScale),
+            PostKind.Ship => Market.PostShipSale(context, player, context.Ship(draft.Ship!.Value), offer.Price, offer.Price, offer.Deadline),
             _ => Market.PostHaul(
                 context, player, draft.Good, draft.Quantity, Holding.StorageAt(draft.Place), draft.Destination!.Value, offer.Price, offer.Price,
                 offer.Deadline, serves: null, offer.Package, cause: null, offer.LateFeeScale),
@@ -553,6 +585,7 @@ public static class PlayerActions
         {
             SaleContract { Side: SaleSide.Wanted } when !Market.CanFund(contract, player, offer.Price) || player.Credits.Amount < offer.Price.Amount * (1m + contract.TaxRate) =>
                 DealBlock.CannotAfford,
+            BuildContract when player.Credits.Amount < offer.Price.Amount * (1m + context.Config.TaxRate) => DealBlock.CannotAfford,
             HaulContract haul when !Market.CanFundHaul(context, player, haul.Origin, haul.Destination, offer.Price) => DealBlock.CannotAfford,
             _ => DealBlock.None,
         };
@@ -596,6 +629,8 @@ public static class PlayerActions
                 return Market.SignAgreed(wanted, offer, () => Market.FillWithShip(context, player, wanted, offer.Price, check.Ship!, check.Source!));
             case SaleContract { Side: SaleSide.ForSale } lot when CheckBuy(context, player, lot) is { Ok: true } check:
                 return Market.SignAgreed(lot, offer, () => Market.BuyLot(context, player, lot, offer.Price, Holding.Aboard(check.Ship!.Id, lot.Place)));
+            case ShipSaleContract sale when CheckBuyShip(context, player, sale, offer.Price) == DealBlock.None:
+                return Market.SignAgreed(sale, offer, () => Market.BuyShip(context, player, sale, offer.Price));
             default:
                 return Signing.CannotPerform;
         }
@@ -607,8 +642,27 @@ public static class PlayerActions
         HaulContract haul => CheckHaul(context, player, haul).Block,
         SaleContract { Side: SaleSide.Wanted } wanted => CheckFill(context, player, wanted).Block,
         SaleContract lot => CheckBuy(context, player, lot).Block,
+        ShipSaleContract sale => CheckBuyShip(context, player, sale, sale.OfferedPrice),
         _ => DealBlock.NotOpen,
     };
+
+    /// <summary>
+    /// Can the player buy a ship for sale at <paramref name="price"/> (design §6.3: stock or second-hand)? It must believe it open,
+    /// and be able to pay the price and its tax: into escrow in Accord space, at handover on the frontier, where nothing is held.
+    /// </summary>
+    public static DealBlock CheckBuyShip(SimulationContext context, ActorState player, ShipSaleContract sale, Credits price)
+    {
+        if (!Believed(context, player, sale) || sale.Seller == player.Id)
+        {
+            return DealBlock.NotOpen;
+        }
+
+        return player.Credits.Amount < price.Amount * (1m + sale.TaxRate) ? DealBlock.CannotAfford : DealBlock.None;
+    }
+
+    /// <summary>Buy a ship for sale as posted: the ship is the player's where it is docked.</summary>
+    public static Signing BuyShip(SimulationContext context, ActorState player, ShipSaleContract sale) =>
+        CheckBuyShip(context, player, sale, sale.OfferedPrice) == DealBlock.None ? Market.BuyShip(context, player, sale, sale.OfferedPrice) : Signing.NotOpen;
 
     /// <summary>Walk away from a signed contract and pay the break fee.</summary>
     public static bool CancelAtWill(SimulationContext context, ActorState player, Contract contract) =>
@@ -625,6 +679,7 @@ public static class PlayerActions
     public static bool Decide(SimulationContext context, ActorState player, PlayerDecision decision, DecisionChoice choice)
     {
         if (!decision.Choices.Contains(choice) || context.Contract(decision.Contract) is not { Status: ContractStatus.Active } contract
+            || (choice == DecisionChoice.Substitute && contract is BuildContract { Proposal.SubstituteDiscount.Amount: <= 0m })
             || !context.ResolvePlayerDecision(decision))
         {
             return false;
@@ -635,11 +690,26 @@ public static class PlayerActions
             case DecisionChoice.Cancel:
                 Market.CancelForDefault(context, contract, player);
                 break;
+            case DecisionChoice.Accept when contract is BuildContract { Ship: { } built } build:
+                Settlement.HandOverBuild(context, build, context.Ship(built), accepted: true);
+                break;
+            case DecisionChoice.Reject when contract is BuildContract { Ship: { } built } build:
+                Settlement.HandOverBuild(context, build, context.Ship(built), accepted: false);
+                break;
             case DecisionChoice.Accept:
                 Settlement.HandOverReserved(context, (SaleContract)contract, inspected: decision.Quality);
                 break;
             case DecisionChoice.Reject:
                 Settlement.Fail(context, contract, FailureReason.Rejected, decision.Quantity, decision.Quality);
+                break;
+            case DecisionChoice.Extend:
+                Market.ChooseRemedy(context, player, (BuildContract)contract, Remedy.Extend);
+                break;
+            case DecisionChoice.Substitute:
+                Market.ChooseRemedy(context, player, (BuildContract)contract, Remedy.Substitute);
+                break;
+            case DecisionChoice.TakeRefund:
+                Market.ChooseRemedy(context, player, (BuildContract)contract, Remedy.Cancel);
                 break;
             case DecisionChoice.Wait:
             default:

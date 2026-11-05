@@ -106,7 +106,7 @@ public sealed class InformationTests
         SimulationContext context = TestWorld.Quiet();
         ActorState kael = context.Actor("Dust Runner Kael");
         ActorState farm = context.Actor("Verdant Agricombine");
-        Credits seen = kael.Knowledge.Stored(farm.Id)!.Value.Ask; // what everyone knew at the start; Verdant is far from the Rust Belt
+        Credits seen = kael.Knowledge.Stored(farm.Id, GoodType.Food)!.Value.Ask; // what everyone knew at the start; Verdant is far from the Rust Belt
         context.Consume(farm, GoodType.Food, 43m); // the farm's ask rises about 5%
         Credits actual = DecisionEngine.Ask(farm);
         Assert.InRange(actual.Amount / seen.Amount, 1.03m, 1.07m);

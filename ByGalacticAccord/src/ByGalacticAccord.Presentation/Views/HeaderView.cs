@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using ByGalacticAccord.Engine.Actors;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Simulation;
 using ByGalacticAccord.Presentation.Session;
@@ -59,8 +60,8 @@ public static class HeaderView
 
         // What of the player's own money escrow holds: its payments where it pays, its bond where it performs.
         decimal escrow = session.PlayerActiveContracts.Sum(c => c.Payer == session.Player.Id ? c.EscrowHeld.Amount - c.LockedBond.Amount : c.LockedBond.Amount);
-        decimal runningPerDay = session.Player.Ships.Sum(id => context.Ship(id).Class.RunningCostPerTick.Amount) * GameTime.HoursPerDay;
-        string shipClass = Templates.ShipClass(ship.Type);
+        decimal runningPerDay = session.Player.Ships.Sum(id => DecisionEngine.RunningCost(context.Ship(id))) * GameTime.HoursPerDay;
+        string shipClass = Templates.ShipName(ship);
 
         var alerts = new List<string>();
         foreach (JournalEntry alert in session.Alerts)
@@ -82,7 +83,7 @@ public static class HeaderView
             Templates.Get("Header.Escrow.Tip"),
             Templates.Get("Header.Running"),
             Templates.Fill("PerDay", ("amount", Format.Money(-runningPerDay))),
-            Templates.Fill("Header.Running.Tip", ("shipClass", shipClass), ("rate", Format.MoneyCents(ship.Class.RunningCostPerTick))),
+            Templates.Fill("Header.Running.Tip", ("shipClass", shipClass), ("rate", Format.MoneyCents(ship.Stats.RunningCostPerTick))),
             Fleet(session, ship, shipClass),
             Templates.Get("Alert.Title"),
             alerts,

@@ -29,8 +29,37 @@ public enum PickupSource
     Aboard,
 }
 
-/// <summary>One line in a ship's life story. "Every object tells a story" (§1.1, §5.7).</summary>
-public sealed record ShipLogEntry(long Tick, string Text);
+/// <summary>What a line of a ship's history records (design §6.4).</summary>
+public enum ShipEventKind
+{
+    /// <summary>Built (or, for a ship the sector began with, first registered): by whom, where, and from which parts.</summary>
+    Commissioned,
+
+    /// <summary>Sold, or handed over to the client that ordered it: from whom to whom, at what price, under which contract.</summary>
+    ChangedHands,
+
+    /// <summary>A transit incident on a run, and what kind.</summary>
+    Incident,
+
+    /// <summary>Broken up by a salvage yard that couldn't sell it: it leaves the sector.</summary>
+    Scrapped,
+}
+
+/// <summary>
+/// One line of a ship's history (design §6.4: where it was built, from which parts at which grades, what was substituted,
+/// its owners, incidents, and the contracts it flew). Data, not prose: the interface words it (design §11.5).
+/// <see cref="Wanted"/> is what the build ordered, so a substitution reads as the difference from the parts fitted.
+/// </summary>
+public sealed record ShipRecord(
+    long Tick,
+    ShipEventKind Kind,
+    ActorId? From = null,
+    ActorId? To = null,
+    ContractId? Contract = null,
+    Credits Price = default,
+    LocationId? At = null,
+    ShipParts? Wanted = null,
+    Simulation.TransitIncidentKind? Incident = null);
 
 /// <summary>
 /// The leg a ship is flying: the locations it passes, origin to destination, and when it left and is due.
@@ -64,50 +93,94 @@ public sealed record ShipJob(
     ContractId? Purchase = null,
     ContractId? Delivery = null)
 {
-    /// <summary>The contract the job is mainly for: the haul it flies, else the sale it delivers, else the one it collects.</summary>
-    public ContractId Main => Haul ?? Delivery ?? Purchase
-        ?? throw new System.InvalidOperationException("A ship job serves no contract.");
+    /// <summary>The contract the job is mainly for: the haul it flies, else the sale it delivers, else the one it collects; none for a ferry.</summary>
+    public ContractId Main => Haul ?? Delivery ?? Purchase ?? default;
+
+    /// <summary>A ferry: the ship flies empty to <see cref="Pickup"/> for its owner, under no contract (a ship it bought going home).</summary>
+    public bool IsFerry => Haul is null && Delivery is null && Purchase is null;
 
     public bool Serves(ContractId contract) => Haul == contract || Purchase == contract || Delivery == contract;
 }
 
 /// <summary>
-/// A ship aggregate. Long-running, with an event-log history surfaced by the Ship Sheet (§5.7). Its hold
-/// carries lots of goods, each with its owner: a carrier's hold holds the shipper's goods.
+/// A ship aggregate (design §6): built from parts (<see cref="Parts"/>), its stats always computed from them
+/// (<see cref="Stats"/>), with a history (design §6.4). Its hold carries lots of goods, each with its owner: a carrier's hold
+/// holds the shipper's goods.
 /// </summary>
 public sealed class Ship
 {
-    private readonly List<ShipLogEntry> _log = new();
-    private readonly List<Lot> _hold = new();
+    private const int BusyKept = 64;
+    private const int FlownKept = 12;
 
-    public Ship(ShipId id, ShipType type, ActorId owner, LocationId location, long createdTick)
+    private readonly List<ShipRecord> _history = new();
+    private readonly List<ContractId> _flown = new();
+    private readonly List<Lot> _hold = new();
+    private readonly List<(long From, long To)> _busy = new();
+    private long? _busySince;
+
+    /// <summary>
+    /// A ship of <paramref name="parts"/>, commissioned now for <paramref name="owner"/> at <paramref name="location"/>: built by
+    /// <paramref name="builtBy"/> under <paramref name="build"/>, which ordered <paramref name="wanted"/>; for a ship the sector
+    /// begins with, nobody.
+    /// </summary>
+    public Ship(ShipId id, ShipParts parts, ActorId owner, LocationId location, long createdTick, ActorId? builtBy = null, ContractId? build = null, ShipParts? wanted = null)
     {
         Id = id;
-        Type = type;
+        Parts = parts;
+        Stats = ShipStats.From(parts);
         Owner = owner;
         Location = location;
         Status = ShipStatus.Docked;
-        ShipClassInfo info = ShipClasses.Info(type);
-        CargoCapacity = info.CargoCapacity;
-        Log(createdTick, $"Commissioned: {info.Name}, cargo capacity {CargoCapacity:0}.");
+        BuiltTick = createdTick;
+        BuiltBy = builtBy;
+        BuiltAt = location;
+        FreeSince = createdTick;
+        OwnedSince = createdTick;
+        _history.Add(new ShipRecord(createdTick, ShipEventKind.Commissioned, builtBy, owner, build, At: location, Wanted: wanted ?? parts));
+    }
+
+    /// <summary>A ship of a standard design, every part at <paramref name="grade"/>.</summary>
+    public Ship(ShipId id, Design design, ActorId owner, LocationId location, long createdTick, Grade grade = Grade.A)
+        : this(id, Designs.Parts(design, grade), owner, location, createdTick)
+    {
     }
 
     public ShipId Id { get; }
 
-    public ShipType Type { get; }
+    /// <summary>What it is built from (design §6.1).</summary>
+    public ShipParts Parts { get; }
+
+    /// <summary>Its stats, from its parts.</summary>
+    public ShipStats Stats { get; }
+
+    /// <summary>The standard design its parts make, whatever their grades; null for a custom build.</summary>
+    public Design? Design => Parts.Design;
+
+    /// <summary>Who built it (a yard), and where and when; nobody for a ship the sector began with.</summary>
+    public ActorId? BuiltBy { get; }
+
+    public LocationId BuiltAt { get; }
+
+    public long BuiltTick { get; }
 
     public ActorId Owner { get; private set; }
+
+    /// <summary>Since when its owner has had it: built, or bought.</summary>
+    public long OwnedSince { get; private set; }
 
     /// <summary>Where the ship is, or last was: it changes when it loads at a pickup and when it arrives.</summary>
     public LocationId Location { get; private set; }
 
     public ShipStatus Status { get; private set; }
 
-    /// <summary>Effective capacity. Equals class capacity in slice 0; mutable so Slice 2 repairs can shave it.</summary>
-    public decimal CargoCapacity { get; private set; }
+    /// <summary>Its cargo capacity, from its parts.</summary>
+    public decimal CargoCapacity => Stats.CargoCapacity;
 
     /// <summary>What the ship is committed to, if anything.</summary>
     public ShipJob? Job { get; private set; }
+
+    /// <summary>The ship Sale it is posted for, if its owner has it up for sale: it takes no work meanwhile.</summary>
+    public ContractId? ListedFor { get; private set; }
 
     /// <summary>The goods aboard, by owner and good, each with its quality as last read.</summary>
     public IReadOnlyList<Lot> Hold => _hold;
@@ -122,19 +195,56 @@ public sealed class Ship
     /// <summary>The leg the ship is flying, empty or laden; null while it sits at <see cref="Location"/>.</summary>
     public ShipCourse? Course { get; private set; }
 
-    public ShipClassInfo Class => ShipClasses.Info(Type);
-
     /// <summary>How much this hold slows perishable decay: 0 for a standard hold.</summary>
-    public decimal Preservation => Class.Preservation;
+    public decimal Preservation => Stats.Preservation;
 
-    public IReadOnlyList<ShipLogEntry> History => _log;
+    /// <summary>Its history, oldest first (design §6.4).</summary>
+    public IReadOnlyList<ShipRecord> History => _history;
 
-    public bool IsFree => Status == ShipStatus.Docked && Job is null;
+    /// <summary>How many contracts it has flown, and the last few, oldest first.</summary>
+    public int ContractsFlown { get; private set; }
 
-    public void Log(long tick, string text) => _log.Add(new ShipLogEntry(tick, text));
+    public IReadOnlyList<ContractId> RecentlyFlown => _flown;
+
+    /// <summary>Since when it has sat free (or since it was built); meaningless while it has a job.</summary>
+    public long FreeSince { get; private set; }
+
+    public bool IsFree => Status == ShipStatus.Docked && Job is null && ListedFor is null && !Scrapped;
+
+    /// <summary>Whether it has been broken up: it is kept for the record, but belongs to no fleet.</summary>
+    public bool Scrapped { get; private set; }
 
     /// <summary>The lot of <paramref name="good"/> that <paramref name="owner"/> has aboard, if any.</summary>
     public Lot? LotOf(ActorId owner, GoodType good) => _hold.FirstOrDefault(l => l.Owner == owner && l.Good == good);
+
+    /// <summary>
+    /// The share of the last <paramref name="window"/> hours (or of its life, if younger) it spent on jobs: what its owner
+    /// judges whether it needs another ship, or one fewer, by.
+    /// </summary>
+    public decimal Utilization(long now, long window)
+    {
+        long from = System.Math.Max(BuiltTick, now - window);
+        long span = now - from;
+        if (span <= 0)
+        {
+            return _busySince is not null ? 1m : 0m;
+        }
+
+        long busy = 0;
+        foreach ((long start, long end) in _busy)
+        {
+            busy += System.Math.Max(0, System.Math.Min(end, now) - System.Math.Max(start, from));
+        }
+
+        if (_busySince is { } since)
+        {
+            busy += System.Math.Max(0, now - System.Math.Max(since, from));
+        }
+
+        return System.Math.Clamp((decimal)busy / span, 0m, 1m);
+    }
+
+    internal void Record(ShipRecord record) => _history.Add(record);
 
     /// <summary>
     /// Commit the ship to a job before it physically departs, so a heartbeat won't double-book it.
@@ -145,7 +255,7 @@ public sealed class Ship
         Status = ShipStatus.InTransit;
         Job = job;
         Course = reposition;
-        Log(tick, $"Committed to contract {job.Main}.");
+        _busySince ??= tick;
     }
 
     /// <summary>At the pickup, where any empty leg ended.</summary>
@@ -168,10 +278,7 @@ public sealed class Ship
             Lot current = _hold[index].At(tick, Preservation);
             _hold[index] = current with { Cargo = current.Cargo.Merged(cargo) };
         }
-
-        Log(tick, $"Loaded {cargo.Quantity:0} {cargo.Good} at {Location}.");
     }
-
     /// <summary>Take up to <paramref name="quantity"/> of an owner's good out of the hold, as it stands now.</summary>
     public Cargo Unload(long tick, ActorId owner, GoodType good, decimal quantity)
     {
@@ -221,7 +328,6 @@ public sealed class Ship
     {
         DepartedTick = tick;
         Course = course;
-        Log(tick, $"Departed {Location} for {course.To}.");
     }
 
     /// <summary>An incident's delay pushes the arrival back.</summary>
@@ -237,21 +343,53 @@ public sealed class Ship
     {
         Location = destination;
         Course = null;
-        Log(tick, $"Arrived {destination}.");
     }
 
     /// <summary>The job is done or has failed: the ship is free where it is.</summary>
     public void FinishJob(long tick)
     {
+        if (Job is { IsFerry: false } job)
+        {
+            ContractsFlown++;
+            _flown.Add(job.Main);
+            if (_flown.Count > FlownKept)
+            {
+                _flown.RemoveAt(0);
+            }
+        }
+
         Job = null;
         Course = null;
         Status = ShipStatus.Docked;
-        Log(tick, "Free.");
+        FreeSince = tick;
+        if (_busySince is { } since)
+        {
+            _busy.Add((since, tick));
+            if (_busy.Count > BusyKept)
+            {
+                _busy.RemoveAt(0);
+            }
+
+            _busySince = null;
+        }
     }
 
-    public void TransferOwnership(long tick, ActorId newOwner)
+    internal void List(ContractId? sale) => ListedFor = sale;
+
+    internal void Scrap(long tick)
     {
+        _history.Add(new ShipRecord(tick, ShipEventKind.Scrapped, Owner, At: Location));
+        Scrapped = true;
+        ListedFor = null;
+    }
+
+    /// <summary>The ship changes hands (design §6.4): sold, or handed over to the client that ordered it.</summary>
+    internal void TransferOwnership(long tick, ActorId newOwner, Credits price, ContractId? contract)
+    {
+        _history.Add(new ShipRecord(tick, ShipEventKind.ChangedHands, Owner, newOwner, contract, price, Location));
         Owner = newOwner;
-        Log(tick, $"Ownership transferred to {newOwner}.");
+        ListedFor = null;
+        FreeSince = tick;
+        OwnedSince = tick;
     }
 }

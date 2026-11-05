@@ -157,6 +157,30 @@ public sealed record IncidentEntry(long Tick, ContractId Contract, ActorId Haule
 public sealed record FaucetAdjustedEntry(long Tick, decimal Drift, decimal Multiplier)
     : JournalEntry(Tick);
 
+/// <summary>A yard finished a ship under a Build (design §6.3): built from parts at their grades, ready to hand over.</summary>
+public sealed record ShipBuiltEntry(long Tick, ContractId Contract, ActorId Yard, ShipId Ship)
+    : JournalEntry(Tick), IContractEntry;
+
+/// <summary>A yard finished a ship on spec for its lot (design §15.5): nobody ordered it; it goes up for sale.</summary>
+public sealed record StockShipBuiltEntry(long Tick, ActorId Yard, ShipId Ship)
+    : JournalEntry(Tick);
+
+/// <summary>A salvage yard broke up a ship it couldn't sell (design §15.5): it leaves the sector.</summary>
+public sealed record ShipScrappedEntry(long Tick, ActorId Owner, ShipId Ship)
+    : JournalEntry(Tick);
+
+/// <summary>A ship changed hands under a contract: a Build handed over (late, or below spec at a discount), or a ship Sale.</summary>
+public sealed record ShipHandedOverEntry(long Tick, ContractId Contract, ActorId Seller, ActorId Buyer, ShipId Ship, long TicksLate, Credits Price, Credits LateFee, Credits Discount)
+    : JournalEntry(Tick), IContractEntry;
+
+/// <summary>A yard can't get a part in time for a Build and invokes its supply-failure term (design §3.4): it proposes remedies.</summary>
+public sealed record SupplyFailureEntry(long Tick, ContractId Contract, ActorId Yard, ContractId FailedOrder, PartSlot Slot)
+    : JournalEntry(Tick), IContractEntry;
+
+/// <summary>The client chose a remedy from a yard's supply-failure proposal.</summary>
+public sealed record RemedyChosenEntry(long Tick, ContractId Contract, ActorId By, Remedy Remedy)
+    : JournalEntry(Tick), IContractEntry;
+
 /// <summary>
 /// The append-only record of what happened. In memory, capped so long soak runs stay bounded: a ring of the last
 /// <c>cap</c> entries, oldest first. The interface reads its tail as the event log.

@@ -99,7 +99,7 @@ public sealed class ShipCourseTests
     public void A_delay_pushes_back_the_arrival_and_nothing_else()
     {
         var path = new[] { new LocationId(1), new LocationId(2), new LocationId(3) };
-        var ship = new Ship(new ShipId(1), ShipType.LightFreighter, new ActorId(1), path[0], createdTick: 0);
+        var ship = new Ship(new ShipId(1), Design.LightFreighter, new ActorId(1), path[0], createdTick: 0);
         var job = new ShipJob(new ActorId(1), GoodType.Ore, 10m, path[0], PickupSource.Aboard, path[2], Delivery: new ContractId(1));
         ship.Reserve(0, job, reposition: null);
         ship.Load(0, new ActorId(1), Cargo.Fresh(GoodType.Ore, 10m));

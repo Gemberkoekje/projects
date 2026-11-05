@@ -56,6 +56,7 @@ public static partial class DecisionEngine
         }
 
         SellOff(context, trader);
+        ManageFleet(context, trader);
     }
 
     /// <summary>
@@ -87,7 +88,7 @@ public static partial class DecisionEngine
 
         foreach (ActorState producer in context.ProducersOf(wanted.Good))
         {
-            if (producer.Id != seller.Id && !producer.IsPlayer && Knowledge.KnownAsk(context, seller, producer, wanted.Quantity, sight) is { } ask
+            if (producer.Id != seller.Id && !producer.IsPlayer && Knowledge.KnownAsk(context, seller, producer, wanted.Good, wanted.Quantity, sight) is { } ask
                 && context.FindPath(producer.Home, wanted.Place) is not null)
             {
                 yield return FillSource.FromProducer(producer, Credits.Of(Math.Round(ask.Amount * wanted.Quantity, 2)));
@@ -163,9 +164,9 @@ public static partial class DecisionEngine
             return null;
         }
 
-        ShipClassInfo cls = ship.Class;
-        long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.SpeedMultiplier);
-        long ladenTicks = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.SpeedMultiplier));
+        ShipStats cls = ship.Stats;
+        long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.Speed);
+        long ladenTicks = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.Speed));
         decimal running = cls.RunningCostPerTick.Amount * (repoTicks + ladenTicks);
         decimal pilotMin = PriceModel.PilotMinimumFee(cls, laden.DistanceTicks, laden.MaxDanger, trader.Personality).Amount
                            + (cls.RunningCostPerTick.Amount * repoTicks);
@@ -219,10 +220,10 @@ public static partial class DecisionEngine
             return null;
         }
 
-        ShipClassInfo cls = ship.Class;
+        ShipStats cls = ship.Stats;
         ContractTerms terms = TermsOn(wanted, offer);
-        long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.SpeedMultiplier);
-        long ladenTicks = pickup == wanted.Place ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.SpeedMultiplier));
+        long repoTicks = PriceModel.TravelTicks(repo.DistanceTicks, cls.Speed);
+        long ladenTicks = pickup == wanted.Place ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, cls.Speed));
         long arrival = context.CurrentTick + repoTicks + ladenTicks;
         if (arrival > offer.Deadline + terms.GraceHours)
         {
@@ -275,7 +276,7 @@ public static partial class DecisionEngine
     /// </summary>
     private static decimal TermsRisk(SimulationContext context, ActorState trader, bool usesEscrow, ContractTerms terms, decimal price, Ship ship, RoutePlan laden)
     {
-        decimal odds = Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Class.IncidentChanceModifier, 0m, 1m);
+        decimal odds = Math.Clamp(context.Config.IncidentProbabilityScale * laden.MaxDanger * ship.Stats.IncidentChance, 0m, 1m);
         decimal bond = usesEscrow ? Math.Min(terms.Bond.Amount, Math.Max(0m, trader.Credits.Amount)) : 0m;
         decimal partial = terms.Partial == PartialDelivery.Failure
             ? price + bond

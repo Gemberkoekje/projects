@@ -54,6 +54,18 @@ public static class NewsText
                 facts.Add(("seller", Name(sale.Seller)));
                 facts.Add(("buyer", Name(sale.Buyer)));
                 break;
+            case BuildContract build:
+                facts.Add(("ship", Templates.ShipName(build.Spec)));
+                facts.Add(("place", context.Location(build.Yard ?? build.Place).Name));
+                facts.Add(("yard", Name(build.Builder)));
+                facts.Add(("client", Name(build.Client)));
+                break;
+            case ShipSaleContract shipSale:
+                facts.Add(("ship", Templates.ShipName(context.Ship(shipSale.Ship))));
+                facts.Add(("place", context.Location(shipSale.Place).Name));
+                facts.Add(("seller", Name(shipSale.Seller)));
+                facts.Add(("buyer", Name(shipSale.Buyer)));
+                break;
             case HaulContract haul:
                 facts.Add(("quantity", Format.Quantity(haul.Quantity)));
                 facts.Add(("good", Templates.Good(haul.Good)));

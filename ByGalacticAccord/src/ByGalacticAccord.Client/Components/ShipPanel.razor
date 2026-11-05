@@ -1,0 +1,81 @@
+@* The ship sheet (design §6.1, §6.4, §11.3): what it is and where, its parts with their grades, every stat with the parts that
+   make it, where it was built and what was substituted, and its history. Beside the map, like the contract. *@
+<section class="panel ship-panel" data-testid="ship-sheet">
+    <div class="panel-head">
+        <h2 class="caps">@Model.Title</h2>
+        <button type="button" class="button small" @onclick="OnClose">@Model.CloseLabel</button>
+    </div>
+    <p class="small muted">@Model.Sub</p>
+    <p class="small">@Model.Where</p>
+
+    <div class="block" data-testid="ship-parts">
+        <h3 class="block-title">@Model.PartsTitle</h3>
+        @foreach (InfoLine part in Model.Parts)
+        {
+            <div class="line" title="@part.Note">
+                <span class="small">@part.Label</span>
+                <span class="small tone-@part.Tone">@part.Value</span>
+            </div>
+        }
+    </div>
+
+    <div class="block" data-testid="ship-stats">
+        <h3 class="block-title">@Model.StatsTitle</h3>
+        @foreach (StatLine stat in Model.Stats)
+        {
+            <div class="line">
+                <span class="small">@stat.Label</span>
+                <span class="mono small">@stat.Value</span>
+            </div>
+            <p class="xsmall muted stat-why">@stat.Explanation</p>
+        }
+    </div>
+
+    <p class="small">@Model.Built</p>
+    @if (Model.Substituted is not null)
+    {
+        <p class="small tone-Warn" data-testid="ship-substituted">@Model.Substituted</p>
+    }
+
+    <div class="block" data-testid="ship-history">
+        <h3 class="block-title">@Model.HistoryTitle</h3>
+        <ol class="why">
+            @foreach (HistoryLine line in Model.History)
+            {
+                <li class="why-line">
+                    <span class="when mono xsmall muted">@line.When</span>
+                    @if (line.Contract is { } id)
+                    {
+                        <button type="button" class="link-text small" @onclick="() => OnSelect.InvokeAsync(id)">@line.Text</button>
+                    }
+                    else
+                    {
+                        <span class="small">@line.Text</span>
+                    }
+                </li>
+            }
+        </ol>
+        <p class="xsmall muted">@Model.Flown</p>
+    </div>
+
+    @if (Model.ForSale is { } sale)
+    {
+        <div class="actions">
+            <button type="button" class="button small" @onclick="() => OnSelect.InvokeAsync(sale)">@ForSaleLabel</button>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public ShipSheetModel Model { get; set; } = default!;
+
+    [Parameter]
+    public string ForSaleLabel { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<ContractId> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+}

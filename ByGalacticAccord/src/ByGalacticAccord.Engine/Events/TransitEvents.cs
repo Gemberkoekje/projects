@@ -66,7 +66,7 @@ public sealed class ShipDeparted : ISimEvent
 
         RoutePlan laden = context.FindPath(Job.Pickup, destination)
                           ?? throw new InvalidOperationException("A laden job has no route to its destination.");
-        long travel = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier));
+        long travel = Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed));
         long midRoute = Tick + Math.Max(1, travel / 2);
         long scheduledArrival = Tick + travel;
 
@@ -106,10 +106,10 @@ public sealed class TransitIncidentCheck : ISimEvent
             return;
         }
 
-        decimal probability = context.Config.IncidentProbabilityScale * _danger * ship.Class.IncidentChanceModifier;
+        decimal probability = context.Config.IncidentProbabilityScale * _danger * ship.Stats.IncidentChance;
         if (context.Rng.Chance(probability))
         {
-            TransitIncident incident = IncidentResolver.Resolve(context.Rng, _danger, ship.Class);
+            TransitIncident incident = IncidentResolver.Resolve(context.Rng, _danger, ship.Stats);
             context.Schedule(new TransitIncidentOccurred(Tick, Ship, Job, _scheduledArrival, incident));
         }
         else
@@ -180,7 +180,7 @@ public sealed class TransitIncidentOccurred : ISimEvent
         }
 
         context.NoteIncident();
-        ship.Log(Tick, $"Transit incident: {_incident.Description}.");
+        ship.Record(new ShipRecord(Tick, ShipEventKind.Incident, Contract: Job.Main, At: ship.Location, Incident: _incident.Kind));
         ship.DelayArrival(_incident.DelayTicks);
         JournalEntry entry = context.Record(new IncidentEntry(Tick, Job.Main, ship.Owner, _incident));
 

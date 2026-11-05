@@ -25,8 +25,16 @@ public enum ActorRole
     /// <summary>Runs a station: docking, and storage rented to anyone (design §8.1).</summary>
     StationOperator,
 
-    // ---- documented later-slice roles (not instantiated in slice 0) ----
+    /// <summary>Turns ordinary goods into ship parts (design §4.1, §15.4).</summary>
     Factory,
+
+    /// <summary>Builds ships to order under Builds, and on spec for its lot (design §4.1, §15.5).</summary>
+    Shipyard,
+
+    /// <summary>Buys ships others sell and sells them second-hand (design §15.5: Edge Salvage).</summary>
+    Salvage,
+
+    // ---- documented later-slice roles (not instantiated in Slice 1) ----
     Pirate,
     BondingAgent,
     DataBroker,

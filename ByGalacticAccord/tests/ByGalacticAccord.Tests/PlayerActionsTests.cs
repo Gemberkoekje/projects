@@ -155,7 +155,7 @@ public sealed class PlayerActionsTests
         SimulationContext context = WorldGenerator.Generate(42L, withPlayer: true).Context;
         ActorState player = context.Player();
         Ship ship = context.ShipOf(player);
-        Credits daily = Credits.Of(ship.Class.RunningCostPerTick.Amount * context.Config.HeartbeatInterval);
+        Credits daily = Credits.Of(ship.Stats.RunningCostPerTick.Amount * context.Config.HeartbeatInterval);
         var charged = new System.Collections.Generic.List<long>();
         Credits last = player.Credits;
         for (long t = 1; t <= 72; t++)

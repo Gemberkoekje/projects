@@ -131,7 +131,7 @@ public static class NewsView
     // A producer's ask a sixth or more off the average of the player's earlier readings of it.
     private static SignalLine? PriceSignalOf(GameSession session, ActorState producer, PriceReading reading)
     {
-        IReadOnlyList<(long Tick, Credits Ask)> history = session.Player.Knowledge.History(producer.Id);
+        IReadOnlyList<(long Tick, Credits Ask)> history = session.Player.Knowledge.History(producer.Id, reading.Good);
         var earlier = history.Where(h => h.Tick < reading.AskTick).ToList();
         if (earlier.Count < ReadingsForSignal)
         {

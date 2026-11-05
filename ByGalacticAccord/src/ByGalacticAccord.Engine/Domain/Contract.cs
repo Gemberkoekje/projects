@@ -154,6 +154,11 @@ public abstract class Contract
         }
     }
 
+    /// <summary>What its poster has paid to show it further, in all.</summary>
+    public Credits AdFeesPaid { get; private set; }
+
+    internal void NoteAdFee(Credits fee) => AdFeesPaid += fee;
+
     internal void NoteAdvertised(long tick)
     {
         LastAdvertised = tick;
@@ -181,7 +186,7 @@ public abstract class Contract
     public Credits Price => AgreedPrice ?? OfferedPrice;
 
     /// <summary>The Accord tax rate on the price; zero outside the Accord, where nobody collects it.</summary>
-    public decimal TaxRate { get; }
+    public decimal TaxRate { get; private set; }
 
     /// <summary>The tax on the price, paid by the payer.</summary>
     public Credits Tax => Credits.Of(Price.Amount * TaxRate);
@@ -195,10 +200,13 @@ public abstract class Contract
 
     public Credits EscrowHeld { get; private set; }
 
-    /// <summary>Where it is performed: a Sale's handover place, a Haul's destination, a store's location (design §3.5).</summary>
-    public AccordReach Jurisdiction { get; }
+    /// <summary>
+    /// Where it is performed: a Sale's handover place, a Haul's destination, a store's location (design §3.5); a Build's yard,
+    /// which is known only when a yard signs it (<see cref="PerformUnder"/>).
+    /// </summary>
+    public AccordReach Jurisdiction { get; private set; }
 
-    public string Region { get; }
+    public string Region { get; private set; }
 
     /// <summary>The bond the performer actually locked: at most its <see cref="PerformanceBond"/>, at most its cash then.</summary>
     public Credits LockedBond { get; private set; }
@@ -261,6 +269,17 @@ public abstract class Contract
         DeadlineTick = deadline;
         Terms = terms;
     }
+
+    /// <summary>The jurisdiction it will be performed under, once known: a Build's, from the yard that signs it.</summary>
+    internal void PerformUnder(AccordReach jurisdiction, string region, decimal taxRate)
+    {
+        Jurisdiction = jurisdiction;
+        Region = region;
+        TaxRate = taxRate;
+    }
+
+    /// <summary>What of the price the payer locks in escrow at signing: all of it, but for a Build's deposit, paid to the yard.</summary>
+    public virtual Credits EscrowedPart(Credits price) => price;
 
     internal void Sign(ActorId counterparty, Credits price, long tick)
     {
@@ -373,6 +392,9 @@ public sealed class SaleContract : Contract
     /// at the producer's ask up to the price posted, and never on a board or in the news.
     /// </summary>
     public bool AtTheDoor { get; internal set; }
+
+    /// <summary>The Build a yard posted this wanted Sale of a part for, if it is one of a Build's parts orders (design §6.3).</summary>
+    public ContractId? ForBuild { get; internal set; }
 
     internal void SetReceipt(Holding receipt) => Receipt = receipt;
 
@@ -594,4 +616,179 @@ public sealed class StorageContract : Contract
     }
 
     internal void Close() => MarkFulfilled();
+}
+
+/// <summary>
+/// A Sale of a ship (design §3.2: "ships are assets and are sold through ordinary Sale contracts"): posted for sale by its
+/// owner where the ship is docked, and handed over the moment it is signed. While posted the ship takes no work.
+/// </summary>
+public sealed class ShipSaleContract : Contract
+{
+    private LocationId[]? _places;
+
+    public ShipSaleContract(
+        ContractId id,
+        ActorId seller,
+        long postedTick,
+        ShipId ship,
+        LocationId place,
+        Credits offeredPrice,
+        Credits reservation,
+        decimal taxRate,
+        long deadlineTick,
+        AccordReach jurisdiction,
+        string region,
+        ContractTerms terms)
+        : base(id, seller, postedTick, offeredPrice, reservation, taxRate, deadlineTick, jurisdiction, region, terms)
+    {
+        Ship = ship;
+        Place = place;
+    }
+
+    public override ContractType Type => ContractType.Sale;
+
+    public ShipId Ship { get; }
+
+    /// <summary>Where the ship is, and changes hands.</summary>
+    public LocationId Place { get; }
+
+    public ActorId Seller => PostedBy;
+
+    public ActorId? Buyer => CounterpartyId;
+
+    public override ActorId? Payer => Buyer;
+
+    public override ActorId? Performer => Seller;
+
+    public override IReadOnlyList<LocationId> Places => _places ??= new[] { Place };
+}
+
+/// <summary>What a yard may propose when something upstream fails a Build (design §3.4: the supply-failure term).</summary>
+public enum Remedy
+{
+    /// <summary>More time, and compensation for it.</summary>
+    Extend,
+
+    /// <summary>A part a grade lower than ordered, at a discount, sooner.</summary>
+    Substitute,
+
+    /// <summary>Cancel: the deposit and escrow back, and compensation.</summary>
+    Cancel,
+}
+
+/// <summary>
+/// A yard's supply-failure proposal on a Build (design §3.4, §16.3): which part it can't get in time and the order that
+/// failed, and its three remedies with their figures. The client chooses.
+/// </summary>
+public sealed record SupplyFailure(
+    long Raised,
+    PartSlot Slot,
+    ContractId FailedOrder,
+    long ExtendedDeadline,
+    Credits Compensation,
+    Grade SubstituteGrade,
+    Credits SubstituteDiscount,
+    long SubstituteDeadline,
+    Credits CancelCompensation,
+    long Entry);
+
+/// <summary>
+/// A Build (design §3.2, §6.3): make a ship of the parts ordered (<see cref="Spec"/>: kinds and the grade wanted) and hand it
+/// over at the yard by a deadline. Posted by whoever wants the ship, at a place it is shown (<see cref="Place"/>); yards bid
+/// on it. On signing the client pays a deposit to the yard (<see cref="DepositShare"/>, design §16.4), so it can buy parts,
+/// and locks the balance in escrow. Its substitution policy follows its package (<see cref="Simulation.Terms.Substitution"/>);
+/// when a part can't be had in time the yard proposes remedies (<see cref="Proposal"/>).
+/// </summary>
+public sealed class BuildContract : Contract
+{
+    private LocationId[]? _places;
+
+    public BuildContract(
+        ContractId id,
+        ActorId client,
+        long postedTick,
+        ShipParts spec,
+        LocationId place,
+        Credits offeredPrice,
+        Credits reservation,
+        decimal taxRate,
+        long deadlineTick,
+        AccordReach jurisdiction,
+        string region,
+        ContractTerms terms)
+        : base(id, client, postedTick, offeredPrice, reservation, taxRate, deadlineTick, jurisdiction, region, terms)
+    {
+        Spec = spec;
+        Ordered = spec;
+        Place = place;
+    }
+
+    /// <summary>The share of the price the client pays the yard on signing (design §16.4: 20% by default).</summary>
+    public const decimal DepositShare = 0.2m;
+
+    public override ContractType Type => ContractType.Build;
+
+    /// <summary>The parts to build from: kinds, and the grade wanted for each. A substitute the client accepts lowers one.</summary>
+    public ShipParts Spec { get; private set; }
+
+    /// <summary>The parts as first ordered, before any substitute.</summary>
+    public ShipParts Ordered { get; }
+
+    /// <summary>Where it was posted, and is shown (design A.2, settled in S7: a Build goes on the board where its poster posts it).</summary>
+    public LocationId Place { get; }
+
+    /// <summary>Where it is built and handed over: the yard of the builder that signed it.</summary>
+    public LocationId? Yard { get; private set; }
+
+    public ActorId Client => PostedBy;
+
+    public ActorId? Builder => CounterpartyId;
+
+    public override ActorId? Payer => Client;
+
+    public override ActorId? Performer => Builder;
+
+    public override IReadOnlyList<LocationId> Places => _places ??= new[] { Place };
+
+    /// <summary>The deposit due on a price: <see cref="DepositShare"/> of it, to the cent.</summary>
+    public static Credits DepositFor(Credits price) => Credits.Of(System.Math.Round(price.Amount * DepositShare, 2));
+
+    public override Credits EscrowedPart(Credits price) => price - DepositFor(price);
+
+    /// <summary>What the client paid the yard on signing.</summary>
+    public Credits DepositPaid { get; private set; }
+
+    /// <summary>The ship built for it, once it is.</summary>
+    public ShipId? Ship { get; private set; }
+
+    /// <summary>Discounts agreed under its terms on the way: a substitute's.</summary>
+    public Credits AgreedDiscount { get; private set; }
+
+    /// <summary>The yard's supply-failure proposal waiting on the client, if any.</summary>
+    public SupplyFailure? Proposal { get; private set; }
+
+    /// <summary>The remedies chosen so far, in order.</summary>
+    public IReadOnlyList<Remedy> Remedies => _remedies;
+
+    private readonly List<Remedy> _remedies = new();
+
+    internal void BuiltAt(LocationId yard) => Yard = yard;
+
+    internal void NoteDeposit(Credits deposit) => DepositPaid = deposit;
+
+    internal void NoteShip(ShipId ship) => Ship = ship;
+
+    internal void Propose(SupplyFailure? proposal) => Proposal = proposal;
+
+    internal void Substitute(PartSlot slot, Grade grade, Credits discount)
+    {
+        if (Spec.In(slot) is { } part)
+        {
+            Spec = Spec.With(slot, part with { Grade = grade });
+        }
+
+        AgreedDiscount += discount;
+    }
+
+    internal void NoteRemedy(Remedy remedy) => _remedies.Add(remedy);
 }

@@ -47,9 +47,9 @@ public static class IncidentResolver
         _ => 0m,
     };
 
-    public static TransitIncident Resolve(DeterministicRandom rng, decimal dangerRating, ShipClassInfo ship)
+    public static TransitIncident Resolve(DeterministicRandom rng, decimal dangerRating, ShipStats ship)
     {
-        decimal severity = ship.IncidentSeverityModifier;
+        decimal severity = ship.IncidentSeverity;
         decimal roll = rng.NextDecimal();
 
         // Higher danger pushes the roll toward the nastier end of the table.

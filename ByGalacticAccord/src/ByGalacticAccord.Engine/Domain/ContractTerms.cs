@@ -26,6 +26,9 @@ public enum CancelReason
 
     /// <summary>A party walked away and paid the break fee.</summary>
     AtWill,
+
+    /// <summary>By agreement after a supply-failure proposal (design §3.4, §16.2): the client took the refund and compensation.</summary>
+    SupplyFailure,
 }
 
 /// <summary>Who cancelled a contract, why, and what it cost them (the bond forfeited, or the break fee paid).</summary>

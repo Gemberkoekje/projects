@@ -59,7 +59,11 @@ public sealed class TemplateTests
         Assert.All(Enum.GetValues<ActorRole>(), r => Assert.False(string.IsNullOrEmpty(Templates.Role(r))));
         Assert.All(Enum.GetValues<ContractType>(), k => Assert.False(string.IsNullOrEmpty(Templates.ContractKind(k))));
         Assert.All(Enum.GetValues<SaleSide>(), s => Assert.False(string.IsNullOrEmpty(Templates.Side(s))));
-        Assert.All(Enum.GetValues<ShipType>(), s => Assert.False(string.IsNullOrEmpty(Templates.ShipClass(s))));
+        Assert.All(Enum.GetValues<Design>(), d => Assert.False(string.IsNullOrEmpty(Templates.Design(d))));
+        Assert.All(Enum.GetValues<PartKind>(), k => Assert.False(string.IsNullOrEmpty(Templates.Part(k))));
+        Assert.All(Enum.GetValues<Grade>(), g => Assert.False(string.IsNullOrEmpty(Templates.Grade(g))));
+        Assert.All(Enum.GetValues<PartSlot>(), s => Assert.False(string.IsNullOrEmpty(Templates.Slot(s))));
+        Assert.All(Goods.All, g => Assert.False(string.IsNullOrEmpty(Templates.Good(g))));
         Assert.All(Enum.GetValues<TermPackage>(), p => Assert.False(string.IsNullOrEmpty(Templates.Package(p))));
         Assert.All(new[] { Tell.Readily, Tell.Reluctant, Tell.AtLimit }, t => Assert.False(string.IsNullOrEmpty(Templates.Tell(t))));
         Assert.All(Offer.LateFeeScales, s => Assert.False(string.IsNullOrEmpty(Templates.LateFee(s))));

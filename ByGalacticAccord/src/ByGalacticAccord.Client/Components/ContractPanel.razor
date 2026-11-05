@@ -27,6 +27,13 @@
             <p class="status small tone-@Model.StatusTone">@Model.Status</p>
         }
 
+        @if (Model.Ship is { } ship)
+        {
+            <div class="actions">
+                <button type="button" class="button small" data-testid="open-ship" @onclick="() => OnSelectShip.InvokeAsync(ship)">@Model.ShipLabel</button>
+            </div>
+        }
+
         @if (Model.Lines.Count > 0)
         {
             <div class="block">
@@ -88,6 +95,28 @@
                 <p class="term small">@term</p>
             }
         </div>
+
+        @if (Model.Orders is { Count: > 0 } orders)
+        {
+            <div class="block" data-testid="orders">
+                <h3 class="block-title">@Model.OrdersTitle</h3>
+                <ul class="orders">
+                    @foreach (OrderLine line in orders)
+                    {
+                        <li class="order-line depth-@line.Depth tone-@line.Tone">
+                            @if (line.Contract is { } order && order != Model.Id)
+                            {
+                                <button type="button" class="link-text small" @onclick="() => OnSelect.InvokeAsync(order)">@line.Text</button>
+                            }
+                            else
+                            {
+                                <span class="small">@line.Text</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
 
         @if (Model.Why.Count > 0)
         {
@@ -222,6 +251,9 @@
 
     [Parameter]
     public EventCallback<IReadOnlyCollection<LocationId>> OnAdvertise { get; set; }
+
+    [Parameter]
+    public EventCallback<ShipId> OnSelectShip { get; set; }
 
     protected override void OnParametersSet()
     {

@@ -241,6 +241,12 @@ public static class Settlement
             context.ReleaseFromEscrow(contract, payer, contract.EscrowHeld);
         }
 
+        if (contract is BuildContract failedBuild)
+        {
+            // The yard gives back the deposit it was paid (design §16.4): a Build that fails owes the client what it took.
+            context.TransferUpTo(performer, payer, failedBuild.DepositPaid);
+        }
+
         if (contract.Arbitrated && contract is HaulContract haul && haul.Terms.Liability is { } liability)
         {
             Credits owed = liability.For(haul.Quantity - delivered) - bond;
@@ -277,10 +283,16 @@ public static class Settlement
     /// from what escrow holds of its money first, then from its account. Anything already moving finishes its trip and
     /// is set down for its owner; goods set aside for it are free again.
     /// </summary>
-    public static void Cancel(SimulationContext context, Contract contract, ActorState by, CancelReason reason)
+    public static void Cancel(SimulationContext context, Contract contract, ActorState by, CancelReason reason, long? cause = null)
     {
         if (contract.Status != ContractStatus.Active)
         {
+            return;
+        }
+
+        if (contract is BuildContract build)
+        {
+            CancelBuild(context, build, by, reason, cause);
             return;
         }
 
@@ -326,6 +338,203 @@ public static class Settlement
         context.NoteCancelled();
         JournalEntry cancelled = context.Record(new ContractCancelledEntry(context.CurrentTick, contract.Id, by.Id, reason, paid));
         WithdrawHaulsFor(context, contract, performer, cancelled.Seq);
+    }
+
+    /// <summary>
+    /// End a Build by cancellation (design §3.4, §16.4). The client's balance comes back out of escrow every time; what else
+    /// moves depends on who and why. For default (the client, past the grace): the yard's bond is the client's and the yard
+    /// gives back the deposit. At will by the client: the deposit was its break fee, and the yard keeps it and gets its bond
+    /// back. At will by the yard: it gives back the deposit and pays the break fee (the deposit's amount again), from its bond
+    /// first. By agreement after a supply failure: the yard gives back the deposit and pays the compensation it proposed.
+    /// </summary>
+    private static void CancelBuild(SimulationContext context, BuildContract build, ActorState by, CancelReason reason, long? cause)
+    {
+        ActorState client = context.Actor(build.Client);
+        ActorState yard = context.Actor(build.Builder!.Value);
+        Credits bond = build.LockedBond;
+        Credits paid;
+        switch (reason)
+        {
+            case CancelReason.ForDefault:
+                if (build.UsesEscrow)
+                {
+                    context.ForfeitFromEscrow(build, client, bond);
+                }
+
+                context.TransferUpTo(yard, client, build.DepositPaid);
+                paid = bond;
+                Blame(context, yard, build, Late(context, build));
+                context.Records.CancelledForDefault(build);
+                context.NoteFailure(FailureKind.CancelledForDefault);
+                break;
+            case CancelReason.AtWill when by.Id == client.Id:
+                if (build.UsesEscrow)
+                {
+                    context.ReleaseFromEscrow(build, yard, bond);
+                }
+
+                paid = build.DepositPaid;
+                Blame(context, client, build, 0, 0.3m);
+                context.Records.WalkedAway(build, client.Id);
+                context.NoteFailure(FailureKind.CancelledAtWill);
+                break;
+            case CancelReason.AtWill:
+            {
+                Credits fee = build.Terms.BreakFee;
+                Credits fromBond = Credits.Of(Math.Min(fee.Amount, bond.Amount));
+                if (build.UsesEscrow)
+                {
+                    context.ForfeitFromEscrow(build, client, fromBond);
+                    context.ReleaseFromEscrow(build, yard, bond - fromBond);
+                }
+                else
+                {
+                    fromBond = Credits.Zero;
+                }
+
+                context.TransferUpTo(yard, client, build.DepositPaid);
+                paid = fromBond + context.TransferUpTo(yard, client, fee - fromBond);
+                Blame(context, yard, build, 0, 0.3m);
+                context.Records.WalkedAway(build, yard.Id);
+                context.NoteFailure(FailureKind.CancelledAtWill);
+                break;
+            }
+
+            default:
+            {
+                Credits compensation = build.Proposal?.CancelCompensation ?? Credits.Zero;
+                if (build.UsesEscrow)
+                {
+                    context.ReleaseFromEscrow(build, yard, bond);
+                }
+
+                context.TransferUpTo(yard, client, build.DepositPaid);
+                paid = context.TransferUpTo(yard, client, compensation);
+                context.NoteFailure(FailureKind.CancelledOnSupplyFailure);
+                break;
+            }
+        }
+
+        if (build.UsesEscrow)
+        {
+            context.ReleaseFromEscrow(build, client, build.EscrowHeld);
+        }
+
+        build.MarkCancelled(new Cancellation(by.Id, reason, context.CurrentTick, paid));
+        context.NoteCancelled();
+        context.Record(new ContractCancelledEntry(context.CurrentTick, build.Id, by.Id, reason, paid) { Cause = cause });
+    }
+
+    /// <summary>
+    /// A yard hands over a ship built for a Build (design §6.3, §16.3). Against what was ordered, the Build's substitution policy
+    /// owes a discount for parts below grade (design §3.4); a part outside the policy lets the client inspect: an AI decides by
+    /// utility (<see cref="DecisionEngine.WouldRejectShip"/>), the player is asked (<paramref name="accepted"/> is its answer). Rejected,
+    /// the Build fails and the ship stays the yard's. Accepted, the ship is the client's; escrow pays the yard the price less the
+    /// deposit it already has, the discount (those agreed on the way included) and the late fee, and the tax is collected.
+    /// </summary>
+    public static HandOver HandOverBuild(SimulationContext context, BuildContract build, Ship ship, bool? accepted = null)
+    {
+        if (build.Status != ContractStatus.Active)
+        {
+            return HandOver.Refused;
+        }
+
+        ActorState client = context.Actor(build.Client);
+        ActorState yard = context.Actor(build.Builder!.Value);
+        Credits? policy = Terms.Substitution(build.Terms.Package, build.Spec, ship.Parts);
+        if (policy is null && accepted is null)
+        {
+            if (client.IsPlayer)
+            {
+                context.RaisePlayerDecision(new PlayerDecision(DecisionKind.Inspection, build.Id, context.CurrentTick, build.LastEntry ?? -1));
+                return HandOver.Pending;
+            }
+
+            accepted = !DecisionEngine.WouldRejectShip(context, client, build, ship);
+        }
+
+        if (accepted == false)
+        {
+            Fail(context, build, FailureReason.Rejected);
+            return HandOver.Refused;
+        }
+
+        // Outside the policy, accepted anyway: a refund for every grade short, at what the grades are worth (the lenient rate).
+        Credits discount = (policy ?? Terms.Substitution(TermPackage.Lenient, build.Spec, ship.Parts) ?? Credits.Zero) + build.AgreedDiscount;
+        long ticksLate = Late(context, build);
+        Credits balance = build.Price - build.DepositPaid;
+        discount = Credits.Of(Math.Min(discount.Amount, balance.Amount));
+        Credits due = balance - discount;
+        decimal late = Math.Min(build.LatePenalty?.PenaltyFor(ticksLate).Amount ?? 0m, Collectable(build, due, build.LockedBond, yard.Credits).Amount);
+        Credits lateFee = Credits.Of(late);
+        if (build.UsesEscrow)
+        {
+            Credits held = due + build.LockedBond;
+            Credits covered = Credits.Of(Math.Min(lateFee.Amount, held.Amount));
+            context.ReleaseFromEscrow(build, yard, held - covered);
+            context.ForfeitFromEscrow(build, client, covered);
+            context.TaxFromEscrow(build, build.Tax);
+            context.ReleaseFromEscrow(build, client, build.EscrowHeld);
+            if (lateFee > covered)
+            {
+                context.TransferUpTo(yard, client, lateFee - covered);
+            }
+        }
+        else if (!context.TryTransfer(client, yard, Credits.Of(Math.Max(0m, due.Amount - lateFee.Amount))))
+        {
+            PayerDefault(context, build);
+            return HandOver.Defaulted;
+        }
+
+        context.TransferShip(ship, client, build.Price, build.Id);
+        build.MarkFulfilled();
+        context.NoteFulfilled();
+        context.Records.Delivered(build, ticksLate, false);
+        if (ticksLate > 0)
+        {
+            context.NoteFailure(FailureKind.LateDelivery);
+        }
+
+        if (discount.Amount > 0m && build.Ordered != ship.Parts)
+        {
+            context.NoteFailure(FailureKind.Substituted);
+        }
+
+        Reward(context, yard, build, ticksLate, 1m);
+        context.Record(new ShipHandedOverEntry(context.CurrentTick, build.Id, yard.Id, client.Id, ship.Id, ticksLate, build.Price, lateFee, discount));
+        return HandOver.Done;
+    }
+
+    /// <summary>
+    /// A ship Sale signed is handed over at once: the ship is the buyer's, and the seller is paid, out of escrow in Accord space
+    /// (the tax collected), directly outside it, where a buyer that can't pay defaults and the seller keeps its ship.
+    /// </summary>
+    public static HandOver HandOverShip(SimulationContext context, ShipSaleContract sale)
+    {
+        ActorState seller = context.Actor(sale.Seller);
+        ActorState buyer = context.Actor(sale.Buyer!.Value);
+        Ship ship = context.Ship(sale.Ship);
+        if (sale.UsesEscrow)
+        {
+            context.ReleaseFromEscrow(sale, seller, sale.Price + sale.LockedBond);
+            context.TaxFromEscrow(sale, sale.Tax);
+            context.ReleaseFromEscrow(sale, buyer, sale.EscrowHeld);
+        }
+        else if (!context.TryTransfer(buyer, seller, sale.Price))
+        {
+            ship.List(null);
+            PayerDefault(context, sale);
+            return HandOver.Defaulted;
+        }
+
+        DecisionEngine.NoteLotSale(seller, ship, context.CurrentTick);
+        context.TransferShip(ship, buyer, sale.Price, sale.Id);
+        sale.MarkFulfilled();
+        context.NoteFulfilled();
+        context.NoteShipSold(seller, buyer);
+        context.Records.Delivered(sale, 0, false);
+        context.Record(new ShipHandedOverEntry(context.CurrentTick, sale.Id, seller.Id, buyer.Id, ship.Id, 0, sale.Price, Credits.Zero, Credits.Zero));
+        return HandOver.Done;
     }
 
     /// <summary>Outside the Accord the payer couldn't pay at handover. Nobody enforces anything; its record with the payee suffers.</summary>
@@ -554,7 +763,7 @@ public static class Settlement
     private static decimal ValueScale(Contract contract)
     {
         // Reputation scales with what the performer earns from the contract: a Sale's goods are mostly passed through.
-        decimal value = contract is SaleContract ? contract.Price.Amount * 0.25m : contract.Price.Amount;
+        decimal value = contract is SaleContract or BuildContract or ShipSaleContract ? contract.Price.Amount * 0.25m : contract.Price.Amount;
         return Math.Clamp(value / 200m, 0.4m, 3m);
     }
 

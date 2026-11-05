@@ -71,10 +71,20 @@ public static partial class Market
         Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package = null, decimal lateFeeScale = 1m) =>
         PostSale(context, poster, side, good, quantity, place, price, reservation, deadline, holding, package, lateFeeScale, atTheDoor: false);
 
+    /// <summary>
+    /// A yard orders a part for a Build (or for a ship on spec, <paramref name="build"/> null): a wanted Sale of one part
+    /// delivered into its stock at its yard (design §6.3: "once a build is signed, the yard posts Wanted Sales for the parts").
+    /// Its posting follows from the Build, so a Build's record reads back through its parts.
+    /// </summary>
+    public static SaleContract PostPartsOrder(
+        SimulationContext context, ActorState yard, GoodType part, Credits price, Credits reservation, long deadline, TermPackage package, BuildContract? build) =>
+        PostSale(context, yard, SaleSide.Wanted, part, 1m, yard.Home, price, reservation, deadline, Holding.StockAt(yard.Home), package, 1m, atTheDoor: false, build);
+
     // A wanted Sale posted at the door (atTheDoor) is an order at a producer's asking price there, answered at once whoever posts it.
     private static SaleContract PostSale(
         SimulationContext context, ActorState poster, SaleSide side, GoodType good, decimal quantity, LocationId place,
-        Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package, decimal lateFeeScale, bool atTheDoor)
+        Credits price, Credits reservation, long deadline, Holding holding, TermPackage? package, decimal lateFeeScale, bool atTheDoor,
+        BuildContract? forBuild = null)
     {
         Location location = context.Location(place);
         decimal? stored = side == SaleSide.ForSale && holding.Kind == HoldingKind.Storage
@@ -86,6 +96,7 @@ public static partial class Market
             Terms.TaxRate(context, location.Reach), deadline, location.Reach, location.Region, terms);
         sale.SetSeen(stored);
         sale.AtTheDoor = atTheDoor;
+        sale.ForBuild = forBuild?.Id;
         if (side == SaleSide.Wanted)
         {
             sale.SetReceipt(holding);
@@ -98,7 +109,7 @@ public static partial class Market
 
         context.Add(sale);
         context.Schedule(new ContractExpiryCheck(deadline, sale.Id));
-        context.Record(new ContractPostedEntry(context.CurrentTick, sale.Id, poster.Id));
+        context.Record(new ContractPostedEntry(context.CurrentTick, sale.Id, poster.Id) { Cause = forBuild?.LastEntry });
         if (side == SaleSide.Wanted && (atTheDoor || !HagglesInGameTime(poster)))
         {
             DecisionEngine.AnswerAtOnce(context, sale);
@@ -533,7 +544,7 @@ public static partial class Market
         long ladenTicks = 0;
         if (job.Destination is { } destination && context.FindPath(job.Pickup, destination) is { } plan)
         {
-            ladenTicks = Math.Max(1, PriceModel.TravelTicks(plan.DistanceTicks, ship.Class.SpeedMultiplier));
+            ladenTicks = Math.Max(1, PriceModel.TravelTicks(plan.DistanceTicks, ship.Stats.Speed));
         }
 
         return (end, pickup + ladenTicks);
@@ -549,7 +560,7 @@ public static partial class Market
 
         RoutePlan plan = context.FindPath(ship.Location, to)
                          ?? throw new InvalidOperationException($"No route from {ship.Location} to {to}.");
-        return PriceModel.TravelTicks(plan.DistanceTicks, ship.Class.SpeedMultiplier);
+        return PriceModel.TravelTicks(plan.DistanceTicks, ship.Stats.Speed);
     }
 
     /// <summary>Commit a ship to a job: any empty leg to the pickup starts now, and it loads when it gets there.</summary>
@@ -561,7 +572,7 @@ public static partial class Market
         {
             RoutePlan plan = context.FindPath(ship.Location, job.Pickup)
                              ?? throw new InvalidOperationException("A dispatched ship has no route to its pickup.");
-            ticks = PriceModel.TravelTicks(plan.DistanceTicks, ship.Class.SpeedMultiplier);
+            ticks = PriceModel.TravelTicks(plan.DistanceTicks, ship.Stats.Speed);
             reposition = ShipCourse.Along(plan, context.CurrentTick, ticks);
         }
 
@@ -570,7 +581,7 @@ public static partial class Market
     }
 
     // Someone now waits on the performer: when its grace runs out, the payer may cancel for default.
-    private static void AwaitPerformance(SimulationContext context, Contract contract)
+    internal static void AwaitPerformance(SimulationContext context, Contract contract)
     {
         if (contract.GraceEndsTick != long.MaxValue)
         {
@@ -602,7 +613,7 @@ public static partial class Market
     }
 
     // Sign, then lock the payer's price and tax and the performer's bond in Accord escrow (design §16.4).
-    private static Signing Sign(SimulationContext context, Contract contract, ActorState taker, Credits price)
+    internal static Signing Sign(SimulationContext context, Contract contract, ActorState taker, Credits price)
     {
         if (contract.PostedBy == taker.Id)
         {
@@ -617,6 +628,7 @@ public static partial class Market
         ActorState payer = contract switch
         {
             SaleContract { Side: SaleSide.ForSale } => taker,
+            ShipSaleContract => taker,
             _ => context.Actor(contract.PostedBy),
         };
         if (!CanFund(contract, payer, price))
@@ -635,10 +647,16 @@ public static partial class Market
         }
 
         context.Sign(contract, taker, price);
+        if (contract is BuildContract build)
+        {
+            // A Build's deposit goes to the yard at once, so it can buy parts (design §16.4); the balance is held like any price.
+            build.NoteDeposit(context.TransferUpTo(payer, context.Actor(build.Builder!.Value), BuildContract.DepositFor(price)));
+        }
+
         if (contract.UsesEscrow)
         {
             ActorState performer = context.Actor(contract.Performer!.Value);
-            context.LockToEscrow(contract, payer, price + contract.Tax);
+            context.LockToEscrow(contract, payer, contract.EscrowedPart(price) + contract.Tax);
             Credits bond = Credits.Of(Math.Min(contract.PerformanceBond.Amount, Math.Floor(Math.Max(0m, performer.Credits.Amount) * 100m) / 100m));
             context.LockToEscrow(contract, performer, bond);
             contract.SetLockedBond(bond);
@@ -675,6 +693,9 @@ public static partial class Market
                 break;
             case HaulContract { Serves: null } haul:
                 Settlement.Unreserve(context, poster, haul.PickupFrom, haul.Good, haul.Quantity);
+                break;
+            case ShipSaleContract sale:
+                context.Ship(sale.Ship).List(null);
                 break;
         }
     }

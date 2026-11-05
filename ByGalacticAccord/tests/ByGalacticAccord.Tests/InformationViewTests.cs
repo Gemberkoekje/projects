@@ -61,7 +61,7 @@ public sealed class InformationViewTests
                 items.Add(new NewsItem(contract.Id, NewsKind.Failed, 5, Reason: reason));
             }
 
-            foreach (CancelReason reason in Enum.GetValues<CancelReason>())
+            foreach (CancelReason reason in new[] { CancelReason.ForDefault, CancelReason.AtWill }) // a supply failure cancels only a Build
             {
                 foreach (ActorId by in new[] { contract.Payer!.Value, contract.Performer!.Value })
                 {

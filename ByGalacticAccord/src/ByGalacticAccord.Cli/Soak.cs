@@ -145,11 +145,28 @@ internal static class Soak
         Line("  Signed from the news", $"{ctx.SignedFromNews.ToString("N0", CultureInfo.InvariantCulture)}; tries that found the post closed {ctx.FoundClosedFromNews.ToString("N0", CultureInfo.InvariantCulture)}");
 
         Console.WriteLine();
-        Console.WriteLine("Goods (produced = consumed + held + lost):");
-        Console.WriteLine($"   {"",-10} {"produced",12} {"consumed",12} {"held",10} {"lost",10}");
-        foreach (GoodType good in Goods.All)
+        Console.WriteLine("Ships (design §6): parts, builds, sales and fleets:");
+        Line("  Parts made, by grade", $"A {ctx.PartsMade[0].ToString("N0", CultureInfo.InvariantCulture)}, B {ctx.PartsMade[1].ToString("N0", CultureInfo.InvariantCulture)}, C {ctx.PartsMade[2].ToString("N0", CultureInfo.InvariantCulture)}; made do without an input {ctx.PartsMadeDo.ToString("N0", CultureInfo.InvariantCulture)}");
+        var builds = ctx.Contracts.Values.OfType<BuildContract>().ToList();
+        Line("  Builds posted, signed", $"{builds.Count.ToString("N0", CultureInfo.InvariantCulture)}, {ctx.BuildsSigned.ToString("N0", CultureInfo.InvariantCulture)}; by status {string.Join(", ", builds.GroupBy(b => b.Status).OrderBy(g => g.Key).Select(g => $"{g.Key} {g.Count().ToString("N0", CultureInfo.InvariantCulture)}"))}");
+        Line("  Ships built", $"to order {ctx.ShipsBuiltToOrder.ToString("N0", CultureInfo.InvariantCulture)}, on spec {ctx.ShipsBuiltOnSpec.ToString("N0", CultureInfo.InvariantCulture)}");
+        Line("  Supply failures, remedies", $"{ctx.Failures(FailureKind.SupplyFailure).ToString("N0", CultureInfo.InvariantCulture)}; extend {ctx.RemediesChosen[0].ToString("N0", CultureInfo.InvariantCulture)}, substitute {ctx.RemediesChosen[1].ToString("N0", CultureInfo.InvariantCulture)}, cancel {ctx.RemediesChosen[2].ToString("N0", CultureInfo.InvariantCulture)}; handed over below spec {ctx.Failures(FailureKind.Substituted).ToString("N0", CultureInfo.InvariantCulture)}");
+        Line("  Ships sold", $"{ctx.ShipsSold.ToString("N0", CultureInfo.InvariantCulture)}; to salvage {ctx.ShipsBoughtBySalvage.ToString("N0", CultureInfo.InvariantCulture)}, by salvage {ctx.ShipsSoldBySalvage.ToString("N0", CultureInfo.InvariantCulture)}");
+        Line("  Ships in the sector", $"{ctx.Ships.Values.Count(s => !s.Scrapped).ToString("N0", CultureInfo.InvariantCulture)}: traders {ctx.ActorsOrdered.Where(a => a.MovesCargo).Sum(a => a.Ships.Count)}, yards' lots {ctx.ActorsOrdered.Where(a => a.Yard is not null).Sum(a => a.Ships.Count)}, salvage {ctx.ActorsOrdered.Where(a => a.Salvage is not null).Sum(a => a.Ships.Count)}; broken up {ctx.ShipsScrapped.ToString("N0", CultureInfo.InvariantCulture)}");
+        Line("  Fleets", string.Join(", ", ctx.ActorsOrdered.Where(a => a.MovesCargo).Select(a => $"{a.Name} {a.Ships.Count}")));
+
+        Console.WriteLine();
+        Console.WriteLine("Goods (produced = consumed + held + lost + built into ships); ship parts by kind, all grades together:");
+        Console.WriteLine($"   {"",-18} {"produced",12} {"consumed",12} {"held",10} {"lost",10} {"built in",10}");
+        foreach (GoodType good in Goods.Trade)
         {
-            Console.WriteLine($"   {good,-10} {ctx.GoodsProduced(good),12:N0} {ctx.GoodsConsumed(good),12:N0} {ctx.GoodsHeld(good),10:N0} {ctx.GoodsLost(good),10:N0}");
+            Console.WriteLine($"   {good,-18} {ctx.GoodsProduced(good),12:N0} {ctx.GoodsConsumed(good),12:N0} {ctx.GoodsHeld(good),10:N0} {ctx.GoodsLost(good),10:N0} {ctx.GoodsBuiltIn(good),10:N0}");
+        }
+
+        foreach (PartKind kind in ShipPart.Kinds)
+        {
+            GoodType[] grades = Enum.GetValues<Grade>().Select(g => ShipPart.GoodOf(kind, g)).ToArray();
+            Console.WriteLine($"   {kind,-18} {grades.Sum(ctx.GoodsProduced),12:N0} {grades.Sum(ctx.GoodsConsumed),12:N0} {grades.Sum(ctx.GoodsHeld),10:N0} {grades.Sum(ctx.GoodsLost),10:N0} {grades.Sum(ctx.GoodsBuiltIn),10:N0}");
         }
 
         Console.WriteLine();
@@ -174,7 +191,7 @@ internal static class Soak
 
         Console.WriteLine();
         Console.WriteLine("Contracts by kind and status:");
-        foreach (ContractType kind in new[] { ContractType.Sale, ContractType.Haul, ContractType.Storage })
+        foreach (ContractType kind in new[] { ContractType.Sale, ContractType.Haul, ContractType.Storage, ContractType.Build })
         {
             var byStatus = new SortedDictionary<ContractStatus, int>();
             foreach (Contract c in ctx.Contracts.Values)

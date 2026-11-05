@@ -389,21 +389,6 @@
   <data name="Role.Multinational" xml:space="preserve">
     <value>Multinational</value>
   </data>
-  <data name="ShipClass.LightFreighter" xml:space="preserve">
-    <value>Light Freighter</value>
-  </data>
-  <data name="ShipClass.BulkHauler" xml:space="preserve">
-    <value>Bulk Hauler</value>
-  </data>
-  <data name="ShipClass.FastCourier" xml:space="preserve">
-    <value>Fast Courier</value>
-  </data>
-  <data name="ShipClass.RefrigeratedTransport" xml:space="preserve">
-    <value>Refrigerated Transport</value>
-  </data>
-  <data name="ShipClass.ArmedFreighter" xml:space="preserve">
-    <value>Armed Freighter</value>
-  </data>
   <!-- Shared fragments. -->
   <data name="Route" xml:space="preserve">
     <value>{origin} → {destination}</value>
@@ -2057,5 +2042,767 @@
   </data>
   <data name="Uncertain.Ask.Range" xml:space="preserve">
     <value> Your readings since {since}: {low} to {high} a unit.</value>
+  </data>
+  <data name="Design.LightFreighter" xml:space="preserve">
+    <value>Light Freighter</value>
+  </data>
+  <data name="Design.BulkHauler" xml:space="preserve">
+    <value>Bulk Hauler</value>
+  </data>
+  <data name="Design.FastCourier" xml:space="preserve">
+    <value>Fast Courier</value>
+  </data>
+  <data name="Design.RefrigeratedTransport" xml:space="preserve">
+    <value>Refrigerated Transport</value>
+  </data>
+  <data name="Design.ArmouredFreighter" xml:space="preserve">
+    <value>Armoured Freighter</value>
+  </data>
+  <data name="Design.Custom" xml:space="preserve">
+    <value>custom ship ({parts})</value>
+  </data>
+  <data name="Part.LightFrame" xml:space="preserve">
+    <value>Light frame</value>
+  </data>
+  <data name="Part.BulkFrame" xml:space="preserve">
+    <value>Bulk frame</value>
+  </data>
+  <data name="Part.CourierFrame" xml:space="preserve">
+    <value>Courier frame</value>
+  </data>
+  <data name="Part.StandardDrive" xml:space="preserve">
+    <value>Standard drive</value>
+  </data>
+  <data name="Part.FastDrive" xml:space="preserve">
+    <value>Fast drive</value>
+  </data>
+  <data name="Part.RefrigerationUnit" xml:space="preserve">
+    <value>Refrigeration unit</value>
+  </data>
+  <data name="Part.ArmourPlating" xml:space="preserve">
+    <value>Armour plating</value>
+  </data>
+  <data name="Part.CargoPod" xml:space="preserve">
+    <value>Cargo pod</value>
+  </data>
+  <data name="Part.None" xml:space="preserve">
+    <value>no module</value>
+  </data>
+  <data name="Grade.A" xml:space="preserve">
+    <value>A</value>
+  </data>
+  <data name="Grade.B" xml:space="preserve">
+    <value>B</value>
+  </data>
+  <data name="Grade.C" xml:space="preserve">
+    <value>C</value>
+  </data>
+  <data name="Part.Graded" xml:space="preserve">
+    <value>{part}, grade {grade}</value>
+  </data>
+  <data name="Good.Part" xml:space="preserve">
+    <value>{part} ({grade})</value>
+  </data>
+  <data name="Slot.Frame" xml:space="preserve">
+    <value>Frame</value>
+  </data>
+  <data name="Slot.Drive" xml:space="preserve">
+    <value>Drive</value>
+  </data>
+  <data name="Slot.Module" xml:space="preserve">
+    <value>Module</value>
+  </data>
+  <data name="Role.Shipyard" xml:space="preserve">
+    <value>Shipyard</value>
+  </data>
+  <data name="Role.Salvage" xml:space="preserve">
+    <value>Salvage yard</value>
+  </data>
+  <data name="Contract.Head.Build" xml:space="preserve">
+    <value>a {ship} to build, posted at {place}</value>
+  </data>
+  <data name="Contract.Head.Ship" xml:space="preserve">
+    <value>a {ship} for sale at {place}</value>
+  </data>
+  <data name="Ship.Line" xml:space="preserve">
+    <value>{ship} {id}</value>
+  </data>
+  <data name="ContractPosted.Build" xml:space="preserve">
+    <value>{poster} posted a Build: a {ship}, wanted by {deadline}, offering {price}.</value>
+  </data>
+  <data name="ContractPosted.Build.You" xml:space="preserve">
+    <value>You posted a Build: a {ship}, wanted by {deadline}, offering {price}.</value>
+  </data>
+  <data name="ContractSigned.Build" xml:space="preserve">
+    <value>{taker} took {poster}'s Build of a {ship} for {signed}, to hand over at {place}. {poster} paid the deposit of {deposit}.</value>
+  </data>
+  <data name="ContractSigned.Build.You" xml:space="preserve">
+    <value>You took {poster}'s Build of a {ship} for {signed}, to hand over at {place}.</value>
+  </data>
+  <data name="ContractSigned.Build.ToYou" xml:space="preserve">
+    <value>{taker} took your Build of a {ship} for {signed}, to hand over at {place}. You paid it the deposit of {deposit}.</value>
+  </data>
+  <data name="ContractExpired.Build" xml:space="preserve">
+    <value>Nobody took {poster}'s Build of a {ship} before its deadline.</value>
+  </data>
+  <data name="ContractExpired.Build.You" xml:space="preserve">
+    <value>Nobody took your Build of a {ship} before its deadline.</value>
+  </data>
+  <data name="ContractWithdrawn.Build" xml:space="preserve">
+    <value>{poster} withdrew its Build of a {ship}.</value>
+  </data>
+  <data name="ContractWithdrawn.Build.You" xml:space="preserve">
+    <value>You withdrew your Build of a {ship}.</value>
+  </data>
+  <data name="ContractInDefault.Build" xml:space="preserve">
+    <value>{performer} is in default on {poster}'s Build of a {ship}: its grace ended with the ship not handed over.</value>
+  </data>
+  <data name="ContractInDefault.Build.You" xml:space="preserve">
+    <value>You are in default on {poster}'s Build of a {ship}: the grace ended with the ship not handed over.</value>
+  </data>
+  <data name="ContractInDefault.Build.ToYou" xml:space="preserve">
+    <value>{performer} is in default on your Build of a {ship}: its grace ended with the ship not handed over. You may cancel.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Build" xml:space="preserve">
+    <value>{by} cancelled its Build of a {ship} with {other} for default: its money back, the deposit back, and the bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Build.You" xml:space="preserve">
+    <value>You cancelled your Build of a {ship} with {other} for default: your money back, the deposit back, and the bond of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.ForDefault.Build.ToYou" xml:space="preserve">
+    <value>{by} cancelled its Build of a {ship} with you for default and took your bond of {paid}, and the deposit back.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Build" xml:space="preserve">
+    <value>{by} walked away from building {poster}'s {ship}: the deposit back, and a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Build.You" xml:space="preserve">
+    <value>You walked away from building {poster}'s {ship}: the deposit back, and a break fee of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Build.ToYou" xml:space="preserve">
+    <value>{by} walked away from building your {ship}: your deposit back, and a break fee of {paid} to you.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Build" xml:space="preserve">
+    <value>{by} called off its Build of a {ship} with {other}, forfeiting the deposit of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Build.You" xml:space="preserve">
+    <value>You called off your Build of a {ship} with {other}, forfeiting the deposit of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.AtWill.Payer.Build.ToYou" xml:space="preserve">
+    <value>{by} called off its Build of a {ship} with you; you keep the deposit of {paid}.</value>
+  </data>
+  <data name="ContractCancelled.SupplyFailure.Build" xml:space="preserve">
+    <value>{by} cancelled its Build of a {ship} with {other} on its supply failure: its money and the deposit back, and {paid} compensation.</value>
+  </data>
+  <data name="ContractCancelled.SupplyFailure.Build.You" xml:space="preserve">
+    <value>You cancelled your Build of a {ship} with {other} on its supply failure: your money and the deposit back, and {paid} compensation.</value>
+  </data>
+  <data name="ContractCancelled.SupplyFailure.Build.ToYou" xml:space="preserve">
+    <value>{by} cancelled its Build of a {ship} with you on your supply failure: you gave back the deposit and paid {paid} compensation.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Build" xml:space="preserve">
+    <value>{payer} rejected the {ship} {performer} built: below what the Build allows. {performer} gave back the deposit, and its bond went to {payer}.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Build.You" xml:space="preserve">
+    <value>{payer} rejected the {ship} you built: below what the Build allows. You gave back the deposit, and your bond went to {payer}.</value>
+  </data>
+  <data name="DeliveryFailed.Rejected.Build.ToYou" xml:space="preserve">
+    <value>You rejected the {ship} {performer} built: below what your Build allows. It gave back the deposit, and its bond went to you.</value>
+  </data>
+  <data name="DeliveryFailed.NotDelivered.Build" xml:space="preserve">
+    <value>{performer} did not hand over {poster}'s {ship}. The Build failed.</value>
+  </data>
+  <data name="DeliveryFailed.NotDelivered.Build.You" xml:space="preserve">
+    <value>You did not hand over {poster}'s {ship}. The Build failed.</value>
+  </data>
+  <data name="DeliveryFailed.NotDelivered.Build.ToYou" xml:space="preserve">
+    <value>{performer} did not hand over your {ship}. The Build failed.</value>
+  </data>
+  <data name="DeliveryFailed.CargoLost.Build" xml:space="preserve">
+    <value>{performer} lost the parts for {poster}'s {ship}. The Build failed.</value>
+  </data>
+  <data name="DeliveryFailed.CargoLost.Build.You" xml:space="preserve">
+    <value>You lost the parts for {poster}'s {ship}. The Build failed.</value>
+  </data>
+  <data name="DeliveryFailed.CargoLost.Build.ToYou" xml:space="preserve">
+    <value>{performer} lost the parts for your {ship}. The Build failed.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Build" xml:space="preserve">
+    <value>{performer} handed over {poster}'s {ship} incomplete. The Build failed.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Build.You" xml:space="preserve">
+    <value>You handed over {poster}'s {ship} incomplete. The Build failed.</value>
+  </data>
+  <data name="DeliveryFailed.ShortDelivery.Build.ToYou" xml:space="preserve">
+    <value>{performer} handed over your {ship} incomplete. The Build failed.</value>
+  </data>
+  <data name="PaymentDefaulted.Build" xml:space="preserve">
+    <value>{payer} did not pay {payee} the balance for the {ship}: a default outside the Accord.</value>
+  </data>
+  <data name="PaymentDefaulted.Build.You" xml:space="preserve">
+    <value>You could not pay {payee} the balance for the {ship}: a default outside the Accord.</value>
+  </data>
+  <data name="PaymentDefaulted.Build.ToYou" xml:space="preserve">
+    <value>{payer} did not pay you the balance for the {ship}: a default outside the Accord.</value>
+  </data>
+  <data name="ShipBuilt" xml:space="preserve">
+    <value>{yard} finished {poster}'s {ship} at {place}, from its parts.</value>
+  </data>
+  <data name="ShipBuilt.You" xml:space="preserve">
+    <value>You finished {poster}'s {ship} at {place}, from its parts.</value>
+  </data>
+  <data name="ShipBuilt.ToYou" xml:space="preserve">
+    <value>{yard} finished your {ship} at {place}, from its parts.</value>
+  </data>
+  <data name="StockShipBuilt" xml:space="preserve">
+    <value>{yard} finished a {ship} on spec at {place}, for its lot.</value>
+  </data>
+  <data name="ShipHandedOver.Build" xml:space="preserve">
+    <value>{seller} handed over {buyer}'s {ship} at {place}, on time. Paid {paid} in all.</value>
+  </data>
+  <data name="ShipHandedOver.Build.You" xml:space="preserve">
+    <value>You handed over {buyer}'s {ship} at {place}, on time. Paid {paid} in all.</value>
+  </data>
+  <data name="ShipHandedOver.Build.ToYou" xml:space="preserve">
+    <value>{seller} handed over your {ship} at {place}, on time. It is yours; paid {paid} in all.</value>
+  </data>
+  <data name="ShipHandedOver.Build.Late" xml:space="preserve">
+    <value>{seller} handed over {buyer}'s {ship} at {place}, {late} late: late fee {lateFee}.</value>
+  </data>
+  <data name="ShipHandedOver.Build.Late.You" xml:space="preserve">
+    <value>You handed over {buyer}'s {ship} at {place}, {late} late: late fee {lateFee}.</value>
+  </data>
+  <data name="ShipHandedOver.Build.Late.ToYou" xml:space="preserve">
+    <value>{seller} handed over your {ship} at {place}, {late} late: late fee {lateFee} to you. It is yours.</value>
+  </data>
+  <data name="ShipHandedOver.Discount" xml:space="preserve">
+    <value>Parts below the grade ordered: {discount} off the price.</value>
+  </data>
+  <data name="ShipHandedOver.Ship" xml:space="preserve">
+    <value>{buyer} bought {seller}'s {ship} at {place} for {paid}.</value>
+  </data>
+  <data name="ShipHandedOver.Ship.You" xml:space="preserve">
+    <value>{buyer} bought your {ship} at {place} for {paid}.</value>
+  </data>
+  <data name="ShipHandedOver.Ship.ToYou" xml:space="preserve">
+    <value>You bought {seller}'s {ship} at {place} for {paid}. It is yours.</value>
+  </data>
+  <data name="ShipHandedOver.Ship.Late" xml:space="preserve">
+    <value>{buyer} bought {seller}'s {ship} at {place} for {paid}.</value>
+  </data>
+  <data name="ShipHandedOver.Ship.Late.You" xml:space="preserve">
+    <value>{buyer} bought your {ship} at {place} for {paid}.</value>
+  </data>
+  <data name="ShipHandedOver.Ship.Late.ToYou" xml:space="preserve">
+    <value>You bought {seller}'s {ship} at {place} for {paid}. It is yours.</value>
+  </data>
+  <data name="SupplyFailure" xml:space="preserve">
+    <value>{yard} can't get the {part} for {poster}'s {ship} in time: an order upstream failed. It proposes remedies under the supply-failure term.</value>
+  </data>
+  <data name="SupplyFailure.You" xml:space="preserve">
+    <value>You can't get the {part} for {poster}'s {ship} in time: an order upstream failed.</value>
+  </data>
+  <data name="SupplyFailure.ToYou" xml:space="preserve">
+    <value>{yard} can't get the {part} for your {ship} in time: an order upstream failed. It proposes remedies; the choice is yours.</value>
+  </data>
+  <data name="RemedyChosen.Extend" xml:space="preserve">
+    <value>{by} gave {yard} more time on the {ship}, with compensation.</value>
+  </data>
+  <data name="RemedyChosen.Extend.You" xml:space="preserve">
+    <value>You gave {yard} more time on your {ship}, with compensation.</value>
+  </data>
+  <data name="RemedyChosen.Extend.ToYou" xml:space="preserve">
+    <value>{by} gave you more time on its {ship}, for compensation.</value>
+  </data>
+  <data name="RemedyChosen.Substitute" xml:space="preserve">
+    <value>{by} took a part a grade lower in its {ship}, at a discount, sooner.</value>
+  </data>
+  <data name="RemedyChosen.Substitute.You" xml:space="preserve">
+    <value>You took a part a grade lower in your {ship}, at a discount, sooner.</value>
+  </data>
+  <data name="RemedyChosen.Substitute.ToYou" xml:space="preserve">
+    <value>{by} took a part a grade lower in its {ship}, at a discount.</value>
+  </data>
+  <data name="RemedyChosen.Cancel" xml:space="preserve">
+    <value>{by} took the refund on its {ship}, with compensation.</value>
+  </data>
+  <data name="RemedyChosen.Cancel.You" xml:space="preserve">
+    <value>You took the refund on your {ship}, with compensation.</value>
+  </data>
+  <data name="RemedyChosen.Cancel.ToYou" xml:space="preserve">
+    <value>{by} took the refund on its {ship}, with compensation from you.</value>
+  </data>
+  <data name="ShipScrapped" xml:space="preserve">
+    <value>{owner} broke up its {ship}: nobody would buy it.</value>
+  </data>
+  <data name="ContractPosted.Ship" xml:space="preserve">
+    <value>{poster} put its {ship} up for sale at {place}, asking {price}.</value>
+  </data>
+  <data name="ContractPosted.Ship.You" xml:space="preserve">
+    <value>You put your {ship} up for sale at {place}, asking {price}.</value>
+  </data>
+  <data name="ContractSigned.Ship" xml:space="preserve">
+    <value>{taker} bought {poster}'s {ship} at {place} for {signed}.</value>
+  </data>
+  <data name="ContractSigned.Ship.You" xml:space="preserve">
+    <value>You bought {poster}'s {ship} at {place} for {signed}.</value>
+  </data>
+  <data name="ContractSigned.Ship.ToYou" xml:space="preserve">
+    <value>{taker} bought your {ship} at {place} for {signed}.</value>
+  </data>
+  <data name="ContractExpired.Ship" xml:space="preserve">
+    <value>Nobody bought {poster}'s {ship} at {place} before its deadline.</value>
+  </data>
+  <data name="ContractExpired.Ship.You" xml:space="preserve">
+    <value>Nobody bought your {ship} at {place} before its deadline.</value>
+  </data>
+  <data name="ContractWithdrawn.Ship" xml:space="preserve">
+    <value>{poster} took its {ship} off sale at {place}.</value>
+  </data>
+  <data name="ContractWithdrawn.Ship.You" xml:space="preserve">
+    <value>You took your {ship} off sale at {place}.</value>
+  </data>
+  <data name="PaymentDefaulted.Ship" xml:space="preserve">
+    <value>{payer} could not pay {payee} for its {ship}: a default outside the Accord. {payee} keeps the ship.</value>
+  </data>
+  <data name="PaymentDefaulted.Ship.You" xml:space="preserve">
+    <value>You could not pay {payee} for its {ship}: a default outside the Accord. It keeps the ship.</value>
+  </data>
+  <data name="PaymentDefaulted.Ship.ToYou" xml:space="preserve">
+    <value>{payer} could not pay you for your {ship}: a default outside the Accord. You keep the ship.</value>
+  </data>
+  <data name="News.Posted.Build" xml:space="preserve">
+    <value>Build wanted: a {ship}, by {deadline}, offering {price}. Posted by {poster} at {place}.</value>
+  </data>
+  <data name="News.Signed.Build" xml:space="preserve">
+    <value>Ordered: a {ship} from {yard}, for {price}, due {deadline}. Client {client}.</value>
+  </data>
+  <data name="News.Expired.Build" xml:space="preserve">
+    <value>No yard: {poster}'s Build of a {ship} expired untaken.</value>
+  </data>
+  <data name="News.Delivered.Build" xml:space="preserve">
+    <value>Handed over {when}: a {ship} built by {yard}, for {price}. Client {client}.</value>
+  </data>
+  <data name="News.Short.Build" xml:space="preserve">
+    <value>Handed over {when}: a {ship} built by {yard}, for {price}. Client {client}.</value>
+  </data>
+  <data name="News.Failed.Build" xml:space="preserve">
+    <value>Rejected: a {ship} built by {yard} below what its Build allows. Client {client}.</value>
+  </data>
+  <data name="News.Defaulted.Build" xml:space="preserve">
+    <value>Unpaid: a {ship} built by {yard}, the client couldn't pay the balance. Client {client}.</value>
+  </data>
+  <data name="News.Cancelled.ForDefault.Build" xml:space="preserve">
+    <value>Cancelled for default: a {ship} {yard} didn't hand over in its grace. Cancelled by {by}.</value>
+  </data>
+  <data name="News.Cancelled.AtWill.Build" xml:space="preserve">
+    <value>Called off: a {ship} from {yard}, the break fee paid by {by}. Client {client}.</value>
+  </data>
+  <data name="News.Cancelled.SupplyFailure.Build" xml:space="preserve">
+    <value>Cancelled on a supply failure: a {ship} {yard} couldn't get the parts for. Client {client}.</value>
+  </data>
+  <data name="News.Posted.Ship" xml:space="preserve">
+    <value>For sale at {place}: a {ship}, asking {price}. Offered by {poster}.</value>
+  </data>
+  <data name="News.Signed.Ship" xml:space="preserve">
+    <value>Sold at {place}: a {ship}, for {price}. Seller {seller}, buyer {buyer}.</value>
+  </data>
+  <data name="News.Expired.Ship" xml:space="preserve">
+    <value>Unsold: a {ship} at {place}, offered by {poster}.</value>
+  </data>
+  <data name="News.Delivered.Ship" xml:space="preserve">
+    <value>Sold at {place}: a {ship}, for {price}. Seller {seller}, buyer {buyer}.</value>
+  </data>
+  <data name="News.Defaulted.Ship" xml:space="preserve">
+    <value>Unpaid: a {ship} at {place}, the buyer couldn't pay. Seller {seller}, buyer {buyer}.</value>
+  </data>
+  <data name="Ship.Owner.You" xml:space="preserve">
+    <value>you</value>
+  </data>
+  <data name="Ship.Sub" xml:space="preserve">
+    <value>Owned by {owner} · worth {value} · runs {running} a day</value>
+  </data>
+  <data name="Ship.Where.Moving" xml:space="preserve">
+    <value>In flight to {destination}, due {when}.</value>
+  </data>
+  <data name="Ship.Where.Free" xml:space="preserve">
+    <value>Docked at {place}, free.</value>
+  </data>
+  <data name="Ship.Where.Busy" xml:space="preserve">
+    <value>At {place}, on a job.</value>
+  </data>
+  <data name="Ship.Where.ForSale" xml:space="preserve">
+    <value>Laid up at {place}, for sale.</value>
+  </data>
+  <data name="Ship.Where.Scrapped" xml:space="preserve">
+    <value>Broken up.</value>
+  </data>
+  <data name="Ship.Part.Note" xml:space="preserve">
+    <value>worth {value} at its grade</value>
+  </data>
+  <data name="Ship.Parts" xml:space="preserve">
+    <value>Parts</value>
+  </data>
+  <data name="Ship.Stats" xml:space="preserve">
+    <value>Stats, from the parts</value>
+  </data>
+  <data name="Ship.Stat.Cargo" xml:space="preserve">
+    <value>Cargo</value>
+  </data>
+  <data name="Ship.Stat.Mass" xml:space="preserve">
+    <value>Mass</value>
+  </data>
+  <data name="Ship.Stat.Power" xml:space="preserve">
+    <value>Power</value>
+  </data>
+  <data name="Ship.Stat.Speed" xml:space="preserve">
+    <value>Speed</value>
+  </data>
+  <data name="Ship.Stat.Toughness" xml:space="preserve">
+    <value>Toughness</value>
+  </data>
+  <data name="Ship.Stat.Reliability" xml:space="preserve">
+    <value>Reliability</value>
+  </data>
+  <data name="Ship.Stat.Preservation" xml:space="preserve">
+    <value>Refrigeration</value>
+  </data>
+  <data name="Ship.Stat.RunningCost" xml:space="preserve">
+    <value>Running cost a day</value>
+  </data>
+  <data name="Ship.Stat.Value" xml:space="preserve">
+    <value>Value</value>
+  </data>
+  <data name="Ship.Stat.Term" xml:space="preserve">
+    <value>{part} {value}</value>
+  </data>
+  <data name="Ship.Stat.Assembly" xml:space="preserve">
+    <value>assembly</value>
+  </data>
+  <data name="Ship.Stat.Speed.Explain" xml:space="preserve">
+    <value>power ({power}) over mass ({mass})</value>
+  </data>
+  <data name="Ship.Stat.Toughness.Explain" xml:space="preserve">
+    <value>{terms}</value>
+  </data>
+  <data name="Ship.Built" xml:space="preserve">
+    <value>Built by {yard} at {place}, {when}.</value>
+  </data>
+  <data name="Ship.Built.Start" xml:space="preserve">
+    <value>In service before the records begin.</value>
+  </data>
+  <data name="Ship.Substituted" xml:space="preserve">
+    <value>Substituted: {parts}.</value>
+  </data>
+  <data name="Ship.Substituted.Part" xml:space="preserve">
+    <value>{slot}: {fitted} for grade {wanted}</value>
+  </data>
+  <data name="Ship.History" xml:space="preserve">
+    <value>History</value>
+  </data>
+  <data name="Ship.Flown" xml:space="preserve">
+    <value>Flew {count} contracts; lately: {recent}.</value>
+  </data>
+  <data name="Ship.Flown.None" xml:space="preserve">
+    <value>No contracts flown yet.</value>
+  </data>
+  <data name="Ship.Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Ship.Record.Registered" xml:space="preserve">
+    <value>Registered to {owner} at {place}.</value>
+  </data>
+  <data name="Ship.Record.Built" xml:space="preserve">
+    <value>Built by {yard} for {owner} at {place}, from {parts}.</value>
+  </data>
+  <data name="Ship.Record.BuiltOnSpec" xml:space="preserve">
+    <value>Built on spec by {yard} at {place}, from {parts}.</value>
+  </data>
+  <data name="Ship.Record.ChangedHands" xml:space="preserve">
+    <value>Changed hands at {place}: {from} to {to}, for {price}.</value>
+  </data>
+  <data name="Ship.Record.Incident" xml:space="preserve">
+    <value>Incident near {place}: {incident}.</value>
+  </data>
+  <data name="Ship.Record.Scrapped" xml:space="preserve">
+    <value>Broken up by {owner} at {place}.</value>
+  </data>
+  <data name="Ship.Incident.MinorDelay" xml:space="preserve">
+    <value>a delay</value>
+  </data>
+  <data name="Ship.Incident.CargoDamage" xml:space="preserve">
+    <value>cargo damaged</value>
+  </data>
+  <data name="Ship.Incident.PartialLoss" xml:space="preserve">
+    <value>part of the cargo lost</value>
+  </data>
+  <data name="Ship.Incident.CreditCost" xml:space="preserve">
+    <value>repairs paid</value>
+  </data>
+  <data name="Ship.Incident.TotalLoss" xml:space="preserve">
+    <value>the whole cargo lost</value>
+  </data>
+  <data name="Ship.Open" xml:space="preserve">
+    <value>The ship</value>
+  </data>
+  <data name="Orders.Title" xml:space="preserve">
+    <value>Orders</value>
+  </data>
+  <data name="Orders.Build" xml:space="preserve">
+    <value>{client}'s {ship}, with {yard}.</value>
+  </data>
+  <data name="Orders.Part" xml:space="preserve">
+    <value>{slot}: {part}, {state}.</value>
+  </data>
+  <data name="Orders.Part.Fitted" xml:space="preserve">
+    <value>fitted</value>
+  </data>
+  <data name="Orders.Part.In" xml:space="preserve">
+    <value>in at the yard</value>
+  </data>
+  <data name="Orders.Part.Ordered" xml:space="preserve">
+    <value>on order</value>
+  </data>
+  <data name="Orders.Part.Waiting" xml:space="preserve">
+    <value>not yet ordered</value>
+  </data>
+  <data name="Orders.Order" xml:space="preserve">
+    <value>Order for {good} at {price}: {status}, from {seller}, due {deadline}.</value>
+  </data>
+  <data name="Orders.Haul" xml:space="preserve">
+    <value>Carried from {origin} by {carrier}: {status}.</value>
+  </data>
+  <data name="Orders.Assembling" xml:space="preserve">
+    <value>Assembling at {yard} until {when}.</value>
+  </data>
+  <data name="Orders.Built" xml:space="preserve">
+    <value>Built: {ship}.</value>
+  </data>
+  <data name="Orders.NoSeller" xml:space="preserve">
+    <value>nobody yet</value>
+  </data>
+  <data name="Orders.NoCarrier" xml:space="preserve">
+    <value>nobody yet</value>
+  </data>
+  <data name="Orders.Status.Open" xml:space="preserve">
+    <value>open</value>
+  </data>
+  <data name="Orders.Status.Active" xml:space="preserve">
+    <value>signed</value>
+  </data>
+  <data name="Orders.Status.Fulfilled" xml:space="preserve">
+    <value>delivered</value>
+  </data>
+  <data name="Orders.Status.PartlyFulfilled" xml:space="preserve">
+    <value>delivered short</value>
+  </data>
+  <data name="Orders.Status.Breached" xml:space="preserve">
+    <value>failed</value>
+  </data>
+  <data name="Orders.Status.Cancelled" xml:space="preserve">
+    <value>cancelled</value>
+  </data>
+  <data name="Orders.Status.Defaulted" xml:space="preserve">
+    <value>unpaid</value>
+  </data>
+  <data name="Orders.Status.Expired" xml:space="preserve">
+    <value>expired untaken</value>
+  </data>
+  <data name="Orders.Status.Withdrawn" xml:space="preserve">
+    <value>withdrawn</value>
+  </data>
+  <data name="Party.You" xml:space="preserve">
+    <value>you</value>
+  </data>
+  <data name="Party.Yard" xml:space="preserve">
+    <value>the yard that takes it</value>
+  </data>
+  <data name="Party.Yard.Start" xml:space="preserve">
+    <value>The yard that takes it</value>
+  </data>
+  <data name="Party.YardsPlace" xml:space="preserve">
+    <value>its yard</value>
+  </data>
+  <data name="Term.Build" xml:space="preserve">
+    <value>{Yard} builds {client} a {ship} from {parts}, and hands it over at {place} by {deadline}.</value>
+  </data>
+  <data name="Term.Build.Grace" xml:space="preserve">
+    <value>After that, {grace} of grace; a late ship costs the yard {perDay} a day, up to {cap}, from its bond.</value>
+  </data>
+  <data name="Term.Build.Substitution.Strict" xml:space="preserve">
+    <value>Strict: no substitutes. A part below the grade ordered lets the client reject the ship.</value>
+  </data>
+  <data name="Term.Build.Substitution.Standard" xml:space="preserve">
+    <value>Standard: a part one grade lower is allowed, 20% of that part's price off; any lower and the client may reject the ship.</value>
+  </data>
+  <data name="Term.Build.Substitution.Lenient" xml:space="preserve">
+    <value>Lenient: any lower grade is allowed, priced down 15% of the part's price for each grade.</value>
+  </data>
+  <data name="Term.Build.SupplyFailure" xml:space="preserve">
+    <value>If a part can't come in time, the yard proposes: more time with compensation, a part a grade lower at a discount, or the money back with compensation. The client chooses.</value>
+  </data>
+  <data name="Term.Build.Escrow" xml:space="preserve">
+    <value>On signing, the client pays the yard a deposit of {deposit} and locks the balance of {balance} and the {tax} tax in Accord escrow; the yard locks a bond of {bond}.</value>
+  </data>
+  <data name="Term.Build.BreakFee" xml:space="preserve">
+    <value>Either side may walk away: the client forfeits the deposit; the yard gives it back and pays as much again.</value>
+  </data>
+  <data name="Term.Courts.Build" xml:space="preserve">
+    <value>Yards are in Accord space: disputes go to the Accord, and at Helios Prime its courts reach the yard's account.</value>
+  </data>
+  <data name="Term.Ship" xml:space="preserve">
+    <value>The {ship} changes hands at {place} the moment the sale is signed, as it is. Read its sheet and history first.</value>
+  </data>
+  <data name="Term.Ship.Escrow" xml:space="preserve">
+    <value>In Accord space the price and the {tax} tax go through escrow at signing.</value>
+  </data>
+  <data name="Term.Ship.Frontier" xml:space="preserve">
+    <value>Outside the Accord there is no escrow and no tax: the buyer pays {seller} at handover, if it can.</value>
+  </data>
+  <data name="Status.Yours.Build" xml:space="preserve">
+    <value>Ordered from {performer} for {price}: to be handed over at {place} by {deadline}.</value>
+  </data>
+  <data name="Status.Yours.Ship" xml:space="preserve">
+    <value>Yours.</value>
+  </data>
+  <data name="Action.BuyShip" xml:space="preserve">
+    <value>Buy the ship</value>
+  </data>
+  <data name="Action.SellShip" xml:space="preserve">
+    <value>Put it up for sale</value>
+  </data>
+  <data name="Block.Build" xml:space="preserve">
+    <value>Only a yard builds: a Build is for the yards to bid on.</value>
+  </data>
+  <data name="Outcome.BoughtShip" xml:space="preserve">
+    <value>Bought for {price}. The {ship} is yours, at {place}.</value>
+  </data>
+  <data name="Outcome.ShipForSale" xml:space="preserve">
+    <value>Put up for sale at {place}, asking {price}.</value>
+  </data>
+  <data name="Decision.SupplyFailure" xml:space="preserve">
+    <value>{yard} can't get the {part} for your {ship} in time: an order upstream failed. Under the supply-failure term it proposes three remedies. Your deadline is {deadline}.</value>
+  </data>
+  <data name="Decision.Extend" xml:space="preserve">
+    <value>More time</value>
+  </data>
+  <data name="Decision.Extend.Note" xml:space="preserve">
+    <value>Due {extended} instead; {yard} pays you {compensation} now.</value>
+  </data>
+  <data name="Decision.Substitute" xml:space="preserve">
+    <value>A substitute</value>
+  </data>
+  <data name="Decision.Substitute.Note" xml:space="preserve">
+    <value>A {substitute} instead, {discount} off the price; due {sooner}.</value>
+  </data>
+  <data name="Decision.TakeRefund" xml:space="preserve">
+    <value>The refund</value>
+  </data>
+  <data name="Decision.TakeRefund.Note" xml:space="preserve">
+    <value>Cancel: the deposit of {deposit} and the {escrow} in escrow back, and {cancel} compensation.</value>
+  </data>
+  <data name="Decision.InspectShip" xml:space="preserve">
+    <value>{yard} built your {ship} from {fitted}, below what your Build allows ({ordered}).</value>
+  </data>
+  <data name="Decision.AcceptShip.Note" xml:space="preserve">
+    <value>Take it: {refund} off for the grades it falls short.</value>
+  </data>
+  <data name="Decision.RejectShip.Note" xml:space="preserve">
+    <value>Refuse it: your money and the deposit of {deposit} back, and the yard's bond of {bond}. The ship stays the yard's.</value>
+  </data>
+  <data name="Map.Overlay.Title.Build" xml:space="preserve">
+    <value>Build: a {ship}, at {place}</value>
+  </data>
+  <data name="Map.Overlay.Title.Ship" xml:space="preserve">
+    <value>{ship} for sale at {place}</value>
+  </data>
+  <data name="Ledger.Ship.Free" xml:space="preserve">
+    <value>Docked at {place}, free.</value>
+  </data>
+  <data name="Ledger.Ship.Busy" xml:space="preserve">
+    <value>On a job, bound for {place}.</value>
+  </data>
+  <data name="Ledger.Ship.ForSale" xml:space="preserve">
+    <value>Laid up for sale at {place}.</value>
+  </data>
+  <data name="Ledger.Role.Ordering" xml:space="preserve">
+    <value>ordering from</value>
+  </data>
+  <data name="Board.Title.Ship" xml:space="preserve">
+    <value>Ship for sale: {ship}</value>
+  </data>
+  <data name="Board.Title.Build" xml:space="preserve">
+    <value>Build wanted: a {ship}</value>
+  </data>
+  <data name="Board.Ship.Worth" xml:space="preserve">
+    <value>worth {value}</value>
+  </data>
+  <data name="Board.Note.Build" xml:space="preserve">
+    <value>For the yards to bid on.</value>
+  </data>
+  <data name="Line.ShipPrice" xml:space="preserve">
+    <value>The ship</value>
+  </data>
+  <data name="Line.ShipPrice.Note" xml:space="preserve">
+    <value>as asked</value>
+  </data>
+  <data name="Line.Tax" xml:space="preserve">
+    <value>Accord tax</value>
+  </data>
+  <data name="Line.Tax.Note" xml:space="preserve">
+    <value>{tax} on the price</value>
+  </data>
+  <data name="Decision.CancelForDefault.Build" xml:space="preserve">
+    <value>{performer} is in default on your Build: its grace ended {when} with the ship not handed over.</value>
+  </data>
+  <data name="Composer.Kind.Build" xml:space="preserve">
+    <value>Build</value>
+  </data>
+  <data name="Composer.Kind.Ship" xml:space="preserve">
+    <value>Ship for sale</value>
+  </data>
+  <data name="Composer.Note.Build" xml:space="preserve">
+    <value>A Build for a {ship}, shown at {place} and wherever else you pay to show it: yards that see it bid their price, terms and delivery.</value>
+  </data>
+  <data name="Composer.Note.Ship" xml:space="preserve">
+    <value>One of your ships, for sale where it is docked.</value>
+  </data>
+  <data name="Composer.Reference.Build" xml:space="preserve">
+    <value>Parts and assembly for a {ship} are worth {value}. Yards bid from the part prices they know, their queues and their habits.</value>
+  </data>
+  <data name="Composer.Reference.Ship" xml:space="preserve">
+    <value>Its parts and assembly are worth {value}.</value>
+  </data>
+  <data name="Composer.Commits.Build" xml:space="preserve">
+    <value>When a yard signs, you pay it a deposit of {deposit} and lock the balance of {balance} and the {tax} tax in escrow.</value>
+  </data>
+  <data name="Composer.Commits.Ship" xml:space="preserve">
+    <value>It changes hands the moment someone signs.</value>
+  </data>
+  <data name="Composer.Commits.Bids" xml:space="preserve">
+    <value>Yards that see it answer with bids over the next hours.</value>
+  </data>
+  <data name="Composer.Field.Design" xml:space="preserve">
+    <value>Design</value>
+  </data>
+  <data name="Composer.Field.Frame" xml:space="preserve">
+    <value>Frame</value>
+  </data>
+  <data name="Composer.Field.Drive" xml:space="preserve">
+    <value>Drive</value>
+  </data>
+  <data name="Composer.Field.Module" xml:space="preserve">
+    <value>Module</value>
+  </data>
+  <data name="Composer.Design.Custom" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="PostBlock.NoShip" xml:space="preserve">
+    <value>There is nothing to post: a Build needs its parts named, and a ship for sale must be yours, free, empty and docked where it is posted, with another left to fly.</value>
+  </data>
+  <data name="Ship.ForSale.Open" xml:space="preserve">
+    <value>Its sale</value>
+  </data>
+  <data name="Orders.Build.You" xml:space="preserve">
+    <value>Your {ship}, with {yard}.</value>
   </data>
 </root>

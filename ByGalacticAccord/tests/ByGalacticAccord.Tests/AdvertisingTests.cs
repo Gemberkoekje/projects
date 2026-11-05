@@ -80,7 +80,7 @@ public sealed class AdvertisingTests
     }
 
     [Fact]
-    public void An_AI_shows_a_post_that_sits_unsold_a_ring_further_each_day_while_that_stays_within_its_budget()
+    public void An_AI_shows_a_post_that_sits_unsold_a_ring_further_each_day_while_what_it_has_paid_stays_within_its_budget()
     {
         SimulationContext context = TestWorld.Quiet();
         ActorState habs = context.Actor("Meridian Habs");
@@ -92,7 +92,8 @@ public sealed class AdvertisingTests
         Advertising.AdvertiseUnsold(context, habs);
         Assert.False(dear.Advertised); // not yet a day unsold
 
-        // Each day: the next ring, every system at that distance, while its fees are no more than 5% of the price.
+        // Each day: the next ring, every system at that distance, while all it has paid to show the post, the ring included, is no
+        // more than 5% of the price (S7 made the budget a total: a post reposted doesn't pay the same rings again and again).
         int[] Furthest(Contract c) => c.Shown.Select(s => Advertising.JumpsFrom(context, c, s.At)).ToArray();
         for (int day = 1; day <= 4; day++)
         {
@@ -101,11 +102,12 @@ public sealed class AdvertisingTests
             Advertising.AdvertiseUnsold(context, habs); // the same day again changes nothing
         }
 
-        Assert.Equal(3, Furthest(dear).Max()); // ₵3, ₵8, then ₵16 for Edge Station: all within ₵100
+        Assert.Equal(3, Furthest(dear).Max()); // ₵3, ₵8, then ₵16 for Edge Station: ₵27 in all, within ₵100
         Assert.Equal(7, dear.Shown.Count());
-        Assert.Equal(2, Furthest(cheap).Max()); // ₵0.60 and ₵1.60 fit in ₵2; Edge Station's ₵3.20 doesn't
+        Assert.Equal(Credits.Of(27m), dear.AdFeesPaid);
+        Assert.Equal(1, Furthest(cheap).Max()); // ₵0.60 fits in ₵2; another ₵1.60 for the next ring would take it to ₵2.20
         Assert.Null(cheap.ShownFrom(context.Place("Edge Station").Id));
-        Assert.Equal(3.00m + 8.00m + 16.00m + 0.60m + 1.60m, context.AdFeesPaid.Amount);
+        Assert.Equal(3.00m + 8.00m + 16.00m + 0.60m, context.AdFeesPaid.Amount);
         context.AssertSound();
     }
 

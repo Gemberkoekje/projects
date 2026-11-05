@@ -11,7 +11,7 @@ public sealed class GoodsTests
     [InlineData(GoodType.Medicine, 2 * 24, 10 * 24)]
     public void Perishables_keep_to_the_design_targets_in_a_standard_hold_and_refrigerated(GoodType good, long standard, long refrigerated)
     {
-        decimal chilled = ShipClasses.Info(ShipType.RefrigeratedTransport).Preservation;
+        decimal chilled = Designs.Stats(Design.RefrigeratedTransport).Preservation;
 
         Assert.Equal(Goods.StandardWarranty, Cargo.Fresh(good, 1m).Decayed(standard, 0m).Quality, 12);
         Assert.Equal(Goods.StandardWarranty, Cargo.Fresh(good, 1m).Decayed(refrigerated, chilled).Quality, 12);
@@ -25,8 +25,8 @@ public sealed class GoodsTests
         SimulationContext context = TestWorld.Quiet();
         long food = context.FindPath(context.Place("Verdant").Id, context.Place("Rust Belt").Id)!.DistanceTicks;
         long medicine = context.FindPath(context.Place("Helios Prime").Id, context.Place("Edge Station").Id)!.DistanceTicks;
-        ShipClassInfo reefer = ShipClasses.Info(ShipType.RefrigeratedTransport);
-        long reeferHours = Engine.Economy.PriceModel.TravelTicks(medicine, reefer.SpeedMultiplier);
+        ShipStats reefer = Designs.Stats(Design.RefrigeratedTransport);
+        long reeferHours = Engine.Economy.PriceModel.TravelTicks(medicine, reefer.Speed);
 
         Assert.True(Cargo.Fresh(GoodType.Food, 1m).Decayed(food, 0m).Quality >= Goods.StandardWarranty);
         Assert.True(Cargo.Fresh(GoodType.Medicine, 1m).Decayed(medicine, 0m).Quality < Goods.StandardWarranty);

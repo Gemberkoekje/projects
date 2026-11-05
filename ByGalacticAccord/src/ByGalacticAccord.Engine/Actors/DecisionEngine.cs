@@ -37,6 +37,21 @@ public static partial class DecisionEngine
             RunProducer(context, actor);
         }
 
+        if (actor.Factory is not null)
+        {
+            RunFactory(context, actor);
+        }
+
+        if (actor.Yard is not null)
+        {
+            RunYard(context, actor);
+        }
+
+        if (actor.Salvage is not null)
+        {
+            RunSalvage(context, actor);
+        }
+
         if (actor.Demands.Count > 0)
         {
             RunConsumer(context, actor);
@@ -57,8 +72,9 @@ public static partial class DecisionEngine
     /// <summary>
     /// The most an AI actor keeps in hand (S3's safety valve, like the inflation monitor, design §5.5): money it has
     /// no use for in the sector leaves it, as a consumer's spending on other things or a business's payout to its
-    /// owners. Without it a saver soaks up the money supply and the monitor starves everyone else. Growth (S7),
-    /// insolvency (S8) and demand starvation (§5.6) are the organic regulators that should replace it. The player is
+    /// owners. Without it a saver soaks up the money supply and the monitor starves everyone else. Since S7 a trader that
+    /// wants another ship keeps its price on top (<see cref="GrowthFund"/>), so growth spends what the payout would sink;
+    /// insolvency (S8) and demand starvation (§5.6) are the other organic regulators that should replace it. The player is
     /// never touched.
     /// </summary>
     public static Credits WorkingCapital(SimulationContext context, ActorState actor)
@@ -74,6 +90,16 @@ public static partial class DecisionEngine
             return Credits.Of(profile.UnitProductionCost.Amount * profile.StockCap * config.ProducerReserveWarehouses);
         }
 
+        if (actor.Factory is not null)
+        {
+            return config.FactoryReserve;
+        }
+
+        if (actor.Yard is not null || actor.Salvage is not null)
+        {
+            return config.YardReserve;
+        }
+
         if (actor.Demands.Count > 0)
         {
             return Credits.Of(actor.IncomePerHeartbeat.Amount * config.ConsumerSavingsDays);
@@ -81,8 +107,8 @@ public static partial class DecisionEngine
 
         if (actor.MovesCargo)
         {
-            decimal fleet = actor.Ships.Sum(id => context.Ship(id).Class.MarketValue.Amount);
-            return Credits.Of(fleet * config.TraderReserveFleets);
+            decimal fleet = actor.Ships.Sum(id => context.Ship(id).Stats.Value.Amount);
+            return Credits.Of((fleet * config.TraderReserveFleets) + GrowthFund(context, actor));
         }
 
         return Credits.Of(decimal.MaxValue);
@@ -98,15 +124,21 @@ public static partial class DecisionEngine
         }
     }
 
-    /// <summary>Running costs drain whether or not a ship is earning (design §6.5): the sink that gates fleet size.</summary>
+    /// <summary>
+    /// Running costs drain whether or not a ship is earning (design §6.5): the sink that gates fleet size. A ship laid up while it is
+    /// up for sale costs a quarter as much (<see cref="LaidUpShare"/>), whoever owns it.
+    /// </summary>
     public static void ChargeRunningCosts(SimulationContext context, ActorState owner)
     {
         foreach (ShipId shipId in owner.Ships)
         {
             Ship ship = context.Ship(shipId);
-            context.ApplySink(owner, Credits.Of(ship.Class.RunningCostPerTick.Amount * context.Config.HeartbeatInterval));
+            context.ApplySink(owner, Credits.Of(RunningCost(ship) * context.Config.HeartbeatInterval));
         }
     }
+
+    /// <summary>What a ship costs to run an hour now: its running cost, a quarter of it while laid up for sale.</summary>
+    public static decimal RunningCost(Ship ship) => ship.Stats.RunningCostPerTick.Amount * (ship.ListedFor is null ? 1m : LaidUpShare);
 
     /// <summary>
     /// AI producers at an AI's wanted Sale's place answer it the moment it is posted (design §4.3: an actor re-evaluates when
@@ -118,7 +150,7 @@ public static partial class DecisionEngine
         foreach (ActorId id in context.Location(wanted.Place).Residents)
         {
             ActorState resident = context.Actor(id);
-            if (!resident.IsPlayer && resident.Producer is { } profile && profile.Good == wanted.Good && TryAnswer(context, resident, wanted))
+            if (!resident.IsPlayer && resident.Makes(wanted.Good) && TryAnswer(context, resident, wanted))
             {
                 return;
             }
@@ -138,7 +170,7 @@ public static partial class DecisionEngine
             return Credits.Zero;
         }
 
-        ShipClassInfo standard = ShipClasses.Info(ShipType.LightFreighter);
+        ShipStats standard = Designs.Stats(Design.LightFreighter);
         decimal minimum = PriceModel.PilotMinimumFee(standard, plan.DistanceTicks, plan.MaxDanger, Personality.Balanced).Amount;
         decimal emptyLeg = standard.RunningCostPerTick.Amount * AverageHoursTo(context, from);
         return Credits.Of(Math.Round(((minimum + emptyLeg) * 1.25m) + 10m, 2));
@@ -289,6 +321,20 @@ public static partial class DecisionEngine
     /// <summary>The utility comparison behind <see cref="ReviewDefault"/>.</summary>
     public static bool WouldCancel(SimulationContext context, ActorState payer, Contract contract)
     {
+        if (contract is BuildContract build)
+        {
+            // Waiting gets the ship, worth more to it than its price, and the late fee as it runs to its cap; cancelling its money
+            // back, the deposit and the yard's bond. A yard no longer building it gives nothing to wait for.
+            if (!context.Actor(build.Builder!.Value).Works.Has(build.Id))
+            {
+                return true;
+            }
+
+            decimal shipWorth = (build.PostedBy == payer.Id ? build.Reservation : build.Price).Amount;
+            decimal waitFor = shipWorth - build.Price.Amount + (build.LatePenalty?.MaxPenalty.Amount ?? 0m);
+            return (build.UsesEscrow ? build.LockedBond.Amount : 0m) > waitFor;
+        }
+
         if (contract is not SaleContract sale || Market.ExpectedArrival(context, contract) is not { } arrival)
         {
             return true;
@@ -315,8 +361,22 @@ public static partial class DecisionEngine
     }
 
     /// <summary>What a producer asks per unit now: its cost, margin, warehouse and savings (design §5.2).</summary>
-    public static Credits Ask(ActorState producer) =>
-        PriceModel.ProducerAsk(producer.Producer!, producer.Stock(producer.Producer!.Good), producer.Credits);
+    public static Credits Ask(ActorState producer) => Ask(producer, producer.Producer!.Good);
+
+    /// <summary>
+    /// What a producer asks per unit of a good it makes now (design §5.2): a producer from its cost, margin, warehouse and
+    /// savings; a factory from the part's cost at its grade and its margin, a little less the fuller its stock of that part.
+    /// </summary>
+    public static Credits Ask(ActorState producer, GoodType good)
+    {
+        if (producer.Producer is { } profile && profile.Good == good)
+        {
+            return PriceModel.ProducerAsk(profile, producer.Stock(good), producer.Credits);
+        }
+
+        ProducerProfile part = producer.ProfileFor(good) ?? throw new ArgumentException($"{producer.Name} doesn't make {good}.", nameof(good));
+        return PriceModel.PartAsk(part, producer.Stock(good));
+    }
 
     /// <summary>
     /// A haul a seller posted to deliver a Sale that nobody has taken in a day is reposted a quarter dearer, while a

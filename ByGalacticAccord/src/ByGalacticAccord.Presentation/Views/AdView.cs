@@ -55,7 +55,9 @@ public static class AdView
         }
 
         IReadOnlyList<(LocationId At, int Jumps, Credits Fee)> options = Advertising.Options(session.Context, contract);
-        return options.Count == 0 ? null : Model(session, contract.Places, options, new HashSet<LocationId>());
+        // Where it is shown already (its own places, and where it was paid for), not only its own places.
+        var shown = contract.Shown.OrderBy(s => s.From).ThenBy(s => s.At.Value).Select(s => s.At).ToList();
+        return options.Count == 0 ? null : Model(session, shown.Count > 0 ? shown : contract.Places, options, new HashSet<LocationId>());
     }
 
     /// <summary>Where a contract is shown, soonest first (its own places, then where it was paid for): "Shown at Verdant; Meridian Station from Day 2 · 10:00."</summary>

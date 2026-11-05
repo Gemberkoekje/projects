@@ -53,19 +53,19 @@ public sealed class ActorKnowledge
     /// <summary>How many days of readings the history keeps per producer.</summary>
     public const int HistoryDays = 14;
 
-    private readonly Dictionary<ActorId, PriceReading> _readings = new();
-    private readonly Dictionary<ActorId, List<(long Tick, Credits Ask)>> _history = new();
+    private readonly Dictionary<(ActorId Producer, GoodType Good), PriceReading> _readings = new();
+    private readonly Dictionary<(ActorId Producer, GoodType Good), List<(long Tick, Credits Ask)>> _history = new();
     private readonly Dictionary<LocationId, long> _lastHere = new();
     private readonly HashSet<ContractId> _closed = new();
     private readonly Dictionary<ActorId, long> _refused = new();
 
-    /// <summary>Its last reading of a producer, as remembered (not live): null if it has never known it.</summary>
-    public PriceReading? Stored(ActorId producer) => _readings.TryGetValue(producer, out PriceReading reading) ? reading : null;
+    /// <summary>Its last reading of a producer's good, as remembered (not live): null if it has never known it.</summary>
+    public PriceReading? Stored(ActorId producer, GoodType good) => _readings.TryGetValue((producer, good), out PriceReading reading) ? reading : null;
 
-    /// <summary>Its readings of a producer's ask, at most one a day, oldest first.</summary>
-    public IReadOnlyList<(long Tick, Credits Ask)> History(ActorId producer)
+    /// <summary>Its readings of a producer's ask for a good, at most one a day, oldest first.</summary>
+    public IReadOnlyList<(long Tick, Credits Ask)> History(ActorId producer, GoodType good)
     {
-        if (!_history.TryGetValue(producer, out List<(long Tick, Credits Ask)>? list))
+        if (!_history.TryGetValue((producer, good), out List<(long Tick, Credits Ask)>? list))
         {
             return Array.Empty<(long, Credits)>();
         }
@@ -89,7 +89,8 @@ public sealed class ActorKnowledge
 
     internal void Note(PriceReading reading)
     {
-        bool known = _readings.TryGetValue(reading.Producer, out PriceReading before);
+        var key = (reading.Producer, reading.Good);
+        bool known = _readings.TryGetValue(key, out PriceReading before);
         if (known && before.AskTick > reading.AskTick)
         {
             return; // it already knows better
@@ -97,15 +98,15 @@ public sealed class ActorKnowledge
 
         // A reading without stock keeps the stock it last saw, with that reading's age; a live one is remembered as seen.
         bool keepStock = reading.Stock is null && known;
-        _readings[reading.Producer] = new PriceReading(
+        _readings[key] = new PriceReading(
             reading.Producer, reading.Good, reading.At, reading.Ask, reading.AskTick,
             reading.Source == ReadingSource.Live ? ReadingSource.Seen : reading.Source,
             keepStock ? before.Stock : reading.Stock, keepStock ? before.StockTick : reading.StockTick);
 
-        if (!_history.TryGetValue(reading.Producer, out List<(long Tick, Credits Ask)>? list))
+        if (!_history.TryGetValue(key, out List<(long Tick, Credits Ask)>? list))
         {
             list = new List<(long Tick, Credits Ask)>(2 * HistoryDays);
-            _history[reading.Producer] = list;
+            _history[key] = list;
         }
 
         int last = list.Count - 1;
@@ -140,20 +141,20 @@ public sealed class PriceBulletin
     /// <summary>The hour of the day the bulletin is posted, with The Daily Accord.</summary>
     public const int Hour = 6;
 
-    private readonly Dictionary<ActorId, Credits> _asks = new();
+    private readonly Dictionary<(ActorId Producer, GoodType Good), Credits> _asks = new();
 
     /// <summary>When it was last posted; null before the first.</summary>
     public long? Tick { get; private set; }
 
-    public Credits? AskOf(ActorId producer) => _asks.TryGetValue(producer, out Credits ask) ? ask : null;
+    public Credits? AskOf(ActorId producer, GoodType good) => _asks.TryGetValue((producer, good), out Credits ask) ? ask : null;
 
     internal void Post(SimulationContext context)
     {
         foreach (ActorState actor in context.ActorsOrdered)
         {
-            if (actor.Producer is not null)
+            foreach (GoodType good in actor.Products)
             {
-                _asks[actor.Id] = DecisionEngine.Ask(actor);
+                _asks[(actor.Id, good)] = DecisionEngine.Ask(actor, good);
             }
         }
 
@@ -181,11 +182,11 @@ public static class Knowledge
         {
             foreach (ActorState producer in context.ActorsOrdered)
             {
-                if (producer.Producer is { } profile)
+                foreach (GoodType good in producer.Products)
                 {
                     actor.Knowledge.Note(new PriceReading(
-                        producer.Id, profile.Good, producer.Home, DecisionEngine.Ask(producer), context.CurrentTick, ReadingSource.Start,
-                        producer.Available(profile.Good), context.CurrentTick));
+                        producer.Id, good, producer.Home, DecisionEngine.Ask(producer, good), context.CurrentTick, ReadingSource.Start,
+                        producer.Available(good), context.CurrentTick));
                 }
             }
         }
@@ -200,9 +201,10 @@ public static class Knowledge
         actor.Knowledge.NotePresent(location, context.CurrentTick);
         foreach (ActorId id in context.Location(location).Residents)
         {
-            if (context.Actor(id) is { Producer: { } profile } producer)
+            ActorState producer = context.Actor(id);
+            foreach (GoodType good in producer.Products)
             {
-                actor.Knowledge.Note(Live(context, producer, profile));
+                actor.Knowledge.Note(Live(context, producer, good));
             }
         }
     }
@@ -223,9 +225,17 @@ public static class Knowledge
             Sight sight = Visibility.Of(context, actor);
             foreach (ActorState producer in context.ActorsOrdered)
             {
-                if (producer.Producer is { } profile && sight.TierOf(producer.Home) == Tier.Near && list.AskOf(producer.Id) is { } ask)
+                if (sight.TierOf(producer.Home) != Tier.Near)
                 {
-                    actor.Knowledge.Note(new PriceReading(producer.Id, profile.Good, producer.Home, ask, posted, ReadingSource.Daily, null, null));
+                    continue;
+                }
+
+                foreach (GoodType good in producer.Products)
+                {
+                    if (list.AskOf(producer.Id, good) is { } ask)
+                    {
+                        actor.Knowledge.Note(new PriceReading(producer.Id, good, producer.Home, ask, posted, ReadingSource.Daily, null, null));
+                    }
                 }
             }
         }
@@ -240,9 +250,14 @@ public static class Knowledge
 
         foreach (ActorState producer in context.ActorsOrdered)
         {
-            if (producer.Producer is { } profile && sight.TierOf(producer.Home) == Tier.Here)
+            if (sight.TierOf(producer.Home) != Tier.Here)
             {
-                actor.Knowledge.Note(Live(context, producer, profile));
+                continue;
+            }
+
+            foreach (GoodType good in producer.Products)
+            {
+                actor.Knowledge.Note(Live(context, producer, good));
             }
         }
     }
@@ -250,7 +265,7 @@ public static class Knowledge
     /// <summary>A producer's lot in the news: whoever reads it learns the price it asks a unit, as of its posting.</summary>
     internal static void ReadLot(SimulationContext context, SaleContract lot)
     {
-        if (context.Actor(lot.PostedBy) is not { Producer: { } profile } producer || profile.Good != lot.Good || lot.Quantity <= 0m)
+        if (context.Actor(lot.PostedBy) is not { } producer || !producer.Makes(lot.Good) || lot.Quantity <= 0m)
         {
             return;
         }
@@ -258,7 +273,7 @@ public static class Knowledge
         var reading = new PriceReading(producer.Id, lot.Good, lot.Place, Credits.Of(Math.Round(lot.OfferedPrice.Amount / lot.Quantity, 2)), lot.PostedTick, ReadingSource.News, null, null);
         foreach (ActorState reader in context.ActorsOrdered)
         {
-            if (reader.Id != producer.Id && (reader.Knowledge.Stored(producer.Id)?.AskTick ?? long.MinValue) < lot.PostedTick)
+            if (reader.Id != producer.Id && (reader.Knowledge.Stored(producer.Id, lot.Good)?.AskTick ?? long.MinValue) < lot.PostedTick)
             {
                 reader.Knowledge.Note(reading);
             }
@@ -270,23 +285,27 @@ public static class Knowledge
     /// the latest bulletin's ask (and the stock it last saw); further, what it remembers. Null if it has never known it.
     /// Reading it changes nothing.
     /// </summary>
-    public static PriceReading? ReadingOf(SimulationContext context, ActorState actor, ActorState producer, Sight sight)
+    public static PriceReading? ReadingOf(SimulationContext context, ActorState actor, ActorState producer, Sight sight) =>
+        producer.Producer is { } profile ? ReadingOf(context, actor, producer, profile.Good, sight) : null;
+
+    /// <summary>What <paramref name="actor"/> knows of a producer's ask and stock of one good it makes (a factory makes several).</summary>
+    public static PriceReading? ReadingOf(SimulationContext context, ActorState actor, ActorState producer, GoodType good, Sight sight)
     {
-        if (producer.Producer is not { } profile)
+        if (!producer.Makes(good))
         {
             return null;
         }
 
         if (producer.Id == actor.Id || sight.TierOf(producer.Home) == Tier.Here)
         {
-            return Live(context, producer, profile);
+            return Live(context, producer, good);
         }
 
-        PriceReading? stored = actor.Knowledge.Stored(producer.Id);
-        if (sight.TierOf(producer.Home) == Tier.Near && context.Bulletin is { Tick: { } posted } list && list.AskOf(producer.Id) is { } ask
+        PriceReading? stored = actor.Knowledge.Stored(producer.Id, good);
+        if (sight.TierOf(producer.Home) == Tier.Near && context.Bulletin is { Tick: { } posted } list && list.AskOf(producer.Id, good) is { } ask
             && (stored is null || stored.Value.AskTick < posted))
         {
-            return new PriceReading(producer.Id, profile.Good, producer.Home, ask, posted, ReadingSource.Daily, stored?.Stock, stored?.StockTick);
+            return new PriceReading(producer.Id, good, producer.Home, ask, posted, ReadingSource.Daily, stored?.Stock, stored?.StockTick);
         }
 
         return stored;
@@ -297,9 +316,9 @@ public static class Knowledge
     /// knows, unless its latest reading saw too little stock (<see cref="PriceReading.CurrentStock"/>) or the producer turned it
     /// down in the last day. Null if not.
     /// </summary>
-    public static Credits? KnownAsk(SimulationContext context, ActorState actor, ActorState producer, decimal quantity, Sight sight)
+    public static Credits? KnownAsk(SimulationContext context, ActorState actor, ActorState producer, GoodType good, decimal quantity, Sight sight)
     {
-        if (ReadingOf(context, actor, producer, sight) is not { } reading || reading.CurrentStock is { } stock && stock < quantity)
+        if (ReadingOf(context, actor, producer, good, sight) is not { } reading || reading.CurrentStock is { } stock && stock < quantity)
         {
             return null;
         }
@@ -371,7 +390,7 @@ public static class Knowledge
     /// <summary>A producer turned down the actor's order at its door: the actor doesn't count on it for a day.</summary>
     internal static void NoteRefused(SimulationContext context, ActorState actor, ActorId producer) => actor.Knowledge.NoteRefused(producer, context.CurrentTick);
 
-    private static PriceReading Live(SimulationContext context, ActorState producer, ProducerProfile profile) =>
-        new(producer.Id, profile.Good, producer.Home, DecisionEngine.Ask(producer), context.CurrentTick, ReadingSource.Live,
-            producer.Available(profile.Good), context.CurrentTick);
+    private static PriceReading Live(SimulationContext context, ActorState producer, GoodType good) =>
+        new(producer.Id, good, producer.Home, DecisionEngine.Ask(producer, good), context.CurrentTick, ReadingSource.Live,
+            producer.Available(good), context.CurrentTick);
 }

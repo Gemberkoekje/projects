@@ -40,6 +40,12 @@ public static partial class DecisionEngine
 
         /// <summary>A consumer buys a lot into its stock or storage, and has it brought home.</summary>
         BuyLot,
+
+        /// <summary>A yard takes a Build into its queue.</summary>
+        Build,
+
+        /// <summary>A buyer takes a ship for sale.</summary>
+        BuyShip,
     }
 
     internal sealed record Plan(PlanKind Kind, Ship? Ship = null, FillSource? Source = null, Holding? Receipt = null);
@@ -111,7 +117,7 @@ public static partial class DecisionEngine
     /// </summary>
     private static decimal? ClosedForm(SimulationContext context, Contract contract, decimal posterReservation, ActorState responder, decimal responderReservation)
     {
-        bool posterPays = contract is not SaleContract { Side: SaleSide.ForSale };
+        bool posterPays = !Market.PosterSells(contract);
         ActorState poster = context.Actor(contract.PostedBy);
         NegotiationOutcome deal = Haggling.Resolve(
             new NegotiationParty(Credits.Of(Math.Round(posterReservation, 2)), poster.Personality.ConcessionRate, posterPays),
@@ -141,7 +147,7 @@ public static partial class DecisionEngine
         decimal ripe = committed ? 1m : Math.Clamp((context.CurrentTick - contract.PostedTick) / RipeAfterHours, 0m, 1m);
         decimal give = (0.25m + (0.5m * (1m - poster.Personality.LiquidityPreference))) * ripe;
         decimal reservation = posted + ((contract.Reservation.Amount - posted) * give);
-        return contract is SaleContract { Side: SaleSide.ForSale }
+        return Market.PosterSells(contract)
             ? reservation
             : Math.Min(reservation, Uncommitted(context, poster) / (1m + contract.TaxRate));
     }
@@ -302,8 +308,10 @@ public static partial class DecisionEngine
     private static bool Answers(ActorState actor, Contract post) => !actor.IsPlayer && post switch
     {
         HaulContract => actor.MovesCargo && actor.Ships.Count > 0,
-        SaleContract { Side: SaleSide.Wanted } wanted => actor.Producer?.Good == wanted.Good || (actor.MovesCargo && actor.Ships.Count > 0),
+        SaleContract { Side: SaleSide.Wanted } wanted => actor.Makes(wanted.Good) || (actor.MovesCargo && actor.Ships.Count > 0),
         SaleContract lot => actor.Demands.Any(d => d.Good == lot.Good),
+        BuildContract => actor.Yard is not null,
+        ShipSaleContract => actor.Salvage is not null || actor.MovesCargo,
         _ => false,
     };
 
@@ -445,7 +453,7 @@ public static partial class DecisionEngine
             {
                 var wanted = (SaleContract)contract;
                 Credits estimate = HaulFeeEstimate(context, ai.Home, wanted.Place);
-                (Credits fee, Credits reservation) = HaulTerms(context, ai, wanted.Good, estimate, price.Amount - (Ask(ai).Amount * wanted.Quantity));
+                (Credits fee, Credits reservation) = HaulTerms(context, ai, wanted.Good, estimate, price.Amount - (Ask(ai, wanted.Good).Amount * wanted.Quantity));
                 HaulContract? haul = null;
                 Signing signed = Market.SignAgreed(
                     contract, offer, () => Market.FillViaHaul(context, ai, wanted, price, FillSource.FromStock(ai), fee, reservation, out haul));
@@ -472,6 +480,19 @@ public static partial class DecisionEngine
                 return signed;
             }
 
+            case PlanKind.Build:
+                return Market.SignAgreed(contract, offer, () => Market.TakeBuild(context, ai, (BuildContract)contract, price));
+            case PlanKind.BuyShip:
+            {
+                Signing signed = Market.SignAgreed(contract, offer, () => Market.BuyShip(context, ai, (ShipSaleContract)contract, price));
+                if (signed == Signing.Signed)
+                {
+                    AfterBuyingShip(context, ai, context.Ship(((ShipSaleContract)contract).Ship));
+                }
+
+                return signed;
+            }
+
             default:
                 return Signing.CannotPerform;
         }
@@ -490,9 +511,11 @@ public static partial class DecisionEngine
         return contract switch
         {
             HaulContract haul when ai.MovesCargo => CarrierQuote(context, ai, haul, offer),
-            SaleContract { Side: SaleSide.Wanted } wanted when ai.Producer?.Good == wanted.Good => ProducerQuote(context, ai, wanted, offer),
+            SaleContract { Side: SaleSide.Wanted } wanted when ai.Makes(wanted.Good) => ProducerQuote(context, ai, wanted, offer),
             SaleContract { Side: SaleSide.Wanted } wanted when ai.MovesCargo => FillerQuote(context, ai, wanted, offer),
             SaleContract { Side: SaleSide.ForSale } lot when ai.Demands.Any(d => d.Good == lot.Good) => BuyerQuote(context, ai, lot, offer),
+            BuildContract build when ai.Yard is not null => BuilderQuote(context, ai, build, offer),
+            ShipSaleContract sale when ai.Salvage is not null || ai.MovesCargo => ShipBuyerQuote(context, ai, sale, offer),
             _ => null,
         };
     }
@@ -504,7 +527,7 @@ public static partial class DecisionEngine
     private static Quote PosterQuote(SimulationContext context, ActorState poster, Contract contract, Offer offer)
     {
         Offer posted = Offer.Of(contract);
-        bool pays = contract is not SaleContract { Side: SaleSide.ForSale };
+        bool pays = !Market.PosterSells(contract);
         long limit = DeadlineLimit(context, contract);
         Offer terms = offer.Deadline > limit ? offer with { Deadline = limit } : offer;
         decimal reservation = PosterReservation(context, contract) * TermsValue(posted, terms, pays);
@@ -583,8 +606,8 @@ public static partial class DecisionEngine
                 continue;
             }
 
-            long arrival = context.CurrentTick + PriceModel.TravelTicks(repo.DistanceTicks, ship.Class.SpeedMultiplier)
-                           + Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier));
+            long arrival = context.CurrentTick + PriceModel.TravelTicks(repo.DistanceTicks, ship.Stats.Speed)
+                           + Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed));
             if (Fit(offer, arrival, o => HaulTake(context, trader, ship, haul, o)) is not { } terms
                 || LeastPriceFrom(p => HaulTake(context, trader, ship, haul, terms with { Price = Credits.Of(p) }) is { } t ? Margin(t, p, threshold) : -1m, terms.Price.Amount)
                     is not { } reservation)
@@ -621,8 +644,8 @@ public static partial class DecisionEngine
                     continue;
                 }
 
-                long arrival = context.CurrentTick + PriceModel.TravelTicks(repo.DistanceTicks, ship.Class.SpeedMultiplier)
-                               + (pickup == wanted.Place ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Class.SpeedMultiplier)));
+                long arrival = context.CurrentTick + PriceModel.TravelTicks(repo.DistanceTicks, ship.Stats.Speed)
+                               + (pickup == wanted.Place ? 0 : Math.Max(1, PriceModel.TravelTicks(laden.DistanceTicks, ship.Stats.Speed)));
                 if (Fit(offer, arrival, o => FillTake(context, trader, ship, wanted, source, o)) is not { } terms
                     || LeastPriceFrom(p => FillTake(context, trader, ship, wanted, source, terms with { Price = Credits.Of(p) }) is { } t ? Margin(t, p, threshold) : -1m, terms.Price.Amount)
                         is not { } reservation)
@@ -647,13 +670,13 @@ public static partial class DecisionEngine
     /// </summary>
     private static Quote? ProducerQuote(SimulationContext context, ActorState producer, SaleContract wanted, Offer offer)
     {
-        ProducerProfile profile = producer.Producer!;
+        ProducerProfile profile = producer.ProfileFor(wanted.Good)!;
         if (producer.Available(wanted.Good) < wanted.Quantity)
         {
             return null;
         }
 
-        decimal goods = Ask(producer).Amount * wanted.Quantity;
+        decimal goods = Ask(producer, wanted.Good).Amount * wanted.Quantity;
         if (wanted.Place == producer.Home)
         {
             return new Quote(Credits.Of(Math.Round(goods, 2)), Pays: false, offer, new Plan(PlanKind.Supply));

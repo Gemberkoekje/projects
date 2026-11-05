@@ -70,13 +70,13 @@ public static partial class DecisionEngine
     /// </summary>
     private static bool TryAnswer(SimulationContext context, ActorState producer, SaleContract wanted)
     {
-        if (!wanted.IsOpen || wanted.PostedBy == producer.Id || producer.Producer is not { } profile || profile.Good != wanted.Good
+        if (!wanted.IsOpen || wanted.PostedBy == producer.Id || !producer.Makes(wanted.Good)
             || wanted.Place != producer.Home || producer.Available(wanted.Good) < wanted.Quantity)
         {
             return false;
         }
 
-        decimal floor = Ask(producer).Amount * wanted.Quantity * 0.999m;
+        decimal floor = Ask(producer, wanted.Good).Amount * wanted.Quantity * 0.999m;
         Offer offer = Offer.Of(wanted);
         if (wanted.AtTheDoor)
         {
@@ -85,7 +85,7 @@ public static partial class DecisionEngine
                 return false;
             }
 
-            Credits atAsk = Credits.Of(Math.Min(wanted.OfferedPrice.Amount, Math.Round(Ask(producer).Amount * wanted.Quantity, 2)));
+            Credits atAsk = Credits.Of(Math.Min(wanted.OfferedPrice.Amount, Math.Round(Ask(producer, wanted.Good).Amount * wanted.Quantity, 2)));
             return Market.SignAgreed(wanted, offer with { Price = atAsk }, () => Market.Supply(context, producer, wanted, atAsk, Holding.StockAt(producer.Home))) == Signing.Signed;
         }
 
@@ -123,7 +123,7 @@ public static partial class DecisionEngine
             return;
         }
 
-        Credits ask = Ask(producer);
+        Credits ask = Ask(producer, profile.Good);
         SaleContract? best = null;
         Offer? bestOffer = null;
         Credits bestFee = Credits.Zero;
@@ -224,7 +224,7 @@ public static partial class DecisionEngine
         // Priced under the ask, and learnt: a lot taken within a day makes the next a little dearer, one left unsold cheaper.
         PriceMemory memory = producer.Prices(new PriceKey(PriceKind.Lot, profile.Good), 0.92m);
         decimal factor = memory.Next(context, onQuickTake: 1.03m, onExpiry: 0.95m, min: 0.8m, max: 1m);
-        Credits ask = Ask(producer);
+        Credits ask = Ask(producer, profile.Good);
         decimal unit = Math.Max(ask.Amount * factor, profile.UnitProductionCost.Amount); // never below cost
         Credits price = Credits.Of(Math.Round(unit * lot, 2));
         SaleContract posted = Market.PostSale(

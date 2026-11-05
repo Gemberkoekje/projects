@@ -51,6 +51,34 @@ public sealed class ActorState
 
     public ProducerProfile? Producer { get; init; }
 
+    /// <summary>A part factory's recipes and quality (design §15.4); null for any other actor.</summary>
+    public FactoryProfile? Factory { get; init; }
+
+    /// <summary>A shipyard's habits (design §15.5); null for any other actor.</summary>
+    public YardProfile? Yard { get; init; }
+
+    /// <summary>What a shipyard is building and has queued.</summary>
+    public YardState Works { get; } = new();
+
+    /// <summary>A salvage yard's habits (Edge Salvage, design §15.5); null for any other actor.</summary>
+    public SalvageProfile? Salvage { get; init; }
+
+    /// <summary>The part a factory is making, if any.</summary>
+    public FactoryWork? Work { get; internal set; }
+
+    /// <summary>Since when a factory has been unable to start a part for want of an input; null while it isn't short.</summary>
+    public long? ShortSince { get; internal set; }
+
+    /// <summary>The goods it makes and sells from its stock: a producer's good, or a factory's parts at every grade.</summary>
+    public IReadOnlyList<GoodType> Products => Producer is { } p ? new[] { p.Good } : Factory?.Products ?? (IReadOnlyList<GoodType>)System.Array.Empty<GoodType>();
+
+    /// <summary>Whether it makes <paramref name="good"/>.</summary>
+    public bool Makes(GoodType good) => Producer?.Good == good || Factory?.Makes(good) == true;
+
+    /// <summary>The producer's profile it prices and sells <paramref name="good"/> by, if it makes it.</summary>
+    public ProducerProfile? ProfileFor(GoodType good) =>
+        Producer is { } p && p.Good == good ? p : Factory is { } f && f.Makes(good) ? f.ProfileFor(good) : null;
+
     public IReadOnlyList<ConsumerDemand> Demands { get; init; } = new List<ConsumerDemand>();
 
     /// <summary>Consumer income (the faucet, §4.2.1): credits injected per heartbeat.</summary>
@@ -73,7 +101,7 @@ public sealed class ActorState
     public decimal Available(GoodType good) => System.Math.Max(0m, Stock(good) - Reserved(good));
 
     /// <summary>Whether the actor keeps goods at home: a producer's warehouse, a consumer's larder (design §16.1).</summary>
-    public bool KeepsStock => Producer is not null || Demands.Count > 0;
+    public bool KeepsStock => Producer is not null || Factory is not null || Yard is not null || Demands.Count > 0;
 
     /// <summary>Stock by good, in the goods' order.</summary>
     public IEnumerable<(GoodType Good, decimal Quantity)> AllStock =>
@@ -138,6 +166,9 @@ public sealed class ActorState
             _ships.Add(ship);
         }
     }
+
+    /// <summary>A ship it no longer owns: sold, or handed over to the client it was built for.</summary>
+    public void RemoveShip(ShipId ship) => _ships.Remove(ship);
 
     public bool MovesCargo => Role is ActorRole.ShippingCompany or ActorRole.IndependentPilot;
 

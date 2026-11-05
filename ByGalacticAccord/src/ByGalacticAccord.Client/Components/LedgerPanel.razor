@@ -25,7 +25,14 @@
         {
             <div class="line ledger-line">
                 <span class="line-label">
-                    <span class="small strong">@line.Label</span>
+                    @if (line.Ship is { } ship)
+                    {
+                        <button type="button" class="link-text small strong" data-testid="ledger-ship" @onclick="() => OnSelectShip.InvokeAsync(ship)">@line.Label</button>
+                    }
+                    else
+                    {
+                        <span class="small strong">@line.Label</span>
+                    }
                     <span class="xsmall muted">@line.Detail</span>
                 </span>
                 <span class="line-value">
@@ -76,6 +83,9 @@
 
     [Parameter]
     public EventCallback<LedgerAction> OnAction { get; set; }
+
+    [Parameter]
+    public EventCallback<ShipId> OnSelectShip { get; set; }
 
     protected override bool ShouldRender()
     {

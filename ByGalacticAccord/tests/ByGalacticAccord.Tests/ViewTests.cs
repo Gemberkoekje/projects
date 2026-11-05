@@ -196,20 +196,21 @@ public sealed class ViewTests
         SaleTests.GiveAboard(session.Context, session.PlayerShip, session.Player, GoodType.Parts, 25m);
 
         LedgerViewModel aboard = LedgerView.Build(session);
-        LedgerLine goods = Assert.Single(aboard.Possessions);
+        LedgerLine goods = Assert.Single(aboard.Possessions, l => l.Ship is null);
+        Assert.Single(aboard.Possessions, l => l.Ship is not null); // the ship itself, which opens its sheet
         Assert.Equal(new LedgerAction("Store at Meridian Station", GoodType.Parts, Store: true), goods.Action);
         Assert.Contains("hold", goods.Detail, System.StringComparison.Ordinal);
         Assert.Empty(aboard.Contracts);
 
         session.Store(GoodType.Parts);
-        LedgerLine stored = Assert.Single(LedgerView.Build(session).Possessions);
+        LedgerLine stored = Assert.Single(LedgerView.Build(session).Possessions, l => l.Ship is null);
         Assert.Equal(new LedgerAction("Load aboard", GoodType.Parts, Store: false), stored.Action);
         Assert.Contains("storage at Meridian Station", stored.Detail, System.StringComparison.Ordinal);
 
         HaulContract haul = PlayerActionsTests.FarmHaul(session.Context);
         session.Accept(haul.Id);
         LedgerViewModel busy = LedgerView.Build(session);
-        Assert.Null(Assert.Single(busy.Possessions).Action); // the ship is away, so the goods stay put
+        Assert.Null(Assert.Single(busy.Possessions, l => l.Ship is null).Action); // the ship is away, so the goods stay put
         LedgerLine contract = Assert.Single(busy.Contracts);
         Assert.Equal((haul.Id, Tone.Gain), (contract.Contract, contract.Tone));
         Assert.StartsWith("carrying for Verdant Agricombine", contract.Detail, System.StringComparison.Ordinal);

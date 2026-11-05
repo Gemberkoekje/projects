@@ -242,21 +242,21 @@ public sealed class MarketReader : Bot
             {
                 if (context.StationOperatorAt(producer.Home) is null || context.FindPath(ship.Location, producer.Home) is not { } repo
                     || context.FindPath(producer.Home, wanted.Place) is not { } laden || producer.Home == wanted.Place
-                    || Knowledge.KnownAsk(context, session.Player, producer, wanted.Quantity, session.Sight) is not { } ask)
+                    || Knowledge.KnownAsk(context, session.Player, producer, wanted.Good, wanted.Quantity, session.Sight) is not { } ask)
                 {
                     continue;
                 }
 
                 decimal unit = ask.Amount; // what an order at its door would pay, as far as it knows: the post must beat it
 
-                long hours = PriceModel.TravelTicks(repo.DistanceTicks + laden.DistanceTicks, ship.Class.SpeedMultiplier) + 24;
+                long hours = PriceModel.TravelTicks(repo.DistanceTicks + laden.DistanceTicks, ship.Stats.Speed) + 24;
                 if (session.Now + hours > wanted.DeadlineTick)
                 {
                     continue;
                 }
 
                 decimal tax = Terms.TaxRate(context, context.Location(producer.Home).Reach);
-                decimal trip = (ship.Class.RunningCostPerTick.Amount * hours) + context.Config.DockingFee.Amount;
+                decimal trip = (ship.Stats.RunningCostPerTick.Amount * hours) + context.Config.DockingFee.Amount;
                 decimal budget = Math.Min(((wanted.OfferedPrice.Amount * (1m - Margin)) - trip) / (1m + tax), unit * wanted.Quantity);
                 decimal margin = ((wanted.OfferedPrice.Amount * (1m - Margin)) - trip) / (1m + tax) - (unit * wanted.Quantity);
                 if (margin > bestMargin && margin > unit * wanted.Quantity * 0.1m && session.Player.Credits.Amount > budget * (1m + tax) * 1.5m)

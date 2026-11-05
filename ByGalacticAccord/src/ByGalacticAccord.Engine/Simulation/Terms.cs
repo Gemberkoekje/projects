@@ -84,8 +84,108 @@ public static class Terms
     {
         SaleContract sale => ForSale(offer.Package, sale.Good, offer.Price, sale.SeenQuality, offer.Deadline - sale.PostedTick, offer.LateFeeScale),
         HaulContract haul => ForHaul(offer.Package, haul.Good, offer.Price, haul.Quantity, haul.DeclaredUnitValue, offer.LateFeeScale),
+        BuildContract => ForBuild(offer.Package, offer.Price, offer.LateFeeScale),
+        ShipSaleContract => ForShipSale(offer.Package),
         _ => contract.Terms,
     };
+
+    // A Build's packages (design §3.4, §16.4): grace in days, the late fee per day of the price and its cap (the yard's bond).
+    // The break fee is the deposit, for either side: the client forfeits it, the yard pays it back and as much again.
+    private static readonly (long GraceHours, decimal LatePerDay, decimal LateCap)[] BuildPackages =
+    {
+        (3 * 24, 0.01m, 0.15m),
+        (7 * 24, 0.005m, 0.10m),
+        (14 * 24, 0.0025m, 0.05m),
+    };
+
+    /// <summary>
+    /// The terms of a ship's Sale: it changes hands the moment it is signed, so nothing can be late and nothing is bonded; the
+    /// buyer reads the ship's sheet and history before it signs (design §6.4), and takes it as it is.
+    /// </summary>
+    public static ContractTerms ForShipSale(TermPackage package) => new(package, 0, null, Credits.Zero, PartialDelivery.Failure, null, null);
+
+    /// <summary>A standard Build's discount for a part one grade lower than ordered, as a share of the part's base price.</summary>
+    public const decimal StandardSubstitutionDiscount = 0.20m;
+
+    /// <summary>A lenient Build's discount per grade a part falls short, as a share of its base price: what the grade is worth (B is 85% of A).</summary>
+    public const decimal LenientDiscountPerStep = 0.15m;
+
+    /// <summary>
+    /// The terms of a Build at <paramref name="price"/> (design §3.4, §16.4): the late fee runs per hour at a day's rate over
+    /// 24, up to its cap; the break fee is the deposit. Its substitution policy is its package's (<see cref="Substitution"/>):
+    /// <code>
+    ///                          strict     standard          lenient
+    ///   grace                  3 days     7 days            14 days
+    ///   late fee per day       1%         0.5%              0.25%
+    ///   late-fee cap (bond)    15%        10%               5%
+    ///   break fee              the 20% deposit, either side
+    ///   substitution           none       one grade lower,  any lower grade,
+    ///                                     20% of the part   15% of the part a grade
+    /// </code>
+    /// </summary>
+    public static ContractTerms ForBuild(TermPackage package, Credits price, decimal lateFeeScale = 1m)
+    {
+        (long grace, decimal perDay, decimal cap) = BuildPackages[(int)package];
+        var lateFee = new PenaltyOnLateDelivery(
+            PenaltyPerTickLate: Math.Max(0.1m, Math.Round(price.Amount * perDay / 24m * lateFeeScale, 2)), MaxPenalty: Credits.Of(Math.Round(price.Amount * cap, 2)));
+        return new ContractTerms(package, grace, lateFee, BuildContract.DepositFor(price), PartialDelivery.Failure, null, null, lateFeeScale);
+    }
+
+    /// <summary>
+    /// What a Build's substitution policy (design §3.4) makes of the parts fitted against those ordered: the discount owed, or
+    /// null if a part falls outside it (another kind, or more grades short than it allows), so the client may reject the ship.
+    /// Strict allows no substitute; standard one grade lower at <see cref="StandardSubstitutionDiscount"/>; lenient any lower
+    /// grade, priced down <see cref="LenientDiscountPerStep"/> a grade.
+    /// </summary>
+    public static Credits? Substitution(TermPackage package, ShipParts ordered, ShipParts fitted)
+    {
+        decimal discount = 0m;
+        foreach (PartSlot slot in Enum.GetValues<PartSlot>())
+        {
+            FittedPart? want = ordered.In(slot);
+            FittedPart? got = fitted.In(slot);
+            if (want is null && got is null)
+            {
+                continue;
+            }
+
+            if (want is not { } w || got is not { } g || w.Kind != g.Kind)
+            {
+                return null;
+            }
+
+            int steps = ShipPart.StepsShort(w.Grade, g.Grade);
+            if (steps <= 0)
+            {
+                continue;
+            }
+
+            if (SubstituteDiscount(package, w, steps) is not { } owed)
+            {
+                return null;
+            }
+
+            discount += owed.Amount;
+        }
+
+        return Credits.Of(Math.Round(discount, 2));
+    }
+
+    /// <summary>The discount a policy owes for a part <paramref name="steps"/> grades short; null if it doesn't allow it.</summary>
+    public static Credits? SubstituteDiscount(TermPackage package, FittedPart ordered, int steps)
+    {
+        decimal basePrice = ordered.Info.BasePrice.Amount;
+        return package switch
+        {
+            TermPackage.Strict => null,
+            TermPackage.Standard => steps == 1 ? Credits.Of(Math.Round(basePrice * StandardSubstitutionDiscount, 2)) : null,
+            _ => Credits.Of(Math.Round(basePrice * LenientDiscountPerStep * steps, 2)),
+        };
+    }
+
+    /// <summary>Whether a Build's policy lets a yard fit <paramref name="fitted"/> where <paramref name="ordered"/> was ordered, without asking.</summary>
+    public static bool Allows(TermPackage package, FittedPart ordered, FittedPart fitted) =>
+        ordered.Kind == fitted.Kind && (fitted.Grade <= ordered.Grade || SubstituteDiscount(package, ordered, ShipPart.StepsShort(ordered.Grade, fitted.Grade)) is not null);
 
     /// <summary>
     /// The package a buyer of perishables posts when goods carried in a standard hold would arrive at

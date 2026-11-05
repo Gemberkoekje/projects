@@ -158,6 +158,7 @@ public static class Advertising
                 }
 
                 context.NoteAdShown(jumps, fee);
+                contract.NoteAdFee(fee);
             }
 
             contract.ShowAt(location, context.CurrentTick + DelayHours(context, jumps));
@@ -175,8 +176,8 @@ public static class Advertising
 
     /// <summary>
     /// An AI actor's rule (design §4.3, D38): a post of its own still open a day after it was posted or last shown further is
-    /// shown one jump further, in every system at that distance, when that costs no more than
-    /// <see cref="SimulationConfig.AdBudgetShare"/> of the post's price and the actor has the credits.
+    /// shown one jump further, in every system at that distance, while what it has paid to show the post, the ring included,
+    /// stays within its budget (<see cref="Budget"/>) and the actor has the credits.
     /// </summary>
     public static void AdvertiseUnsold(SimulationContext context, ActorState actor)
     {
@@ -203,7 +204,7 @@ public static class Advertising
             int next = options[0].Jumps;
             var ring = options.Where(o => o.Jumps == next).ToList();
             decimal fee = ring.Sum(o => o.Fee.Amount);
-            if (fee > config.AdBudgetShare * contract.OfferedPrice.Amount || actor.Credits.Amount < fee)
+            if (contract.AdFeesPaid.Amount + fee > Budget(context, contract).Amount || actor.Credits.Amount < fee)
             {
                 continue;
             }
@@ -211,6 +212,14 @@ public static class Advertising
             Show(context, actor, contract, ring.Select(o => o.At).ToList());
         }
     }
+
+    /// <summary>
+    /// The most an AI pays to show one post further, in all (D38): <see cref="SimulationConfig.AdBudgetShare"/> of its price for goods
+    /// and hauls, which reaches four jumps out; <see cref="SimulationConfig.AdAssetBudgetShare"/> for a Build or a ship for sale,
+    /// which cost far more than goods (plan S7: the fee share and budget "mean something else" for ships).
+    /// </summary>
+    public static Credits Budget(SimulationContext context, Contract contract) =>
+        Credits.Of(contract.OfferedPrice.Amount * (contract is BuildContract or ShipSaleContract ? context.Config.AdAssetBudgetShare : context.Config.AdBudgetShare));
 
     /// <summary>Whether a taker sees a contract only where its poster paid to show it, not at its places or in the free reach.</summary>
     internal static bool SeenOnlyThroughAd(SimulationContext context, Contract contract, Sight sight)

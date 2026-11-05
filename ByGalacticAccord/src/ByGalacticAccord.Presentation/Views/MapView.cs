@@ -141,7 +141,7 @@ public static class MapView
         {
             bool yours = ship.Owner == session.Player.Id;
             string owner = context.Actor(ship.Owner).Name;
-            string shipClass = Templates.ShipClass(ship.Type);
+            string shipClass = Templates.ShipName(ship);
             if (ship.Course is { } course)
             {
                 (double x, double y) = Along(context, course, clock);
@@ -283,6 +283,10 @@ public static class MapView
         SaleContract sale => Templates.Fill(
             "Map.Overlay.Title.Sale." + sale.Side,
             ("quantity", Format.Quantity(sale.Quantity)), ("good", Templates.Good(sale.Good)), ("place", context.Location(sale.Place).Name)),
+        BuildContract build => Templates.Fill(
+            "Map.Overlay.Title.Build", ("ship", Templates.ShipName(build.Spec)), ("place", context.Location(build.Yard ?? build.Place).Name)),
+        ShipSaleContract shipSale => Templates.Fill(
+            "Map.Overlay.Title.Ship", ("ship", JournalText.ShipLine(context, shipSale.Ship)), ("place", context.Location(shipSale.Place).Name)),
         _ => string.Empty,
     };
 

@@ -83,7 +83,11 @@ public sealed record ContractViewModel(
     IReadOnlyList<ThreadViewModel> Threads,
     string CounterTitle,
     OfferFormModel? Counter,
-    string? CounterBlocked);
+    string? CounterBlocked,
+    string OrdersTitle = "",
+    IReadOnlyList<OrderLine>? Orders = null,
+    ShipId? Ship = null,
+    string ShipLabel = "");
 
 /// <summary>Builds the contract panel and words the outcomes of the player's commands.</summary>
 public static class ContractView
@@ -121,11 +125,28 @@ public static class ContractView
             threads.AddRange(Threads(session, contract));
             actions.Add(new ContractAction(ContractCommand.Withdraw, Templates.Get("Action.Withdraw"), Templates.Get("Action.Withdraw.Note"), true));
         }
+        else if (contract is BuildContract && contract.IsOpen)
+        {
+            blocked = Templates.Get("Block.Build"); // the yards bid on it; the player only watches
+            threads.AddRange(Threads(session, contract));
+        }
         else if (contract.IsOpen)
         {
             DealBlock block = Check(session, contract);
             canAccept = block == DealBlock.None;
             blocked = canAccept ? null : BlockText(session, contract, block);
+            if (contract is ShipSaleContract forSale)
+            {
+                lines.Add(new MoneyLine(Templates.Get("Line.ShipPrice"), Templates.Get("Line.ShipPrice.Note"), Format.Money(forSale.OfferedPrice), Tone.Loss));
+                if (forSale.Tax.Amount > 0m)
+                {
+                    lines.Add(new MoneyLine(Templates.Get("Line.Tax"), Templates.Fill("Line.Tax.Note", ("tax", Format.Percent(forSale.TaxRate))), Format.Money(forSale.Tax), Tone.Loss));
+                }
+
+                takeHome = Format.Money(forSale.OfferedPrice + forSale.Tax);
+                takeTone = Tone.Plain;
+            }
+
             if (block is DealBlock.None or DealBlock.NoFreeShip && DealEstimate.For(context, session.Player, session.PlayerShip, contract) is { } e)
             {
                 Estimate(session, contract, e, lines, schedule, uncertain);
@@ -170,6 +191,13 @@ public static class ContractView
             known = sight.CanSee(contract) ? null : BoardView.Seen(session, contract, sight).Seen; // only the news needs a caution
         }
 
+        buying = buying || contract is ShipSaleContract;
+        ShipId? shipLink = contract switch
+        {
+            ShipSaleContract forSaleShip => forSaleShip.Ship,
+            BuildContract { Ship: { } built } => built,
+            _ => null,
+        };
         return new ContractViewModel(
             id, kindLine, Head(context, contract), sub, status, statusTone,
             Templates.Get(buying ? "Contract.Cost" : "Contract.Certain"), lines, Templates.Get(buying ? "Cost" : "TakeHome"), takeHome, takeTone, takeHomeNote,
@@ -180,7 +208,8 @@ public static class ContractView
             contract.IsOpen && contract.PostedBy != session.Player.Id, canAccept, Templates.Get(AcceptKey(contract)), blocked,
             actions, Templates.Get("Contract.Why"), why, whyEnd,
             Templates.Get(contract.PostedBy == session.Player.Id ? "Contract.Answers" : "Contract.Haggle"), threads,
-            Templates.Get("Contract.Counter"), counter, counterBlocked);
+            Templates.Get("Contract.Counter"), counter, counterBlocked,
+            Templates.Get("Orders.Title"), ShipView.Orders(session, contract), shipLink, Templates.Get("Ship.Open"));
     }
 
     /// <summary>
@@ -344,7 +373,7 @@ public static class ContractView
     {
         SimulationContext context = session.Context;
         Ship ship = session.PlayerShip;
-        string shipClass = Templates.ShipClass(ship.Type);
+        string shipClass = Templates.ShipName(ship);
         (LocationId pickup, LocationId destination, GoodType good, decimal quantity) = Shape(contract);
         switch (block)
         {
@@ -399,6 +428,9 @@ public static class ContractView
 
         switch (signing)
         {
+            case Signing.Signed when contract is ShipSaleContract sold:
+                return Templates.Fill(
+                    "Outcome.BoughtShip", ("price", Format.Money(sold.Price)), ("ship", JournalText.ShipLine(context, sold.Ship)), ("place", context.Location(sold.Place).Name));
             case Signing.Signed:
             {
                 Ship ship = session.PlayerShip;
@@ -406,7 +438,7 @@ public static class ContractView
                 var facts = new[]
                 {
                     ("price", Format.Money(contract.Price)),
-                    ("shipClass", Templates.ShipClass(ship.Type)),
+                    ("shipClass", Templates.ShipName(ship)),
                     ("origin", where),
                     ("when", Format.Date(ship.Course?.ArrivalTick ?? session.Now)),
                     ("bond", Format.Money(contract.LockedBond)),
@@ -431,6 +463,7 @@ public static class ContractView
 
     private static string AcceptKey(Contract contract) => contract switch
     {
+        ShipSaleContract => "Action.BuyShip",
         SaleContract { Side: SaleSide.Wanted } => "Action.Fill",
         SaleContract => "Action.Buy",
         _ => "Action.Accept",
@@ -448,7 +481,7 @@ public static class ContractView
         GameSession session, Contract contract, DealEstimate e, List<MoneyLine> lines, List<InfoLine> schedule, List<InfoLine> uncertain)
     {
         SimulationContext context = session.Context;
-        string shipClass = Templates.ShipClass(e.Ship.Type);
+        string shipClass = Templates.ShipName(e.Ship);
         string poster = context.Actor(contract.PostedBy).Name;
         string pickup = context.Location(e.Pickup).Name;
         (_, LocationId to, GoodType good, decimal quantity) = Shape(contract);
@@ -516,7 +549,7 @@ public static class ContractView
                 break;
         }
 
-        string rate = Format.MoneyCents(e.Ship.Class.RunningCostPerTick);
+        string rate = Format.MoneyCents(e.Ship.Stats.RunningCostPerTick);
         if (e.Running.Amount > 0m || e.Kind != DealKind.Buy)
         {
             string runningNote = e.Kind == DealKind.Buy
@@ -616,7 +649,7 @@ public static class ContractView
     // and the range of the player's own readings of it.
     private static InfoLine AskWhenSigning(GameSession session, ActorState maker, PriceReading reading, Credits goods, decimal quantity)
     {
-        string range = InfoText.Range(session.Player.Knowledge.History(maker.Id)) is { } r && r.Low != r.High
+        string range = InfoText.Range(session.Player.Knowledge.History(maker.Id, reading.Good)) is { } r && r.Low != r.High
             ? Templates.Fill("Uncertain.Ask.Range", ("since", Format.Date(r.Since)), ("low", Format.MoneyCents(r.Low)), ("high", Format.MoneyCents(r.High)))
             : string.Empty;
         return new InfoLine(
@@ -630,7 +663,7 @@ public static class ContractView
     // The bottom line: take-home and its rate for a haul or a fill; the cost, and the cost per unit, for a lot.
     private static (string Value, Tone Tone, string Note) Total(GameSession session, Contract contract, DealEstimate e)
     {
-        string shipClass = Templates.ShipClass(e.Ship.Type);
+        string shipClass = Templates.ShipName(e.Ship);
         string duration = Format.Duration(e.TiedUpTicks(session.Now));
         if (e.Kind == DealKind.Buy)
         {
@@ -704,6 +737,7 @@ public static class ContractView
             ContractStatus.Active when contract.Involves(player) && contract.InDefault(session.Now) =>
                 (Templates.Fill(contract.Performer == player ? "Status.InDefault.You" : "Status.InDefault.ToYou", facts), Tone.Warn),
             ContractStatus.Active when contract is HaulContract && contract.Payer == player => (Templates.Fill("Status.Yours.Haul.Shipper", facts), Tone.Yours),
+            ContractStatus.Active when contract is BuildContract build && contract.Involves(player) => (ShipView.BuildStatus(session, build), Tone.Yours),
             ContractStatus.Active when contract.Involves(player) => (Templates.Fill("Status.Yours." + JournalText.Kind(contract), facts), Tone.Yours),
             ContractStatus.Active => (Templates.Fill("Status.Taken", facts), Tone.Muted),
             ContractStatus.Fulfilled => (Templates.Fill(Key("Status.Fulfilled", contract.Performer, contract.Payer), facts), Yours(Tone.Gain)),
@@ -725,6 +759,16 @@ public static class ContractView
     /// </summary>
     public static IReadOnlyList<string> TermsOf(GameSession session, Contract contract)
     {
+        if (contract is BuildContract build)
+        {
+            return ShipView.BuildTerms(session, build);
+        }
+
+        if (contract is ShipSaleContract shipSale)
+        {
+            return ShipView.ShipSaleTerms(session, shipSale);
+        }
+
         SimulationContext context = session.Context;
         ActorId player = session.Player.Id;
         string poster = context.Actor(contract.PostedBy).Name;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Resources;
 using System.Text;
 using ByGalacticAccord.Engine.Actors;
@@ -68,7 +69,9 @@ public static class Templates
     }
 
     // ---- words for the engine's enums (fact types) ----
-    public static string Good(GoodType good) => Get("Good." + good);
+    /// <summary>A good: "Food", or a ship part with its grade, "Light frame (A)".</summary>
+    public static string Good(GoodType good) =>
+        ShipPart.PartOf(good) is { } part ? Fill("Good.Part", ("part", Part(part.Kind)), ("grade", Grade(part.Grade))) : Get("Good." + good);
 
     public static string Jurisdiction(AccordReach reach) => Get("Jurisdiction." + reach);
 
@@ -93,7 +96,27 @@ public static class Templates
         ? Fill("Kind.Line.Sale", ("kind", ContractKind(ContractType.Sale)), ("side", Side(sale.Side)))
         : ContractKind(contract.Type);
 
-    public static string ShipClass(ShipType type) => Get("ShipClass." + type);
+    /// <summary>A standard design's name: "Light Freighter".</summary>
+    public static string Design(Design design) => Get("Design." + design);
+
+    /// <summary>A ship as its kind of ship: its design's name, or a custom ship by its part kinds.</summary>
+    public static string ShipName(Ship ship) => ShipName(ship.Parts);
+
+    /// <summary>What a set of parts makes: a design's name, or a custom ship by its part kinds ("custom ship (Light frame, Fast drive, Refrigeration unit)").</summary>
+    public static string ShipName(ShipParts parts) =>
+        parts.Design is { } design ? Design(design) : Fill("Design.Custom", ("parts", string.Join(", ", parts.All.Select(p => Part(p.Kind)))));
+
+    /// <summary>A part kind: "Light frame".</summary>
+    public static string Part(PartKind kind) => Get("Part." + kind);
+
+    /// <summary>A grade letter.</summary>
+    public static string Grade(Grade grade) => Get("Grade." + grade);
+
+    /// <summary>A part with its grade: "Light frame, grade B".</summary>
+    public static string Part(FittedPart part) => Fill("Part.Graded", ("part", Part(part.Kind)), ("grade", Grade(part.Grade)));
+
+    /// <summary>A part slot: "Frame".</summary>
+    public static string Slot(PartSlot slot) => Get("Slot." + slot);
 
     /// <summary>How a reply read (design §3.6): "readily", "reluctant", "appears to be at its limit".</summary>
     public static string Tell(Tell tell) => Get("Tell." + tell);

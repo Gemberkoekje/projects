@@ -46,6 +46,10 @@ public sealed class SimulationContext
     private readonly Dictionary<GoodType, decimal> _consumed = new();
     private readonly Dictionary<GoodType, decimal> _lost = new();
 
+    // Parts built into ships (design §20.2: goods conservation holds through parts into ships).
+    private readonly Dictionary<GoodType, decimal> _builtIn = new();
+    private readonly long[] _partsMade = new long[3];
+
     // Haggles (design §3.6), by id, and the open ones per contract in the order they began.
     private readonly Dictionary<NegotiationId, Negotiation> _negotiations = new();
     private readonly Dictionary<ContractId, List<Negotiation>> _negotiationsOn = new();
@@ -171,6 +175,17 @@ public sealed class SimulationContext
     public long SignedViaAd { get; private set; }
 
     private readonly long[] _adsShown = new long[5];
+
+    /// <summary>Parts the factories finished, by grade (design §15.4).</summary>
+    public IReadOnlyList<long> PartsMade => _partsMade;
+
+    /// <summary>Parts a factory started without one of its inputs, a grade lower (design §15.4).</summary>
+    public long PartsMadeDo { get; private set; }
+
+    /// <summary>Ships the yards finished: to order under a Build, and on spec for their lots.</summary>
+    public long ShipsBuiltToOrder { get; private set; }
+
+    public long ShipsBuiltOnSpec { get; private set; }
 
     public IReadOnlyDictionary<ActorId, ActorState> Actors => _actors;
 
@@ -625,12 +640,12 @@ public sealed class SimulationContext
     /// <summary>Every actor, in id order. Actors are never removed, so the order is kept until one is added.</summary>
     public IReadOnlyList<ActorState> ActorsOrdered => _actorsOrdered ??= _actors.Values.OrderBy(a => a.Id.Value).ToArray();
 
-    /// <summary>The producers of a good, in id order.</summary>
+    /// <summary>The producers of a good (a factory for each grade of the parts it makes), in id order.</summary>
     public IReadOnlyList<ActorState> ProducersOf(GoodType good)
     {
         if (!_producersOf.TryGetValue(good, out ActorState[]? producers))
         {
-            producers = ActorsOrdered.Where(a => a.Producer is { } p && p.Good == good).ToArray();
+            producers = ActorsOrdered.Where(a => a.Makes(good)).ToArray();
             _producersOf[good] = producers;
         }
 
@@ -829,6 +844,9 @@ public sealed class SimulationContext
 
     public decimal GoodsLost(GoodType good) => _lost.GetValueOrDefault(good);
 
+    /// <summary>A part good built into ships that still exist (design §20.2).</summary>
+    public decimal GoodsBuiltIn(GoodType good) => _builtIn.GetValueOrDefault(good);
+
     /// <summary>Everything of a good that exists: in stock, in storage and in holds.</summary>
     public decimal GoodsHeld(GoodType good)
     {
@@ -993,6 +1011,118 @@ public sealed class SimulationContext
     /// <summary>Take an owner's goods out of a ship's hold, as they stand now.</summary>
     public Cargo Unload(Ship ship, ActorId owner, GoodType good, decimal quantity) =>
         ship.Unload(CurrentTick, owner, good, quantity);
+
+    // ---- ships (design §6): built from parts, and changing hands ----
+
+    /// <summary>
+    /// A yard builds a ship from parts in its stock (design §6.3): one of each part leaves its stock, built into the ship (the
+    /// goods ledger's "built in"), and the ship is commissioned for <paramref name="owner"/> at the yard. <paramref name="build"/>
+    /// is the Build it was ordered under, which asked for <paramref name="wanted"/>; none for a ship built on spec.
+    /// </summary>
+    public Ship BuildShip(ActorState yard, ShipParts parts, ActorState owner, ContractId? build, ShipParts? wanted)
+    {
+        foreach (FittedPart part in parts.All)
+        {
+            if (yard.Available(part.Good) < 1m)
+            {
+                throw new InvalidOperationException($"{yard.Name} has no {part.Good} free to build with.");
+            }
+        }
+
+        foreach (FittedPart part in parts.All)
+        {
+            yard.RemoveStock(part.Good, 1m);
+            _builtIn[part.Good] = GoodsBuiltIn(part.Good) + 1m;
+        }
+
+        var ship = new Ship(NextShipId(), parts, owner.Id, yard.Home, CurrentTick, yard.Id, build, wanted);
+        Add(ship);
+        owner.AddShip(ship.Id);
+        if (build is null)
+        {
+            ShipsBuiltOnSpec++;
+        }
+        else
+        {
+            ShipsBuiltToOrder++;
+        }
+
+        return ship;
+    }
+
+    /// <summary>A ship changes hands (sold, or handed over to the client that ordered it): its owners' fleets and its history follow.</summary>
+    public void TransferShip(Ship ship, ActorState to, Credits price, ContractId? contract)
+    {
+        ActorState from = Actor(ship.Owner);
+        from.RemoveShip(ship.Id);
+        to.AddShip(ship.Id);
+        ship.TransferOwnership(CurrentTick, to.Id, price, contract);
+    }
+
+    /// <summary>Builds yards signed (design §6.3).</summary>
+    public long BuildsSigned { get; private set; }
+
+    /// <summary>The remedies clients chose from yards' supply-failure proposals, by remedy.</summary>
+    public IReadOnlyList<long> RemediesChosen => _remedies;
+
+    private readonly long[] _remedies = new long[3];
+
+    /// <summary>Ships sold under ship Sales, all told; and those a salvage yard bought or sold.</summary>
+    public long ShipsSold { get; private set; }
+
+    public long ShipsBoughtBySalvage { get; private set; }
+
+    public long ShipsSoldBySalvage { get; private set; }
+
+    internal void NoteBuildSigned() => BuildsSigned++;
+
+    internal void NoteRemedy(Remedy remedy) => _remedies[(int)remedy]++;
+
+    internal void NoteShipSold(ActorState seller, ActorState buyer)
+    {
+        ShipsSold++;
+        if (buyer.Salvage is not null)
+        {
+            ShipsBoughtBySalvage++;
+        }
+
+        if (seller.Salvage is not null)
+        {
+            ShipsSoldBySalvage++;
+        }
+    }
+
+    /// <summary>Ships salvage broke up.</summary>
+    public long ShipsScrapped { get; private set; }
+
+    /// <summary>
+    /// A ship is broken up (design §15.5: a salvage yard's last resort for a ship nobody will buy): it leaves its owner's fleet and
+    /// the sector, its parts written off (the goods ledger books them lost, no longer built in). It stays in the record.
+    /// </summary>
+    public void ScrapShip(Ship ship)
+    {
+        if (!ship.IsFree || ship.HoldQuantity > 0m)
+        {
+            throw new InvalidOperationException($"{ship.Id} isn't free and empty to break up.");
+        }
+
+        Actor(ship.Owner).RemoveShip(ship.Id);
+        if (ship.BuiltBy is not null)
+        {
+            foreach (FittedPart part in ship.Parts.All)
+            {
+                _builtIn[part.Good] = GoodsBuiltIn(part.Good) - 1m;
+                Lose(part.Good, 1m);
+            }
+        }
+
+        ship.Scrap(CurrentTick);
+        ShipsScrapped++;
+    }
+
+    internal void NotePartMade(Grade grade) => _partsMade[(int)grade]++;
+
+    internal void NoteMadeDo() => PartsMadeDo++;
 
     // ---- counters ----
     public void NoteFulfilled() => ContractsFulfilled++;

@@ -48,7 +48,7 @@ public static class BoardView
         Sight sight = session.Sight;
         foreach (Contract contract in session.KnownOpen().Reverse())
         {
-            if (contract is SaleContract or HaulContract && contract.PostedBy != session.Player.Id)
+            if (contract is SaleContract or HaulContract or ShipSaleContract or BuildContract && contract.PostedBy != session.Player.Id)
             {
                 rows.Add(Row(session, contract, sight));
             }
@@ -87,6 +87,17 @@ public static class BoardView
                     : Templates.Fill("Board.At", ("place", place));
                 due = Templates.Fill(sale.Side == SaleSide.Wanted ? "Board.Due" : "Board.Until", ("when", Format.Relative(sale.DeadlineTick, now)));
                 break;
+            case ShipSaleContract shipSale:
+                title = Templates.Fill("Board.Title.Ship", ("ship", JournalText.ShipLine(context, shipSale.Ship)));
+                route = Templates.Fill("Board.At", ("place", context.Location(shipSale.Place).Name));
+                due = Templates.Fill("Board.Until", ("when", Format.Relative(shipSale.DeadlineTick, now)));
+                break;
+            case BuildContract build:
+                title = Templates.Fill("Board.Title.Build", ("ship", Templates.ShipName(build.Spec)));
+                route = Templates.Fill("Board.At", ("place", context.Location(build.Place).Name));
+                due = Templates.Fill("Board.Due", ("when", Format.Relative(build.DeadlineTick, now)));
+                blocked = true;
+                break;
             default:
                 title = route = due = string.Empty;
                 break;
@@ -112,8 +123,15 @@ public static class BoardView
             }
         }
 
+        if (contract is ShipSaleContract forSale && !blocked)
+        {
+            value = Format.Money(forSale.OfferedPrice + forSale.Tax);
+            tone = Tone.Plain;
+            rate = Templates.Fill("Board.Ship.Worth", ("value", Format.Money(context.Ship(forSale.Ship).Stats.Value)));
+        }
+
         DangerBand band = estimate?.Band ?? DangerBand.Green;
-        (string? note, Tone noteTone) = Note(session, contract, block, estimate);
+        (string? note, Tone noteTone) = contract is BuildContract ? (Templates.Get("Board.Note.Build"), Tone.Muted) : Note(session, contract, block, estimate);
         (string? seen, Age age) = Seen(session, contract, sight);
         return new BoardRow(
             contract.Id, contract.Type, Templates.KindLine(contract), title, route, value, tone, rate,

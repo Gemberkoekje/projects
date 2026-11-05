@@ -133,6 +133,16 @@ public sealed class GameSession
     /// Take an open contract as posted, through the same checks and market commands an AI actor uses: carry a haul,
     /// fill a delivered Sale (buying the goods at the source the check picks), or buy a lot and collect it.
     /// </summary>
+    /// <summary>
+    /// A check aid (the client's <c>?credits=</c>, like <c>?bench=</c>): the player is given <paramref name="credits"/> more, booked as
+    /// income (the faucet), so the money invariants hold. Lets the browser check order a ship before the player could have earned one.
+    /// </summary>
+    public void Grant(Credits credits)
+    {
+        Context.ApplyFaucet(Player, credits);
+        Revision++;
+    }
+
     public DealOutcome Accept(ContractId id)
     {
         DealOutcome outcome;
@@ -156,6 +166,13 @@ public sealed class GameSession
             {
                 PlayerActions.BuyFeasibility check = PlayerActions.CheckBuy(Context, Player, lot);
                 outcome = check.Ok ? new DealOutcome(DealBlock.None, PlayerActions.Buy(Context, Player, lot, check.Ship!)) : new DealOutcome(check.Block, null);
+                break;
+            }
+
+            case ShipSaleContract sale:
+            {
+                DealBlock block = PlayerActions.CheckBuyShip(Context, Player, sale, sale.OfferedPrice);
+                outcome = block == DealBlock.None ? new DealOutcome(DealBlock.None, PlayerActions.BuyShip(Context, Player, sale)) : new DealOutcome(block, null);
                 break;
             }
 

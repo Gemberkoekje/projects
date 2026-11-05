@@ -39,6 +39,16 @@ public static class PriceModel
         return ProducerAsk(producer with { Margin = producer.Margin * marginShare }, currentStock);
     }
 
+    /// <summary>
+    /// What a factory asks for a part (design §5.2, §15.4): its cost with its margin, 10% over with none in stock, 10% under
+    /// with its stock full. Parts are few and dear, so the swing is narrower than a producer's warehouse.
+    /// </summary>
+    public static Credits PartAsk(ProducerProfile part, decimal currentStock)
+    {
+        decimal stockRatio = part.StockCap <= 0m ? 0m : Math.Clamp(currentStock / part.StockCap, 0m, 1m);
+        return Credits.Of(Math.Round(part.UnitProductionCost.Amount * (1m + part.Margin) * (1.1m - (0.2m * stockRatio)), 2));
+    }
+
     /// <summary>The most a consumer will pay per unit at the destination, given how short it is of its buffer.</summary>
     public static Credits ConsumerWillingness(GoodType good, decimal currentStock, decimal targetStock)
     {
@@ -63,9 +73,9 @@ public static class PriceModel
     }
 
     /// <summary>The pilot's floor fee for a haul: running cost over the route + a risk premium + a thin margin.</summary>
-    public static Credits PilotMinimumFee(ShipClassInfo cls, long distanceTicks, decimal danger, Personality personality)
+    public static Credits PilotMinimumFee(ShipStats cls, long distanceTicks, decimal danger, Personality personality)
     {
-        long travelTicks = TravelTicks(distanceTicks, cls.SpeedMultiplier);
+        long travelTicks = TravelTicks(distanceTicks, cls.Speed);
         decimal runningCost = cls.RunningCostPerTick.Amount * travelTicks;
 
         // Risk premium: dangerous routes demand more, discounted by the pilot's risk tolerance.

@@ -76,8 +76,14 @@ public sealed record SimulationConfig
     /// <summary>How long an AI actor's post sits unsold, since it was posted or last shown further, before it pays to show it a jump further.</summary>
     public long AdWaitHours { get; init; } = 24;
 
-    /// <summary>The most an AI actor pays to show a post one jump further, as a share of the post's price.</summary>
+    /// <summary>
+    /// The most an AI actor pays to show a post further, in all, as a share of the post's price: enough for goods and hauls to reach
+    /// four jumps out (S6b's per-ring rule reached as far; S7 made it a total, so a post reposted doesn't pay again and again).
+    /// </summary>
     public decimal AdBudgetShare { get; init; } = 0.05m;
+
+    /// <summary>The same for a Build or a ship for sale, whose prices are far higher than goods' (plan S7, D38).</summary>
+    public decimal AdAssetBudgetShare { get; init; } = 0.01m;
 
     /// <summary>The most a consumer keeps in hand, in days of income; the rest goes on things outside the sector (a sink).</summary>
     public decimal ConsumerSavingsDays { get; init; } = 90m;
@@ -87,4 +93,10 @@ public sealed record SimulationConfig
 
     /// <summary>The working capital a trader keeps, as a multiple of its fleet's value; profit above it is paid out (a sink).</summary>
     public decimal TraderReserveFleets { get; init; } = 1.5m;
+
+    /// <summary>The working capital a part factory keeps for inputs and labour; above it, profit is paid out (a sink).</summary>
+    public Credits FactoryReserve { get; init; } = Credits.Of(30_000m);
+
+    /// <summary>The working capital a shipyard or salvage yard keeps, enough to build or buy a ship or two; above it, profit is paid out (a sink).</summary>
+    public Credits YardReserve { get; init; } = Credits.Of(60_000m);
 }

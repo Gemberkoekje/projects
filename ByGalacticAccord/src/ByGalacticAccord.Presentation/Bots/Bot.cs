@@ -78,7 +78,7 @@ public abstract class Bot
     {
         SimulationContext context = session.Context;
         Ship ship = session.PlayerShip;
-        decimal running = ship.Class.RunningCostPerTick.Amount;
+        decimal running = ship.Stats.RunningCostPerTick.Amount;
         var deals = Takeable(session).Select(d => (d.Contract, d.Estimate, Net: d.Estimate.TakeHome.Amount - Risk(d.Contract, d.Estimate))).Where(d => d.Net > 0m).ToList();
         (Contract, DealEstimate)? best = null;
         decimal bestScore = 0m;
@@ -96,7 +96,7 @@ public abstract class Bot
 
                 // The next deal as it would be from where this one ends: its empty leg from there instead of from here.
                 long fromEnd = end == later.Pickup ? 0
-                    : context.FindPath(end, later.Pickup) is { } leg ? PriceModel.TravelTicks(leg.DistanceTicks, ship.Class.SpeedMultiplier) : long.MaxValue / 4;
+                    : context.FindPath(end, later.Pickup) is { } leg ? PriceModel.TravelTicks(leg.DistanceTicks, ship.Stats.Speed) : long.MaxValue / 4;
                 decimal secondNet = laterNet + (running * (later.RepoTicks - fromEnd));
                 if (secondNet <= 0m)
                 {

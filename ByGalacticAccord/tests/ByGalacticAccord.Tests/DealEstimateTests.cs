@@ -68,7 +68,7 @@ public sealed class DealEstimateTests
 
         Assert.NotNull(estimate.Repositioning);
         Assert.True(estimate.RepoTicks > 0);
-        Assert.Equal(ship.Class.RunningCostPerTick.Amount * (estimate.RepoTicks + estimate.LadenTicks), estimate.Running.Amount);
+        Assert.Equal(ship.Stats.RunningCostPerTick.Amount * (estimate.RepoTicks + estimate.LadenTicks), estimate.Running.Amount);
         Assert.Equal(context.CurrentTick + estimate.RepoTicks + estimate.LadenTicks, estimate.ArrivalTick);
     }
 

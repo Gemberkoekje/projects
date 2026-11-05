@@ -26,7 +26,12 @@ public sealed class EconomyTests
     public void The_economy_stays_alive_over_200k_ticks(long seed) =>
         AssertEconomyAlive(TestWorld.RunHeadless(seed, 200_000));
 
-    /// <summary>Plan S4's check: over a long run every failure path of design §16.3 that S4 brings happens, and is settled by its terms.</summary>
+    /// <summary>
+    /// Plan S4's check: over a long run every failure path of design §16.3 that S4 brings happens, and is settled by its terms. A
+    /// Build's own paths (a supply failure, a substitution, a cancellation on a supply failure, plan S7) are left out: ships are
+    /// ordered rarely once the fleets settle, so a long run may meet none. <see cref="BuildTests"/> drives each of them, for an AI
+    /// client and for the player; the soak's telemetry counts those that happen.
+    /// </summary>
     [Theory]
     [Trait(TestWorld.Category, TestWorld.Soak)]
     [InlineData(42L)]
@@ -35,12 +40,42 @@ public sealed class EconomyTests
     {
         SimulationContext context = TestWorld.RunHeadless(seed, 1_000_000);
 
-        foreach (FailureKind kind in System.Enum.GetValues<FailureKind>())
+        var buildOnly = new[] { FailureKind.SupplyFailure, FailureKind.Substituted, FailureKind.CancelledOnSupplyFailure };
+        foreach (FailureKind kind in System.Enum.GetValues<FailureKind>().Except(buildOnly))
         {
             Assert.True(context.Failures(kind) > 0, $"No {kind} in a million ticks of seed {seed}.");
         }
 
         Assert.True(context.ContractsCancelled > 0 && context.ContractsBreached > 0 && context.ContractsDefaulted > 0);
+        context.AssertSound();
+    }
+
+    /// <summary>
+    /// Plan S7's check: over a long run the yards complete builds (to order and on spec), the traders' fleets grow from the sector's
+    /// nine ships, and shrink too (traders sell ships, and some reach Edge Salvage), and every invariant holds: goods conservation
+    /// through parts into ships among them.
+    /// </summary>
+    [Theory]
+    [Trait(TestWorld.Category, TestWorld.Soak)]
+    [InlineData(42L)]
+    [InlineData(20260619L)]
+    public void Yards_complete_builds_and_fleets_grow_and_shrink_over_a_million_ticks(long seed)
+    {
+        SimulationContext context = WorldGenerator.Generate(seed, withPlayer: false).Context;
+        int start = context.ActorsOrdered.Where(a => a.MovesCargo).Sum(a => a.Ships.Count);
+        int most = start;
+        for (long tick = 50_000; tick <= 1_000_000; tick += 50_000)
+        {
+            context.RunTo(tick);
+            most = System.Math.Max(most, context.ActorsOrdered.Where(a => a.MovesCargo).Sum(a => a.Ships.Count));
+        }
+
+        Assert.True(context.ShipsBuiltToOrder > 0, $"No ship built to order (seed {seed}).");
+        Assert.True(most > start, $"The traders' fleets never grew past {start} (seed {seed}).");
+        int soldByTraders = context.Contracts.Values.OfType<ShipSaleContract>()
+            .Count(s => s.Status == ContractStatus.Fulfilled && context.Actor(s.Seller).MovesCargo);
+        Assert.True(soldByTraders > 0, $"No trader sold a ship (seed {seed}).");
+        Assert.True(context.ShipsSold > 0);
         context.AssertSound();
     }
 

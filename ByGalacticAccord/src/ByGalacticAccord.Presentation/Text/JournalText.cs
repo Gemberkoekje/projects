@@ -39,6 +39,16 @@ public static class JournalText
         OfferAcceptedEntry e => Haggle("OfferAccepted", context, e.Contract, e.By, e.To, e.Offer, e.ReplyHours, e.Tell),
         NegotiationEndedEntry e => Haggle("NegotiationEnded." + e.End, context, e.Contract, e.By, e.To, null, e.ReplyHours, Tell.None),
         FaucetAdjustedEntry e => Templates.Fill("FaucetAdjusted", ("drift", Format.Percent(e.Drift)), ("multiplier", e.Multiplier.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))),
+        ShipBuiltEntry e => Templates.Fill(
+            Key("ShipBuilt", context, e.Yard, context.Contract(e.Contract).PostedBy),
+            Facts(context, e.Contract, ("yard", Name(context, e.Yard)), ("ship", ShipLine(context, e.Ship)))),
+        StockShipBuiltEntry e => Templates.Fill(
+            "StockShipBuilt", ("yard", Name(context, e.Yard)), ("ship", ShipLine(context, e.Ship)), ("place", context.Location(context.Ship(e.Ship).BuiltAt).Name)),
+        ShipHandedOverEntry e => ShipHandedOver(context, e),
+        SupplyFailureEntry e => SupplyFailed(context, e),
+        RemedyChosenEntry e => Templates.Fill(
+            Key("RemedyChosen." + e.Remedy, context, e.By, context.Contract(e.Contract).Performer), Facts(context, e.Contract, ("by", Name(context, e.By)))),
+        ShipScrappedEntry e => Templates.Fill("ShipScrapped", ("owner", Name(context, e.Owner)), ("ship", ShipLine(context, e.Ship))),
         _ => throw new ArgumentOutOfRangeException(nameof(entry), entry, "No template for this journal entry."),
     };
 
@@ -59,6 +69,12 @@ public static class JournalText
         OfferMadeEntry e => e.By,
         OfferAcceptedEntry e => e.By,
         NegotiationEndedEntry e => e.By,
+        ShipBuiltEntry e => e.Yard,
+        StockShipBuiltEntry e => e.Yard,
+        ShipHandedOverEntry e => e.Seller,
+        SupplyFailureEntry e => e.Yard,
+        RemedyChosenEntry e => e.By,
+        ShipScrappedEntry e => e.Owner,
         _ => null,
     };
 
@@ -81,15 +97,22 @@ public static class JournalText
             "Contract.Head.Sale." + sale.Side, ("quantity", Format.Quantity(sale.Quantity)), ("good", Templates.Good(sale.Good)),
             ("place", context.Location(sale.Place).Name)),
         StorageContract storage => Templates.Fill("Contract.Head.Storage", ("place", context.Location(storage.Location).Name)),
+        BuildContract build => Templates.Fill("Contract.Head.Build", ("ship", Templates.ShipName(build.Spec)), ("place", context.Location(build.Place).Name)),
+        ShipSaleContract sale => Templates.Fill("Contract.Head.Ship", ("ship", ShipLine(context, sale.Ship)), ("place", context.Location(sale.Place).Name)),
         _ => contract.Id.ToString(),
     };
+
+    /// <summary>A ship in a line: its kind of ship and its id, "Light Freighter S12".</summary>
+    public static string ShipLine(SimulationContext context, ShipId id) =>
+        Templates.Fill("Ship.Line", ("ship", Templates.ShipName(context.Ship(id))), ("id", id.ToString()));
 
     /// <summary>The contract an entry concerns, if any.</summary>
     public static ContractId? ContractOf(JournalEntry entry) => entry is IContractEntry e ? e.Contract : null;
 
-    /// <summary>A contract's kind as a template key part: "Sale.Wanted", "Sale.ForSale", "Haul", "Storage".</summary>
+    /// <summary>A contract's kind as a template key part: "Sale.Wanted", "Sale.ForSale", "Haul", "Storage", "Build", "Ship" (a ship's Sale).</summary>
     public static string Kind(Contract contract, bool side = true) => contract switch
     {
+        ShipSaleContract => "Ship",
         SaleContract sale when side => "Sale." + sale.Side,
         _ => contract.Type.ToString(),
     };
@@ -153,7 +176,36 @@ public static class JournalText
                 ("quality", Format.Percent(e.Quality))));
     }
 
-    // Cancelled for default by the payer, who took the bond; or at will by either party, who paid the break fee.
+    // A ship changed hands: a Build handed over (late, or below spec at a discount, or both), or a ship sold.
+    private static string ShipHandedOver(SimulationContext context, ShipHandedOverEntry e)
+    {
+        Contract contract = context.Contract(e.Contract);
+        var facts = Facts(
+            context, e.Contract,
+            ("seller", Name(context, e.Seller)),
+            ("buyer", Name(context, e.Buyer)),
+            ("ship", ShipLine(context, e.Ship)),
+            ("paid", Format.Money(e.Price)),
+            ("late", Format.Duration(Math.Max(0, e.TicksLate))),
+            ("lateFee", Format.Money(e.LateFee)),
+            ("discount", Format.Money(e.Discount)));
+        string kind = Kind(contract, side: false);
+        string sentence = Templates.Fill(Key("ShipHandedOver." + kind + (e.TicksLate > 0 ? ".Late" : string.Empty), context, e.Seller, e.Buyer), facts);
+        return e.Discount.Amount > 0m ? sentence + " " + Templates.Fill("ShipHandedOver.Discount", ("discount", Format.Money(e.Discount))) : sentence;
+    }
+
+    // A yard can't get a part in time: what failed upstream, and the remedies it proposes.
+    private static string SupplyFailed(SimulationContext context, SupplyFailureEntry e)
+    {
+        var build = (BuildContract)context.Contract(e.Contract);
+        FittedPart part = build.Spec.In(e.Slot) ?? build.Ordered.In(e.Slot)!.Value;
+        return Templates.Fill(
+            Key("SupplyFailure", context, e.Yard, build.Client),
+            Facts(context, e.Contract, ("yard", Name(context, e.Yard)), ("part", Templates.Part(part))));
+    }
+
+    // Cancelled for default by the payer, who took the bond; or at will by either party, who paid the break fee; or a Build cancelled
+    // by agreement after a supply failure.
     private static string Cancelled(SimulationContext context, ContractCancelledEntry e)
     {
         Contract contract = context.Contract(e.Contract);
@@ -251,6 +303,19 @@ public static class JournalText
                 break;
             case StorageContract storage:
                 facts.Add(("place", context.Location(storage.Location).Name));
+                break;
+            case BuildContract build:
+                facts.Add(("deadline", Format.Date(build.DeadlineTick)));
+                facts.Add(("ship", Templates.ShipName(build.Spec)));
+                facts.Add(("place", context.Location(build.Yard ?? build.Place).Name));
+                facts.Add(("deposit", Format.Money(build.DepositPaid)));
+                facts.Add(("yard", build.Builder is { } y ? Name(context, y) : string.Empty));
+                facts.Add(("client", Name(context, build.Client)));
+                break;
+            case ShipSaleContract shipSale:
+                facts.Add(("ship", ShipLine(context, shipSale.Ship)));
+                facts.Add(("place", context.Location(shipSale.Place).Name));
+                facts.Add(("buyer", shipSale.Buyer is { } sb ? Name(context, sb) : string.Empty));
                 break;
         }
 

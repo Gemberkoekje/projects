@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using ByGalacticAccord.Engine.Domain;
 using ByGalacticAccord.Engine.Simulation;
@@ -158,13 +159,61 @@ public sealed class DomainTests
     }
 
     [Fact]
-    public void All_five_hulls_and_seven_goods_are_defined()
+    public void Five_designs_seven_goods_and_eight_part_kinds_at_three_grades_are_defined()
     {
-        Assert.Equal(5, ShipClasses.All.Count);
-        Assert.Equal(7, Goods.All.Count);
-        foreach (ShipType type in ShipClasses.All)
+        Assert.Equal(5, Designs.All.Count);
+        Assert.Equal(7, Goods.Trade.Count);
+        Assert.Equal(8 * 3, ShipPart.Goods.Count);
+        Assert.Equal(7 + (8 * 3), Goods.All.Count);
+        foreach (Design design in Designs.All)
         {
-            Assert.True(ShipClasses.Info(type).CargoCapacity > 0m);
+            Assert.True(Designs.Stats(design).CargoCapacity > 0m);
+            Assert.Equal(design, Designs.Parts(design).Design);
         }
+
+        foreach (PartKind kind in ShipPart.Kinds)
+        {
+            foreach (Grade grade in Enum.GetValues<Grade>())
+            {
+                GoodType good = ShipPart.GoodOf(kind, grade);
+                Assert.Equal((kind, grade), ShipPart.Of(good));
+                Assert.Equal(GoodCategory.ShipPart, Goods.Info(good).Category);
+            }
+        }
+    }
+
+    [Theory]
+    // Design §15.6: the standard designs' stats follow from the parts of §15.4.
+    [InlineData(Design.LightFreighter, 120, 1.0, 1.0, 8_000)]
+    [InlineData(Design.BulkHauler, 500, 0.588, 0.85, 17_000)]
+    [InlineData(Design.FastCourier, 45, 1.795, 0.7, 11_500)]
+    [InlineData(Design.RefrigeratedTransport, 110, 0.952, 1.0, 13_000)]
+    [InlineData(Design.ArmouredFreighter, 105, 0.909, 1.6, 16_000)]
+    public void A_designs_stats_follow_from_its_parts(Design design, double cargo, double speed, double toughness, double value)
+    {
+        ShipStats stats = Designs.Stats(design);
+
+        Assert.Equal((decimal)cargo, stats.CargoCapacity);
+        Assert.Equal((decimal)speed, stats.Speed);
+        Assert.Equal((decimal)toughness, stats.Toughness);
+        Assert.Equal((decimal)value, stats.Value.Amount);
+    }
+
+    [Fact]
+    public void Grade_scales_a_parts_main_stat_and_a_custom_build_is_no_design()
+    {
+        // A grade-B Light frame holds 115 instead of 120 (design §6.1); a grade-C drive gives 0.92 of its power.
+        ShipParts parts = new(new FittedPart(PartKind.LightFrame, Grade.B), new FittedPart(PartKind.StandardDrive, Grade.C), null);
+        ShipStats stats = ShipStats.From(parts);
+        Assert.Equal(115.2m, stats.CargoCapacity);
+        Assert.Equal(0.92m, stats.Speed);
+        Assert.Equal(Design.LightFreighter, parts.Design);
+
+        // A Light frame, a Fast drive and refrigeration: quick enough to beat spoilage, and no standard design (design §13).
+        ShipParts custom = ShipParts.Of(PartKind.LightFrame, PartKind.FastDrive, PartKind.RefrigerationUnit);
+        Assert.Null(custom.Design);
+        Assert.Equal(110m, ShipStats.From(custom).CargoCapacity);
+        Assert.Equal(1.333m, ShipStats.From(custom).Speed);
+        Assert.Equal(0.8m, ShipStats.From(custom).Preservation);
     }
 }
