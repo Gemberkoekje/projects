@@ -19,8 +19,8 @@ yard's cheap bid a bargain or a trap, should you post your own contract instead?
 ## The current build
 
 **S1 (groundwork), S2 (the browser client), S3 (possession, Sale and Haul), S4 (terms and failure), S5
-(posting, responses and haggling), S6 (information and the news), S6b (showing a post further) and S7 (ships from parts)
-are done; S8 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
+(posting, responses and haggling), S6 (information and the news), S6b (showing a post further), S7 (ships from parts) and
+S8 (consequences) are done; S9 is next.** Goods belong to someone and are somewhere: in an actor's stock, in storage it rents from a
 station, or in a ship's hold. Two kinds of contract move them. A **Sale** is goods wanted or for sale, handed
 over at a place; a **Haul** carries a shipper's goods from one place to another. Consumers post the Sales they
 need delivered, producers sell lots and answer what is wanted, and traders fill Sales by buying and carrying,
@@ -45,8 +45,14 @@ yards bid on it, take a deposit, buy the parts with wanted Sales anyone can fill
 hand it over, its terms deciding what a substitute costs; when a part can't come in time the yard proposes more time,
 a substitute or the money back, and the client chooses. Ships also change hands by **Sale**: yards sell what they
 build on spec, traders buy when their ships are busy and sell when they are idle, and Edge Salvage buys cheap and sells
-second-hand at the frontier. Debt and insolvency come in S8; the foundation (the event queue, the seeded random
-numbers, the money primitives, the invariants and the soak harness) stays.
+second-hand at the frontier. **Risk has a downside.** Money can run out: running costs, rent, docking fees, interest and the
+remedies the deep Accord enforces keep charging below ₵0, and debt costs 0.2% a day. Every bond is locked in full, the Accord
+clearing house lending what a performer lacks while its debt stays within half of what it owns. Owe more than half of what you
+own and you are warned; owe more than all of it, or more than half for seven days, and you are insolvent: your contracts are
+cancelled, the clearing house sells your ships and goods in fire sales shown in every system, and you are gone. A ship flies its
+laden leg at cruise or pushed, faster and riskier, more so for a drive that runs hot, and a route's danger makes an incident both
+likelier and worse. The foundation (the event queue, the seeded random numbers, the money primitives, the invariants and the
+soak harness) stays.
 
 The **Blazor WebAssembly client** runs that simulation in the browser: the schematic sector map with
 routes styled by danger and ships moving along them, the time bar (pause, 1×, 4×, 16×), the board of open
@@ -64,7 +70,11 @@ from you and fades what you know of it with age ("live", "daily …", "as of …
 only from the news says it may have been taken, and every party shows its public record. You can open your
 ship's **sheet** (its parts, each stat with the parts that make it, its history), order a ship with the **build
 composer** (a design or a custom combination), read the yards' **bids** as threads and accept one, follow the Build's
-**orders tree** as the yard buys its parts, and buy a ship for sale.
+**orders tree** as the yard buys its parts, and buy a ship for sale. Each haul or fill also says what pushing it would do (when it
+would arrive, how much likelier an incident is, and, for a deadline only pushing makes, that it is a trap) and lets you take it
+pushed. In debt the time bar and the ledger show what you owe, its interest and what you own against it, and a warning stops the
+clock; if you go insolvent, the game ends on the **legacy**: how it ended, the failures that led there, the contracts you honoured
+and broke, the markets you moved, the companies you outlasted and the ships you flew, with their histories.
 
 ## Running it
 

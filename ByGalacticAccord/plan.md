@@ -6,8 +6,8 @@ says *what*; this file says *in which order*, and tracks status. Each step below
 deliverable, a check, and one status line. When a step finishes, its log (what was built, checked and
 measured) goes in `log/S<n>.md` and the status line links there.
 
-**Status (2026-11-05):** S1–S7 and S6b done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
-[S4 log](log/S4.md), [S5 log](log/S5.md), [S6 log](log/S6.md), [S6b log](log/S6b.md), [S7 log](log/S7.md)); S8 is next. The UI mockup
+**Status (2026-11-05):** S1–S8 and S6b done ([S1 log](log/S1.md), [S2 log](log/S2.md), [S3 log](log/S3.md),
+[S4 log](log/S4.md), [S5 log](log/S5.md), [S6 log](log/S6.md), [S6b log](log/S6b.md), [S7 log](log/S7.md), [S8 log](log/S8.md)); S9 is next. The UI mockup
 is at <https://claude.ai/artifact/VUfFWMFGd7p4ryYau2g7Pg> (private until shared): it is the visual target for
 S2 and S9.
 
@@ -37,15 +37,17 @@ foundation is sound; most of the game logic on top of it changes shape.
 |---|---|
 | The board and the event log show the buyer's hidden reservation fee, so haggling is solved. *Since S2 neither prints it, but the posted late fee and its cap (the bond) are still scaled from it, so the terms give it away.* | S3 (fixed early: every term now scales from the posted price) |
 | The player never pays running costs (heartbeats skip the player) | S3 (fixed) |
-| Charges stop at ₵0, so nobody can go broke; a broke player still takes escrow jobs with a ₵0 bond | S8 |
+| Charges stop at ₵0, so nobody can go broke; a broke player still takes escrow jobs with a ₵0 bond | S8 (fixed: running costs, fees, interest and enforced remedies charge into debt, and every bond is locked in full, the clearing house lending it within half of what the performer owns) |
 | `AcceptHaul` doesn't check the contract is still open | S2 (fixed: the client calls it) |
 | Food decays below its warranty on even the shortest run | S3 (fixed: the §15.3 keep-times) |
 | Visibility is effectively omniscient (keyed on a fixed home; home region covers 5 of 7 locations) | S6 (fixed: presence, the here, near and far tiers, and a knowledge store per actor) |
-| Incident outcomes don't shift with danger, despite the comment saying they do | S8 |
+| Incident outcomes don't shift with danger, despite the comment saying they do | S8 (fixed: danger moves the outcome table's bounds toward the severe end) |
 | The test suite is slow: the board query walks and sorts every contract ever posted, and `FindPath` runs Dijkstra per contract, per ship, per heartbeat | S1 |
 | *Found in S2:* outside the Accord the pilot pays the producer for the goods at pickup and is paid only the fee at handover, so nearly every frontier haul loses money (and AI haulers take them, since their scoring ignores the goods) | S3 (fixed: a delivered Sale pays for the goods) |
 | *Found in S2:* consumers post hauls from a producer at their own location (Helios Prime), a one-hour trip to nowhere | S3 (fixed: a Sale handed over where it is posted) |
-| *Found in S3:* AI actors pay out whatever they hold above a working capital, a sink standing in for spending, growth and failure; without it savers soak up the money supply | S7 (in part: a trader that wants a ship keeps its price back and spends it on the ship), S8 (insolvency) |
+| *Found in S3:* AI actors pay out whatever they hold above a working capital, a sink standing in for spending, growth and failure; without it savers soak up the money supply | S7 (in part: a trader that wants a ship keeps its price back and spends it on the ship). S8 measured insolvency in its place: it doesn't take money out of the sector, and with the payout off trade halves (traders keeping their surplus) or collapses (station operators keeping their fees). Open: spending in the sector would replace it |
+| *Found in S8:* a producer with a full warehouse asks exactly its cost, so it banks nothing; idle with a small debt, interest takes it under in decades (Halcyon Fuelworks, two seeds of ten) | Open: see the questions in [`log/S8.md`](log/S8.md) |
+| *Found in S8:* the bots keep leftover goods in storage and pay their rent while idle; in debt they can't climb out (the market reader went under on seed 5) | S10 (the bots) |
 | *Found in S3:* a producer that sells delivered fails the Sale when nobody takes its Haul in time (about 3.5% of contracts over a million ticks) | S4 (in part: such a Sale now ends by its terms, the producer walking away for its break fee or its buyer cancelling for the bond). S5's haggling didn't fix it (walking away rose by 40–85%): carriers' time near the goods binds, not the fee. S6's limited sight lowered walking away by 16–28%, but carriers' hours still bind. S7 (fleets that grow): over ten seeds walking away fell from 3,251 to 204 a run (26–387) as the traders' fleets grew from 9 ships to about 16 |
 | *Found in S4:* filling a Sale through a carrier pays only if the player watches its haul: at the usual offer about one in seven goes untaken and the Sale is cancelled for the bond, and the player can raise an offer only by reposting it | S5 (in part: the player posts a haul at its own price and terms, and haggles with the carriers that answer). S6: a post reaches only the carriers that can see it or read of it in the news; I didn't measure the untaken share again |
 | *Found in S4:* decisions rarely reach the player, which is a payer only of the hauls it posts and the lots it buys | S5 (in part: the player can post wanted Sales and is then asked about defaults and inspections, but neither bot met a decision in 8,333 game days) |
@@ -292,7 +294,18 @@ foundation is sound; most of the game logic on top of it changes shape.
   - Insolvency tests for an AI and for the player.
   - In a soak, some AI actors fail and their ships resell, but not en masse.
   - The trap contract from the first hour is visibly a trap.
-- **Status:** not started.
+- **Status (2026-11-05):** done. Running costs, rent, docking fees (now the station operator's), interest at 0.2% a day and the remedies the
+  deep Accord enforces charge below ₵0; every bond is locked in full, the clearing house lending it while the performer's debt stays within
+  half of what it owns. Debt above half of what an actor owns warns it; above all of it, or above half for seven days, it is insolvent:
+  its contracts are cancelled, its ships and goods go in fire sales shown in every system, and it dissolves with its debt written off. The
+  player's insolvency ends the game on the legacy screen. Ships fly their laden leg at cruise or pushed (×1.25 the speed, ×1.5 or ×2 the
+  incident chance); an AI pushes only to beat a late fee, and danger shifts incident outcomes toward the severe end. Over ten seeds every
+  invariant holds, 137,005 contracts are fulfilled (S7 135,229) with 1.16% failing (S7 1.2%), and ten actors went insolvent in all (seven
+  pilots, a shipping company and Halcyon Fuelworks twice), no more than two in a run, their ships resold to Edge Salvage. The market
+  reader wins nine seeds of ten at 1.43×; on seed 5 it went under. The trap reads "on time only if you push" on the board and in the
+  contract. D38: debt and insolvency don't replace the payout (without it trade halves or collapses), so station operators still pay out
+  their fees above their float and the fee level holds. The client shows debt, the warning, the push choice and the legacy. See
+  [`log/S8.md`](log/S8.md).
 
 ### S9 — The interface, complete
 
@@ -303,6 +316,8 @@ foundation is sound; most of the game logic on top of it changes shape.
   - Ledger profit and loss per contract.
   - Player pause rules.
   - Onboarding polish.
+  - *From S8:* explanations for the debt's interest, what the player owns, the push odds and the shifted incident table; retiring to the
+    legacy at any time (design §10), if the review wants it; a richer legacy.
 - **Verify:**
   - Playwright walks the first hour's screens.
   - Every number on the board and in the contract panel has an explanation.
@@ -317,7 +332,8 @@ foundation is sound; most of the game logic on top of it changes shape.
     which an AI does after a day: the board at Day 1 · 06:00 holds only Meridian's posts and the news (the browser
     check runs five game hours before anything takeable is live), and beat 2 needs Verdant's cheap food visible from
     Meridian. The seeded start has to show those posts at Meridian, or the AI has to advertise sooner.
-  - Bot players that measure beats 4–5 and the skill gap. Since S7 a supply failure needs an upstream order to fail, which long
+  - Bot players that measure beats 4–5 and the skill gap. *From S8:* the bots should sell leftover goods rather than pay their rent idle,
+    and the first hour's trap (design §13) has to be on Meridian's board at the start. Since S7 a supply failure needs an upstream order to fail, which long
     runs didn't meet: beat 4 has to be made likely (a seeded fragile parts run, or parts that come by red routes).
   - Tuning against the §17 pacing targets, with advertising's figures among the knobs (D38): the fee share and growth,
     the delays, the AI's wait and budget, and whether a jump of free reach helps the first hour. S6b's experiments
