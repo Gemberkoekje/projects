@@ -133,6 +133,17 @@ a real certificate: `https://<app>.lan.gemberkoekje.nl`, LAN and Tailscale only.
       Part 1 1080p`-style titles still pass.
     - The 12 grabs were removed from the queue with blocklist, which also starts Sonarr's own
       redownload search.
+- **Anime releases don't always carry English subtitles.**
+  - ToonsHub's Amazon rips (Apocalypse Hotel S01E01/E11/E12, plus E03/E04/E07 queued) had no
+    subtitle tracks at all; Erai-raws' copies of the same show had English and 12 more.
+  - Also seen: RawsPlease (raws), and French-only VOSTFR or Tsundere-Raws releases (SPY x FAMILY
+    E11, the CITY THE ANIMATION season pack).
+  - Sonarr can't see subtitles before the download. Release profile 2, "Geen ToonsHub zonder
+    ondertitels", rejects ToonsHub names that don't mention subs.
+  - The real fix is Bazarr (gembernodes PR #129, DEPLOY.md part C): it fetches an English `.en.srt`
+    for anything without English audio or subtitles.
+  - The auto-mode safety check refused deleting the subtitle-less files without the user's
+    explicit OK. With Bazarr they don't need replacing.
 - **Space (2026-11-06 evening).**
   - The share has 682 GB used of 3.4 TB (21%): `TV Shows` 543 GB, `Movies` 39 GB.
   - Reclaimable:
