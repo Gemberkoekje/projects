@@ -337,14 +337,23 @@ piped from their pods, never printed. Only the login and the OpenSubtitles accou
 - **TsukiHime**, for anime. It serves the subtitle tracks of fansub releases and needs no account;
   it finds a show through the public Anime-Lists mapping.
 - **Podnapisi**, general, no account.
-- Not used: **Animetosho**. It needs AniDB episode ids, which require a registered AniDB HTTP
-  client (an AniDB account). Add it later if TsukiHime misses too much. The **Embedded Subtitles**
-  provider only copies tracks that are already in the video out to `.srt`, which Jellyfin doesn't
-  need.
-- **Minimum score for series: 80** (the default is 90; films stay at 70).
-  - Anime subtitles are usually made for a different release than the one on disk. One for
-    Apocalypse Hotel S01E12, made for the Judas release, scored 86 and was skipped at 90.
-  - Audio sync fixes the timing.
+- **Subdl**, with the user's free API key, AI translation off (added 2026-11-06).
+- **AnimeTosho.xyz** (provider `animetosho_xyz`), for anime: the subtitle tracks of every release
+  Anime Tosho mirrors, matched to the exact episode through AniDB.
+  - It needs **AniDB** (Settings → Providers → AniDB): a free AniDB account, then a registered
+    project at https://anidb.net/software/add, with an HTTP API client (name in lowercase letters,
+    version 1).
+  - Not the older **"Anime Tosho"** provider (`animetosho`). Its `feed.animetosho.org` no longer
+    exists in DNS. Anime Tosho lives at animetosho.net now, and `feed.animetosho.xyz` redirects
+    there.
+- Not used: the **Embedded Subtitles** provider. It only copies tracks that are already in the
+  video out to `.srt`, which Jellyfin doesn't need.
+- **Minimum score for series: 65** (the default is 90; films stay at 70).
+  - Anime subtitles are almost never made for the exact release on disk. Anime Tosho's
+    right-episode matches score 68–74; OpenSubtitles' one for Apocalypse Hotel S01E12 (the Judas
+    release) scored 86.
+  - Audio sync fixes the timing. Apocalypse Hotel E01 and E12 were synced with offsets of only
+    0.05–0.07 seconds.
 
 ### C6. Subtitles: sync and Jellyfin
 
@@ -366,8 +375,10 @@ piped from their pods, never printed. Only the login and the OpenSubtitles accou
 - [ ] Then OpenSubtitles' free tier stopped: "Daily download limit reached", throttled for 6 hours.
       10 were left (Apocalypse Hotel 3, Dragon Ball DAIMA 6, an Azumanga extra without dialogue).
       Bazarr's own 6-hourly search picks them up after the reset.
-- [ ] Apocalypse Hotel S01E01 (a ToonsHub file without subtitle tracks) gets an `.en.srt`, and
-      Jellyfin offers English subtitles for it.
+- [x] Apocalypse Hotel S01E01 (a ToonsHub file without subtitle tracks) gets an `.en.srt`, and
+      Jellyfin offers English subtitles for it (2026-11-06, from AnimeTosho.xyz). All six of its
+      episodes on disk now have English subtitles; the remaining five DAIMA episodes wait for
+      OpenSubtitles' reset.
 
 The free OpenSubtitles tier (about 20 downloads a day) is the bottleneck for a backlog; new
 episodes trickle in well below it. VIP, or a second provider with an API key (Subdl), would raise it.
