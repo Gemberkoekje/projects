@@ -231,8 +231,10 @@ The menu calls the *arr apps **Media Managers**; the docs say "Arr".
     `Remote Path Mapping`. Those failures need a manual fix, not deletion; everything else is
     removed and searched again.
   - A stalled-download rule, enabled, Max Strikes 3.
-- **Seeker:** it searches for better copies of what you already have. Turn it off if you don't want
-  existing files replaced.
+- **Seeker:** keep **"Search" on** and turn **"Proactive search" off**. "Proactive search" hunts for
+  better copies of what you already have. "Search" is the main switch and also runs the
+  replacement search after Cleanuparr removes a download. Cleanuparr tells Sonarr/Radarr to skip
+  their own redownload, so with "Search" off a removed fake is never replaced.
 
 ### B8. Kodi
 

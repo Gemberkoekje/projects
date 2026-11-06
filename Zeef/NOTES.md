@@ -76,8 +76,11 @@ a real certificate: `https://<app>.lan.gemberkoekje.nl`, LAN and Tailscale only.
 - **QNAP indexing:** Multimedia Console no longer has a content source for the Multimedia share.
   Nothing indexes `@Downloads`, and the single disk is spared the thumbnail work. Jellyfin replaced
   QuMagie.
-- **Seeker: off** (decided 2026-11-06). Sonarr/Radarr upgrade only through their regular feed
-  checks. The user switched it off in Cleanuparr's UI.
+- **Seeker: "Search" on, "Proactive search" off** (decided 2026-11-06, corrected the same day).
+  Sonarr/Radarr upgrade only through their regular feed checks, and Cleanuparr still searches
+  for a replacement after it removes a download. The user sets this in Cleanuparr's UI.
+  - The first attempt switched off the whole Seeker ("Search", 15:18), which also stopped the
+    replacement searches; see the gotcha below.
 
 ### Gotchas
 
@@ -285,8 +288,25 @@ Status at ~14:00, for the record:
     11 lines a second while weighing releases), all written to `/config` on that volume.
     `<APP>__LOG__LEVEL=info` fixes it (gembernodes PR #120).
   - **Don't untick "sync" on `gembernodes-pvcs`.** Postgres relies on it.
-- **Cleanuparr's Seeker hunts for better copies of what you already have.** It triggered
-  replacement searches for films already in the library.
+- **Cleanuparr's Seeker has two switches, and the main one also does replacement searches.**
+  - "Proactive search" hunts for missing items and better copies of what you already have.
+  - "Search" is the main switch. It also runs the replacement search after Cleanuparr removes a
+    download, one queued item per run.
+  - Cleanuparr removes queue items with `blocklist=true&skipRedownload=true` (2.10.12
+    `ArrClient.cs`), so Sonarr/Radarr's own "Redownload Failed" never runs, and the replacement
+    is left to Seeker.
+  - With "Search" off (from 2026-11-06 15:18), 7 removals had gone unreplaced by ~18:45. South
+    Park S29E01, E02 and E04 had been grabbed from Knaben as fakes: a single `.exe` named after a
+    real release group (FLUX, NTb). The malware filter removed them correctly, then nothing
+    searched again.
+  - A manual Sonarr EpisodeSearch for the 6 still-missing episodes grabbed all 6. S29E01's pick
+    ("CC WEB H264 KRAFT" on TorrentDownload, 733 seeders) was another lone `.exe`, removed within
+    seconds. E01 was then grabbed by hand: a LimeTorrents release carrying the episode title
+    ("South American Biker Gangs … AMZN WEB-DL … Kitsune", 0.92 GB).
+- **Seeder counts don't prove a release is real.** The South Park fakes showed hundreds of
+  seeders. The real copies of new episodes carried the episode title in the name and were
+  ~0.8–0.9 GB; the fakes had only `S29E0x 1080p WEB H264-<group>`. The malware filter is what
+  actually stops them, at metadata time, before any payload arrives.
 - **Git Bash rewrites `/data/...` arguments to `kubectl exec`** into `C:/Program Files/Git/data/...`.
   Set `MSYS_NO_PATHCONV=1`.
 - **Docker Hub's API through Python's `urllib` fails here** (an expired CA in the store). `curl`
