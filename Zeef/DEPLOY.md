@@ -304,6 +304,10 @@ Bazarr fetches English subtitles for anything without English audio or English s
 - **Settings → General → Security:** Authentication **Forms**, with a username and password
   (1Password). Bazarr starts without a login.
 
+C3 to C6 were done on 2026-11-06 through Bazarr's own API, from inside the pod (`POST
+/api/system/settings`, `X-API-KEY` from `/config/config/config.yaml`). The Sonarr/Radarr keys were
+piped from their pods, never printed. Only the login and the OpenSubtitles account are the user's.
+
 ### C3. Sonarr and Radarr
 
 - **Settings → Sonarr:** address `sonarr.zeef.svc.cluster.local`, port `8989`, the Sonarr API key
@@ -315,15 +319,32 @@ Bazarr fetches English subtitles for anything without English audio or English s
 
 - **Settings → Languages:** language filter **English**.
 - A languages profile **English** with English only, set as the default for series and for films.
-- **Treat embedded subtitles as present:** on, so a video with an English subtitle track isn't
-  given a second one.
+- **"Exclude if matching audio" on** for English (`audio_exclude`). An episode or film with an
+  English audio track needs no subtitles, which keeps the providers' daily quotas for the
+  non-English ones.
+- **Treat embedded subtitles as present:** on (the default), so a video with an English subtitle
+  track isn't given a second one. A track flagged *forced* (signs only) doesn't count: Dragon Ball
+  DAIMA's files have only a forced English track, so Bazarr fetches a full one.
+- **Undefined-language embedded subtitles count as English** (`default_und_embedded_subtitles_lang
+  = en`).
+  - Nichijou's fansub files have a subtitle track with no language set (Jellyfin shows "?").
+  - Without this setting Bazarr fetched 7 needless English subtitles for them, out of the
+    OpenSubtitles daily quota.
 
 ### C5. Providers
 
-- **OpenSubtitles.com**, with the account from C1.
-- **Animetosho**, for anime. It reuses the subtitles of fansub releases and needs no account.
-- **Embedded Subtitles**, which reads the subtitle tracks already inside a video.
-- Optional extras without an account: Podnapisi, and YIFY Subtitles for films.
+- **OpenSubtitles.com**, with the account from C1 (entered by the user).
+- **TsukiHime**, for anime. It serves the subtitle tracks of fansub releases and needs no account;
+  it finds a show through the public Anime-Lists mapping.
+- **Podnapisi**, general, no account.
+- Not used: **Animetosho**. It needs AniDB episode ids, which require a registered AniDB HTTP
+  client (an AniDB account). Add it later if TsukiHime misses too much. The **Embedded Subtitles**
+  provider only copies tracks that are already in the video out to `.srt`, which Jellyfin doesn't
+  need.
+- **Minimum score for series: 80** (the default is 90; films stay at 70).
+  - Anime subtitles are usually made for a different release than the one on disk. One for
+    Apocalypse Hotel S01E12, made for the Judas release, scored 86 and was skipped at 90.
+  - Audio sync fixes the timing.
 
 ### C6. Subtitles: sync and Jellyfin
 
@@ -336,7 +357,17 @@ Bazarr fetches English subtitles for anything without English audio or English s
 
 ### C7. Checks
 
-- Bazarr's **Wanted** lists show the episodes and films still missing English subtitles. Start
-  "Search all" once.
-- Apocalypse Hotel S01E01 (a ToonsHub file without subtitle tracks) gets an `.en.srt`, and
-  Jellyfin offers English subtitles for it.
+- [x] Bazarr runs on PostgreSQL: 17 tables in `bazarr`, no SQLite file (2026-11-06).
+- [x] The first sync found 49 episodes without English subtitles, all non-English audio.
+- [x] The first search (2026-11-06 ~20:57) downloaded 20 subtitles from OpenSubtitles (13 Dragon
+      Ball DAIMA, 7 Nichijou) and synced each to the audio.
+- [x] The post-processing script got a 204 from Jellyfin each time, and Jellyfin listed the new
+      `eng (external)` tracks straight away.
+- [ ] Then OpenSubtitles' free tier stopped: "Daily download limit reached", throttled for 6 hours.
+      10 were left (Apocalypse Hotel 3, Dragon Ball DAIMA 6, an Azumanga extra without dialogue).
+      Bazarr's own 6-hourly search picks them up after the reset.
+- [ ] Apocalypse Hotel S01E01 (a ToonsHub file without subtitle tracks) gets an `.en.srt`, and
+      Jellyfin offers English subtitles for it.
+
+The free OpenSubtitles tier (about 20 downloads a day) is the bottleneck for a backlog; new
+episodes trickle in well below it. VIP, or a second provider with an API key (Subdl), would raise it.

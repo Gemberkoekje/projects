@@ -133,6 +133,10 @@ a real certificate: `https://<app>.lan.gemberkoekje.nl`, LAN and Tailscale only.
       Part 1 1080p`-style titles still pass.
     - The 12 grabs were removed from the queue with blocklist, which also starts Sonarr's own
       redownload search.
+    - Widened the same evening to `/\bPart\s?\d+\s*(?:-?\s+\d{2,3}\b|\[)/i`. An Erai-raws
+      *batch*, "Dr Stone - Science Future Part 3 [1080P …][Unofficial Batch]", has no episode
+      number after "Part 3". Sonarr took "Part 3" for episode 3 and grabbed it as S01E03. It was
+      removed with blocklist as well.
 - **Anime releases don't always carry English subtitles.**
   - ToonsHub's Amazon rips (Apocalypse Hotel S01E01/E11/E12, plus E03/E04/E07 queued) had no
     subtitle tracks at all; Erai-raws' copies of the same show had English and 12 more.
