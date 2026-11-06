@@ -244,6 +244,12 @@ The menu calls the *arr apps **Media Managers**; the docs say "Arr".
 
 Kodi's sources stay `Movies/` and `TV Shows/`.
 
+**Superseded by Jellyfin (phase 0b, DESIGN.md 12.4).** Kodi now gets its library through the
+Jellyfin for Kodi add-on. Sonarr and Radarr use Connect → **Emby / Jellyfin** instead (host
+`jellyfin.zeef.svc.cluster.local`, port `8096`, "Update Library" on), with **Map Paths From `/data/`
+To `/media/`**. Without that mapping, new series and films only appear at Jellyfin's 12-hourly
+scan.
+
 ### B9. QNAP media apps
 
 In Multimedia Console (content sources for QuMagie/Video Station), make sure

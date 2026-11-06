@@ -698,7 +698,9 @@ That's decided at the start of phase 1, after Jellyfin has been used for a while
    - turn off real-time monitoring, which doesn't work over NFS. The Sonarr/Radarr notification
      does that job.
 3. **Dashboard → API Keys:** make a key, then Sonarr and Radarr → Connect → Emby / Jellyfin
-   (host `jellyfin.zeef.svc.cluster.local`, port `8096`), with "Update Library" on.
+   (host `jellyfin.zeef.svc.cluster.local`, port `8096`), with "Update Library" on and **Map
+   Paths From `/data/` To `/media/`**. Without the mapping, only items Jellyfin already knows get
+   updated; new series and films wait for the 12-hourly scan (found and fixed 2026-11-06).
 4. **Backups:** schedule them to the NFS volume.
 5. **English subtitles on by default** (the user asked for this on 2026-11-06):
    - **Jellyfin:** this is per user, under your profile → **Playback → Subtitles**. Set Preferred

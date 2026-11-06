@@ -38,6 +38,16 @@ a real certificate: `https://<app>.lan.gemberkoekje.nl`, LAN and Tailscale only.
   - Every pod in `zeef` and `lan-proxy` Running.
   - Sonarr's queue: 37 downloading, 4 queued, 1 stalled (Cleanuparr's job); 94 monitored episodes
     still missing from the gap-fill.
+- **The end-to-end test passed (2026-11-06 ~17:40).** The public-domain test film, Night of the
+  Living Dead (1968, Radarr id 5, from the Internet Archive):
+  - grabbed 15:02, imported 17:24 as `Movies/Night of the Living Dead (1968)/… .m4v` (3.05 GB,
+    WEBRip-1080p);
+  - a hardlink: the library file and the seeding copy in `@Downloads/complete/radarr/` share one
+    inode, so it is stored once;
+  - in Jellyfin (h264 1432×1080) and "available" in Seerr, after the path-mapping fix below and a
+    manual library scan.
+  - South Park (season 29 only, so "partially available") and Dragon Maid showed up in Jellyfin and
+    Seerr in the same scan.
 
 ### Details
 
@@ -88,15 +98,20 @@ a real certificate: `https://<app>.lan.gemberkoekje.nl`, LAN and Tailscale only.
   - On 2026-11-06 four attempts failed: a wrong password, not the switchboard.
   - "Forgot password?" writes a one-time PIN to `/config/passwordreset<hash>.json` in the pod,
     valid for 30 minutes, not by email.
+- **Sonarr/Radarr's Jellyfin connection needs Map Paths `/data/` → `/media/`** (set via the API
+  on 2026-11-06).
+  - The pods see the share as `/data`, Jellyfin as `/media`.
+  - For an item Jellyfin already has, Sonarr/Radarr ask Jellyfin for its path, so updates landed
+    (new For All Mankind episodes appeared within seconds).
+  - For anything new they send their own `/data/…` path, which Jellyfin ignores. The test film,
+    South Park and Dragon Maid then waited for Jellyfin's 12-hourly library scan, and Seerr (which
+    learns from Jellyfin) didn't see them either.
 - **Jellyfin sees the switchboard's pod IP (`10.42.x.x`) as the client.** Harmless: it falls in
   Jellyfin's LAN ranges. Adding the pod network to Jellyfin's Known Proxies would show real client
   IPs in its log; not done.
 
 ### Carried over
 
-- **The public-domain test film:** Night of the Living Dead (1968), Radarr id 5, from the Internet
-  Archive. It was downloading at the close (3.6 GB, about 25%, behind the gap-fill). Left to check:
-  imported as a hardlink, and visible in Jellyfin and Seerr.
 - **Phase 2** (the Zeef app for software & games, the import verifier, "Plak een link"): best
   started after the stack has run a week or so without help.
 
