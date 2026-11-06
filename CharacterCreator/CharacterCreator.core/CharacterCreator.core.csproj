@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The rules engine and its model (DESIGN.md §6). Plain C#: no I/O, no framework, no storage,
+       because the build screen runs this same assembly in the browser. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CharacterCreator.core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CharacterCreator.test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Qowaiv" />
+  </ItemGroup>
+
+</Project>

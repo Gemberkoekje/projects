@@ -1,0 +1,20 @@
+@page "/afgemeld"
+
+<PageTitle>Character Creator · Afgemeld</PageTitle>
+
+<h1>Je bent afgemeld</h1>
+
+<p class="secondary">Je plannen in deze browser blijven gewoon bewaard.</p>
+
+<p><a href="@Back">Verder</a></p>
+
+@code {
+    /// <summary>Where the sign-out came from; already made local by the sign-out endpoint.</summary>
+    [SupplyParameterFromQuery]
+    private string ReturnUrl { get; set; } = string.Empty;
+
+    /// <summary>The way back: the page the sign-out came from, or the build screen.</summary>
+    private string Back => string.IsNullOrEmpty(ReturnUrl) || !ReturnUrl.StartsWith('/') || ReturnUrl.StartsWith("//", StringComparison.Ordinal)
+        ? string.Empty
+        : ReturnUrl.TrimStart('/');
+}

@@ -1,0 +1,61 @@
+# Vortex Character Creator — repo conventions
+
+The rebuild of Thorfgin's character builder (builder.qequoia.nl) on the Vortex stack. Read
+[DESIGN.md](DESIGN.md) first (the design, every decision and why), then [NOTES.md](NOTES.md) for
+where the last phase stopped.
+
+**It lives here only for the proof of concept.** After Thorfgin's yes it moves to Vortex's private
+GitLab (DESIGN.md §10, phase 6). Until then nothing of Vortex's is touched: no GitLab project, no
+pushed VOID branch, no Keycloak change.
+
+## Template
+
+Kluskat (this repo) for the `projects` plumbing, by way of werkplaats: the layering, ports and
+adapters, inline DI in `Program.cs`, config via the colon-path indexer, the analyzer stack in
+`Directory.Build.props`, severities in the single `.globalconfig`, the GitHub workflow and the
+gembernodes deploy. landerijen (`C:\git\gitlabs\landerijen-volken`) for Blazor and the ERU sign-in.
+
+## Deltas
+
+- **Layers:** `CharacterCreator.core` ← `.application` ← `.infrastructure` ← `.WebApp`, plus
+  `.WebApp.Client` (the build screen, Blazor WebAssembly, references **core only**) and `.test`.
+  `Architecture/Layering_specs` guards it.
+- **core is the rules engine and must run in the browser:** plain C#, Qowaiv only, no I/O, no
+  framework, no storage. It returns facts (findings), never sentences; the UI words them.
+- **Warnings are errors** (projects/ house style). Tune a rule only in `.globalconfig`, with a
+  `[Justification: …]`.
+- **Anonymous by default.** No fallback policy: pages that need a sign-in name a policy
+  (`CharacterCreatorPolicies`). `Beheer` = `void.referee`, `void.eventcontrol` or `*_*`, by name.
+- **ERU sign-in is gated on `Keycloak:Issuer`.** Empty (the demo, the specs, a bare compose) means
+  anonymous only, and `/aanmelden` explains why. Development uses `vortex-dev`, which only takes
+  localhost redirects.
+- **Guild Hall**, the player register of vortex-tools-style, vendored in
+  `CharacterCreator.WebApp/wwwroot/lib/vortex-tools` (`vendor.ps1 -Register GuildHall`). Colours by
+  role token only; the app's own components live in `wwwroot/app.css`.
+- **Public repo.** `projects` and gembernodes are public: never commit the SL-only skills, the SL
+  file (`skill-requirements-sl.json`) or a secret. The recorded VOID snapshot holds book skills only.
+- Dutch UI (English toggle from phase 3), English code names. Test methods are snake_case English
+  sentences.
+- Local Postgres on **5435**, web on **8084** (`docker compose up -d postgres`, then run the WebApp;
+  the dev password is in `appsettings.Development.json` and must match your `.env`).
+- CI is GitHub Actions in this repo (`charactercreator-build-and-push.yml`), image on GHCR.
+
+## Working here
+
+```bash
+dotnet build CharacterCreator.slnx
+```
+
+```bash
+dotnet test CharacterCreator.slnx
+```
+
+- **Every phase ends with a written summary appended to `NOTES.md`.**
+- Razor components have nullable on, but avoid `?`: render an attribute that may be absent with
+  `@attributes` (see `App.razor`'s theme), not with a `null` value.
+- The client's `Program` is an explicit class in its own namespace: a second top-level `Program`
+  would clash with the host's in the specs' `WebApplicationFactory<Program>`.
+- Whatever a client page injects must be registered in both `Program.cs` files: the server
+  prerenders the page first.
+- The VOID side lives in the local worktree `C:\git\gitlabs\void-charactercreator`, branch
+  `feature/skills-requirements-api`, which is never pushed until phase 6.

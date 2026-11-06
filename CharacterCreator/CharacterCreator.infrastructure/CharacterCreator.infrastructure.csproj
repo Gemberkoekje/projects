@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The adapters behind the application's ports: Marten, VOID over HTTP or a recorded snapshot,
+       the content files, the PDF writer (DESIGN.md §6). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CharacterCreator.infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CharacterCreator.test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- For IXmlRepository: the data-protection key ring lives in PostgreSQL next to everything else. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Marten" />
+    <PackageReference Include="Qowaiv" />
+    <PackageReference Include="Qowaiv.Validation.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CharacterCreator.application/CharacterCreator.application.csproj" />
+    <ProjectReference Include="../CharacterCreator.core/CharacterCreator.core.csproj" />
+  </ItemGroup>
+
+</Project>

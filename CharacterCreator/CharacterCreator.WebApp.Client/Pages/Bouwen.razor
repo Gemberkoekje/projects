@@ -1,0 +1,25 @@
+@page "/"
+@rendermode InteractiveWebAssembly
+
+@* The build screen (DESIGN.md §5). Phase 0 only proves the route: prerendered on the server, then
+   taken over by the browser. The picker, the chosen skills and the summary arrive in phase 3. *@
+<PageTitle>Character Creator · Bouwen</PageTitle>
+
+<h1>Personage bouwen</h1>
+
+<p class="secondary">
+    Hier komt het bouwscherm: vaardigheden kiezen, XP, vereisten, energie per dag, spreuken en
+    recepten.
+</p>
+
+<p class="muted" data-render-state="@RenderState">@RenderText</p>
+
+@code {
+    /// <summary>Where this page runs right now: on the server while prerendering, then in the browser.</summary>
+    private string RenderState => RendererInfo.IsInteractive ? "browser" : "server";
+
+    /// <summary>The same, for a reader.</summary>
+    private string RenderText => RendererInfo.IsInteractive
+        ? "Dit scherm draait nu in je browser."
+        : "Dit scherm wordt geladen…";
+}

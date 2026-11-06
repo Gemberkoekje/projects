@@ -1,0 +1,51 @@
+# Local development and a stand-alone run. The demo runs on the gembernodes k3s cluster against the
+# cluster's shared PostgreSQL (DESIGN.md §6); this file is for your own machine.
+#
+#   docker compose up -d postgres     # just the database, then `dotnet run` the WebApp
+#   docker compose up -d --build      # everything in containers (needs a published app, see Dockerfile)
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: charactercreator-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-charactercreator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-charactercreator}
+      TZ: Europe/Amsterdam
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Loopback only, on 5435 so it does not clash with plotboek (5432), werkplaats (5433) or
+    # landerijen and Kluskat (5434).
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-charactercreator} -d ${POSTGRES_DB:-charactercreator}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  webapp:
+    image: ghcr.io/gemberkoekje/charactercreator:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: charactercreator-webapp
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${WEBAPP_PORT:-8084}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      TZ: Europe/Amsterdam
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-charactercreator};Username=${POSTGRES_USER:-charactercreator};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+      # Optional: without an issuer the app runs anonymous only.
+      Keycloak__Issuer: ${KEYCLOAK_ISSUER:-}
+      Keycloak__ClientId: ${KEYCLOAK_CLIENT_ID:-}
+      Keycloak__ClientSecret: ${KEYCLOAK_CLIENT_SECRET:-}
+
+volumes:
+  postgres_data:

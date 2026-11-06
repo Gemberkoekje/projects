@@ -1,0 +1,80 @@
+@using System.Reflection
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+@* The crest bar every Vortex app shares, Guild Hall register (vortex-tools-style,
+   reference/guildhall.html): the wordmark, then always the user, the theme toggle and sign in/out,
+   and the screens in a second row. *@
+<header class="vtx-header">
+    <a class="vtx-wordmark" href="">
+        <img class="vtx-crest" src="@Assets["lib/vortex-tools/img/vortex-crest.svg"]" alt="" width="29" height="38" />
+        <span class="vtx-wordmark-text">
+            <span class="vtx-wordmark-title">Vortex Adventures</span>
+            <span class="vtx-wordmark-tool">Character Creator</span>
+        </span>
+    </a>
+    <div class="vtx-header-end">
+        <AuthorizeView>
+            <Authorized>
+                <div class="vtx-user" title="@context.User.FindFirst(EruClaims.Email)?.Value">
+                    <span class="vtx-user-seal" aria-hidden="true">@context.User.Initials()</span>
+                    <span class="vtx-user-who">
+                        <span class="vtx-user-name">@context.User.DisplayName()</span>
+                    </span>
+                </div>
+                <ThemeToggle />
+                <form class="vtx-signout-form" method="post" action="afmelden">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+                    <button type="submit" class="vtx-signout">
+                        <span class="vtx-signout-icon" aria-hidden="true"></span><span class="vtx-signout-label">Afmelden</span>
+                    </button>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                <ThemeToggle />
+                @* Sign-out's shape, with a sign-in icon: on a phone Guild Hall shrinks it to the icon and
+                   keeps the label for screen readers. *@
+                <a class="vtx-signout" href="@($"aanmelden?returnUrl={Uri.EscapeDataString(ReturnUrl)}")">
+                    <span class="vtx-signout-icon cc-signin-icon" aria-hidden="true"></span><span class="vtx-signout-label">Aanmelden</span>
+                </a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+    <nav class="vtx-header-nav" aria-label="Hoofdmenu">
+        <NavLink href="" Match="NavLinkMatch.All">Bouwen</NavLink>
+        <NavLink href="voorbeelden">Voorbeelden</NavLink>
+        <NavLink href="vragen">Vragen</NavLink>
+    </nav>
+</header>
+
+<main id="inhoud" class="cc-page" tabindex="-1">
+    @Body
+</main>
+
+<footer class="vtx-footer">
+    <div class="vtx-footer-inner">
+        <span class="vtx-footer-start">Versie @Version</span>
+        <span class="vtx-footer-credit">
+            <span class="vtx-footer-by">Character Creator</span>
+            <span class="vtx-footer-brand">Vortex Adventures</span>
+        </span>
+        <span class="vtx-footer-end"><a class="vtx-footer-link" href="vragen">Vragen</a></span>
+    </div>
+</footer>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Er ging iets mis.
+    <a href="." class="reload">Opnieuw laden</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    /// <summary>The app's version, without the commit hash the SDK appends to it.</summary>
+    private static readonly string Version =
+        (typeof(MainLayout).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0")
+            .Split('+')[0];
+
+    /// <summary>The current page, relative to the app, to come back to after signing in or out.</summary>
+    private string ReturnUrl => new Uri(Navigation.Uri).PathAndQuery;
+}

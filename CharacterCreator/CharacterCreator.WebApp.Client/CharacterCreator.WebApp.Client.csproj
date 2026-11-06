@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!-- The build screen, run in the browser (DESIGN.md decision 12). It is a second composition root,
+       the browser's, and references core only: the rules engine runs here and on the server alike. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CharacterCreator.WebApp.Client</RootNamespace>
+    <Nullable>enable</Nullable>
+    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+    <StaticWebAssetProjectMode>Default</StaticWebAssetProjectMode>
+    <!-- The house RuntimeIdentifiers (linux-x64, win-x64) are for the server; this runs in the browser. -->
+    <RuntimeIdentifiers>browser-wasm</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CharacterCreator.test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CharacterCreator.core/CharacterCreator.core.csproj" />
+  </ItemGroup>
+
+</Project>

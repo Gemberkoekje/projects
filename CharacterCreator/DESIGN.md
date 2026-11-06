@@ -739,7 +739,7 @@ environment):
 
 - `ConnectionStrings:Postgres`;
 - `Void:BaseUrl`, or `Void:SnapshotFile` for the proof of concept;
-- `Keycloak:Authority`, `Keycloak:ClientId`, `Keycloak:ClientSecret`;
+- `Keycloak:Issuer`, `Keycloak:ClientId`, `Keycloak:ClientSecret`;
 - `CharacterCreator:PublicBaseUrl`.
 
 **Demo on gembernodes** (Kluskat's route, Kluskat's `DEPLOY.md` as the recipe):

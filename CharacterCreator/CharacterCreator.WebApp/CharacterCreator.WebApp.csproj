@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The host and sole server-side composition root: server-rendered pages, the /api endpoints, the
+       ERU sign-in, and the WebAssembly client's files (DESIGN.md §6). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CharacterCreator.WebApp</RootNamespace>
+    <Nullable>enable</Nullable>
+    <OutputType>exe</OutputType>
+    <IsPublishable>true</IsPublishable>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <SelfContained>false</SelfContained>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <InformationalVersion>0.1.0</InformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CharacterCreator.test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <PackageReference Include="Qowaiv.Diagnostics.Contracts" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CharacterCreator.infrastructure/CharacterCreator.infrastructure.csproj" />
+    <ProjectReference Include="../CharacterCreator.WebApp.Client/CharacterCreator.WebApp.Client.csproj" />
+  </ItemGroup>
+
+</Project>

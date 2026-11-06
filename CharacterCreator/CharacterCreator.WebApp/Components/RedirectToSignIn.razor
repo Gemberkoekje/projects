@@ -1,0 +1,12 @@
+@inject NavigationManager Navigation
+
+@* A page that needs a sign-in sends an anonymous visitor to /aanmelden, which goes on to the ERU
+   (or explains that this copy has no sign-in) and comes back here afterwards. *@
+@code {
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        var returnUrl = new Uri(Navigation.Uri).PathAndQuery;
+        Navigation.NavigateTo($"aanmelden?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+    }
+}
