@@ -1,0 +1,1057 @@
+# Vortex Character Creator on the Vortex stack — design (draft 4)
+
+Design phase, 2026-11-06. Nothing is built yet.
+
+- **Draft 1:** the design, from reading the current builder, VOID and vortex-tools-style.
+- **Draft 2 (Arie, 2026-11-06):**
+  - Thorfgin is on board, and the first build is a proof of concept that steps on nobody's toes.
+  - The host is `builder.the-vortex.nl`.
+  - SL or EC publish rulesets.
+  - Pushing a character into VOID waits for v2.
+  - The build screen runs in the browser.
+- **Draft 3 (Arie, 2026-11-06):**
+  - The name stays *Character Creator*.
+  - The proof of concept lives in Arie's `projects` repo for now, and runs on gembernodes for the
+    demo.
+  - v2 pushes new characters into VOID; v3 pushes changes to existing ones.
+  - No field is mandatory.
+  - The infobalie's list is in VoidWalker.
+  - **VOID settles every rule disagreement.**
+- **Draft 4 (Arie, 2026-11-06):**
+  - The demo host is `charactercreator.gemberkoekje.nl`.
+  - Thorfgin won't maintain it; on Vortex's private GitLab every developer can.
+  - Keeping the rules and the 2026 text right is the job of SL and EC. §3.7 spells out what they
+    need to do, and what VOID's screens allow today.
+  - VOID learns the "3 XP left over" rule as a warning that never blocks.
+  - In VOID, Referee and up may change the rules.
+  - SL and EC edit the text in the app, from v4. Until then it goes through GitLab.
+
+§11 lists everything that was settled.
+
+**Where it lives:**
+
+- **For now:** `CharacterCreator/` in the `projects` repo (GitHub `Gemberkoekje/projects`,
+  **public**).
+  - It is built in the worktree `C:\git\projects-charactercreator`, on the branch
+    `claude/charactercreator`, because the main checkout is shared with other work.
+  - The demo runs at `charactercreator.gemberkoekje.nl`.
+- **After Thorfgin's yes:**
+  - it moves to Vortex's private GitLab (`vortexadventures/character-creator`, proposed), where
+    every Vortex developer can work on it, and to Vortex's hosting at `builder.the-vortex.nl`;
+  - the `projects` folder and the gembernodes demo are removed.
+
+**What I read for draft 1:**
+
+- the live builder at builder.qequoia.nl. It runs entirely in the browser; its source is Thorfgin's
+  `charactercreator` on GitHub, v0.7.4 of 2026-04-04;
+- VOID's skill work from the envelope checkout (slice 4): `skill_requirements`, `SkillRules` and
+  the rulebook draft *Vaardigheden 2026 V07*;
+- VOID's rules for concept characters;
+- vortex-tools-style 2.0.0, its Guild Hall register;
+- Kluskat (in `projects`, deployed on gembernodes) for the build and deploy route.
+
+> **To understand this, start by reading** §0 (at a glance), then §3 (the rules come from VOID),
+> then §10 (phases). §1 is the current builder and §2 the decisions. §4–§9 are detail, §11 has the
+> open and settled questions, and §12 the sources.
+
+---
+
+## 0. At a glance
+
+- **Same job, new home.** A player picks skills. The Character Creator shows XP, prerequisites,
+  energy per day, spells, techniques and recipes, and prints the result. As today, anyone can use
+  it without signing in.
+- **VOID is the source of truth.**
+  - The Character Creator reads from VOID:
+    - a skill's cost;
+    - how often it may be bought, at creation and in total;
+    - whether it is deprecated;
+    - its energy and imbue cap, and whether it has a loresheet;
+    - its **prerequisites** (`skill_requirements`, built for the checkout).
+  - Where VOID and the rulebook (or the old builder) disagree, **VOID wins**. A wrong rule is
+    fixed in VOID, and the Character Creator picks it up at its next import.
+  - The Character Creator adds only what VOID does not hold:
+    - names in Dutch and English, categories and rulebook pages;
+    - descriptions, spells and techniques, recipes;
+    - loresheet links and presets.
+- **The book decides what is offered.** A VOID skill is in the picker only when the content names
+  it. The 35 SL-only skills never appear, except on a signed-in player's own character. They are
+  also never in either public repo.
+- **Published rulesets.** A ruleset combines the content with an imported snapshot of VOID.
+  - Once published it never changes.
+  - Every plan records the ruleset it was made on.
+  - An older plan opened on a newer ruleset lists what changed.
+- **Signing in with a Vortex account (ERU) adds more:**
+  - open your own VOID characters and keep plans on the server;
+  - plan the next events: XP from the table, extra skills through a teacher, one per event;
+  - print the list for your envelope.
+
+  In v1 all of this only reads from VOID.
+- **Pushing into VOID is for later versions**, and always lands *unvalidated*, for the infobalie
+  to validate in VoidWalker (§7):
+  - **v2:** a signed-in player pushes a new character;
+  - **v3:** a signed-in player pushes changes to an existing character.
+- **Planning never refuses anything, as in the checkout.** When a rule says no, the Character
+  Creator gives the reason and offers *add anyway*, because items and imbues can meet a
+  prerequisite. A push (v2, v3) does need a plan without problems.
+- **Guild Hall**, the player register of vortex-tools-style:
+  - parchment, the crest bar, Inknut Antiqua and Spectral;
+  - light and dark from the shared `vortex-theme` cookie;
+  - energy chips in the `--en-*` colours.
+- **Our stack:**
+  - .NET 10 with the layered template (`core` ← `application` ← `infrastructure` ← host);
+  - Marten on PostgreSQL, and Qowaiv;
+  - cookie + OIDC sign-in against ERU.
+
+  The build screen runs in the browser (Blazor WebAssembly) on the same C# rules engine as the
+  server.
+- **Hosting:**
+  - the demo: a GitHub workflow builds the image, and gembernodes runs it (Kluskat's route);
+  - production: a Portainer stack behind the Caddy edge, with GitLab CI.
+- **One small VOID change for v1:** `GET /skills` also returns each skill's prerequisite groups.
+  For the proof of concept it lives on a local VOID branch only.
+
+---
+
+## 1. The builder today
+
+**What it is.** *Vortex Character Creator*, by Thorfgin ("Deprecated Dodo").
+
+- Built with React 18 and Vite, hosted on GitHub Pages at builder.qequoia.nl, under LGPL-3.0.
+- No backend and no login.
+- `Thorfgin/charactercreator` is the live one. `charactercreator2` is an older copy (2024 v0.6.1,
+  Dutch only).
+- It uses ruleset `2023-10b`, with text fixes up to 2026-04.
+
+**What it does.**
+
+- **Name and XP.** A name, then either:
+  - the *new character* switch: 15 XP, basis skills only, at most 3 XP left over (the rest is
+    lost);
+  - or a free maximum XP, in quarter steps.
+- **Two pickers**, one for basis and one for extra skills (extra is hidden for a new character).
+  Add, raise or lower the count, remove, clear.
+- **Prerequisite checks** on add, and on remove: a skill another skill needs cannot be removed.
+- **Side panels:**
+  - character properties (HP, AP, imbue and craft caps);
+  - energy per day (elemental, spiritual, ritual, willpower, inspiration);
+  - spells and techniques, and recipes.
+
+  Tooltips show the description, cost, requirements and rulebook page.
+- **The rest:**
+  - loresheet links (PDFs on the-vortex.nl) and 15 presets (archetypes);
+  - several characters saved in localStorage; export and import as a JSON file;
+  - PDF export: cover, sheet, skills, spells, recipes, loresheets, XP per event;
+  - NL/EN, FAQ, release notes, a disclaimer and some animated easter eggs.
+
+**Its data** (`src/json/{nl,en}/`):
+
+- `vaardigheden.json`: 84 basis and 98 extra skills. Each entry is `{id, skill, category, page,
+  description, xp, Requirements, multi_purchase, maxcount, loresheet, Eigenschappen, Spreuken,
+  Recepten}`.
+- Requirements come in four shapes:
+  - `skill`: all of these skills;
+  - `any_list`: one of these skills;
+  - `Category {name, value}`: XP in these categories;
+  - `exception`: a druid, necromancer or demonologist may skip a spell's A prerequisite.
+- `spreuken.json`: 8 categories of spells per skill, each with mana type and cost, incantation,
+  effect, duration and page.
+- `recepten.json`: crafting and alchemy recipes, each with inspiration, effect and components.
+- `presets.json`, `faq.json`, `releasenotes.json`.
+- Saves look like `{version, is_checked, max_xp, name, Skills: [{id, skill, count}]}`.
+
+**What players asked for** (in its README, approved or under review):
+
+- say *why* a skill can't be added;
+- dark mode;
+- add several skills at once;
+- XP from the number of events;
+- force-add a skill over the XP limit;
+- imbues;
+- add the prerequisite chain automatically (Harnas III also gives I and II);
+- a bigger presets button.
+
+**Why rebuild rather than patch:**
+
+- **The rules are a copy, and copies drift.** The builder has its own 2023-10b rules, while VOID
+  now holds the 2026 V07 prerequisites. They already disagree (§3.6).
+- **There is no link to VOID.**
+  - Its own FAQ says you can't submit a character to Vortex.
+  - You can't start from your real character.
+  - Its README lists "integration with VOIDWALKER / create new characters" as a wish that needs a
+    server.
+- **It is not on the Vortex look or the Vortex servers.** It has its own styling, no dark mode and
+  one maintainer, outside Vortex's GitLab and hosting.
+
+---
+
+## 2. Decisions and assumptions
+
+*Settled* marks what Arie confirmed. The rest are my calls from reading the code, and can be
+overruled.
+
+1. **A new codebase, not a port.** The React code stays Thorfgin's. The content carries over:
+   descriptions, spells, recipes, presets, FAQ. *Settled.*
+   - Thorfgin is on board, but won't maintain it.
+   - Vortex's developers maintain the code on the private GitLab.
+   - SL and EC answer for the rules and the text (§3.7).
+2. **Guild Hall**, because players use it.
+   - Its tokens and fonts come from vortex-tools-style.
+   - The Character Creator writes its own component CSS on the role tokens, as ERU does.
+3. **VOID is the source of truth, and settles every rule disagreement.** *Settled.* The
+   Character Creator holds the text, and only what VOID does not know (§4).
+   - A rulebook rule should count only once VOID knows it.
+   - A rule can also be a **warning that never blocks**, in VOID and in the Character Creator.
+     "At most 3 XP left over" is the first one (*Settled*, §3.3).
+4. **The book decides what is offered** (§0).
+5. **Published rulesets, not live reads.**
+   - VOID's API needs a signed-in identity with a PLIN, and anonymous visitors have none.
+   - A published snapshot also lets the rules team choose when changes go live in the Character
+     Creator.
+6. **The same rules as VOID's `SkillRules`:**
+   - prerequisite groups of kind `any`, `points` or `extra`;
+   - an extra skill is one with `base_max` 0;
+   - whole XP only;
+   - `times_max`.
+
+   Shared test cases keep the two engines in step (§3.5).
+7. **Planning refuses nothing, but a push must be clean.** VOID checks only `base_max` and XP on a
+   concept, not prerequisites. So the Character Creator checks them before it pushes; otherwise
+   the infobalie inherits the mess.
+8. **One choice per VOID skill.** Where VOID splits a book skill in two (healer A elemental and
+   spiritual, demonology B, …) the picker offers both, with the book's text on each.
+9. **Signing in is optional.** Anonymous plans live in the browser (localStorage) and in exported
+   files, as today.
+10. **v1 never writes to VOID.** *Settled.*
+    - v2 pushes new characters and v3 pushes changes to existing ones. Both use the player's own
+      token, land *unvalidated*, and are validated by the infobalie in VoidWalker (§7).
+    - Until v3, purchases for an active character go through the envelope at checkout.
+11. **The UI is in Dutch and English**, as today. Code names are in English; the content is in
+    both languages.
+12. **The build screen runs in the browser** (Blazor WebAssembly on .NET 10). *Settled.* The
+    other pages are rendered on the server.
+    - Why not Blazor Server, like landerijen: the Character Creator is public and recalculates on
+      every click. A server connection per anonymous visitor, and the reconnect overlay when a
+      phone puts the tab to sleep, cost more than a second composition root.
+    - The rules engine is plain C# in `core`, so the server checks a plan with the same code
+      before it stores or pushes it.
+13. **Marten documents, no event store.**
+    - A ruleset is a document that is never changed.
+    - A plan is a document with optimistic concurrency.
+    - Nothing here needs more history than "which ruleset".
+14. **Production host `builder.the-vortex.nl`.** *Settled.* A subdomain of the-vortex.nl shares
+    the light/dark cookie, and builder.qequoia.nl will redirect there.
+15. **SL or EC publish rulesets** (ERU `void.referee` or `void.eventcontrol`, or `*_*`).
+    *Settled.* Infobalie alone is not enough. Whether this matches VOID's Referee-and-up is open
+    question 1, and whether it becomes EC only is open question 2.
+16. **The name stays *Character Creator***, in both languages. *Settled.*
+17. **The proof of concept lives in `projects` and runs on gembernodes.** *Settled.*
+    - **Both repos are public**, so neither may hold the SL-only skills, the SL file or a secret.
+      The recorded VOID snapshot keeps only the skills the content names.
+    - It follows the `projects` house style (Kluskat's `Directory.Build.props`: warnings are
+      errors, implicit usings off, the analyzer stack). That is stricter than werkplaats, so the
+      move to GitLab costs nothing.
+
+---
+
+## 3. The rules, from VOID
+
+### 3.1 What VOID knows about a skill
+
+From `GET /skills`. Any signed-in player may read it: `SkillsControllerPolicy::index` asks for
+`Authorization::Player`.
+
+| VOID field | Meaning in the Character Creator |
+|---|---|
+| `id`, `name` | the VOID skill, named in lower-case English (`lifeforce B`) |
+| `cost` | XP per purchase |
+| `base_max` | how often it may be bought at creation; **0 = an extra skill**: not at creation, and the first purchase goes through a teacher |
+| `times_max` | how often it may be bought in total |
+| `manatype`, `mana_amount` | energy per day, per purchase |
+| `imbue_type`, `imbue_cap` | imbue cap, per purchase |
+| `loresheet`, `blanks` | has a loresheet; prints blanks |
+| `sort_order` | its place in lists |
+| `deprecated` | never offered |
+| *requirements* (new, §3.4) | prerequisite groups |
+
+VOID does not hold the following, so they go in the content:
+
+- Dutch names, categories, pages and descriptions;
+- spells and techniques, recipes and loresheet URLs;
+- the properties VOID does not calculate: hit points, armour points and craft caps (Thorfgin's
+  `Eigenschappen`).
+
+The properties are for display only. If VOID ever holds them, VOID's values win.
+
+### 3.2 Prerequisites
+
+From `skill_requirements` (on VOID's main since 2026-11; CHECKOUT-DESIGN §6). Every group of a
+skill must hold.
+
+| Kind | Holds when | Example |
+|---|---|---|
+| `any` | the character has one of the group's skills at least `amount` times | *Paladin*: one of healer A (elemental or spiritual), and armour I. *Group Ritual Specialist*: one of the two ritualisms, 3× |
+| `points` | the character spent at least `amount` XP on the group's skills | *Brew Expertise*: 3 XP in alchemist skills |
+| `extra` | the character has at least `amount` extra skills | *Teaching Expertise*: 1 extra skill |
+
+- **Saying what is missing.** The Character Creator words a missing group the way VOID's
+  `describe()` does ("one of …", "3× …", "3 XP in …", "1 extra skill"), in Dutch or English. That
+  answers the players' first request.
+- **Fixing it.** When every missing group is a single skill (Harnas III needs II, which needs I),
+  *add with prerequisites* adds the whole chain and shows its XP. When there is a real choice (an
+  `any` group of several skills), it lists the options.
+
+### 3.3 Creation and growth
+
+**A new character** (VOID's concept rules):
+
+- 15 XP, VOID's default;
+- each skill at most `base_max` times, which rules out extra skills;
+- total cost no more than the XP.
+
+**"At most 3 XP left over; the rest is lost"** (the old builder's rule). Arie, 2026-11-06: VOID
+should know it, and warn without blocking.
+
+- **In VOID:**
+  - a constant (3);
+  - a warning on a concept character with more XP left over, shown by VoidWalker on the character
+    page and, from v2, on the *To validate* list;
+  - the number in the API, so the Character Creator reads it at import.
+
+  This goes into the same VOID MR as §3.4.
+- **In the Character Creator:** a `Warning` finding under the XP counter ("3.5 XP left over;
+  everything above 3 is lost"). It never blocks, and a push carries it along to the infobalie.
+- **Until VOID has it** (the proof of concept), the recorded snapshot holds the number by hand,
+  marked as such.
+
+**After creation** (CHECKOUT-DESIGN §6, as the checkout applies it):
+
+- **Whole XP only.** Quarter and half points stay saved.
+- **A basis skill, or an extra skill bought again:** whole XP available must be at least the cost,
+  and the skill must be below `times_max`.
+- **An extra skill, the first time:**
+  - it goes through a teacher, one per event;
+  - it is paid off from free XP; that is the teaching card's progress;
+  - while it is being paid off, free XP goes there first.
+- **XP per event**, one character per player per event:
+
+  | XP before the event | XP gained |
+  |---|---|
+  | below 20 | 1.5 |
+  | 20 or more | 1.25 |
+  | 30 or more | 1 |
+  | 40 or more | 0.75 |
+  | 50 or more | 0.5 |
+
+The Character Creator uses these rules to look ahead, for example:
+
+- "after the next event you have 2 whole XP";
+- "you can afford Harnas III after 2 events";
+- "Brew Expertise needs a teacher; with your XP it is paid off at the event after next".
+
+### 3.4 The VOID change
+
+- **What:** `GET /skills` and `GET /skills/{id}` also return the skill's requirement groups, as
+  `requirements: [{kind, amount, skills: [ids]}]`.
+- **How:** one `contain` in `SkillsTable`, the entity's compact fields, and tests. A small MR on
+  void `develop`, opened after Thorfgin's yes.
+- **For the proof of concept** the change stays on a local VOID branch, which is never pushed.
+  - The Character Creator reads a **recorded snapshot file** through the same `IVoidClient` port.
+  - The snapshot is taken from a local VOID with that branch and the rulebook draft loaded
+    (`checkout-e2e/` shows how). Alternatively, the requirement groups can be read from live
+    once, through Arie's own login, as the rulebook's `void` names were on 2026-10-29.
+  - Only the skills the content names go into the file, because `projects` is public.
+- **The same MR** also carries:
+  - the "3 XP left over" warning (§3.3);
+  - whatever SL and EC need in VOID's screens to keep the prerequisites right (§3.7).
+- **v2 and v3** need a validation marker and VoidWalker's list (§7).
+
+**Waiting outside the Character Creator**, from the checkout work:
+
+1. Arie reviews `vaardigheden-2026-v07-review.md`.
+2. The draft, and the SL file, are loaded on live with `bin/cake skill_requirements --apply`.
+
+At the checkout design's last update (2026-11-01) neither was done. The proof of concept doesn't
+wait for them; going live does.
+
+### 3.5 Keeping two engines in step
+
+VOID's `SkillRules` (PHP) and the Character Creator's engine (C#) must agree. Otherwise a player
+plans something the desk won't do.
+
+Proposal:
+
+- **A cases file in void**, `tests/data/skill-rules-cases.json`. Each case has skills,
+  requirements and a character's skills, plus the expected missing groups and XP.
+- **Both test suites run it:** `SkillRulesTest` in void, and the Character Creator's specs.
+- **The Character Creator vendors a copy**, and its CI fails when the copy differs from the void
+  tag it names.
+- **Book skills only**, because void is a public repo.
+
+During the proof of concept the file lives on the local VOID branch; the Character Creator's copy
+is the one that runs.
+
+### 3.6 What changes for players compared to the old builder
+
+VOID settles these (decision 3). The Character Creator applies VOID's rules, and the list goes
+into the release notes and the FAQ.
+
+| Skill | Old builder (2023-10b) | VOID (2026 V07 draft) |
+|---|---|---|
+| *Uitdrijving* (exorcism) | 4 XP in priest skills | a priest A |
+| *Extra Elementaire mana* | 4 XP in mage skills | 4 XP in mage spells **or** healer A (elemental) (Arie, 2026-10-29) |
+| *Magiërspreuken B/C* Metaal, Vuur, Hout and *Priesterspreuken B/C* Reinheid, Dood, Natuur | a death druid, necromancer or demonologist may skip the A (`exception`) | no exception: B needs an A, C needs its B |
+| skill list | 182 entries, with its own ids | 160 book entries; 206 live VOID skills, of which 171 are in the book and 35 are SL-only |
+
+If the book says otherwise, VOID is corrected first, on its admin skills page or in its rulebook
+draft. The next import brings the fix along. For the druid exception, an `any` group that also
+lists those skills would do, without a new kind.
+
+### 3.7 Keeping the rules and the text right: SL and EC
+
+Arie, 2026-11-06: this is the job of SL and EC. It covers two separate things in two places:
+
+| What | Where it lives | Who changes it today |
+|---|---|---|
+| **Rules**: cost, maxima, extra (`base_max` 0), energy, imbue cap, prerequisites | VOID (`skills`, `skill_requirements`) | only **Super**, on VOID's admin skills page; **Referee and up** once the §3.4 MR is in |
+| **Text**: names, descriptions, pages, spells and techniques, recipes, loresheet links, presets, FAQ | the Character Creator's content files (§4.1) | a developer, through GitLab; **SL and EC in the app** from v4 |
+
+#### What VOID shows and allows today
+
+Checked on void `main`, 2026-11-06:
+
+- **The edit page** (`/admin/skills/edit/{id}`, `templates/Admin/Skills/edit.php`).
+  - It lists a skill's prerequisites under the skill form, one line per group, in VOID's wording
+    ("one of mage A (white), mage A (gray), mage A (black)", "3 XP in …").
+  - Each group has **Remove**. **Add prerequisite** takes a kind (`any`, `points`, `extra`), an
+    amount and a multi-select of every skill.
+  - **Only Super can open it.** `Admin/SkillsControllerPolicy`: `edit`, `addRequirement` and
+    `deleteRequirement` all need `Authorization::Super`.
+- **The skills list** (`/admin/skills`, Read-only and up) shows name, cost, loresheet, blanks,
+  `times_max`, mana, imbue cap and deprecated.
+  - It does **not** show the prerequisites, or `base_max`, so not which skills are extra.
+  - An SL or EC can therefore **not see** a skill's prerequisites anywhere in VOID.
+- **VoidWalker** shows no prerequisites, and **the API** doesn't return them (§3.4).
+- **There is no overview.** Reviewing the whole book means opening ~170 edit pages one by one.
+  The only overview is the review sheet in the repo (`vaardigheden-2026-v07-review.md`).
+- **Changing a group** means removing it and adding it again; there is no edit in place.
+- **The skill picker** is a plain 12-row multi-select of all ~206 skills, deprecated ones
+  included. A group like "3 XP in alchemist skills" means ctrl-clicking 18 skills. The sets the
+  loader knows (`@MagierA`, `@Alchemistenvaardigheden`) don't exist in the screen.
+- **History.** Changes are written to VOID's history table (every table logs through `Table`),
+  but no screen shows a skill's history. So there is no answer to "who changed this rule, and
+  when".
+- **Whether the rules are loaded on live** can't be seen from the code. At the checkout design's
+  last update (2026-11-01) they weren't.
+  - Quick check, as Super: open *lifeforce B* on the edit page. *None* under Prerequisites means
+    nothing is loaded.
+  - Or run the loader's dry run on the server: `bin/cake skill_requirements`.
+
+**Verdict.** The data is shown properly, in plain words, and can be changed through the UI, but
+only by Super. For SL and EC to own the rules, VOID needs, in order of importance:
+
+1. **Let them see the rules:**
+   - a *Prerequisites* column on `/admin/skills`, with the extra skills marked;
+   - or, better, a read-only overview page of every skill with its prerequisites (the review
+     sheet, live), for Read-only and up.
+2. **Let them change the rules: Referee and up** (*Settled*, Arie, 2026-11-06).
+   - VOID's rights are a ladder with Infobalie above Referee, so this also lets Infobalie, EC and
+     Super in. Arie disagrees with that order, but it stands for now.
+   - Arie still has to discuss with the others whether it should become EC only. He thinks not:
+     this is exactly the kind of change an EC wants to delegate.
+   - It covers `addRequirement` and `deleteRequirement`, and the rule fields on the edit page:
+     `cost`, `base_max`, `times_max`, energy, imbue cap, loresheet, deprecated.
+   - Renaming, adding and deleting skills stay Super only. A rename breaks the matching on names
+     (the loader's and the Character Creator's).
+   - That means splitting the edit page's form, or checking the rights per field (VOID already
+     drops fields a caller may not edit).
+3. **Make editing bearable:** pick from the named sets (alchemist skills, mage spells, …), hide
+   deprecated skills in the picker, and edit a group in place.
+4. **Show who changed what:** a history block on the skill's edit page.
+
+1 and 2 are small, and belong in the §3.4 MR. 3 and 4 can follow.
+
+#### What SL and EC need to do for the 2026 book
+
+**In VOID (the rules):**
+
+1. **Review the prerequisites draft**, `config/SkillRequirements/vaardigheden-2026-v07-review.md`
+   in void: one line per book skill, with "Points to check" at the top. Corrections go into
+   `vaardigheden-2026-v07.json` (a developer), or straight into VOID afterwards (step 4).
+2. **Check the skill fields against the book:** cost, `base_max` (0 exactly for the *Extra
+   Vaardigheden* chapter), `times_max`, energy, imbue cap, loresheet, deprecated. With today's
+   screens that is the skills list plus the edit page, as Super.
+3. **Have it loaded on live.** A developer with access to the VOID server runs
+   `bin/cake skill_requirements` (dry run; it lists every name it can't match), then `--apply`,
+   then the same with the SL file `skill-requirements-sl.json`. They also clear the old
+   `teachings` rows the checkout notes mention.
+4. **From then on**, every rule change happens in VOID's admin skills page. It takes effect in
+   the checkout at once, and in the Character Creator at the next published ruleset.
+
+**In the Character Creator (the text):**
+
+5. **Bring the text up to 2026.** Thorfgin's text is the 2023-10b book with fixes up to 2026-04.
+   SL and EC go through the 2026 book and note what changed: descriptions, spells and techniques,
+   recipes, pages, loresheet links, presets.
+6. **Get the changes into the content.** Arie, 2026-11-06: this should not be a developer's job,
+   but it needn't be in v1.
+   - **Until v4:** on the private GitLab, a developer turns the notes into a merge request. An SL
+     or EC with GitLab access can also use GitLab's web editor; the schema check in CI catches
+     broken files.
+   - **From v4:** SL and EC edit the content in the app (*Beheer → Content*), and their edits go
+     into the next ruleset they publish (§10, phase 11).
+7. **Publish the ruleset** (SL or EC, *Beheer → Rulesets*):
+   - read the dry run: unmatched names, new VOID skills without text, rule differences;
+   - publish.
+
+   Do it after every batch of rule or text changes.
+
+The yearly book: the same steps 1, 2, 4, 5, 6 and 7, with the new book's names matched in the
+dry run.
+
+---
+
+## 4. Content: what the Character Creator adds
+
+### 4.1 One entry per book skill
+
+The content lives per ruleset in the repo (`content/2026-v07/skills.json`, plus spells, recipes,
+presets and FAQ), checked against a schema in CI:
+
+```json
+{
+  "key": "levenskracht-b",
+  "void": ["lifeforce B"],
+  "name": {"nl": "Levenskracht B", "en": "Lifeforce B"},
+  "category": "algemeen",
+  "page": 12,
+  "description": {"nl": "…", "en": "…"},
+  "properties": [{"name": "hitpoints", "value": 1}],
+  "spells": ["…"],
+  "recipes": ["…"],
+  "loresheet": {"url": "https://the-vortex.nl/wp-content/uploads/…", "page": 1}
+}
+```
+
+- **`key`** is the Character Creator's own and stays the same across books. Plans store keys, not
+  VOID ids: ids differ between void-test and live, and VOID's own loader matches on names.
+- **`void`** lists the VOID names an entry stands for, as VOID's rulebook draft does. It is seeded
+  from each entry's `name`, `english` and `void` in
+  `config/SkillRequirements/vaardigheden-2026-v07.json`, so both start from the same matches.
+- **The text** comes from Thorfgin's files (2023-10b, fixed up to 2026-04). A one-off script maps
+  his ids to keys. SL and EC bring it up to the 2026 book (§3.7, steps 5 and 6).
+
+### 4.2 Import and publish
+
+An import combines a content version with a VOID snapshot. A dry run lists, before anything is
+stored:
+
+- book entries with no VOID skill, and VOID names that match twice;
+- VOID skills no entry names. The SL-only skills are expected here; anything else is new in VOID;
+- deprecated VOID skills the content still offers;
+- prerequisites that name a skill outside the book;
+- differences from the published ruleset: costs, maxima, energy, prerequisites, and skills added
+  or removed.
+
+*Publish* stores the ruleset: the content version, the VOID snapshot and the date. It is never
+changed afterwards. Anonymous visitors get the newest published ruleset.
+
+- **In the proof of concept and the demo:** there is no sign-in. The first start publishes the
+  bundled content with the recorded snapshot, and a spec shows the dry-run report.
+- **From phase 7:** an SL or EC opens *Rulesets*, picks the content version and imports from live
+  VOID with their own token.
+
+### 4.3 Plans across rulesets
+
+- A plan stores its ruleset id and a `{key, times}` per skill.
+- Opened on a newer ruleset, it shows the differences that touch it ("Uitdrijving now needs a
+  priest A", "Rekenen costs 2") and offers to move.
+- Thorfgin's saves import through his id-to-key map (§4.1). The differences between 2023-10b and
+  the current ruleset are listed the same way.
+
+---
+
+## 5. Screens
+
+**Crest bar** (`header.vtx-header`):
+
+- the crest, "Vortex Adventures" and *Character Creator*;
+- at the end: `.vtx-user` (when signed in), the theme toggle, NL/EN, sign in or out;
+- a second row (`nav.vtx-header-nav`): *Bouwen* / *Build*, *Mijn personages* / *My characters*
+  (when signed in), *Voorbeelden* / *Presets*, *Vragen* / *FAQ*.
+
+The footer is the portal's.
+
+**Build** is the main screen. On a phone the same blocks are stacked, with the summary as a tab.
+
+```
+┌ Name [Ilse van de Vijfhoek ]  ○ New character ● Existing ○ Free  XP 23.5 · spent 21 · left 2 ┐
+│ ┌ Skills ──────────────────────────────┐ ┌ Energy per day ───────────────────────────────┐ │
+│ │ [search…]  Basis | Extra | All       │ │ (●) Elemental 6  (●) Willpower 3              │ │
+│ │ ▸ Pantser                            │ ├ Properties ───────────────────────────────────┤ │
+│ │   Harnas II        2  ✓ can buy  [+] │ │ HP 3 · AP 2 · Glyph imbue cap 20              │ │
+│ │   Harnas III       3  needs Harnas II│ ├ Spells & techniques (12) ─────────────────────┤ │
+│ │                       [+ with chain] │ │ tiles…                                        │ │
+│ │ ▸ Magiër  …                          │ ├ Recipes (3) ──────────────────────────────────┤ │
+│ └──────────────────────────────────────┘ │ tiles…                                        │ │
+│ ┌ Chosen ─────────────────────────────────────────────────────────────────────────────┐   │
+│ │ Skill            XP  ×   Loresheet  Notes                                           │   │
+│ │ Harnas I          1  1               −  ×                                           │   │
+│ │ Magiërspreuken B  3  1   ⧉           ⚠ added anyway: needs one of Magiërspreuken A  │   │
+│ └─────────────────────────────────────────────────────────────────────────────────────┘   │
+│ [Print]  [Save]  [Export file]                                       2 XP left            │
+└───────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **States in words.** The picker shows each skill's state: *can buy*, *needs …*, *needs a
+  teacher*, *at maximum*, *not enough XP*. Finding out why not never takes a click.
+- **Add anyway.** A skill can still be added; it then carries the warning.
+- **Removing.** Removing a skill other skills depend on names them, and offers *remove these too*.
+- **Several at once.** Several skills can be ticked and added in one go.
+- **Energy chips** use Guild Hall's `.echip` with the `--en-elemental`, `--en-spiritual`,
+  `--en-willpower` and `--en-inspiration` tokens (and the ritual ones).
+- **Spells and recipes** are tiles with a details panel: incantation, cost, effect, duration,
+  page.
+
+**Voorbeelden / Presets**: the presets as cards, with archetype, text and skills, and *start from
+this*.
+
+**Mijn personages / My characters** (signed in):
+
+- The player's VOID characters, each with name, status, XP and whole XP available.
+- Opening a character makes a plan of it. Its current skills are fixed (shown, not removable); the
+  plan holds the new purchases.
+- *Next events* lays the plan out per event, using the XP table, the one-extra-skill-per-event
+  rule and the teaching pay-off.
+- It prints **the list for the envelope**: per skill, the name as VOID spells it and its cost,
+  plus a box for the teacher's PLIN-CHIN on an extra skill. These are the fields the checkout's
+  skill rows ask for.
+- Skills the player holds that the book doesn't name (SL-only skills, rank skills) are shown by
+  their VOID name, without explanation.
+
+**Send to Vortex** (v2 for a new character, v3 for changes; signed in, a plan without problems):
+see §7.
+
+**Print**: a PDF in Guild Hall's print look, which is always light. It holds the sheet (name, XP,
+properties, energy), the skills, spells and techniques, recipes, loresheet links and XP per event.
+It is made on the server.
+
+**Beheer** (SL and EC, from phase 7): *Rulesets* (§4.2) and the content check.
+
+---
+
+## 6. Architecture
+
+```
+CharacterCreator.core            rules engine and model: Ruleset, RuleSkill, RequirementGroup, Plan,
+                                 PlanEvaluation, Finding; plain C#, Qowaiv only, no I/O
+CharacterCreator.application     ports (IVoidClient, IRulesetStore, IPlanStore, IContentSource,
+                                 ISheetWriter) and handlers
+CharacterCreator.infrastructure  MartenRulesetStore, MartenPlanStore, VoidHttpClient,
+                                 SnapshotVoidClient, JsonContentSource, MigraDocSheetWriter
+CharacterCreator.WebApp          host: composition root, OIDC, server-rendered pages, /api endpoints
+CharacterCreator.WebApp.Client   the build screen (Blazor WebAssembly); references core only
+CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shared VOID cases
+```
+
+**Templates:**
+
+- Kluskat (`projects`, cloned from werkplaats) for the `projects` plumbing: build props, the
+  GitHub workflow, the Dockerfile and the gembernodes deploy;
+- landerijen for Blazor and the ERU sign-in.
+
+**Deltas from those:**
+
+- **A WebAssembly client project.** It is a second composition root (the browser's), and may
+  reference only `core`.
+- **Anonymous pages.** The fallback policy is not "authenticated". Only *Mijn personages*,
+  `/api/me/*` and *Beheer* need a sign-in.
+- **No ASP.NET Identity and no app password.** Cookie + OIDC against ERU only, as in landerijen,
+  and gated on configuration: without the Keycloak settings the app runs anonymous only, as the
+  demo does.
+
+**The engine returns facts, not sentences** (landerijen's rule):
+
+- It returns `Finding` codes with arguments: `MissingGroup(kind, amount, skills)`,
+  `NotEnoughXp(need, have)`, `NeedsTeacher`, `AtMaximum`, `TooMuchLeftOver(left, limit)`.
+- Each finding has a severity:
+  - a **problem** breaks a rule VOID enforces, and stops a push (never planning);
+  - a **warning** is a rule VOID only warns about (3 XP left over); it never stops anything.
+- The UI and the PDF put them into Dutch or English.
+- Enums get an empty first member.
+
+**Data flow:**
+
+- The client loads the current ruleset once (`/api/rulesets/current?lang=nl`, cached with an
+  ETag). I estimate about 150 KB gzipped per language.
+- The client evaluates plans itself. The server evaluates again whatever it stores or pushes.
+
+**VOID is called from the server only**, a backend-for-frontend:
+
+- The access token stays in the auth cookie's ticket (`SaveTokens`, refreshed), never in the
+  browser, and the browser talks to one origin.
+- For reading the player's data:
+  - `GET /players/{plin}`, the player with their characters (as the portal does);
+  - `GET /characters/{plin}/{chin}`: skills, XP, teacher;
+  - `GET /factions`.
+- For the import: `GET /skills` and `GET /manatypes`.
+- For v2: `PUT /players/{plin}/characters`, then `/characters/{plin}/{chin}/skills[/{id}]` with
+  `PUT` or `DELETE`.
+- **In the proof of concept and the demo**, `SnapshotVoidClient` (the recorded file) stands in for
+  `VoidHttpClient`. No VOID is needed.
+- **No CORS involved.** CORS is a browser rule; these are server-to-server calls.
+  - Reachability checked 2026-11-06: a throwaway pod on gembernodes got `401` from
+    `https://void-api.the-vortex.nl/skills` (no token, as expected) in 0.1 s.
+  - The only thing that keeps a hosted copy from calling VOID for a player is the sign-in: it
+    needs a Keycloak client that accepts its redirect URI (see Keycloak below).
+
+**Keycloak:**
+
+- **Production:** a new confidential client in the realm (proposed `vortex-character-creator`),
+  created at go-live.
+  - It needs the audience mapper that puts `vortex-api` in the token, because VOID checks `aud`.
+  - Redirect URIs for builder.the-vortex.nl.
+- **Local development:** `vortex-dev`, as the other tools use. Only developers may use it, it is
+  public with PKCE, and it takes localhost redirects only. So the gembernodes demo has no sign-in,
+  and no realm change is needed before go-live.
+
+**Marten:**
+
+- `Ruleset`: never changed after publishing; ids like `2026-v07@2026-11-20`.
+- `Plan`: PLIN, name, ruleset id, mode, start XP, skills, a link to the pushed character
+  `{plin, chin}` (v2), and a version for optimistic concurrency.
+- Anonymous plans never reach the server.
+
+**PDF:** PDFsharp-MigraDoc (as in landerijen's print pack), with the fonts from vortex-tools-style's
+`dist/fonts`.
+
+**Styling:**
+
+- `vendor.ps1 -Register GuildHall` copies the package into `wwwroot/lib/vortex-tools`.
+- In `<head>`: `vortex-theme.js`, then `guildhall.min.css`, then the app's own CSS.
+- Colours by role token only (README, *Using Guild Hall*).
+- The server renders the theme from the cookie, so the page doesn't flash.
+- On the demo host the cookie isn't shared with the-vortex.nl, so the toggle there remembers its
+  own choice.
+
+**Config** (colon paths; secrets are empty strings in `appsettings.json`, with the values from the
+environment):
+
+- `ConnectionStrings:Postgres`;
+- `Void:BaseUrl`, or `Void:SnapshotFile` for the proof of concept;
+- `Keycloak:Authority`, `Keycloak:ClientId`, `Keycloak:ClientSecret`;
+- `CharacterCreator:PublicBaseUrl`.
+
+**Demo on gembernodes** (Kluskat's route, Kluskat's `DEPLOY.md` as the recipe):
+
+- **Build:** `.github/workflows/charactercreator-build-and-push.yml` in `projects` builds and tests
+  on every push. On `main` it publishes and pushes `ghcr.io/gemberkoekje/charactercreator:<sha>`.
+- **Manifests:** in gembernodes, `apps/charactercreator/` (deployment, service, kustomization, a
+  `OnePasswordItem`), `namespaces/charactercreator-namespace.yaml` and
+  `ingress/charactercreator-ingress.yaml` for `charactercreator.gemberkoekje.nl`.
+  - The `*.gemberkoekje.nl` wildcard already points at the cluster.
+  - Every deploy is an image-tag bump in a gembernodes PR.
+- **Database:** the cluster's shared PostgreSQL. Arie creates the role and database
+  `charactercreator`, and the 1Password item `charactercreator-secrets` (vault `Gembercluster`)
+  with one field, `ConnectionStrings__Postgres`.
+- **One pod.** The image runs as non-root, with `/healthz` for the probes.
+
+**Production** (after the move to GitLab):
+
+- docker-compose (postgres and the app) locally, on ports clear of werkplaats (5433/8081) and
+  landerijen (5434/…): 5435/8084;
+- a Portainer *Repository* stack on endpoint 3, joined to the `edge` network, with Caddy serving
+  `builder.the-vortex.nl`;
+- the GitLab deploy job copied from werkplaats: re-send the stack's environment variables, and use
+  the API token plus Caddy basic auth;
+- CI jobs are manual buttons while CI minutes are short.
+
+---
+
+## 7. v2 and v3: pushing into VOID, unvalidated
+
+Arie (2026-11-06): in the long term a signed-in player can push both a **new character (v2)** and
+**changes to an existing one (v3)** straight into VOID. Both land *unvalidated* and show up in
+VoidWalker for the infobalie. Each version gets its own design pass first; this section is the
+starting point.
+
+### 7.1 What VOID already has, and lacks
+
+**What it has.** A player may make and edit **one** concept character through the API, so v2
+needs no new rights to create one:
+
+- `CharacterPolicy::canEdit` lets the owner edit while `status` is `concept`;
+- `CharactersTable::ruleOnlyOneConcept` allows one concept per player;
+- `CharactersSkillsTable::ruleLimitConceptCharacter` checks `times ≤ base_max` and that the total
+  cost is no more than the XP;
+- VOID refuses a deprecated faction.
+
+**What it lacks:**
+
+- a way to tell the infobalie "a player made this; check it";
+- for v3, any way for a player to change an active character: only Referee and up may edit one.
+
+### 7.2 The proposal
+
+*Validated* and *active* are separate things: the infobalie checks a character before the event,
+and activates it when it is first played.
+
+- **A validation marker on `characters`**: empty means *unvalidated*; filled means when and by
+  whom it was validated.
+- **The owner may edit an unvalidated concept**, and no longer once it is validated. That is one
+  extra condition in `CharacterPolicy` / `CharactersSkillPolicy`.
+- **VoidWalker gets a *To validate* list** (*Settled: in VoidWalker*): unvalidated characters,
+  oldest first.
+  - Each row shows the character, any findings the player overruled, and a link to the character
+    page.
+  - The character page shows the *unvalidated* badge and a **Validate** action.
+  - The infobalie can correct skills first.
+- **Activation at the first event is unchanged.** Setting the status to active also makes the
+  player's other characters inactive.
+
+### 7.3 v2: a new character
+
+No field is mandatory (*Settled*): a player often doesn't know their faction yet.
+
+- **Faction:** left empty, VOID stores its `-` faction (`CharactersTable::nameToId`).
+- **Belief, group and world** may be empty too.
+- **Name:** VOID requires a non-empty name (`CharacterValidator::notEmptyString('name')`) that is
+  unique among the player's characters.
+  - Without a name, the Character Creator sends a placeholder, *Nieuw personage* (the player's
+    language), which the player or the infobalie changes later.
+  - VOID's rule stands, because VOID is the source of truth.
+
+The steps:
+
+1. **Check.** The server evaluates the plan again: *New character* mode, no problems. Warnings
+   (3 XP left over) go along to the infobalie.
+2. **Create.** `PUT /players/{plin}/characters` with whatever fields the player filled in. VOID
+   gives the CHIN (the player's highest + 1) and 15 XP, and the character starts unvalidated.
+3. **Sync the skills.** One `PUT …/skills` per skill. VOID has no transaction across calls, so
+   this step is a sync: make VOID's skills equal to the plan (add, change `times`, delete).
+   - It is safe to repeat after a failure.
+   - It runs again for later edits, until the character is validated.
+4. **Link.** The plan stores `{plin, chin}`. VOID's errors (a second concept, a name already used)
+   come back as the reason, in the player's language.
+
+After validation the Character Creator shows the character read-only. After activation it treats
+it as an existing character.
+
+### 7.4 v3: changes to an existing character
+
+The planned purchases on an active character, pushed as **pending changes** for the infobalie to
+validate. The player's VOID data stays as it is until then.
+
+Questions for v3's design pass:
+
+- **Where pending changes live:** in VOID (a pending-skills table the *To validate* list shows),
+  or as a wish list the envelope checkout reads into its skill rows (the checkout already plans
+  teachers, XP after the event's award, and the card reprint)?
+- **Teaching:** an extra skill needs a teacher and is paid off over events. Validating it means
+  starting a teaching, which is checkout logic today.
+- **Timing:** XP comes in at checkout. Is a change pushed before the event checked against the XP
+  after the award, as the checkout does?
+
+---
+
+## 8. Access
+
+| Who | Can |
+|---|---|
+| anyone | build, view presets, print, save in the browser, export and import a file |
+| signed in (any ERU account with a PLIN) | the above, plus: their own VOID characters (read only), plans on the server, the envelope list; in v2 and v3, pushing |
+| SL or EC | the above, plus: importing and publishing rulesets |
+
+- **The SL-or-EC policy** is one policy, `Beheer`. It is met by any of the ERU permissions
+  `void.referee` (SL), `void.eventcontrol` (EC) or `*_*`, read from
+  `resource_access.vortex-api.roles` at sign-in, as landerijen does.
+  - The permissions are listed by name, not taken as a ladder, so `void.infobalie` alone does not
+    qualify. Adding it would match VOID's Referee and up (§11, open question 1).
+  - Making it EC only means removing `void.referee` from the policy (under discussion; Arie leans
+    against it).
+  - There is no in-app override.
+  - From v4 the same policy also covers *Beheer → Content*.
+- **No PLIN.** A player without a PLIN can sign in, but gets only the anonymous features, plus a
+  line explaining why.
+- **The demo has no sign-in at all** (§6, Keycloak).
+
+---
+
+## 9. Testing and checking
+
+- **Engine specs** per rule and per finding, plus the shared VOID cases (§3.5).
+- **A ruleset spec** that loads the current content against the recorded VOID snapshot:
+  - every book entry is matched and every prerequisite resolves;
+  - the snapshot holds no skill the content doesn't name, which guards the public repo.
+- **Handler specs** with fake ports.
+- **HTTP specs** with a throwaway PostgreSQL and a stand-in VOID. When a real VOID is needed, the
+  checkout's `checkout-e2e/` shows how to run one locally.
+- **Content schema specs**: Thorfgin's ajv tests, in C#.
+- **Screens:**
+  - add the Character Creator to vortex-tools-style's `screens.config.mjs` (both themes, phone and
+    desktop) and run the contrast audit;
+  - do a keyboard-only pass over the build screen.
+
+---
+
+## 10. Phases
+
+Each phase ends with a NOTES.md entry: decisions, gotchas, a file map, and *to understand this,
+start by reading…*.
+
+### The proof of concept
+
+Phases 0–4 happen in `projects` (worktree `C:\git\projects-charactercreator`, branch
+`claude/charactercreator`). They touch nothing of Vortex's:
+
+- no GitLab project;
+- no pushed VOID branch;
+- no Keycloak change.
+
+The app runs anonymously on the recorded VOID snapshot.
+
+0. **Scaffold.**
+   - `CharacterCreator/`, with Kluskat's build props and layers, and the WebAssembly client
+     project.
+   - Guild Hall vendored, the crest bar shell.
+   - OIDC wired but gated on configuration, so it is off without settings.
+   - The GitHub workflow, the Dockerfile and docker-compose.
+   - In a local void branch: the `GET /skills` requirements change (§3.4) and the shared cases file
+     (§3.5).
+1. **Engine.**
+   - The model, prerequisites, creation and growth rules, findings (problems and warnings), the
+     XP table.
+   - Specs and the VOID cases. No UI.
+2. **Content and rulesets.**
+   - The content schema, and Thorfgin's text mapped to keys.
+   - The seeded `void` names.
+   - The recorded snapshot (book skills only).
+   - The import dry run, and publishing the bundled ruleset at first start.
+   - The ruleset API.
+3. **Build screen.**
+   - Picker, the chosen-skills table, reasons, add with chain, remove with dependants.
+   - Summary panels and presets.
+   - localStorage, file export and import (including old saves).
+   - NL/EN, light and dark.
+4. **Print**: the PDF.
+5. **Demo on gembernodes.**
+   - Arie creates the database role and the 1Password item.
+   - The gembernodes manifests and the ingress, then an image-tag PR.
+   - Show Thorfgin at `charactercreator.gemberkoekje.nl`.
+
+### After Thorfgin's yes
+
+6. **Move to Vortex.**
+   - Create the private GitLab project, and carry `CharacterCreator/`'s history over
+     (`git subtree split`).
+   - Swap the GitHub workflow for GitLab CI.
+   - Remove the folder from `projects` and the app from gembernodes.
+   - Open the void MR, which carries:
+     - prerequisites on `GET /skills` (§3.4) and the cases file in void's tests (§3.5);
+     - the "3 XP left over" warning (§3.3);
+     - SL/EC seeing the rules, and Referee and up changing them (§3.7, verdict items 1 and 2).
+7. **Signed in** (read only):
+   - my characters, plans on the server, *next events*, the envelope list;
+   - *Beheer → Rulesets*: import from live VOID and publish.
+8. **Go-live v1.**
+   - SL and EC have done §3.7's steps 1–6: the rules are reviewed and loaded on live, and the
+     text is at the 2026 book.
+   - Publish the first ruleset from live VOID.
+   - The `vortex-character-creator` Keycloak client, the Portainer stack, Caddy, and Thorfgin's
+     redirect.
+   - FAQ and release notes, including §3.6, and an announcement.
+9. **v2: push new characters** (§7.3).
+   - Its design pass first.
+   - Then VOID's validation marker and the policy change, and VoidWalker's *To validate* list.
+   - Then the Character Creator's push and sync.
+10. **v3: push changes to existing characters** (§7.4). Its own design pass first.
+11. **v4: SL and EC edit the content in the app** (§3.7, step 6). Its own design pass first.
+    - **Where the content lives:** today the content files in the repo are the source. In v4,
+      Marten documents become the source for the text, versioned, with the repo files as the
+      first import.
+    - **The screen:** per skill, spell, recipe, preset and FAQ entry, Dutch and English side by
+      side, with a preview of how the build screen shows it.
+    - **Drafts and publishing:** edits are drafts until an SL or EC publishes a ruleset, which
+      takes both the text and VOID's rules. Every edit records who made it and when.
+
+Later, not in this design:
+
+- a *Plan in the Character Creator* link from the portal's character screen;
+- an automatic VOID sync (this needs a service identity VOID accepts);
+- showing a teacher their students.
+
+---
+
+## 11. Questions
+
+### Open
+
+1. **Should publishing match VOID?** Changing a rule in VOID is now Referee and up, which
+   includes Infobalie. Publishing a ruleset is SL or EC by name, which excludes Infobalie. So an
+   Infobalie could change a rule in VOID, but not publish it to the Character Creator.
+   - Aligning them would mean `void.infobalie` joins the `Beheer` policy (§8).
+   - Left as is, an SL or EC publishes what an Infobalie changed.
+2. **EC only, or not:** Arie still has to discuss this with the others, for both VOID and
+   publishing. He leans against it, because EC wants to delegate these changes.
+3. **Dependency:** the review of the 2026 V07 draft, and loading it (and the SL file) on live
+   (§3.7, steps 1–3). Going live waits for it.
+
+### Settled
+
+- **Draft 2 (Arie, 2026-11-06):**
+  - Thorfgin is on board; the first build is a proof of concept that steps on nobody's toes.
+  - The production host is `builder.the-vortex.nl`.
+  - SL or EC publish rulesets (perhaps EC only later).
+  - v1 never writes to VOID.
+  - The build screen runs in the browser (WebAssembly).
+- **Draft 3 (Arie, 2026-11-06):**
+  - The name stays *Character Creator*.
+  - The proof of concept lives in the `projects` repo for now, and runs on gembernodes for the
+    demo.
+  - The long term supports pushing both new characters (v2) and changes to existing ones (v3).
+  - No field is mandatory; even the faction is often empty.
+  - The *To validate* list is in VoidWalker.
+  - VOID is the source of truth and settles every rule disagreement. That also settles the druid
+    exception (§3.6) and keeps the properties VOID doesn't hold as display content (§3.1).
+- **Draft 4 (Arie, 2026-11-06):**
+  - The demo host is `charactercreator.gemberkoekje.nl`.
+  - Thorfgin won't maintain it. On Vortex's private GitLab every developer can.
+  - The rules and the 2026 text are the responsibility of SL and EC (§3.7).
+  - VOID learns "at most 3 XP left over" as a warning, and so does the Character Creator; neither
+    blocks on it (§3.3).
+  - In VOID, **Referee and up** may change the rules. Infobalie above Referee is an old choice
+    Arie disagrees with, but it stands for now. Whether it becomes EC only is still under
+    discussion (§3.7, verdict item 2).
+  - Editing the text is **not a developer's job**. SL and EC edit it in the app from v4; until
+    then it goes through GitLab (§3.7, step 6).
+
+---
+
+## 12. Sources
+
+- **The current builder:**
+  - builder.qequoia.nl;
+  - github.com/Thorfgin/charactercreator, v0.7.4 of 2026-04-04: README, `src/json`,
+    `SharedActions.js`, `Toolbar.jsx`, `ExportToPDF.js`, `public/locales`;
+  - github.com/Thorfgin/charactercreator2.
+- **The checkout design:** `C:\git\gitlabs\CHECKOUT-DESIGN.md` §0, §6 and §9.
+- **void** (all paths in the void repo):
+  - `CHECKOUT-STEP4-NOTES.md` and `PLAYER-NO-ACCESS-NOTES.md`;
+  - `src/Checkout/SkillRules.php`;
+  - `config/Migrations/20261031120000_SkillRequirements.php`;
+  - `config/SkillRequirements/vaardigheden-2026-v07.json` and `-review.md`;
+  - `src/Model/Entity/{Skill,Character}.php`;
+  - `src/Model/Table/{Characters,CharactersSkills,Skills}Table.php`;
+  - `src/Model/Validation/CharacterValidator.php`;
+  - `src/Policy/Controller/SkillsControllerPolicy.php`;
+  - `src/Policy/Entity/{Character,CharactersSkill}Policy.php`;
+  - `src/EruAuth/Service/KeycloakTokenValidator.php`;
+  - `config/routes.php`.
+- **The SL file:** `C:\git\gitlabs\skill-requirements-sl.json`. SL only; never commit it to a
+  public repo, and `projects` and gembernodes are public.
+- **vortex-tools-style 2.0.0:** the README (*Using Guild Hall*) and `reference/guildhall.html`.
+- **The sibling apps:**
+  - Kluskat's `DEPLOY.md`, `Directory.Build.props` and `kluskat-build-and-push.yml` (in
+    `projects`), and gembernodes `apps/kluskat/`;
+  - werkplaats and landerijen-volken `CLAUDE.md` (the template deltas);
+  - landerijen `DESIGN.md` (the layout of this kind of document).
