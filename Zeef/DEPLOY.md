@@ -267,9 +267,118 @@ In Multimedia Console (content sources for QuMagie/Video Station), make sure
       for the share any more (checked by the user, 2026-11-06). Jellyfin has replaced QuMagie for
       watching.
 - [x] Everything comes back after a PostgreSQL outage and restart (2026-11-06, see NOTES.md).
-- [ ] The first gap-fill episodes download, import as hardlinks, and update Kodi.
-- [ ] **End to end, free content:** in Radarr, add *Night of the Living Dead* (1968, public domain)
+- [x] The first gap-fill episodes download, import as hardlinks, and update the library
+      (through Jellyfin, which replaced the direct Kodi connection; 2026-11-06).
+- [x] **End to end, free content:** in Radarr, add *Night of the Living Dead* (1968, public domain)
       or *Big Buck Bunny* and search. It grabs (Internet Archive if available), downloads into
-      `@Downloads/complete/radarr`, appears in `Movies/` as a hardlink, Kodi's library updates, and
-      after 7 days or ratio 1.0 the staging copy is removed while the film stays.
-- [ ] `Zeef/NOTES.md` gets the phase 0 wrap-up.
+      `@Downloads/complete/radarr`, appears in `Movies/` as a hardlink, and the library updates.
+      Passed 2026-11-06 with *Night of the Living Dead*, shown in Jellyfin and Seerr; the film was
+      deleted again afterwards.
+- [x] `Zeef/NOTES.md` gets the phase 0 wrap-up.
+
+## Part C: Bazarr, English subtitles (added 2026-11-06)
+
+Bazarr fetches English subtitles for anything without English audio or English subtitles, as
+`.en.srt` next to the video. Manifest: gembernodes `apps/zeef/bazarr.yaml` (PR #129).
+
+### C1. Before the merge
+
+- **Database**, in DBeaver on the shared PostgreSQL (`192.168.1.232`, user `postgres`), with
+  auto-commit on:
+
+  ```sql
+  CREATE ROLE bazarr LOGIN PASSWORD '<password>';
+  CREATE DATABASE bazarr OWNER bazarr;
+  REVOKE CONNECT, TEMPORARY ON DATABASE bazarr FROM PUBLIC;
+  ```
+
+  Make the password with `openssl rand -hex 24`, or 1Password's generator with letters and digits
+  only (a quote in it would break the SQL).
+- **1Password:** add the field `BAZARR__POSTGRES__PASSWORD` (exact label) to `zeef-stack`, with
+  the same password.
+- **OpenSubtitles.com:** create a free account. The free tier allows a limited number of
+  downloads a day, which is plenty once the backlog is done.
+
+### C2. First visit (`https://bazarr.lan.gemberkoekje.nl`)
+
+- **Settings → General → Security:** Authentication **Forms**, with a username and password
+  (1Password). Bazarr starts without a login.
+
+C3 to C6 were done on 2026-11-06 through Bazarr's own API, from inside the pod (`POST
+/api/system/settings`, `X-API-KEY` from `/config/config/config.yaml`). The Sonarr/Radarr keys were
+piped from their pods, never printed. Only the login and the OpenSubtitles account are the user's.
+
+### C3. Sonarr and Radarr
+
+- **Settings → Sonarr:** address `sonarr.zeef.svc.cluster.local`, port `8989`, the Sonarr API key
+  from `zeef-stack`.
+- **Settings → Radarr:** `radarr.zeef.svc.cluster.local`, `7878`, the Radarr key.
+- No path mappings: Bazarr sees the library at `/data`, like Sonarr and Radarr.
+
+### C4. Languages
+
+- **Settings → Languages:** language filter **English**.
+- A languages profile **English** with English only, set as the default for series and for films.
+- **"Exclude if matching audio" on** for English (`audio_exclude`). An episode or film with an
+  English audio track needs no subtitles, which keeps the providers' daily quotas for the
+  non-English ones.
+- **Treat embedded subtitles as present:** on (the default), so a video with an English subtitle
+  track isn't given a second one. A track flagged *forced* (signs only) doesn't count: Dragon Ball
+  DAIMA's files have only a forced English track, so Bazarr fetches a full one.
+- **Undefined-language embedded subtitles count as English** (`default_und_embedded_subtitles_lang
+  = en`).
+  - Nichijou's fansub files have a subtitle track with no language set (Jellyfin shows "?").
+  - Without this setting Bazarr fetched 7 needless English subtitles for them, out of the
+    OpenSubtitles daily quota.
+
+### C5. Providers
+
+- **OpenSubtitles.com**, with the account from C1 (entered by the user).
+- **TsukiHime**, for anime. It serves the subtitle tracks of fansub releases and needs no account;
+  it finds a show through the public Anime-Lists mapping.
+- **Podnapisi**, general, no account.
+- **Subdl**, with the user's free API key, AI translation off (added 2026-11-06).
+- **AnimeTosho.xyz** (provider `animetosho_xyz`), for anime: the subtitle tracks of every release
+  Anime Tosho mirrors, matched to the exact episode through AniDB.
+  - It needs **AniDB** (Settings → Providers → AniDB): a free AniDB account, then a registered
+    project at https://anidb.net/software/add, with an HTTP API client (name in lowercase letters,
+    version 1).
+  - Not the older **"Anime Tosho"** provider (`animetosho`). Its `feed.animetosho.org` no longer
+    exists in DNS. Anime Tosho lives at animetosho.net now, and `feed.animetosho.xyz` redirects
+    there.
+- Not used: the **Embedded Subtitles** provider. It only copies tracks that are already in the
+  video out to `.srt`, which Jellyfin doesn't need.
+- **Minimum score for series: 65** (the default is 90; films stay at 70).
+  - Anime subtitles are almost never made for the exact release on disk. Anime Tosho's
+    right-episode matches score 68–74; OpenSubtitles' one for Apocalypse Hotel S01E12 (the Judas
+    release) scored 86.
+  - Audio sync fixes the timing. Apocalypse Hotel E01 and E12 were synced with offsets of only
+    0.05–0.07 seconds.
+
+### C6. Subtitles: sync and Jellyfin
+
+- **Settings → Subtitles → Audio synchronization:** on. Bazarr lines a downloaded subtitle up with
+  the audio (ffsubsync), so one made for a different release of the same episode still fits.
+- **Post-processing:** on, with the command `/scripts/jellyfin-notify.sh "{{episode}}"`.
+  - The script comes with the manifest (ConfigMap `bazarr-scripts`).
+  - It tells Jellyfin about the new subtitle at once, instead of at Jellyfin's 12-hourly scan.
+  - It needs `JELLYFIN__APIKEY` in `zeef-stack`, which is already there.
+
+### C7. Checks
+
+- [x] Bazarr runs on PostgreSQL: 17 tables in `bazarr`, no SQLite file (2026-11-06).
+- [x] The first sync found 49 episodes without English subtitles, all non-English audio.
+- [x] The first search (2026-11-06 ~20:57) downloaded 20 subtitles from OpenSubtitles (13 Dragon
+      Ball DAIMA, 7 Nichijou) and synced each to the audio.
+- [x] The post-processing script got a 204 from Jellyfin each time, and Jellyfin listed the new
+      `eng (external)` tracks straight away.
+- [ ] Then OpenSubtitles' free tier stopped: "Daily download limit reached", throttled for 6 hours.
+      10 were left (Apocalypse Hotel 3, Dragon Ball DAIMA 6, an Azumanga extra without dialogue).
+      Bazarr's own 6-hourly search picks them up after the reset.
+- [x] Apocalypse Hotel S01E01 (a ToonsHub file without subtitle tracks) gets an `.en.srt`, and
+      Jellyfin offers English subtitles for it (2026-11-06, from AnimeTosho.xyz). All six of its
+      episodes on disk now have English subtitles; the remaining five DAIMA episodes wait for
+      OpenSubtitles' reset.
+
+The free OpenSubtitles tier (about 20 downloads a day) is the bottleneck for a backlog; new
+episodes trickle in well below it. VIP, or a second provider with an API key (Subdl), would raise it.
