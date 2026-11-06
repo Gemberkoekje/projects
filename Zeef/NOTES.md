@@ -112,6 +112,35 @@ a real certificate: `https://<app>.lan.gemberkoekje.nl`, LAN and Tailscale only.
 - **Jellyfin sees the switchboard's pod IP (`10.42.x.x`) as the client.** Harmless: it falls in
   Jellyfin's LAN ranges. Adding the pod network to Jellyfin's Known Proxies would show real client
   IPs in its log; not done.
+- **Sonarr runs only 3 tasks at once, and a big anime search can take all three.**
+  - Anime is searched episode by episode, under every alternative title, across all indexers:
+    about a minute per episode with 18 indexers.
+  - On 2026-11-06 ~10 anime series were requested within 20 minutes. Dr. STONE (94 episodes),
+    SPY x FAMILY (50) and Evil Lord (12) held all three slots for up to an hour.
+  - Everything else waited behind them: the download check and imports (`RefreshMonitoredDownloads`),
+    RSS, and the episode lists of newly added series (Clannad and Strawberry Marshmallow showed 0
+    episodes).
+  - Harmless, it clears itself; but Sonarr's queue page is stale meanwhile. Request big anime a few
+    at a time.
+- **Anime named "Title Part N - 01" lands in the wrong season.** Erai-raws restarts the numbering
+  for each part ("Dr. Stone: Science Future Part 3 - 01").
+  - Sonarr's season alias ("Dr. Stone: Science Future" = season 4) doesn't match with "Part 3"
+    added, so it read "01" as absolute episode 1. Twelve season 4 episodes were grabbed as Dr.
+    STONE S01E01–E13.
+  - Fixed 2026-11-06:
+    - Sonarr release profile "Geen 'Part N - 01'-namen" (all series) rejects
+      `/\bPart\s?\d+\s*-?\s+\d{2,3}\b/i`. It was tested against the day's real names: `S01E11 …
+      Part 1 1080p`-style titles still pass.
+    - The 12 grabs were removed from the queue with blocklist, which also starts Sonarr's own
+      redownload search.
+- **Space (2026-11-06 evening).**
+  - The share has 682 GB used of 3.4 TB (21%): `TV Shows` 543 GB, `Movies` 39 GB.
+  - Reclaimable:
+    - `temp/` 49 GB, a Download Station leftover;
+    - the QNAP's `@Recycle` 26 GB (Ted Lasso, deleted 2026-10-10);
+    - Radarr's recycle bin 21 GB, emptied automatically within 7 days.
+  - Everything requested so far was estimated at ~400–500 GB more, mostly anime backlog at ~1 GB
+    per episode.
 
 ### Carried over
 
