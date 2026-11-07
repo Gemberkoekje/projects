@@ -17,7 +17,7 @@
 
     <div class="cc-picker-tools">
         <label class="cc-visually-hidden" for="cc-search">@Ui.T("Zoeken", "Search")</label>
-        <input id="cc-search" class="ctl" type="search" placeholder="@Ui.T("Zoek een vaardigheid…", "Search a skill…")" value="@search" @oninput="Search" />
+        <input id="cc-search" class="ctl" type="search" placeholder="@Ui.T("Zoek een vaardigheid, spreuk of oude naam…", "Search a skill, spell or old name…")" value="@search" @oninput="Search" />
         <label class="cc-check">
             <input type="checkbox" checked="@onlyBuyable" @onchange="() => onlyBuyable = !onlyBuyable" />
             @Ui.T("Alleen wat kan", "Only what fits")
@@ -77,6 +77,10 @@
                                 <button type="button" class="cc-skill-name" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@($"{RowId(key)}-more")">@name</button>
                                 <span class="cc-skill-meta">
                                     <span class="cc-skill-cost">@rule.Cost XP@(rule.IsExtra ? " · extra" : string.Empty)</span>
+                                    @if (hits.TryGetValue(key, out var via))
+                                    {
+                                        <span class="cc-skill-via"><span aria-hidden="true">⌕</span> @via</span>
+                                    }
                                     @if (status.Kind != StatusKind.None)
                                     {
                                         <span class="cc-pill cc-pill--@status.Kind.ToString().ToLowerInvariant()" title="@status.Full">
@@ -149,6 +153,9 @@
     private PlanMode filteredFor;
     private bool onlyBuyable;
     private bool multi;
+    private SkillSearch finder = new (default, []);
+    private object finderFor = new ();
+    private readonly Dictionary<SkillKey, string> hits = [];
     private SkillKey focusAfterRender;
 
     /// <summary>Which skills the picker lists.</summary>
@@ -211,6 +218,12 @@
             Filter = Plan.Mode == PlanMode.NewCharacter ? PickerFilter.Basis : PickerFilter.All;
             filteredFor = Plan.Mode;
         }
+
+        if (!ReferenceEquals(finderFor, Data))
+        {
+            finder = new SkillSearch(Ui, Data.Content.Legacy);
+            finderFor = Data;
+        }
     }
 
     /// <inheritdoc />
@@ -226,12 +239,16 @@
         }
     }
 
+    /// <summary>The categories to show, and why each found skill matched the search (for its row).</summary>
     private List<Category> Groups()
-        => [.. Data.Offered
+    {
+        hits.Clear();
+        return [.. Data.Offered
             .Select(key => Data.Content.TryGet(key, out var skill) ? skill : null)
             .OfType<SkillContent>()
             .Where(skill => Shown(skill))
             .GroupBy(skill => skill.Category.Nl, (_, skills) => new Category(Ui.T(skills.First().Category), [.. skills]))];
+    }
 
     private bool Shown(SkillContent skill)
     {
@@ -245,10 +262,19 @@
         var fits = !onlyBuyable
             || Plan.Planned[skill.Key] > 0
             || (Options.TryGetValue(skill.Key, out var option) && option.CanBuy);
-        return listed && fits && (search.Length == 0
-            || skill.Name.Nl.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || skill.Name.En.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || Ui.T(skill.Category).Contains(search, StringComparison.OrdinalIgnoreCase));
+        if (!listed || !fits)
+        {
+            return false;
+        }
+
+        // Spells, recipes and old names too (UX-REVIEW.md P8); the row says which one matched.
+        var hit = finder.Match(skill, search);
+        if (hit.Via.Length > 0)
+        {
+            hits[skill.Key] = hit.Via;
+        }
+
+        return hit.Matched;
     }
 
     /// <summary>A category in the picker, named in the screen's language; grouped by its Dutch name.</summary>

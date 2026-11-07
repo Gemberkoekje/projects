@@ -17,6 +17,18 @@ public sealed record SummaryValue
     required public string Value { get; init; }
 }
 
+/// <summary>A group of tiles in the summary: one skill's spells or recipes, or a category's common recipes.</summary>
+/// <remarks>Immutable and thread-safe.</remarks>
+/// <typeparam name="TItem">A spell or a recipe.</typeparam>
+public sealed record TileGroup<TItem>
+{
+    /// <summary>What the group is: the skill's name, or the category with "(algemeen)".</summary>
+    required public LocalizedText Title { get; init; }
+
+    /// <summary>Its tiles, each once in the whole summary.</summary>
+    required public IReadOnlyList<TItem> Items { get; init; }
+}
+
 /// <summary>
 /// What a plan adds up to beyond its XP: properties, spells and techniques, recipes. The build
 /// screen's summary and the printed sheet show the same, so both ask here.
@@ -95,6 +107,44 @@ public static class PlanSummary
         return [.. skills.SelectMany(skill => skill.Recipes)
             .Concat(content.CommonRecipes.Where(group => categories.Contains(group.Category.Nl)).SelectMany(group => group.Recipes))
             .DistinctBy(recipe => recipe.Id)];
+    }
+
+    /// <summary>
+    /// The spells and techniques grouped under the skill that brings them (UX-REVIEW.md P10), in plan
+    /// order; a spell two skills bring sits under the first.
+    /// </summary>
+    /// <param name="content">The content.</param>
+    /// <param name="plan">The plan.</param>
+    /// <returns>One group per skill with spells.</returns>
+    public static IReadOnlyList<TileGroup<SpellContent>> SpellGroups(ContentBook content, Plan plan)
+    {
+        var seen = new HashSet<int>();
+        return [.. Skills(content, plan)
+            .Select(skill => new TileGroup<SpellContent> { Title = skill.Name, Items = [.. skill.Spells.Where(spell => seen.Add(spell.Id))] })
+            .Where(group => group.Items.Count > 0)];
+    }
+
+    /// <summary>
+    /// The recipes grouped by where they come from (UX-REVIEW.md P10): each skill's own, then each
+    /// category's common recipes once the plan has a skill in it; each recipe once.
+    /// </summary>
+    /// <param name="content">The content.</param>
+    /// <param name="plan">The plan.</param>
+    /// <returns>The groups with recipes.</returns>
+    public static IReadOnlyList<TileGroup<RecipeContent>> RecipeGroups(ContentBook content, Plan plan)
+    {
+        var skills = Skills(content, plan);
+        var categories = skills.Select(skill => skill.Category.Nl).ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<int>();
+        var own = skills.Select(skill => new TileGroup<RecipeContent> { Title = skill.Name, Items = [.. skill.Recipes.Where(recipe => seen.Add(recipe.Id))] });
+        var common = content.CommonRecipes
+            .Where(group => categories.Contains(group.Category.Nl))
+            .Select(group => new TileGroup<RecipeContent>
+            {
+                Title = new LocalizedText { Nl = $"{group.Category.Nl} (algemeen)", En = $"{group.Category.En} (general)" },
+                Items = [.. group.Recipes.Where(recipe => seen.Add(recipe.Id))],
+            });
+        return [.. own.Concat(common).Where(group => group.Items.Count > 0)];
     }
 
     /// <summary>The content of the plan's skills that the content knows, in plan order.</summary>

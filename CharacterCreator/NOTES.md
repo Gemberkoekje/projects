@@ -1291,3 +1291,92 @@ Batch 5:
 - P10: spells grouped under their skill, with details beside the tile.
 
 Then §4's check: five players with one task each, and Thorfgin's eye.
+
+---
+
+## UX batch 5 — search by spell and old name, grouped spells (2026-11-07)
+
+_To understand this, start by reading `UX-REVIEW.md` P8 and P10, then
+`CharacterCreator.WebApp.Client/Words/SkillSearch.cs` and `PlanSummary.SpellGroups`, then the folds
+in `Components/SummaryPanels.razor`._
+
+Local on `claude/charactercreator`, after batch 4. Nothing is pushed. With this batch every proposal
+in the review is built, except P11's short names.
+
+### What it does
+
+- **Search (P8),** in `SkillSearch.Match`:
+  - a skill's names in Dutch and English, and its category;
+  - from 3 letters on (`DeepSearchFrom`), also its spells and techniques, its recipes, and
+    Thorfgin's old names (the ruleset's legacy map);
+  - case and accents never matter (`Fold`: "magier" finds "Magiër");
+  - a hit that isn't the skill's own name says why in its row: "⌕ via Heal Wounds", "oude naam:
+    Glyph Gebruiken";
+  - the box says "Zoek een vaardigheid, spreuk of oude naam…".
+- **Spells and recipes (P10),** in the summary card:
+  - grouped under the skill that brings them (`PlanSummary.SpellGroups` / `RecipeGroups`), each
+    once; a category's common recipes get a group "… (algemeen)";
+  - a group with more than 12 tiles starts folded (none has more than 5 today);
+  - a tile shows its cost: the energy's colour dot and the number, or inspiration;
+  - one tile is open at a time, and its details sit right after it, on a line of their own, with ✕
+    and Escape;
+  - on a phone the details are a sheet from the bottom, above the XP bar.
+
+### Decisions
+
+1. **Accents folded by hand, not with Unicode normalization:** a fixed map of the letters Dutch
+   and the content use, which needs nothing from the browser's globalization data.
+2. **Deep search from three letters:** two letters match half the spell book ("he" sits in
+   "vaardig**he**den" as well).
+3. **The first matching spell names the hit.** "wou" names whichever wound spell comes first, and
+   that is good enough to explain the hit.
+4. **Details after the tile, not a floating popover:** the same DOM serves desktop (inline, next to
+   the tile) and phone (a fixed sheet). Nothing needs measuring or positioning.
+5. **The PDF keeps the flat lists** (`PlanSummary.Spells` / `Recipes`); grouping is for the screen.
+
+### Gotchas
+
+- **Many current names equal Thorfgin's old ones** ("Runen Gebruiken" still is). A spec for the
+  old-name path needs one that changed ("Glyph Gebruiken" → "Glyphs Gebruiken").
+- **A `fixed` sheet inside a hidden tab stays hidden:** `display: none` on an ancestor hides fixed
+  descendants too, so a tile left open in *Overzicht* doesn't show on *Kiezen*.
+- **`finder` in the picker needs a non-null start** (`new (default, [])`): `default!` is refused in
+  razor (S8970), and an uninitialized field is CS8618. It is rebuilt when the ruleset object
+  changes.
+
+### How it was checked
+
+- **Specs:** 359 green, 14 new:
+  - `SkillSearch_specs` (8): accents, a spell, an old name, a recipe, a direct hit, two letters,
+    an empty search, folding;
+  - `PlanSummary_specs` (6): every spell and recipe exactly once for three presets, the groups'
+    titles, common recipes.
+- **Release publish** clean.
+- **In the browser:**
+  - 1280: "heal wounds" finds both healing A skills, each saying "via Heal Wounds"; "magier"
+    finds 20; "glyph gebruiken" finds Glyphs Gebruiken with its old name;
+  - the summary groups Paladijn's spells (Genezingsspreuken A (spiritueel) 5, Paladijnspreuken A
+    3), with cost dots; a tile's details open 4 px under it;
+  - 375: the details are a sheet from 515 to 756 px, ending on the XP bar.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.WebApp.Client/Words/SkillSearch.cs` | new: `SkillSearch`, `SearchHit`, `Fold` |
+| `CharacterCreator.WebApp.Client/Words/PlanSummary.cs` | `TileGroup<T>`, `SpellGroups`, `RecipeGroups` |
+| `CharacterCreator.WebApp.Client/Components/SkillPicker.razor` | the search through `SkillSearch`; "via" in the row |
+| `CharacterCreator.WebApp.Client/Components/SummaryPanels.razor` | grouped tiles, costs, details after the tile, one open at a time |
+| `CharacterCreator.WebApp/wwwroot/app.css` | tile groups, costs, details and the phone sheet, the "via" hint |
+| `CharacterCreator.test/Words/SkillSearch_specs.cs`, `PlanSummary_specs.cs` | the specs |
+| `UX-REVIEW.md`, `DESIGN.md` §5 | status, "as built, batch 5" |
+
+### Next
+
+The review's own check (§4):
+- five players, one task each ("make a paladin with 15 XP and print it"; "bring your old builder
+  character and add Harnas III");
+- Thorfgin's eye.
+
+Both need the work on the demo, which means pushing `claude/charactercreator` and a PR into
+`projects` main (CI builds the image). After that, a gembernodes tag bump. That waits for Arie's go.

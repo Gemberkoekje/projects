@@ -1725,7 +1725,48 @@ button.cc-chip {
     gap: var(--s-2);
 }
 
+/* A group of tiles under the skill that brings them (UX-REVIEW.md P10). */
+.cc-tilegroup {
+    margin-bottom: var(--s-3);
+}
+
+.cc-tilegroup summary {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 36px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-2);
+    cursor: pointer;
+    list-style: none;
+}
+
+.cc-tilegroup summary::-webkit-details-marker {
+    display: none;
+}
+
+.cc-tilegroup summary::before {
+    content: "\25B8";
+    width: 1em;
+    color: var(--ink-3);
+    font-size: 12px;
+}
+
+.cc-tilegroup[open] summary::before {
+    content: "\25BE";
+}
+
+.cc-tilegroup summary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--va-focus-ring);
+    border-radius: var(--r-sm);
+}
+
 .cc-tile {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
     font: 600 14px var(--f-text);
     color: var(--ink);
     background: var(--paper);
@@ -1746,17 +1787,85 @@ button.cc-chip {
     border-color: var(--va-crimson);
 }
 
+/* A tile's energy or inspiration cost: the energy's colour dot and the number. */
+.cc-tile-cost {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font: 400 12.5px var(--f-mono);
+    color: var(--ink-3);
+}
+
+.cc-tile.is-on .cc-tile-cost {
+    color: inherit;
+}
+
+.cc-tile-cost .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: var(--r-seal);
+    background: var(--chip, var(--ink-3));
+}
+
+/* The details open right after their tile, on a line of their own (Proximity); on a phone as a
+   sheet from the bottom, above the XP bar. */
 .cc-tile-details {
-    margin-top: var(--s-4);
+    flex: 1 0 100%;
     background: var(--paper-sunken);
     border: var(--bd-hair);
     border-radius: var(--r-md);
-    padding: var(--s-4);
+    padding: var(--s-3) var(--s-4) var(--s-4);
     font-size: 15px;
 }
 
+.cc-tile-details-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-3);
+}
+
 .cc-tile-details h3 {
+    margin: var(--s-2) 0 var(--s-2);
     font-size: 17px;
+}
+
+.cc-tile-close {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    margin: -6px -10px 0 0;
+    font-size: 16px;
+    color: var(--ink-2);
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+}
+
+.cc-tile-close:hover {
+    background: var(--paper);
+}
+
+@media (max-width: 640px) {
+    .cc-tile-details {
+        position: fixed;
+        inset: auto 0 calc(56px + env(safe-area-inset-bottom));
+        z-index: 45;
+        max-height: 60vh;
+        overflow-y: auto;
+        border-width: 1px 0 0;
+        border-radius: var(--r-lg) var(--r-lg) 0 0;
+        box-shadow: var(--sh-lg);
+        background: var(--paper-raised);
+    }
+}
+
+/* A search hit on a spell, recipe or old name, under the skill's name (UX-REVIEW.md P8). */
+.cc-skill-via {
+    font-size: 13px;
+    font-style: italic;
+    color: var(--va-action-text);
 }
 
 /* A file input dressed as a button or menu item. */

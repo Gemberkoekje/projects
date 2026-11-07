@@ -800,6 +800,17 @@ The footer is the portal's.
 - **The plan's general notes** moved from the head into the checklist. The XP bar's status jumps
   to a skill's row, or to the checklist line for a note about the whole plan.
 
+*As built after the UX review, batch 5 (P8, P10):*
+
+- **Search** looks at a skill's names in both languages and its category. From three letters on it
+  also looks at the skill's spells and techniques, its recipes, and Thorfgin's old names (the
+  ruleset's legacy map). Case and accents don't matter. A hit that isn't the name says why under
+  the skill: "via Heal Wounds", "oude naam: Glyph Gebruiken".
+- **Spells and recipes** in the summary are grouped under the skill that brings them, each once,
+  with a category's common recipes in their own group. A group with more than 12 starts folded. A
+  tile shows its energy cost with the energy's colour, or its inspiration. Its details open right
+  after the tile, or as a sheet from the bottom on a phone.
+
 **Voorbeelden / Presets**: the presets as cards, with archetype, text and skills, and *start from
 this*. As built: *start from this* opens the build screen with `?voorbeeld={key}`, which asks
 first when the current plan has skills. After the UX review the cards are compact:

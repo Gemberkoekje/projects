@@ -1,10 +1,14 @@
 @* The summary (DESIGN.md §5), compact for the "Jouw personage" column and the phone's Overzicht tab
    (UX-REVIEW.md P2): energy per day and the properties on a line each, the spells, techniques and
-   recipes folded with their counts, as tiles with a details panel. *@
+   recipes folded with their counts. Inside, the tiles are grouped under the skill that brings them,
+   with their cost, and a tile's details open right after it; on a phone as a sheet from the bottom
+   (P10). *@
 @{
     var energy = Evaluation.Energy.Where(total => total.Kind == EnergyKind.Energy).ToList();
-    var spells = PlanSummary.Spells(Data.Content, Plan);
-    var recipes = PlanSummary.Recipes(Data.Content, Plan);
+    var spellGroups = PlanSummary.SpellGroups(Data.Content, Plan);
+    var recipeGroups = PlanSummary.RecipeGroups(Data.Content, Plan);
+    var spellCount = spellGroups.Sum(group => group.Items.Count);
+    var recipeCount = recipeGroups.Sum(group => group.Items.Count);
 }
 <section class="cc-card cc-summary" aria-labelledby="cc-summary-title">
     <h2 id="cc-summary-title">@Ui.T("Overzicht", "Summary")</h2>
@@ -35,73 +39,99 @@
     </dl>
 
     <details class="cc-fold">
-        <summary>@Ui.T("Spreuken en technieken", "Spells and techniques") <span class="cc-count">@spells.Count</span></summary>
-        @if (spells.Count == 0)
+        <summary>@Ui.T("Spreuken en technieken", "Spells and techniques") <span class="cc-count">@spellCount</span></summary>
+        @if (spellCount == 0)
         {
             <p class="muted">@Ui.T("Geen.", "None.")</p>
         }
-        else
+        @foreach (var group in spellGroups)
         {
-            <div class="cc-tiles">
-                @foreach (var spell in spells)
-                {
-                    <button type="button" class="cc-tile @(selectedSpell == spell.Id ? "is-on" : string.Empty)" aria-pressed="@(selectedSpell == spell.Id ? "true" : "false")" @onclick="() => selectedSpell = selectedSpell == spell.Id ? 0 : spell.Id">@Ui.T(spell.Name)</button>
-                }
-            </div>
-            var shown = spells.FirstOrDefault(spell => spell.Id == selectedSpell);
-            if (shown is not null)
-            {
-                <div class="cc-tile-details">
-                    <h3>@Ui.T(shown.Name)</h3>
-                    <dl class="cc-facts">
-                        @Fact(Ui.T("Energie", "Energy"), $"{Ui.T(shown.EnergyType)} {shown.Cost}".Trim())
-                        @Fact(Ui.T("Incantatie", "Incantation"), Ui.T(shown.Incantation))
-                        @Fact(Ui.T("Effect", "Effect"), Ui.T(shown.Effect))
-                        @Fact(Ui.T("Duur", "Duration"), Ui.T(shown.Duration))
-                        @Fact(Ui.T("Regelboek", "Rulebook"), shown.Page > 0 ? $"{Ui.T("Spreuken en Technieken, blz.", "Spells and Techniques, p.")} {shown.Page}" : string.Empty)
-                    </dl>
-                    @if (!string.IsNullOrWhiteSpace(Ui.T(shown.Description)))
+            <details class="cc-tilegroup" open="@(group.Items.Count <= FoldAbove)">
+                <summary>@Ui.T(group.Title) <span class="cc-count">@group.Items.Count</span></summary>
+                <div class="cc-tiles">
+                    @foreach (var spell in group.Items)
                     {
-                        <p class="cc-description">@Ui.T(shown.Description)</p>
+                        var on = selected == Selection.Spell(spell.Id);
+                        <button type="button" class="cc-tile @(on ? "is-on" : string.Empty)" aria-expanded="@(on ? "true" : "false")" aria-controls="cc-tile-details" @onclick="() => Toggle(Selection.Spell(spell.Id))">
+                            @Ui.T(spell.Name)
+                            @if (HasCost(spell.Cost))
+                            {
+                                <span class="cc-tile-cost" title="@($"{Ui.T(spell.EnergyType)} {spell.Cost}".Trim())"><span class="dot @PlanSummary.EnergyClass(spell.EnergyType.En)" aria-hidden="true"></span>@spell.Cost</span>
+                            }
+                        </button>
+                        @if (on)
+                        {
+                            <div id="cc-tile-details" class="cc-tile-details" role="region" aria-label="@Ui.T(spell.Name)" @onkeydown="CloseOnEscape">
+                                <div class="cc-tile-details-head">
+                                    <h3>@Ui.T(spell.Name)</h3>
+                                    <button type="button" class="cc-tile-close" aria-label="@Ui.T("Sluiten", "Close")" @onclick="() => selected = Selection.None">✕</button>
+                                </div>
+                                <dl class="cc-facts">
+                                    @Fact(Ui.T("Energie", "Energy"), $"{Ui.T(spell.EnergyType)} {spell.Cost}".Trim())
+                                    @Fact(Ui.T("Incantatie", "Incantation"), Ui.T(spell.Incantation))
+                                    @Fact(Ui.T("Effect", "Effect"), Ui.T(spell.Effect))
+                                    @Fact(Ui.T("Duur", "Duration"), Ui.T(spell.Duration))
+                                    @Fact(Ui.T("Regelboek", "Rulebook"), spell.Page > 0 ? $"{Ui.T("Spreuken en Technieken, blz.", "Spells and Techniques, p.")} {spell.Page}" : string.Empty)
+                                </dl>
+                                @if (!string.IsNullOrWhiteSpace(Ui.T(spell.Description)))
+                                {
+                                    <p class="cc-description">@Ui.T(spell.Description)</p>
+                                }
+                            </div>
+                        }
                     }
                 </div>
-            }
+            </details>
         }
     </details>
 
     <details class="cc-fold">
-        <summary>@Ui.T("Recepten", "Recipes") <span class="cc-count">@recipes.Count</span></summary>
-        @if (recipes.Count == 0)
+        <summary>@Ui.T("Recepten", "Recipes") <span class="cc-count">@recipeCount</span></summary>
+        @if (recipeCount == 0)
         {
             <p class="muted">@Ui.T("Geen.", "None.")</p>
         }
-        else
+        @foreach (var group in recipeGroups)
         {
-            <div class="cc-tiles">
-                @foreach (var recipe in recipes)
-                {
-                    <button type="button" class="cc-tile @(selectedRecipe == recipe.Id ? "is-on" : string.Empty)" aria-pressed="@(selectedRecipe == recipe.Id ? "true" : "false")" @onclick="() => selectedRecipe = selectedRecipe == recipe.Id ? 0 : recipe.Id">@Ui.T(recipe.Name)</button>
-                }
-            </div>
-            var shown = recipes.FirstOrDefault(recipe => recipe.Id == selectedRecipe);
-            if (shown is not null)
-            {
-                <div class="cc-tile-details">
-                    <h3>@Ui.T(shown.Name)</h3>
-                    <dl class="cc-facts">
-                        @Fact(Ui.T("Effect", "Effect"), Ui.T(shown.Effect))
-                        @Fact(Ui.T("Inspiratie", "Inspiration"), shown.Inspiration)
-                        @Fact(Ui.T("Componenten", "Components"), Ui.T(shown.Components))
-                    </dl>
+            <details class="cc-tilegroup" open="@(group.Items.Count <= FoldAbove)">
+                <summary>@Ui.T(group.Title) <span class="cc-count">@group.Items.Count</span></summary>
+                <div class="cc-tiles">
+                    @foreach (var recipe in group.Items)
+                    {
+                        var on = selected == Selection.Recipe(recipe.Id);
+                        <button type="button" class="cc-tile @(on ? "is-on" : string.Empty)" aria-expanded="@(on ? "true" : "false")" aria-controls="cc-tile-details" @onclick="() => Toggle(Selection.Recipe(recipe.Id))">
+                            @Ui.T(recipe.Name)
+                            @if (HasCost(recipe.Inspiration))
+                            {
+                                <span class="cc-tile-cost" title="@Ui.T($"Inspiratie {recipe.Inspiration}", $"Inspiration {recipe.Inspiration}")"><span class="dot cc-en-inspiration" aria-hidden="true"></span>@recipe.Inspiration</span>
+                            }
+                        </button>
+                        @if (on)
+                        {
+                            <div id="cc-tile-details" class="cc-tile-details" role="region" aria-label="@Ui.T(recipe.Name)" @onkeydown="CloseOnEscape">
+                                <div class="cc-tile-details-head">
+                                    <h3>@Ui.T(recipe.Name)</h3>
+                                    <button type="button" class="cc-tile-close" aria-label="@Ui.T("Sluiten", "Close")" @onclick="() => selected = Selection.None">✕</button>
+                                </div>
+                                <dl class="cc-facts">
+                                    @Fact(Ui.T("Effect", "Effect"), Ui.T(recipe.Effect))
+                                    @Fact(Ui.T("Inspiratie", "Inspiration"), recipe.Inspiration)
+                                    @Fact(Ui.T("Componenten", "Components"), Ui.T(recipe.Components))
+                                </dl>
+                            </div>
+                        }
+                    }
                 </div>
-            }
+            </details>
         }
     </details>
 </section>
 
 @code {
-    private int selectedSpell;
-    private int selectedRecipe;
+    /// <summary>A group with more tiles than this starts folded (UX-REVIEW.md P10).</summary>
+    private const int FoldAbove = 12;
+
+    private Selection selected = Selection.None;
 
     /// <summary>The language.</summary>
     [Parameter, EditorRequired]
@@ -122,6 +152,29 @@
     /// <summary>What the engine makes of it.</summary>
     [Parameter, EditorRequired]
     public PlanEvaluation Evaluation { get; set; }
+
+    private static bool HasCost(string cost) => !string.IsNullOrWhiteSpace(cost) && cost.Trim() != "0";
+
+    /// <summary>One tile open at a time, spell or recipe; the same tile again closes it.</summary>
+    private void Toggle(Selection tile) => selected = selected == tile ? Selection.None : tile;
+
+    private void CloseOnEscape(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            selected = Selection.None;
+        }
+    }
+
+    /// <summary>The open tile: a spell or a recipe by its id.</summary>
+    private readonly record struct Selection(bool IsRecipe, int Id)
+    {
+        public static Selection None => default;
+
+        public static Selection Spell(int id) => new (false, id);
+
+        public static Selection Recipe(int id) => new (true, id);
+    }
 
     private static RenderFragment Fact(string label, string value) => builder =>
     {

@@ -8,12 +8,11 @@ _To understand this, start with §0 (the short version), then §3 (the proposals
 (the laws) where a proposal's reasoning matters._
 
 **Status:**
-- **Batches 1 (P3, P4, P9, P11), 2 (P5, P7), 3 (P1) and 4 (P2, P6) are built.** NOTES.md ("UX batch
-  1" to "4") has what was built and where it departs from the proposals. P4's motion came with P1,
-  and P11's folding head with P2.
+- **All five batches are built:** P1 to P11. NOTES.md ("UX batch 1" to "5") has what was built and
+  where it departs from the proposals.
 - **Left from P11:** the short names, which need an SL/EC check.
-- **Next:** batch 5 (P8 search by spell and old name, P10 spells grouped with their details beside
-  them). After that, the five-player test in §4.
+- **Next:** §4's check. Five players, one task each, and Thorfgin's eye. It needs the work on the
+  demo (a push and a PR).
 
 ---
 
