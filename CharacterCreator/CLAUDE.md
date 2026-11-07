@@ -57,5 +57,17 @@ dotnet test CharacterCreator.slnx
   would clash with the host's in the specs' `WebApplicationFactory<Program>`.
 - Whatever a client page injects must be registered in both `Program.cs` files: the server
   prerenders the page first.
-- The VOID side lives in the local worktree `C:\git\gitlabs\void-charactercreator`, branch
-  `feature/skills-requirements-api`, which is never pushed until phase 6.
+- The VOID side lives in the worktree `C:\git\gitlabs\void-charactercreator`, branch
+  `feature/skills-requirements-api`. It is pushed, and on its way to `develop`, whose instance
+  `void-test` the demo talks to.
+- VOID's shared rule cases are copied, never edited:
+  `scripts/sync-void-cases.ps1 -VoidRepo <void checkout>`. `VoidCases_specs` fails on a hand-edited
+  copy.
+- The engine (`core/Rules/PlanEvaluator`) returns findings with a severity:
+  - Problem: VOID enforces the rule;
+  - Warning: VOID only warns;
+  - Info: something to know.
+
+  Planning never stops on any of them.
+- Text with backslashes or quotes: edit it with the edit tool. Bash heredocs and inline Python on
+  this machine mangle them.

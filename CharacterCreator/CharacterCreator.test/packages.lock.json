@@ -784,7 +784,8 @@
       "charactercreator.core": {
         "type": "Project",
         "dependencies": {
-          "Qowaiv": "[8.0.0, )"
+          "Qowaiv": "[8.0.0, )",
+          "Qowaiv.Validation.Abstractions": "[2.1.0, )"
         }
       },
       "charactercreator.infrastructure": {

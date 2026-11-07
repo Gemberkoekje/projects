@@ -28,6 +28,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- VOID's shared skill rule cases (DESIGN.md §3.5), copied by scripts/sync-void-cases.ps1. -->
+    <None Update="Rules/skill-rules-cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Rules/skill-rules-cases.source" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 

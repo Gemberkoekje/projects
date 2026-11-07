@@ -135,3 +135,125 @@ then `CharacterCreator.WebApp.Client/Pages/Bouwen.razor`._
 | `CharacterCreator.test/` | `Architecture/`, `Authorization/`, `Web/Shell_specs`, `TestHelpers/CharacterCreatorWebApplicationFactory` |
 | `Dockerfile`, `docker-compose.yml`, `.env.example` | image and local run |
 | `../.github/workflows/charactercreator-build-and-push.yml` | CI |
+
+---
+
+## Phase 1 — the rules engine (2026-11-07)
+
+_To understand this, start by reading `DESIGN.md` §3 (the rules) and §6 (facts, not sentences),
+then `CharacterCreator.core/Rules/PlanEvaluator.cs` top to bottom, then `Rules/SkillRules.cs` next
+to VOID's `src/Checkout/SkillRules.php`. The specs in `CharacterCreator.test/Rules/` read as the
+rules in plain English._
+
+### What it does
+
+`CharacterCreator.core`, plain C# with Qowaiv only, so the browser can run it:
+
+- **The model:**
+  - `Skills/`: `SkillKey`, `RequirementGroup` (kind `any`/`points`/`extra`, read from VOID's spelling
+    by `RequirementKinds.FromVoid`), `RuleSkill` (cost, `base_max`, `times_max`, deprecated,
+    prerequisites, energy), `EnergyGrant`;
+  - `Plans/`: `Holdings` (skills with times, immutable, ordered), `Plan` (mode, XP, held, planned);
+  - `Rules/`: `RuleBook` (built through a Qowaiv `Result`, refusing duplicate or empty keys and
+    negative numbers), `CreationRules` (15 XP, at most 3 left over), `XpTable` (VOID's `XpAward`,
+    with the book of experiences).
+- **`SkillRules`** mirrors VOID's `SkillRules`: `Whole`, `Spent`, `Holds`, `Missing`.
+- **`PlanEvaluator`:**
+  - `Evaluate` checks a plan in one of three modes:
+    - new character: 15 XP, `base_max`, no extra skills, a warning above 3 XP left over;
+    - existing character: whole XP, teacher for a first extra purchase, one per event;
+    - free: `times_max`, the prerequisites and the XP only.
+
+    It returns XP, spent, remaining, findings (problems first) and energy totals.
+  - `Option` is the picker's view of one more purchase of a skill.
+  - `Chain` is "add with prerequisites".
+  - `Dependants` is "remove these too".
+- **Findings**, each with a severity:
+  - *Problem* (VOID enforces it): missing prerequisite, not enough XP, above maximum, above the
+    creation maximum, not at creation, deprecated, unknown planned skill;
+  - *Warning* (VOID only warns): too much left over, more than one teaching;
+  - *Info*: needs a teacher, teaching not paid off yet, an unknown skill the character already holds.
+- **VOID's shared cases:**
+  - In VOID, `tests/data/skill-rules-cases.json` now also holds the XP award table (commit
+    `72e705f`, pushed), run by `SkillRulesCasesTest::testAward`.
+  - Here, `scripts/sync-void-cases.ps1` copies the file into `CharacterCreator.test/Rules/`, with a
+    `.source` file naming VOID's commit and the hash of the text.
+  - `VoidCases_specs` runs all 29 cases, the same 29 VOID runs. It also fails when the copy no
+    longer matches its recorded hash.
+
+### Decisions
+
+1. **A skill's prerequisites are checked against the character's other skills, never itself.**
+   Brew Expertise is in its own "XP in alchemist skills" set, and Teaching Expertise is itself an
+   extra skill. Counting the skill would let it meet its own prerequisite. At the checkout's moment
+   of purchase the skill isn't held yet, so this matches VOID.
+2. **An existing character's XP follows the checkout** (CHECKOUT-DESIGN §6):
+   - a first purchase of an extra skill takes the whole XP first, and may start without being paid
+     off (Info, with what is still owed);
+   - basis purchases must fit in what is left;
+   - more than one teaching is a warning, because the checkout would hold the rest back.
+3. **Severities:**
+   - *Problem* is what VOID enforces, or would refuse;
+   - *Warning* is what VOID only warns about (the 3 XP rule, decided in draft 4);
+   - *Info* never stops anything.
+
+   Planning stops on nothing. A push (v2, v3) will stop on problems.
+4. **Held skills are fixed.** Their prerequisites are never checked (what VOID holds is VOID's
+   record), and an unknown held skill is Info (SL-only or rank skills).
+5. **Free mode is the old builder's free mode:** `times_max`, the prerequisites and the XP. No
+   creation rules, no teachers.
+6. **Records with `required` init properties, no positional records.** That is the house style
+   (Qowaiv's QW0016, and landerijen and Kluskat have none).
+7. **XP is `decimal`.** Whole XP is floored with VOID's epsilon (0.001), through Qowaiv's rounding.
+
+### Gotchas
+
+- **QW0016** rejects positional records; write `required public T Name { get; init; }` (SA1206 wants
+  `required` before `public`).
+- **SA1642** (StyleCop 1.1.118) treats a `record struct` as a class. The constructor summary must
+  say "…the `<see cref="SkillKey"/>` class", not "struct".
+- **QW0013** wants Qowaiv rounding. `Qowaiv.Mathematics.DecimalMath` is internal; the public form
+  is the extension `System.QowaivDecimalExtensions.Round(decimal, int, DecimalRounding)`, as in
+  `(xp + Epsilon).Round(0, DecimalRounding.Floor)`.
+- **Sonar S3459/S1144** fire on *private* records that only JSON deserialization fills; make such
+  test DTOs public nested records.
+- **NUnit test names** built with `$"…{decimal}"` use the current culture (`1,5` here); build them
+  with `string.Create(CultureInfo.InvariantCulture, …)` (S6618 refuses `FormattableString`).
+- **On this machine, Bash heredocs and inline Python lose backslashes** in what they write, and an
+  odd quote can stop a heredoc from running at all. It broke a JSON escape in VOID's cases file
+  once. Edit text with backslashes or quotes through the edit tool.
+
+### How it was checked
+
+- `dotnet build`: clean, warnings as errors. `dotnet test`: 140 specs, 101 of them new:
+  - the 29 VOID cases (prerequisites, whole XP, award table);
+  - new character, existing character, free planning;
+  - the picker, the chain, the dependants;
+  - holdings, the rule book, the XP table.
+- **The hash guard:** a space appended to the copy makes it fail; restoring the copy makes it pass.
+- **VOID:** `SkillRulesCasesTest` 29 tests, code style and static analysis green; pushed to
+  `feature/skills-requirements-api`.
+
+### Not done / next
+
+- **A teaching already on record** in VOID (a character mid-teaching, paying off) is not modelled
+  yet. It belongs with reading characters from VOID (phase 7), as a plan input "teaching of S, owed
+  N".
+- **The next-events timeline** (spreading purchases over events with the XP table and one teaching
+  per event) is built on this engine in phase 7; `XpTable.After` is ready for it.
+- **Phase 2:**
+  - the content schema, Thorfgin's text mapped to keys, the seeded `void` names;
+  - `VoidHttpClient` against `void-test`, the import dry run, publishing, *Beheer → Rulesets*;
+  - a recorded snapshot.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.core/Skills/` | `SkillKey`, `RequirementGroup`, `RequirementKind(s)`, `RuleSkill`, `EnergyGrant` |
+| `CharacterCreator.core/Plans/` | `Holdings`, `Plan`, `PlanMode` |
+| `CharacterCreator.core/Rules/` | `RuleBook`, `CreationRules`, `XpTable`, `SkillRules`, `Findings`, `PlanEvaluation` (with `SkillOption`, `PrerequisiteChain`, `EnergyTotal`), `PlanEvaluator` |
+| `CharacterCreator.test/TestHelpers/Book.cs` | a small rule book of book skills for the specs |
+| `CharacterCreator.test/Rules/` | `VoidCases_specs` (with the copied cases and their `.source`), `NewCharacter_specs`, `Existing_specs`, `Picker_specs`, `ChainAndDependants_specs`, `Building_blocks_specs` |
+| `scripts/sync-void-cases.ps1` | copies VOID's shared cases and records commit and hash |
+| VOID `tests/data/skill-rules-cases.json`, `tests/TestCase/Checkout/SkillRulesCasesTest.php` | the award cases (commit `72e705f`) |

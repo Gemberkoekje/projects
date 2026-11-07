@@ -297,7 +297,8 @@
       "charactercreator.core": {
         "type": "Project",
         "dependencies": {
-          "Qowaiv": "[8.0.0, )"
+          "Qowaiv": "[8.0.0, )",
+          "Qowaiv.Validation.Abstractions": "[2.1.0, )"
         }
       },
       "Microsoft.Extensions.Logging.Abstractions": {
@@ -314,6 +315,12 @@
         "requested": "[8.0.0, )",
         "resolved": "8.0.0",
         "contentHash": "b3h631xprvOJGqUqdRPrDb4yyd3u/WZKPmrn5nrt/pjI7M0CV7K2Hkr668Kh2pOmNHM+RNm0umA6yqkxd7WV9g=="
+      },
+      "Qowaiv.Validation.Abstractions": {
+        "type": "CentralTransitive",
+        "requested": "[2.1.0, )",
+        "resolved": "2.1.0",
+        "contentHash": "YWX9tsoLOqRX+dg3XwcSkgUUA/PxPADgbkbLFEv1gr03bI7hNMbyYrl21gu3gYodmNdB90+a/MAm0S9oDlqkEQ=="
       }
     },
     "net10.0/browser-wasm": {}

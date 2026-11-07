@@ -1,0 +1,124 @@
+{
+  "about": "The skill rules both engines must agree on: VOID's App\\Checkout\\SkillRules (tests/TestCase/Checkout/SkillRulesCasesTest.php) and the Vortex Character Creator's rules engine, which keeps a copy of this file and fails its build when the copy differs. Book skills only: void is a public repo. A requirement is {kind, amount, skills}: any = one of the skills at least amount times; points = at least amount XP spent on the skills; extra = at least amount extra skills (base_max 0). 'character' is the skills held, times by skill id. 'missing' lists the indexes of the requirements that do not hold. 'whole' is the XP that can buy a skill (SkillRules::whole); 'award' is the XP an event adds to a total (App\\Checkout\\XpAward::forTotal).",
+  "skills": [
+    {"id": 1, "name": "herb lore", "cost": 1, "base_max": 1},
+    {"id": 2, "name": "brew poison A", "cost": 2, "base_max": 1},
+    {"id": 3, "name": "elemental ritualism", "cost": 1, "base_max": 5},
+    {"id": 4, "name": "spiritual ritualism", "cost": 1, "base_max": 5},
+    {"id": 5, "name": "strength B", "cost": 3, "base_max": 0},
+    {"id": 6, "name": "healer A (elemental)", "cost": 4, "base_max": 1},
+    {"id": 7, "name": "healer A (spiritual)", "cost": 4, "base_max": 1},
+    {"id": 8, "name": "armour I", "cost": 1, "base_max": 1},
+    {"id": 9, "name": "brew expertise", "cost": 1, "base_max": 0}
+  ],
+  "missing": [
+    {
+      "case": "one skill, held",
+      "requirements": [{"kind": "any", "amount": 1, "skills": [1]}],
+      "character": {"1": 1},
+      "missing": []
+    },
+    {
+      "case": "one skill, not held",
+      "requirements": [{"kind": "any", "amount": 1, "skills": [1]}],
+      "character": {},
+      "missing": [0]
+    },
+    {
+      "case": "one of several: either will do",
+      "requirements": [{"kind": "any", "amount": 1, "skills": [6, 7]}],
+      "character": {"7": 1},
+      "missing": []
+    },
+    {
+      "case": "every group must hold: paladin with a healer A but no armour",
+      "requirements": [{"kind": "any", "amount": 1, "skills": [6, 7]}, {"kind": "any", "amount": 1, "skills": [8]}],
+      "character": {"6": 1},
+      "missing": [1]
+    },
+    {
+      "case": "a level: one of the ritualisms 3 times",
+      "requirements": [{"kind": "any", "amount": 3, "skills": [3, 4]}],
+      "character": {"4": 3},
+      "missing": []
+    },
+    {
+      "case": "a level is per skill, not a sum: 2 + 1 is not 3 times one ritualism",
+      "requirements": [{"kind": "any", "amount": 3, "skills": [3, 4]}],
+      "character": {"3": 2, "4": 1},
+      "missing": [0]
+    },
+    {
+      "case": "points: 3 XP in alchemist skills, from herb lore (1) and brew poison A (2)",
+      "requirements": [{"kind": "points", "amount": 3, "skills": [1, 2, 9]}],
+      "character": {"1": 1, "2": 1},
+      "missing": []
+    },
+    {
+      "case": "points: 1 XP is short of 3",
+      "requirements": [{"kind": "points", "amount": 3, "skills": [1, 2, 9]}],
+      "character": {"1": 1},
+      "missing": [0]
+    },
+    {
+      "case": "points count every purchase: 3 times a 1 XP skill is 3 XP",
+      "requirements": [{"kind": "points", "amount": 3, "skills": [3]}],
+      "character": {"3": 3},
+      "missing": []
+    },
+    {
+      "case": "points only count the group's skills",
+      "requirements": [{"kind": "points", "amount": 3, "skills": [1, 2]}],
+      "character": {"1": 1, "6": 1},
+      "missing": [0]
+    },
+    {
+      "case": "extra: one extra skill (base_max 0) held",
+      "requirements": [{"kind": "extra", "amount": 1, "skills": null}],
+      "character": {"5": 1, "1": 1},
+      "missing": []
+    },
+    {
+      "case": "extra: only basis skills held",
+      "requirements": [{"kind": "extra", "amount": 1, "skills": null}],
+      "character": {"1": 1, "8": 1},
+      "missing": [0]
+    },
+    {
+      "case": "extra counts skills, not purchases",
+      "requirements": [{"kind": "extra", "amount": 2, "skills": null}],
+      "character": {"5": 2},
+      "missing": [0]
+    },
+    {
+      "case": "a skill no longer in VOID never meets a group",
+      "requirements": [{"kind": "any", "amount": 1, "skills": [99]}],
+      "character": {"1": 1},
+      "missing": [0]
+    },
+    {
+      "case": "no requirements: nothing missing",
+      "requirements": [],
+      "character": {},
+      "missing": []
+    }
+  ],
+  "whole": [
+    {"xp": 3.75, "whole": 3},
+    {"xp": 4.0, "whole": 4},
+    {"xp": 3.9999, "whole": 4},
+    {"xp": 0.5, "whole": 0},
+    {"xp": 0, "whole": 0}
+  ],
+  "award": [
+    {"xp": 15, "award": 1.5},
+    {"xp": 19.75, "award": 1.5},
+    {"xp": 20, "award": 1.25},
+    {"xp": 29.75, "award": 1.25},
+    {"xp": 30, "award": 1},
+    {"xp": 40, "award": 0.75},
+    {"xp": 49.75, "award": 0.75},
+    {"xp": 50, "award": 0.5},
+    {"xp": 80, "award": 0.5}
+  ]
+}

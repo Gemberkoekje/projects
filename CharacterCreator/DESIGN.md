@@ -1,4 +1,4 @@
-# Vortex Character Creator on the Vortex stack — design (draft 4)
+# Vortex Character Creator on the Vortex stack — design (draft 5)
 
 Design phase, 2026-11-06. Nothing is built yet.
 
@@ -25,6 +25,11 @@ Design phase, 2026-11-06. Nothing is built yet.
   - VOID learns the "3 XP left over" rule as a warning that never blocks.
   - In VOID, Referee and up may change the rules.
   - SL and EC edit the text in the app, from v4. Until then it goes through GitLab.
+- **Draft 5 (Arie, 2026-11-07):**
+  - The VOID change goes to a pushed branch (`feature/skills-requirements-api`, pushed
+    2026-11-07), and to `develop` in time.
+  - **The demo talks to VOID's develop instance, `void-test`** (API
+    `https://test-void-api.the-vortex.nl/`), not to a recorded snapshot (§6, demo).
 
 §11 lists everything that was settled.
 
@@ -109,7 +114,8 @@ Design phase, 2026-11-06. Nothing is built yet.
   - the demo: a GitHub workflow builds the image, and gembernodes runs it (Kluskat's route);
   - production: a Portainer stack behind the Caddy edge, with GitLab CI.
 - **One small VOID change for v1:** `GET /skills` also returns each skill's prerequisite groups.
-  For the proof of concept it lives on a local VOID branch only.
+  It is on the pushed branch `feature/skills-requirements-api`, on its way to `develop`, whose
+  instance (`void-test`) the demo talks to.
 
 ---
 
@@ -321,8 +327,8 @@ should know it, and warn without blocking.
   This goes into the same VOID MR as §3.4.
 - **In the Character Creator:** a `Warning` finding under the XP counter ("3.5 XP left over;
   everything above 3 is lost"). It never blocks, and a push carries it along to the infobalie.
-- **Until VOID has it** (the proof of concept), the recorded snapshot holds the number by hand,
-  marked as such.
+- **Until VOID's API gives it**, the Character Creator's ruleset holds the number (3), marked as
+  such.
 
 **After creation** (CHECKOUT-DESIGN §6, as the checkout applies it):
 
@@ -353,14 +359,17 @@ The Character Creator uses these rules to look ahead, for example:
 
 - **What:** `GET /skills` and `GET /skills/{id}` also return the skill's requirement groups, as
   `requirements: [{kind, amount, skills: [ids]}]`.
-- **How:** one `contain` in `SkillsTable`, the entity's compact fields, and tests. A small MR on
-  void `develop`, opened after Thorfgin's yes.
-- **For the proof of concept** the change stays on a local VOID branch, which is never pushed.
-  - The Character Creator reads a **recorded snapshot file** through the same `IVoidClient` port.
-  - The snapshot is taken from a local VOID with that branch and the rulebook draft loaded
-    (`checkout-e2e/` shows how). Alternatively, the requirement groups can be read from live
-    once, through Arie's own login, as the rulebook's `void` names were on 2026-10-29.
-  - Only the skills the content names go into the file, because `projects` is public.
+- **How:** one `contain` in `SkillsTable`, the entity's compact fields, and tests.
+- **Where:** branch `feature/skills-requirements-api` (commit `d4ed90a`), pushed 2026-11-07, and
+  merged into `develop` in time (Arie: "eventually"). `develop` deploys to `void-test`, the instance
+  the demo talks to.
+- **Gotcha found on the way:** VOID's entities use `LazyLoadEntityTrait`, so `has()` and `get()` load
+  a missing association. The skill's `requirements` are shown only when the endpoint loaded them,
+  and the check reads the loaded fields, or every character response would gain a query per skill.
+- **Offline and in the specs**, the Character Creator reads a **recorded snapshot file** through
+  the same `IVoidClient` port (`SnapshotVoidClient`). A snapshot is recorded from `void-test` by
+  the same import. Only the skills the content names go into a committed file, because `projects`
+  is public.
 - **The same MR** also carries:
   - the "3 XP left over" warning (§3.3);
   - whatever SL and EC need in VOID's screens to keep the prerequisites right (§3.7).
@@ -369,10 +378,11 @@ The Character Creator uses these rules to look ahead, for example:
 **Waiting outside the Character Creator**, from the checkout work:
 
 1. Arie reviews `vaardigheden-2026-v07-review.md`.
-2. The draft, and the SL file, are loaded on live with `bin/cake skill_requirements --apply`.
+2. The draft, and the SL file, are loaded with `bin/cake skill_requirements --apply`: on
+   `void-test` for the demo, on live for going live.
 
-At the checkout design's last update (2026-11-01) neither was done. The proof of concept doesn't
-wait for them; going live does.
+At the checkout design's last update (2026-11-01) neither was done. The demo needs step 2 on
+`void-test` (the review can follow); going live needs both on live.
 
 ### 3.5 Keeping two engines in step
 
@@ -388,8 +398,10 @@ Proposal:
   tag it names.
 - **Book skills only**, because void is a public repo.
 
-During the proof of concept the file lives on the local VOID branch; the Character Creator's copy
-is the one that runs.
+The file is on the pushed VOID branch (`tests/data/skill-rules-cases.json`). The Character
+Creator's copy (`CharacterCreator.test/Rules/skill-rules-cases.json`) records the VOID commit it
+came from and its hash; a spec fails when the copy is edited by hand. Comparing it with VOID itself
+in CI waits for the move to GitLab, where both repos sit side by side.
 
 ### 3.6 What changes for players compared to the old builder
 
@@ -556,8 +568,9 @@ stored:
 *Publish* stores the ruleset: the content version, the VOID snapshot and the date. It is never
 changed afterwards. Anonymous visitors get the newest published ruleset.
 
-- **In the proof of concept and the demo:** there is no sign-in. The first start publishes the
-  bundled content with the recorded snapshot, and a spec shows the dry-run report.
+- **In the demo** (draft 5): an SL or EC signs in and imports from `void-test`, VOID's develop
+  instance. Until somebody has, the first start publishes the bundled content with a recorded
+  snapshot, so the build screen is never empty.
 - **From phase 7:** an SL or EC opens *Rulesets*, picks the content version and imports from live
   VOID with their own token.
 
@@ -697,8 +710,11 @@ CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shar
 - For the import: `GET /skills` and `GET /manatypes`.
 - For v2: `PUT /players/{plin}/characters`, then `/characters/{plin}/{chin}/skills[/{id}]` with
   `PUT` or `DELETE`.
-- **In the proof of concept and the demo**, `SnapshotVoidClient` (the recorded file) stands in for
-  `VoidHttpClient`. No VOID is needed.
+- **The demo calls `void-test`** (`Void:BaseUrl` = `https://test-void-api.the-vortex.nl/`), VOID's
+  develop instance. It trusts the same Keycloak realm as live (VoidWalker-test signs in with
+  `vortex-spa` on `auth.the-vortex.nl/realms/vortex`), so a real ERU token works there.
+- **Offline and in the specs**, `SnapshotVoidClient` (a recorded file) stands in for
+  `VoidHttpClient`.
 - **No CORS involved.** CORS is a browser rule; these are server-to-server calls.
   - Reachability checked 2026-11-06: a throwaway pod on gembernodes got `401` from
     `https://void-api.the-vortex.nl/skills` (no token, as expected) in 0.1 s.
@@ -712,8 +728,11 @@ CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shar
   - It needs the audience mapper that puts `vortex-api` in the token, because VOID checks `aud`.
   - Redirect URIs for builder.the-vortex.nl.
 - **Local development:** `vortex-dev`, as the other tools use. Only developers may use it, it is
-  public with PKCE, and it takes localhost redirects only. So the gembernodes demo has no sign-in,
-  and no realm change is needed before go-live.
+  public with PKCE, and it takes localhost redirects only.
+- **The demo** needs a client that accepts `https://charactercreator.gemberkoekje.nl/signin-oidc`
+  (and `/signout-callback-oidc`), with the `vortex-api` audience. Either add those redirect URIs
+  to `vortex-dev` (developers only, which suits a demo), or create the production client early and
+  give it both hosts. That is a realm change for Arie; until then the demo runs anonymous only.
 
 **Marten:**
 
@@ -738,7 +757,7 @@ CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shar
 environment):
 
 - `ConnectionStrings:Postgres`;
-- `Void:BaseUrl`, or `Void:SnapshotFile` for the proof of concept;
+- `Void:BaseUrl` (the demo: `https://test-void-api.the-vortex.nl/`), or `Void:SnapshotFile` offline;
 - `Keycloak:Issuer`, `Keycloak:ClientId`, `Keycloak:ClientSecret`;
 - `CharacterCreator:PublicBaseUrl`.
 
@@ -753,7 +772,10 @@ environment):
   - Every deploy is an image-tag bump in a gembernodes PR.
 - **Database:** the cluster's shared PostgreSQL. Arie creates the role and database
   `charactercreator`, and the 1Password item `charactercreator-secrets` (vault `Gembercluster`)
-  with one field, `ConnectionStrings__Postgres`.
+  with `ConnectionStrings__Postgres`, plus `Keycloak__ClientSecret` if the demo's client is
+  confidential.
+- **VOID:** `Void__BaseUrl=https://test-void-api.the-vortex.nl/`, and the Keycloak settings once
+  the demo's client exists.
 - **One pod.** The image runs as non-root, with `/healthz` for the probes.
 
 **Production** (after the move to GitLab):
@@ -873,7 +895,8 @@ Questions for v3's design pass:
   - From v4 the same policy also covers *Beheer → Content*.
 - **No PLIN.** A player without a PLIN can sign in, but gets only the anonymous features, plus a
   line explaining why.
-- **The demo has no sign-in at all** (§6, Keycloak).
+- **The demo** runs anonymous only until it has a Keycloak client of its own (§6, Keycloak). With
+  one, an SL or EC signs in there to import from `void-test`.
 
 ---
 
@@ -901,32 +924,34 @@ start by reading…*.
 
 ### The proof of concept
 
-Phases 0–4 happen in `projects` (worktree `C:\git\projects-charactercreator`, branch
-`claude/charactercreator`). They touch nothing of Vortex's:
+Phases 0–5 happen in `projects` (worktree `C:\git\projects-charactercreator`, branch
+`claude/charactercreator`). Of Vortex's they touch only:
 
-- no GitLab project;
-- no pushed VOID branch;
-- no Keycloak change.
+- the pushed VOID branch, on its way to `develop`;
+- `void-test`, which the demo reads from;
+- the demo's Keycloak redirect (Arie).
 
-The app runs anonymously on the recorded VOID snapshot.
+There is no Character Creator GitLab project yet.
 
-0. **Scaffold.**
+0. **Scaffold.** *Done 2026-11-07.*
    - `CharacterCreator/`, with Kluskat's build props and layers, and the WebAssembly client
      project.
    - Guild Hall vendored, the crest bar shell.
    - OIDC wired but gated on configuration, so it is off without settings.
    - The GitHub workflow, the Dockerfile and docker-compose.
-   - In a local void branch: the `GET /skills` requirements change (§3.4) and the shared cases file
-     (§3.5).
-1. **Engine.**
+   - In VOID: the `GET /skills` requirements change (§3.4) and the shared cases file (§3.5), on
+     `feature/skills-requirements-api`.
+1. **Engine.** *Done 2026-11-07.*
    - The model, prerequisites, creation and growth rules, findings (problems and warnings), the
      XP table.
    - Specs and the VOID cases. No UI.
-2. **Content and rulesets.**
+2. **Content, rulesets and VOID.**
    - The content schema, and Thorfgin's text mapped to keys.
    - The seeded `void` names.
-   - The recorded snapshot (book skills only).
-   - The import dry run, and publishing the bundled ruleset at first start.
+   - `VoidHttpClient`, the import dry run, publishing, and *Beheer → Rulesets* for a signed-in SL
+     or EC. This comes forward from phase 7, because the demo imports from `void-test`.
+   - A recorded snapshot (book skills only) for the specs, for offline work and for the first
+     start.
    - The ruleset API.
 3. **Build screen.**
    - Picker, the chosen-skills table, reasons, add with chain, remove with dependants.
@@ -936,7 +961,11 @@ The app runs anonymously on the recorded VOID snapshot.
 4. **Print**: the PDF.
 5. **Demo on gembernodes.**
    - Arie creates the database role and the 1Password item.
+   - Arie gives the demo host a Keycloak redirect (§6, Keycloak).
+   - VOID: the branch merged into `develop`, `void-test` running `develop`'s image, and the
+     rulebook draft loaded there (`bin/cake skill_requirements --apply`).
    - The gembernodes manifests and the ingress, then an image-tag PR.
+   - Sign in, import from `void-test`, publish.
    - Show Thorfgin at `charactercreator.gemberkoekje.nl`.
 
 ### After Thorfgin's yes
@@ -946,13 +975,12 @@ The app runs anonymously on the recorded VOID snapshot.
      (`git subtree split`).
    - Swap the GitHub workflow for GitLab CI.
    - Remove the folder from `projects` and the app from gembernodes.
-   - Open the void MR, which carries:
-     - prerequisites on `GET /skills` (§3.4) and the cases file in void's tests (§3.5);
+   - The rest of the VOID work, next to the requirements change already on `develop`:
      - the "3 XP left over" warning (§3.3);
-     - SL/EC seeing the rules, and Referee and up changing them (§3.7, verdict items 1 and 2).
-7. **Signed in** (read only):
-   - my characters, plans on the server, *next events*, the envelope list;
-   - *Beheer → Rulesets*: import from live VOID and publish.
+     - SL/EC seeing the rules, and Referee and up changing them (§3.7, verdict items 1 and 2);
+     - the cases-file comparison in CI (§3.5).
+7. **Signed in** (read only): my characters, plans on the server, *next events*, the envelope
+   list.
 8. **Go-live v1.**
    - SL and EC have done §3.7's steps 1–6: the rules are reviewed and loaded on live, and the
      text is at the 2026 book.
@@ -995,6 +1023,15 @@ Later, not in this design:
    publishing. He leans against it, because EC wants to delegate these changes.
 3. **Dependency:** the review of the 2026 V07 draft, and loading it (and the SL file) on live
    (§3.7, steps 1–3). Going live waits for it.
+4. **Does `void-test` run `develop`'s image yet?** void's `deploy/README.md` says both stacks
+   still run the old `eru_integration` image "until you deploy them deliberately" (*Cutting a
+   stack over, not done yet*). It may be out of date; if it isn't, merging into `develop` won't
+   reach the demo.
+5. **Who loads the rulebook draft on `void-test`**, from a shell in its container
+   (`bin/cake skill_requirements`, dry run first)?
+6. **The demo's Keycloak redirect:** on `vortex-dev`, or the production client created early
+   (§6, Keycloak)?
+7. **When to open the VOID MR** for `feature/skills-requirements-api`: now, or with the demo?
 
 ### Settled
 
@@ -1024,6 +1061,9 @@ Later, not in this design:
     discussion (§3.7, verdict item 2).
   - Editing the text is **not a developer's job**. SL and EC edit it in the app from v4; until
     then it goes through GitLab (§3.7, step 6).
+- **Draft 5 (Arie, 2026-11-07):**
+  - The VOID change goes to a pushed branch, and to `develop` in time.
+  - The demo talks to `develop`'s instance, `void-test`, instead of a recorded snapshot.
 
 ---
 
