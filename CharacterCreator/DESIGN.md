@@ -337,6 +337,17 @@ should know it, and warn without blocking.
 - **Until VOID's API gives it**, the Character Creator's ruleset holds the number (3), marked as
   such.
 
+*As built in phase 5* (VOID branch `feature/skills-requirements-api`, `CHARACTER-CREATOR-NOTES.md`
+there):
+
+- **The constants:** `SkillRules::MAX_LEFT_OVER` (3) and `SkillRules::CONCEPT_XP` (15, also a new
+  character's default XP).
+- **The warning:** a concept character with more left over gets `warnings.left_over` on
+  `GET /characters/{plin}/{chin}`. It is a warning, never a refusal.
+- **The import:** `GET /skills` returns `creation: {start_xp, max_left_over}` beside the list.
+  The import reads it into the published ruleset; the dry run says whether VOID gave it.
+- **Not yet:** VoidWalker doesn't show the warning; that is a VoidWalker merge request of its own.
+
 **After creation** (CHECKOUT-DESIGN §6, as the checkout applies it):
 
 - **Whole XP only.** Quarter and half points stay saved.
@@ -497,6 +508,15 @@ only by Super. For SL and EC to own the rules, VOID needs, in order of importanc
 4. **Show who changed what:** a history block on the skill's edit page.
 
 1 and 2 are small, and belong in the §3.4 MR. 3 and 4 can follow.
+
+*As built in phase 5* (same VOID branch):
+
+- **1:** `/admin/skills` (Read-only and up) is the overview: maxima as creation / total with
+  extra skills marked, and every prerequisite in words.
+- **2:** Referee and up edit the rule fields and the prerequisites.
+  - A skill's name, sort order and blanks stay Super only: shown disabled, and dropped from
+    what others save.
+  - Adding and deleting skills, and the API's `PUT /skills`, stay Super only.
 
 #### What SL and EC need to do for the 2026 book
 

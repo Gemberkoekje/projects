@@ -768,3 +768,96 @@ _To understand this, start by reading `DESIGN.md` §5 (Print, "as built in phase
 | `Directory.Packages.props` | PDFsharp-MigraDoc 6.2.4 and the Pkcs pin |
 | `docker-compose.yml`, `.env.example` | `VOID_BASE_URL` |
 | `CharacterCreator.test/Printing/`, `Web/Sheet_specs.cs` | the specs |
+
+---
+
+## Phase 5a — the VOID work and the demo, ready to ship (2026-11-07)
+
+_To understand this, start by reading `CHARACTER-CREATOR-NOTES.md` in the VOID worktree
+(`C:\git\gitlabs\void-charactercreator`), then DESIGN.md §3.3 and §3.7 ("as built in phase 5"), then
+`apps/charactercreator/README.md` in the gembernodes worktree (`C:\git\gembernodes-charactercreator`)._
+
+Phase 5 is split: 5a is everything that can be done without pushing, 5b the pushes, Arie's steps
+and the live demo.
+
+### What it does
+
+- **VOID** (branch `feature/skills-requirements-api`, three new local commits on top of the two
+  pushed ones):
+  - **the 3-XP rule:** a concept character with more than 3 XP left over gets
+    `warnings.left_over` (a warning, never a refusal), and `GET /skills` gives
+    `creation: {start_xp: 15, max_left_over: 3}`;
+  - **SL and EC keep the rules:**
+    - `/admin/skills` is the overview, with extra skills marked and every prerequisite in words;
+    - Referee and up edit the rule fields and prerequisites;
+    - name, sort order and blanks, adding, deleting and the API stay Super only;
+  - the branch's notes file.
+- **The Character Creator** reads `creation` at import (`VoidSnapshot.Creation`,
+  `CreationFromVoid`). It publishes VOID's numbers instead of assuming 15 and 3, and the dry run
+  says where they came from. The offline snapshot states them too.
+- **gembernodes** (branch `claude/charactercreator-demo`, one local commit):
+  - the namespace, the `charactercreator-secrets` 1Password item, one pod (Recreate), the service,
+    and the nginx-public ingress with cert-manager for `charactercreator.gemberkoekje.nl`;
+  - sign-in through `vortex-dev`, VOID at `void-test`;
+  - a README with the database role, the 1Password item and the Keycloak redirect URIs;
+  - the image tag is `PENDING-FIRST-BUILD` until `projects` main has built one.
+
+### Decisions
+
+1. **Nothing pushed yet:** not VOID, not `projects`, not gembernodes. Each costs CI or publishes
+   something, so each waits for Arie's go.
+2. **The creation rules ride on `GET /skills`** rather than a new endpoint: the import already
+   calls it.
+3. **The admin page only:** `PUT /skills` in the API stays Super, as the decision was about the
+   screen.
+4. **VoidWalker doesn't show the warning yet:** that is its own repository and MR, outside "VOID,
+   once".
+5. **The demo pod gets `ghcr-login` from Reflector**, which copies it into every namespace, so the
+   app declares none.
+
+### Gotchas
+
+- **VOID fixtures:** a test that adds `SkillRequirements` rows must declare that fixture, or the rows
+  leak into the next class. `CheckoutSkillsTest` passed alone and failed in the full run.
+- **`run-tests.sh` passes its arguments through `bash -c`:** a `--filter "A|B"` becomes a pipe.
+- **The image is only built from `projects` main** (`if: github.ref == 'refs/heads/main'`). So the
+  demo needs the Character Creator merged into the public `projects` main, as Kluskat was.
+- **The main gembernodes checkout was on another session's branch** (`claude/zeef-…`); the demo is
+  in a worktree of its own.
+
+### How it was checked
+
+- **VOID:** `./run-tests.sh` passes all four stages: code style, PHPStan, phpunit (769 tests, 12
+  new) and printing (26). The branch is 5 ahead of `develop`, 0 behind, and merges cleanly.
+- **Character Creator:** 309 specs (6 new: parsing `creation`, the client's flag, the builder
+  publishing VOID's numbers, the offline snapshot).
+- **gembernodes:** `kubectl kustomize` builds `apps/charactercreator`, `ingress` and `namespaces`.
+
+### Phase 5b: what remains, in order
+
+1. **VOID:** push `feature/skills-requirements-api` once, and open one MR into `develop`. Then Arie
+   refreshes `void-test` in Portainer and loads the draft there (`bin/cake skill_requirements`, dry
+   run, then `--apply`).
+2. **`projects`:** push `claude/charactercreator` and merge it into main (PR), so "Build and Push
+   CharacterCreator" builds the image.
+3. **Arie, for the demo:**
+   - the database role and the `charactercreator-secrets` 1Password item (README steps 1 and 2);
+   - the `vortex-dev` redirect URIs (step 3).
+4. **gembernodes:** fill in the image sha, push `claude/charactercreator-demo`, open the PR and
+   merge it. Then check the pod, the certificate and the seed.
+5. **On the demo:** sign in as an SL or EC, run the dry run against `void-test`, publish, and show
+   Thorfgin.
+
+### File map
+
+| Path | What |
+|---|---|
+| VOID `src/Checkout/SkillRules.php`, `src/Model/Entity/Character.php` | the 3-XP constant and warning |
+| VOID `src/Controller/SkillsController.php`, `src/View/ApiView.php` | `creation` beside the list |
+| VOID `src/Policy/…/SkillsControllerPolicy.php`, `src/Policy/Entity/SkillPolicy.php` | Referee and up; Super-only fields |
+| VOID `src/Controller/Admin/SkillsController.php`, `templates/Admin/Skills/*` | overview and edit |
+| VOID `tests/ApiTest/Admin/SkillRulesTest.php` and adjusted tests | the specs |
+| VOID `CHARACTER-CREATOR-NOTES.md` | the branch's notes |
+| `CharacterCreator.application/Void/VoidSnapshot.cs`, `Rulesets/RulesetBuilder.cs`, `ImportReport.cs` | creation rules from VOID |
+| `CharacterCreator.infrastructure/Void/*`, `Content/2026-v07/void-snapshot.json` | reading them |
+| gembernodes `apps/charactercreator/`, `ingress/charactercreator-ingress.yaml`, `namespaces/charactercreator-namespace.yaml` | the demo |
