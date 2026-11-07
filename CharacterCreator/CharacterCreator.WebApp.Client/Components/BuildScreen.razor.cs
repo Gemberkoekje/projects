@@ -53,6 +53,7 @@ public sealed partial class BuildScreen
     private bool toastExpired;
     private bool focusQuestion;
     private SkillKey restoreRow;
+    private IReadOnlySet<SkillKey> fresh = new HashSet<SkillKey>();
 
     private bool MadeOnAnotherRuleset => madeOn.Length > 0 && madeOn != data.Ruleset.Id;
 
@@ -109,6 +110,7 @@ public sealed partial class BuildScreen
     /// <summary>A change to the plan: evaluate it, and keep it in the browser.</summary>
     private async Task ChangeAsync(Plan next)
     {
+        fresh = new HashSet<SkillKey>();
         plan = next;
         madeOn = data.Ruleset.Id;
         pending = Removal.None;
@@ -145,6 +147,7 @@ public sealed partial class BuildScreen
     {
         var before = Snapshot();
         await ChangeAsync(plan with { Planned = plan.Planned.Plus(purchases) });
+        fresh = purchases.Skills.ToHashSet();
         var cost = Ui.Number(SkillRules.Spent(purchases, data.Rules));
         var text = purchases.Skills.Count == 1
             ? Ui.T($"{words.Name(purchases.Skills[0])} toegevoegd · {cost} XP", $"Added {words.Name(purchases.Skills[0])} · {cost} XP")
@@ -384,6 +387,48 @@ public sealed partial class BuildScreen
 
     /// <summary>"Zelf kiezen": to the picker's search box.</summary>
     private async Task ToTheListAsync() => await Browser.ShowAndFocusAsync("#cc-search");
+
+    private async Task PrintFromMenuAsync()
+    {
+        CloseMenus();
+        await PrintAsync();
+    }
+
+    /// <summary>
+    /// The XP bar's status jumps to the first thing that isn't right (UX-REVIEW.md P1): the skill's row
+    /// in the chosen table, or the plan's general notes in the head.
+    /// </summary>
+    private async Task JumpToProblemAsync()
+    {
+        var first = FindingWords.Open(evaluation).FirstOrDefault();
+        if (first is null)
+        {
+            return;
+        }
+
+        var target = first.Skill.IsEmpty ? "#cc-general" : $"#cc-chosen-{first.Skill}";
+        await Browser.ShowAndFocusAsync(target, "#cc-general", ".cc-chosen");
+    }
+
+    /// <summary>The kind of plan, for the XP bar.</summary>
+    private string ModeName() => plan.Mode switch
+    {
+        PlanMode.NewCharacter => Ui.T("nieuw personage", "new character"),
+        PlanMode.Free => Ui.T("vrij plannen", "free planning"),
+        _ => Ui.T("bestaand personage", "existing character"),
+    };
+
+    /// <summary>An amount of XP as a share of the plan's total, for the budget track's CSS.</summary>
+    private string Percent(decimal xp)
+    {
+        var share = Math.Clamp(xp, 0m, 1m);
+        if (evaluation.Xp > 0)
+        {
+            share = Math.Clamp(xp / evaluation.Xp, 0m, 1m);
+        }
+
+        return (share * 100m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    }
 
     private void KeepMyPlan()
     {

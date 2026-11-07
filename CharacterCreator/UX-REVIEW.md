@@ -8,13 +8,12 @@ _To understand this, start with §0 (the short version), then §3 (the proposals
 (the laws) where a proposal's reasoning matters._
 
 **Status:**
-- **Batches 1 (P3, P4, P9, P11) and 2 (P5, P7) are built.** NOTES.md, "UX batch 1" and "UX batch
-  2", has what was built and where it departs from the proposals.
-- **Left from P4 and P11** until P1/P2 give them a place:
-  - P4: the XP bar's motion and the new row's flash;
-  - P11: the folding phone head and the short names (which need an SL/EC check).
-- **Next:** batch 3 (P1, the sticky XP bar). The bar is already in the head, with Opslaan and
-  Afdrukken.
+- **Batches 1 (P3, P4, P9, P11), 2 (P5, P7) and 3 (P1) are built.** NOTES.md ("UX batch 1", "2"
+  and "3") has what was built and where it departs from the proposals. P4's motion came with P1.
+- **Left from P11:**
+  - the folding phone head, with P2;
+  - the short names, which need an SL/EC check.
+- **Next:** batch 4 (P2 "Jouw personage" beside the picker and phone tabs, P6 the checklist).
 
 ---
 

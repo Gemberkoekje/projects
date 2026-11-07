@@ -95,6 +95,49 @@ public sealed class FindingWords(Ui ui, ContentBook content)
             : string.Join("; ", option.Reasons.Select(Describe).Distinct());
     }
 
+    /// <summary>The findings that still ask something of the player: problems and warnings, problems first.</summary>
+    /// <param name="evaluation">What the engine made of the plan.</param>
+    /// <returns>Those findings, in the engine's order.</returns>
+    public static IReadOnlyList<Finding> Open(PlanEvaluation evaluation)
+    {
+        ArgumentNullException.ThrowIfNull(evaluation);
+        return [.. evaluation.Findings.Where(finding => finding.Severity >= FindingSeverity.Warning)];
+    }
+
+    /// <summary>The plan's status in one phrase, for the XP bar (UX-REVIEW.md P1).</summary>
+    /// <param name="evaluation">What the engine made of the plan.</param>
+    /// <returns>"Alles klopt", or how many things don't yet.</returns>
+    public string Verdict(PlanEvaluation evaluation) => Open(evaluation).Count switch
+    {
+        0 => ui.T("Alles klopt", "All in order"),
+        1 => ui.T("1 ding klopt nog niet", "1 thing isn't right yet"),
+        var open => ui.T($"{open} dingen kloppen nog niet", $"{open} things aren't right yet"),
+    };
+
+    /// <summary>The XP spent out of the total, for the XP bar: "13 / 15 XP".</summary>
+    /// <param name="evaluation">What the engine made of the plan.</param>
+    /// <returns>The words.</returns>
+    public string BudgetSpent(PlanEvaluation evaluation)
+    {
+        ArgumentNullException.ThrowIfNull(evaluation);
+        return $"{ui.Number(evaluation.Spent)} / {ui.Number(evaluation.Xp)} XP";
+    }
+
+    /// <summary>What is left, for the XP bar: "nog 2 over", "alles besteed" or "1 te veel".</summary>
+    /// <param name="evaluation">What the engine made of the plan.</param>
+    /// <returns>The words.</returns>
+    public string BudgetLeft(PlanEvaluation evaluation)
+    {
+        ArgumentNullException.ThrowIfNull(evaluation);
+        var left = evaluation.Remaining;
+        return left switch
+        {
+            < 0 => ui.T($"{ui.Number(-left)} te veel", $"{ui.Number(-left)} too many"),
+            0 => ui.T("alles besteed", "all spent"),
+            _ => ui.T($"nog {ui.Number(left)} over", $"{ui.Number(left)} left"),
+        };
+    }
+
     /// <summary>
     /// The picker's status pill (UX-REVIEW.md P3): the one reason that matters most, in few words.
     /// Nothing for a skill that can simply be bought: its add button says so already.

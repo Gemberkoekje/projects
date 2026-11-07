@@ -764,6 +764,21 @@ The footer is the portal's.
 - **Undo everywhere a plan is replaced:** starting from a preset, opening a saved plan, importing.
   The old builder's import keeps its banner, which explains what changed.
 
+*As built after the UX review, batch 3 (P1):*
+
+- **The XP bar** stays in view: sticky at the top on a wide screen, and docked at the bottom on a
+  phone (56 px). It holds:
+  - the plan's name and kind;
+  - a budget track. For a new character, the "at most 3 left over" zone is hatched, with a tick
+    where it starts;
+  - "13 / 15 XP · nog 2 over";
+  - the status in one phrase: "✓ Alles klopt", or "⚠ 2 dingen kloppen nog niet ›", which jumps to
+    the first: the skill's row in the chosen table, or the general notes;
+  - *Opslaan*, *Afdrukken* and *⋯ Meer*. On a phone *Afdrukken* moves into *Meer*.
+- **The head** keeps the name, *Mijn plannen*, the kind of plan and the provisional badge.
+- **A row just added** flashes once in the chosen table, and the budget moves in 150 ms. Both stay
+  still under `prefers-reduced-motion`.
+
 **Voorbeelden / Presets**: the presets as cards, with archetype, text and skills, and *start from
 this*. As built: *start from this* opens the build screen with `?voorbeeld={key}`, which asks
 first when the current plan has skills. After the UX review the cards are compact:

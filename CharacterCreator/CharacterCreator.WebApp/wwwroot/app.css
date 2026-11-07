@@ -530,13 +530,129 @@ fieldset.cc-field {
     min-width: 0;
 }
 
-.cc-build-bar {
+/* The XP bar (UX-REVIEW.md P1): sticky under the page's top on a wide screen, docked at the bottom
+   on a phone. Outside the head card, so it can stick across the whole build screen. */
+.cc-xpbar {
+    position: sticky;
+    top: 0;
+    z-index: 15;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--s-3) var(--s-5);
-    padding-top: var(--s-4);
-    border-top: var(--bd-hair);
+    gap: var(--s-2) var(--s-5);
+    margin-bottom: var(--s-5);
+    padding: var(--s-2) var(--s-3) var(--s-2) var(--s-5);
+    background: var(--paper-raised);
+    border: var(--bd-hair);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-md);
+}
+
+.cc-xpbar-id {
+    display: grid;
+    min-width: 0;
+    max-width: 15rem;
+    line-height: 1.25;
+}
+
+.cc-xpbar-id strong {
+    overflow: hidden;
+    font-family: var(--f-display);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cc-budget {
+    flex: 1 1 240px;
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+
+.cc-budget-track {
+    position: relative;
+    height: 12px;
+    overflow: hidden;
+    background: var(--paper-sunken);
+    border: var(--bd-hair);
+    border-radius: var(--r-seal);
+}
+
+.cc-budget-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--va-action);
+    border-radius: inherit;
+    transition: width 150ms ease-out;
+}
+
+/* Where a new character should end: the last few XP, hatched under the fill, so it shows the
+   distance still to go; a tick on top marks where it begins. */
+.cc-budget-zone {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--success) 45%, transparent) 0 3px, transparent 3px 7px);
+}
+
+.cc-budget-mark {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--ink);
+}
+
+.cc-xpbar.is-over .cc-budget-fill {
+    background: var(--error-fill);
+}
+
+.cc-budget-text {
+    font-size: 14px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.cc-budget-text strong {
+    color: var(--ink);
+}
+
+.cc-xpbar.is-over .cc-budget-text,
+.cc-xpbar.is-over .cc-budget-text strong {
+    color: var(--error);
+}
+
+/* The status: "✓ Alles klopt", or a button to the first thing that isn't right. */
+.cc-verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    font: 600 15px var(--f-text);
+}
+
+.cc-verdict.is-ok {
+    color: var(--success);
+}
+
+.cc-verdict.is-open {
+    padding: 0 var(--s-3);
+    color: var(--notice-ink);
+    background: var(--notice-bg);
+    border: 1px solid var(--notice-border);
+    border-radius: var(--r-md);
+    cursor: pointer;
+}
+
+.cc-verdict.is-open:hover {
+    border-color: var(--notice-ink);
+}
+
+.cc-verdict-count {
+    display: none;
 }
 
 .cc-bar-actions {
@@ -545,6 +661,92 @@ fieldset.cc-field {
     align-items: center;
     gap: var(--s-2);
     margin-left: auto;
+}
+
+.cc-phone-only {
+    display: none !important;
+}
+
+/* Where the jump lands: a row of the chosen table, or the general notes. */
+.cc-chosen tr:focus,
+.cc-general:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--va-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cc-budget-fill {
+        transition: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .cc-xpbar {
+        position: fixed;
+        inset: auto 0 0;
+        z-index: 40;
+        flex-wrap: nowrap;
+        gap: var(--s-2);
+        min-height: 56px;
+        margin: 0;
+        padding: var(--s-1) var(--s-3) calc(var(--s-1) + env(safe-area-inset-bottom)) var(--s-4);
+        border-width: 1px 0 0;
+        border-radius: 0;
+    }
+
+    .cc-xpbar-id,
+    .cc-budget-left,
+    .cc-wide-only {
+        display: none !important;
+    }
+
+    .cc-phone-only {
+        display: flex !important;
+    }
+
+    .cc-budget {
+        flex: 1 1 auto;
+    }
+
+    .cc-verdict {
+        justify-content: center;
+        min-width: 44px;
+        padding: 0 var(--s-2);
+    }
+
+    .cc-verdict-words {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .cc-verdict-count {
+        display: inline;
+    }
+
+    .cc-bar-actions {
+        flex-wrap: nowrap;
+        margin-left: 0;
+    }
+
+    .cc-xpbar .cc-menu-panel {
+        top: auto;
+        bottom: calc(100% + var(--s-2));
+    }
+
+    /* Room at the foot of the page for the docked bar (the toasts sit above it: see the dock). */
+    body:has(.cc-xpbar) {
+        padding-bottom: 64px;
+    }
+}
+
+@media print {
+    .cc-xpbar {
+        display: none;
+    }
 }
 
 /* "Voorlopige regels ⓘ": the explanation folds open beneath it. */
@@ -597,10 +799,11 @@ fieldset.cc-field {
     position: relative;
 }
 
+/* Under the XP bar (15), whose own menu would otherwise sit beneath it; above everything else. */
 .cc-menu-scrim {
     position: fixed;
     inset: 0;
-    z-index: 20;
+    z-index: 14;
 }
 
 .cc-menu-panel {
@@ -700,34 +903,6 @@ button.cc-chip {
 
 .cc-field--events .ctl {
     width: 110px;
-}
-
-.cc-xp {
-    display: flex;
-    gap: var(--s-5);
-    margin: 0;
-}
-
-.cc-xp div {
-    text-align: left;
-}
-
-.cc-xp dt {
-    font-family: var(--f-mono);
-    font-size: 11px;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-}
-
-.cc-xp dd {
-    margin: 0;
-    font: 700 26px/1.1 var(--f-display);
-    font-variant-numeric: tabular-nums;
-}
-
-.cc-xp .is-negative dd {
-    color: var(--error);
 }
 
 .cc-general {
@@ -1121,6 +1296,23 @@ button.cc-chip {
     display: block;
 }
 
+/* A row just added flashes once (UX-REVIEW.md P4). */
+.cc-chosen tr.is-new td {
+    animation: cc-flash 1.2s ease-out;
+}
+
+@keyframes cc-flash {
+    from {
+        background: var(--va-action-tint);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cc-chosen tr.is-new td {
+        animation: none;
+    }
+}
+
 @media (max-width: 640px) {
     .cc-chosen .cc-table thead {
         display: none;
@@ -1296,6 +1488,13 @@ button.cc-chip {
 .cc-dock > *,
 .cc-dock-live > * {
     pointer-events: auto;
+}
+
+/* On a phone the XP bar is docked at the bottom; the toasts sit above it. */
+@media (max-width: 640px) {
+    .cc-dock {
+        bottom: calc(64px + var(--s-3) + env(safe-area-inset-bottom));
+    }
 }
 
 .cc-toast {

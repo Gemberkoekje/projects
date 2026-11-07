@@ -1088,3 +1088,95 @@ Batch 3: P1. Make the head's bar sticky:
   sits above it;
 - a budget line with the ≤3 XP zone marked;
 - a status line that jumps to the first problem.
+
+---
+
+## UX batch 3 — the sticky XP bar (2026-11-07)
+
+_To understand this, start by reading `UX-REVIEW.md` P1, then the `cc-xpbar` block in
+`CharacterCreator.WebApp.Client/Components/BuildScreen.razor` and its CSS in `app.css` ("The XP
+bar")._
+
+Local on `claude/charactercreator`, after batch 2. Nothing is pushed.
+
+### What it does
+
+- **The XP bar** is its own element under the head card:
+  - sticky at the top on a wide screen: one row of 54 px at 1280, two rows of 102 px at 768;
+  - docked at the bottom on a phone (56 px).
+- **What the bar holds:**
+  - the plan's name and kind (wide screens only);
+  - a budget track, filled to the XP spent and red past the total. For a new character, the last
+    3 XP (`Creation.MaxLeftOver`) are hatched under the fill, with a dark tick where that zone
+    begins: it shows the distance still to go, and the tick still shows once the fill covers it.
+    A tooltip says the rule in words;
+  - "13 / 15 XP · nog 2 over" (`FindingWords.BudgetSpent` / `BudgetLeft`); a phone shows only the
+    numbers;
+  - the status (`FindingWords.Verdict`, over `FindingWords.Open` = problems and warnings):
+    - "✓ Alles klopt";
+    - or a button "⚠ n dingen kloppen nog niet ›". It scrolls to and focuses the first one: the
+      skill's row in the chosen table (`#cc-chosen-{key}`, `tabindex=-1`), or the general notes
+      (`#cc-general`);
+    - a phone shows "⚠ n ›", with the words kept for screen readers;
+  - *Opslaan*, *Afdrukken*, *⋯ Meer*. On a phone *Afdrukken* moves into *Meer*, which opens
+    upward.
+- **The head** keeps the name, *Mijn plannen*, the kind of plan and the provisional badge. The
+  counters are gone from it.
+- **Motion (P4's leftovers):**
+  - the fill moves in 150 ms;
+  - a row just added flashes once in the chosen table (`ChosenSkills.Fresh`);
+  - neither moves under `prefers-reduced-motion`.
+
+### Decisions
+
+1. **The badge stays in the head, not in the bar:** it informs and doesn't act, so it needn't
+   scroll along. That keeps a phone's bar to the essentials.
+2. **No "Mijn personage" button on the phone bar yet:** that opens P2's tab, which doesn't exist.
+   For now *Opslaan* and *⋯ Meer* fill that place; P2 can move them into its tab.
+3. **"Things" are findings:** two missing prerequisites on one skill count as two. That's simple
+   and honest. Information (needs a teacher) doesn't count.
+4. **The ≤3 zone only for a new character:** the engine raises `TooMuchLeftOver` only there.
+
+### Gotchas
+
+- **`position: sticky` sticks within its parent.** Inside the head card the bar would leave with
+  the card, so it is a sibling of the head, a child of `.cc-build`.
+- **A positioned bar with a z-index is a stacking context.** The menu scrim (formerly z 20) sat
+  above the bar's own *Meer* menu and swallowed its clicks. The scrim is now z 14, under the bar
+  (15).
+- **A media query earlier in the file loses to a plain rule later in it:** the phone offset for the
+  toasts had to move into the dock's section. Until then the toast covered the docked bar.
+- **The ≤3 hatch is invisible over the crimson fill,** hence the hatch under the fill plus a tick
+  on top.
+- **The first `navigate` right after `preview_start` often fails** ("denied or failed"): the server
+  isn't listening yet. Navigate again.
+
+### How it was checked
+
+- **Specs:** 343 green, 6 new: the verdict counts problems and warnings but not information,
+  problems come first, the budget's words in both languages. Release publish clean.
+- **In the browser:**
+  - 1280×900: one row, `top: 0` after scrolling; removing Paladijnspreuken A gives "11 / 15 XP · nog 4 over", the hatched zone ahead, and "⚠ 1 ding klopt nog niet ›", which focuses the "4 XP over" note;
+  - adding Magiërspreuken B anyway: the status jumps to its row in the chosen table, which flashes;
+  - 375×812: docked at 756–812, *Meer* opens upward with *Afdrukken*, the toast clears the bar (740 against 756), the footer isn't covered;
+  - 768×1024: sticky, two rows;
+  - nothing scrolls sideways at any of the three sizes.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.WebApp.Client/Components/BuildScreen.razor` | the bar; the badge moved into the head |
+| `CharacterCreator.WebApp.Client/Components/BuildScreen.razor.cs` | `JumpToProblemAsync`, `Percent`, `ModeName`, `PrintFromMenuAsync`, `fresh` |
+| `CharacterCreator.WebApp.Client/Components/ChosenSkills.razor` | row ids for the jump, `Fresh` for the flash |
+| `CharacterCreator.WebApp.Client/Words/FindingWords.cs` | `Open`, `Verdict`, `BudgetSpent`, `BudgetLeft` |
+| `CharacterCreator.WebApp/wwwroot/app.css` | the bar, track, zone, tick, verdict, phone dock, flash; the counters' rules removed |
+| `CharacterCreator.test/Words/FindingWords_specs.cs` | the specs |
+| `UX-REVIEW.md`, `DESIGN.md` §5 | status, "as built, batch 3" |
+
+### Next
+
+Batch 4:
+- P2: "Jouw personage" as a sticky column beside the picker on a wide screen, with tabs *Kiezen ·
+  Mijn personage (n) · Overzicht* on a phone. The phone bar then gets its "Mijn personage" button.
+- P6: the "Klopt je personage?" checklist at the top of that column.

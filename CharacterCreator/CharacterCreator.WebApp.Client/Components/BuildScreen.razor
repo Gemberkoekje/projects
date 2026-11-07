@@ -121,17 +121,6 @@ else
                         <span class="hint">@Ui.T($"Vult de XP in: {Ui.Number(data.Rules.Creation.StartXp)} plus wat elk evenement geeft.", $"Fills in the XP: {Ui.Number(data.Rules.Creation.StartXp)} plus each event's award.")</span>
                     </div>
                 }
-            </div>
-
-            @* Where the XP bar (UX-REVIEW.md P1) will be: the counters, the rules' status, and the two
-               main actions; the rest under "Meer" (P7). *@
-            <div class="cc-build-bar">
-                <dl class="cc-xp" aria-live="polite">
-                    <div><dt>XP</dt><dd>@Ui.Number(evaluation.Xp)</dd></div>
-                    <div><dt>@Ui.T("Uitgegeven", "Spent")</dt><dd>@Ui.Number(evaluation.Spent)</dd></div>
-                    <div class="@(evaluation.Remaining < 0 ? "is-negative" : string.Empty)"><dt>@Ui.T("Over", "Left")</dt><dd>@Ui.Number(evaluation.Remaining)</dd></div>
-                </dl>
-
                 @if (data.Ruleset.Provisional)
                 {
                     <details class="cc-badge">
@@ -143,34 +132,12 @@ else
                         </p>
                     </details>
                 }
-
-                <div class="cc-bar-actions">
-                    <button type="button" class="va-btn va-btn--primary" @onclick="SaveAsync">@Ui.T("Opslaan", "Save")</button>
-                    <button type="button" class="va-btn va-btn--secondary" disabled="@printing" @onclick="PrintAsync">
-                        @(printing ? Ui.T("PDF wordt gemaakt…", "Making the PDF…") : Ui.T("Afdrukken", "Print"))
-                    </button>
-                    <div class="cc-menu" @onkeydown="MenuKeyDown">
-                        <button type="button" class="va-btn va-btn--ghost" aria-expanded="@(showMore ? "true" : "false")" aria-controls="cc-more" @onclick="ToggleMore">
-                            <span aria-hidden="true">⋯</span> @Ui.T("Meer", "More")
-                        </button>
-                        @* Hidden, never removed: the file input must outlive the menu closing, or the
-                           chosen file never arrives. *@
-                        <div id="cc-more" class="cc-menu-panel" hidden="@(!showMore)">
-                            <button type="button" class="cc-menu-item" @onclick="ExportFromMenuAsync">@Ui.T("Exporteren als bestand", "Export as a file")</button>
-                            <label class="cc-menu-item cc-file" @onclick="CloseMenus">
-                                @Ui.T("Importeren…", "Import…")
-                                <InputFile class="cc-visually-hidden" accept=".json,.dat" OnChange="ImportAsync" />
-                            </label>
-                            <button type="button" class="cc-menu-item" @onclick="NewFromMenuAsync">@Ui.T("Nieuw plan", "New plan")</button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             @* Not on an empty plan: "15 XP left over" before anything is chosen says nothing new. *@
             @if (!plan.Planned.IsEmpty && General.Any())
             {
-                <ul class="cc-general">
+                <ul id="cc-general" class="cc-general" tabindex="-1">
                     @foreach (var finding in General)
                     {
                         <li class="cc-note cc-note--@finding.Severity.ToString().ToLowerInvariant()">@words.Describe(finding)</li>
@@ -178,6 +145,74 @@ else
                 </ul>
             }
         </section>
+
+        @* The XP bar (UX-REVIEW.md P1): it stays in view, at the top on a wide screen and at the bottom on
+           a phone. The budget with the "at most 3 left over" zone, the status in one phrase that jumps
+           to what is wrong, and the two actions that end a session; the rest under "Meer". *@
+        <div class="cc-xpbar @(evaluation.Remaining < 0 ? "is-over" : string.Empty)" role="region" aria-label="@Ui.T("XP en status", "XP and status")">
+            <div class="cc-xpbar-id">
+                <strong>@(name.Length > 0 ? name : Ui.T("Naamloos personage", "Unnamed character"))</strong>
+                <span class="cc-sub">@ModeName()</span>
+            </div>
+
+            <div class="cc-budget" title="@(plan.Mode == PlanMode.NewCharacter ? Ui.T($"Een nieuw personage houdt hoogstens {Ui.Number(data.Rules.Creation.MaxLeftOver)} XP over; de rest vervalt.", $"A new character keeps at most {Ui.Number(data.Rules.Creation.MaxLeftOver)} XP left over; the rest is lost.") : string.Empty)">
+                <div class="cc-budget-track" aria-hidden="true">
+                    @if (plan.Mode == PlanMode.NewCharacter && evaluation.Xp > 0)
+                    {
+                        <span class="cc-budget-zone" style="left: @Percent(evaluation.Xp - data.Rules.Creation.MaxLeftOver)"></span>
+                    }
+                    <span class="cc-budget-fill" style="width: @Percent(evaluation.Spent)"></span>
+                    @if (plan.Mode == PlanMode.NewCharacter && evaluation.Xp > 0)
+                    {
+                        <span class="cc-budget-mark" style="left: @Percent(evaluation.Xp - data.Rules.Creation.MaxLeftOver)"></span>
+                    }
+                </div>
+                <span class="cc-budget-text" aria-live="polite">
+                    <strong>@words.BudgetSpent(evaluation)</strong><span class="cc-budget-left"> · @words.BudgetLeft(evaluation)</span>
+                </span>
+            </div>
+
+            @if (!plan.Planned.IsEmpty)
+            {
+                var open = FindingWords.Open(evaluation);
+                if (open.Count == 0)
+                {
+                    <span class="cc-verdict is-ok" role="status"><span aria-hidden="true">✓</span> <span class="cc-verdict-words">@words.Verdict(evaluation)</span></span>
+                }
+                else
+                {
+                    <button type="button" class="cc-verdict is-open" aria-label="@($"{words.Verdict(evaluation)}: {Ui.T("toon het eerste", "show the first")}")" @onclick="JumpToProblemAsync">
+                        <span aria-hidden="true">⚠&#xFE0E;</span>
+                        <span class="cc-verdict-words">@words.Verdict(evaluation)</span>
+                        <span class="cc-verdict-count" aria-hidden="true">@open.Count</span>
+                        <span aria-hidden="true">›</span>
+                    </button>
+                }
+            }
+
+            <div class="cc-bar-actions">
+                <button type="button" class="va-btn va-btn--primary" @onclick="SaveAsync">@Ui.T("Opslaan", "Save")</button>
+                <button type="button" class="va-btn va-btn--secondary cc-wide-only" disabled="@printing" @onclick="PrintAsync">
+                    @(printing ? Ui.T("PDF wordt gemaakt…", "Making the PDF…") : Ui.T("Afdrukken", "Print"))
+                </button>
+                <div class="cc-menu" @onkeydown="MenuKeyDown">
+                    <button type="button" class="va-btn va-btn--ghost" aria-expanded="@(showMore ? "true" : "false")" aria-controls="cc-more" aria-label="@Ui.T("Meer", "More")" @onclick="ToggleMore">
+                        <span aria-hidden="true">⋯</span> <span class="cc-wide-only">@Ui.T("Meer", "More")</span>
+                    </button>
+                    @* Hidden, never removed: the file input must outlive the menu closing, or the
+                       chosen file never arrives. *@
+                    <div id="cc-more" class="cc-menu-panel" hidden="@(!showMore)">
+                        <button type="button" class="cc-menu-item cc-phone-only" disabled="@printing" @onclick="PrintFromMenuAsync">@Ui.T("Afdrukken (PDF)", "Print (PDF)")</button>
+                        <button type="button" class="cc-menu-item" @onclick="ExportFromMenuAsync">@Ui.T("Exporteren als bestand", "Export as a file")</button>
+                        <label class="cc-menu-item cc-file" @onclick="CloseMenus">
+                            @Ui.T("Importeren…", "Import…")
+                            <InputFile class="cc-visually-hidden" accept=".json,.dat" OnChange="ImportAsync" />
+                        </label>
+                        <button type="button" class="cc-menu-item" @onclick="NewFromMenuAsync">@Ui.T("Nieuw plan", "New plan")</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         @* An empty plan shows three ways to start instead of empty cards (UX-REVIEW.md P5). *@
         <div class="cc-build-grid @(plan.Planned.IsEmpty ? "is-empty" : string.Empty)">
@@ -215,7 +250,7 @@ else
             else
             {
                 <div class="cc-area-chosen">
-                    <ChosenSkills Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" OnMore="MoreAsync" OnLess="LessAsync" OnRemove="RemoveAllAsync" />
+                    <ChosenSkills Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" Fresh="fresh" OnMore="MoreAsync" OnLess="LessAsync" OnRemove="RemoveAllAsync" />
                 </div>
             }
 

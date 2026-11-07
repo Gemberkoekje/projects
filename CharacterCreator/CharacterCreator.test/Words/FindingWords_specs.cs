@@ -156,6 +156,38 @@ public sealed class FindingWords_specs
     public void a_skill_that_can_simply_be_bought_says_so()
         => English.State(new SkillOption { Skill = ArmourI, Offered = true, Reasons = [] }).Should().Be("can buy");
 
+    [Test]
+    public void the_verdict_counts_problems_and_warnings_but_not_what_is_only_to_know()
+    {
+        Dutch.Verdict(Evaluation(10, 15, new NeedsTeacher { Skill = ArmourI })).Should().Be("Alles klopt");
+        Dutch.Verdict(Evaluation(10, 15, new TooMuchLeftOver { Left = 5, Limit = 3 })).Should().Be("1 ding klopt nog niet");
+        English.Verdict(Evaluation(17, 15, new NotEnoughXp { Needed = 17, Available = 15 }, new MissingPrerequisite { Skill = HealerEl, Group = RequirementGroup.Any(1, ArmourI) }))
+            .Should().Be("2 things aren't right yet");
+    }
+
+    [Test]
+    public void the_open_findings_put_problems_first()
+    {
+        var evaluation = Evaluation(17, 15, new NotEnoughXp { Needed = 17, Available = 15 }, new NeedsTeacher { Skill = ArmourI });
+
+        FindingWords.Open(evaluation).Should().ContainSingle().Which.Should().BeOfType<NotEnoughXp>();
+    }
+
+    [TestCase(13, "13 / 15 XP", "nog 2 over")]
+    [TestCase(15, "15 / 15 XP", "alles besteed")]
+    [TestCase(16.5, "16,5 / 15 XP", "1,5 te veel")]
+    public void the_budget_says_what_is_spent_and_what_is_left(decimal spent, string numbers, string left)
+    {
+        var evaluation = Evaluation(spent, 15);
+
+        Dutch.BudgetSpent(evaluation).Should().Be(numbers);
+        Dutch.BudgetLeft(evaluation).Should().Be(left);
+    }
+
+    [Test]
+    public void the_budget_is_english_too()
+        => English.BudgetLeft(Evaluation(13, 15)).Should().Be("2 left");
+
     [TestCase("Elemental", "Elementair")]
     [TestCase("Spiritual ritual", "Spiritueel ritueel")]
     [TestCase("Willpower", "Wilskracht")]
@@ -170,6 +202,16 @@ public sealed class FindingWords_specs
     [TestCase("", Language.Dutch)]
     public void a_language_code_falls_back_to_dutch(string code, Language language)
         => Ui.For(code).Language.Should().Be(language);
+
+    private static PlanEvaluation Evaluation(decimal spent, decimal xp, params Finding[] findings) => new ()
+    {
+        Plan = core.Plans.Plan.NewCharacter(core.Plans.Holdings.None),
+        Xp = xp,
+        Spent = spent,
+        Remaining = xp - spent,
+        Findings = [.. findings.OrderByDescending(finding => finding.Severity)],
+        Energy = [],
+    };
 
     private static SkillContent Skill(SkillKey key, string nl, string en) => new ()
     {
