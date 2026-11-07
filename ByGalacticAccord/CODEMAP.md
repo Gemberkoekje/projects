@@ -1,7 +1,7 @@
 # By Galactic Accord — code map
 
 What is where, what calls what, and where money and goods move. Use it to find the file, then read the
-file: the code is the truth. **Last checked against the code: 2026-11-05, after S8 (consequences).**
+file: the code is the truth. **Last checked against the code: 2026-11-05, after S8 (consequences); section 2 on 2026-11-07, for the hosting image.**
 
 **Keep it true.** A commit that adds, removes, renames or moves a file or a type, changes who calls a
 public member, adds or removes an event, or changes a money or goods path updates this map in the same
@@ -87,6 +87,7 @@ commit. If you find the map wrong, fix it. Section 12 has the commands that rege
 | Soak harness | `src/ByGalacticAccord.Cli/` | Engine, Presentation | Console app: headless runs, telemetry, invariant checks, state fingerprints, bot players. |
 | Tests | `tests/ByGalacticAccord.Tests/` | Engine (and its internals), Presentation, xUnit | Fast by default; `[Trait("Category", "Soak")]` for long runs. |
 | Browser check | `tools/client-check/` | Node, Playwright (`package.json`) | Publishes the client, drives it in Chromium, screenshots it, compares WebAssembly with desktop. |
+| Hosting image | `Dockerfile`, `nginx.conf`, `.dockerignore` | .NET SDK (build stage), nginx (`nginxinc/nginx-unprivileged`) | Publishes the client and serves its `wwwroot` as a static site; gembernodes (`apps/bygalacticaccord`) runs it at https://bygalacticaccord.gemberkoekje.nl. |
 
 - `ByGalacticAccord.slnx` lists the five .NET projects. `Directory.Build.props`: net10.0, nullable on, **implicit usings off**
   (every file has explicit `using`s), **warnings are errors**.
@@ -97,7 +98,11 @@ commit. If you find the map wrong, fix it. Section 12 has the commands that rege
 - CI: [`../.github/workflows/ci-bygalacticaccord.yml`](../.github/workflows/ci-bygalacticaccord.yml) runs on every
   push and pull request that touches `ByGalacticAccord/` (or the workflow): restore, Release build, fast tests,
   soak tests, then the browser check (`npm ci`, `npx playwright install --with-deps chromium`, `node check.cjs`),
-  on Ubuntu, and uploads the check's screenshots.
+  on Ubuntu, and uploads the check's screenshots. On `main`, once that is green, its `docker` job builds the hosting image and
+  pushes it to `ghcr.io/gemberkoekje/bygalacticaccord` as `:latest` and `:<commit sha>`; gembernodes deploys a sha.
+- The hosting image: `nginx.conf` serves `/` (no fallback: the client is one page), the `.gz` files the publish writes, and
+  `/healthz` for the pod's probes; `_framework/` is cached for a year (every name there carries its fingerprint), the rest
+  revalidates on each load. The build stage drops the `.br` files (stock nginx has no Brotli).
 
 ## 3. How a run flows
 

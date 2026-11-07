@@ -1,0 +1,8 @@
+# The image needs only Directory.Build.props, src/ and nginx.conf (Dockerfile).
+**/bin/
+**/obj/
+artifacts/
+log/
+tests/
+tools/
+*.md

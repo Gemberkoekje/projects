@@ -65,3 +65,40 @@ jobs:
           name: client-check-screenshots
           path: ByGalacticAccord/artifacts/client-check/screenshots
           if-no-files-found: ignore
+
+  # The site's image (ByGalacticAccord/Dockerfile), pushed only from main and only once the check above
+  # is green. gembernodes (apps/bygalacticaccord) deploys a sha from here: bump its tag to roll it out.
+  docker:
+    name: Image (ghcr.io)
+    runs-on: ubuntu-latest
+    needs: [build-test]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize repository owner for image tags
+        id: owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push the By Galactic Accord image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./ByGalacticAccord
+          file: ./ByGalacticAccord/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.owner }}/bygalacticaccord:latest
+            ghcr.io/${{ steps.owner.outputs.owner }}/bygalacticaccord:${{ github.sha }}

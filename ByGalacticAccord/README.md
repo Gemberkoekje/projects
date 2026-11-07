@@ -112,6 +112,19 @@ node check.cjs
 
 Any `--filter` on the command line replaces the default one, so a filter that matches soak tests runs them.
 
+## Playing it online
+
+The game is hosted at **https://bygalacticaccord.gemberkoekje.nl**. The client is a static site (the simulation
+runs in the browser), so the image is nginx serving the published `wwwroot`: [`Dockerfile`](Dockerfile) and
+[`nginx.conf`](nginx.conf). CI pushes it to `ghcr.io/gemberkoekje/bygalacticaccord:<commit sha>` from `main` once
+the checks pass; to roll a build out, set that sha in gembernodes' `apps/bygalacticaccord/deployment.yaml`. A game
+lives only in the browser tab: reloading starts a new one.
+
+```bash
+docker build -t bygalacticaccord .
+docker run --rm -p 8080:8080 bygalacticaccord    # http://localhost:8080
+```
+
 ## Layout
 
 ```
@@ -121,6 +134,7 @@ src/ByGalacticAccord.Client/        the Blazor WebAssembly client
 src/ByGalacticAccord.Cli/           the soak harness
 tests/ByGalacticAccord.Tests/       xUnit: fast by default; soak-length tests carry [Trait("Category", "Soak")]
 tools/client-check/                 the browser check (Playwright)
+Dockerfile, nginx.conf              the hosting image: nginx serving the published client
 ```
 
 [`CODEMAP.md`](CODEMAP.md) goes file by file.
