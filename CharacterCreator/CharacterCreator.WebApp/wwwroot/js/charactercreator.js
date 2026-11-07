@@ -23,6 +23,24 @@ export function store(key, value) {
     }
 }
 
+// Focus the first element matching one of the selectors, in order. With onlyIfLost, only when focus
+// was lost: a re-render that removed the focused button (an add turns "+" into a stepper) drops it to
+// the page, and nothing else has claimed it since.
+export function focus(selectors, onlyIfLost) {
+    const active = document.activeElement;
+    if (onlyIfLost && active && active !== document.body && active.isConnected) {
+        return false;
+    }
+    for (const selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+            element.focus({ preventScroll: true });
+            return true;
+        }
+    }
+    return false;
+}
+
 export function download(fileName, contentType, contents) {
     // Text from DownloadAsync, a Uint8Array from DownloadBytesAsync (Blazor sends byte[] as one).
     const url = URL.createObjectURL(new Blob([contents], { type: contentType }));

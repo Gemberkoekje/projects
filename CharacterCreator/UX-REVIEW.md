@@ -7,6 +7,14 @@ _A review of the build screen, the presets page and the FAQ against the Laws of 
 _To understand this, start with §0 (the short version), then §3 (the proposals), and read §2
 (the laws) where a proposal's reasoning matters._
 
+**Status:**
+- **Batch 1 (P3, P4, P9, P11) is built.** NOTES.md, "UX batch 1", has what was built and where it
+  departs from the proposals.
+- **Left from P4 and P11** until P1/P2 give them a place:
+  - P4: the XP bar's motion and the new row's flash;
+  - P11: the folding phone head and the short names (which need an SL/EC check).
+- **Next:** batch 2 (P5, P7).
+
 ---
 
 ## 0. At a glance

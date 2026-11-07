@@ -16,7 +16,7 @@
             <div class="cc-chips">
                 @foreach (var total in energy)
                 {
-                    <span class="echip @EnergyClass(total.Type)"><span class="dot" aria-hidden="true"></span>@Words.EnergyType(total.Type) <strong>@total.Amount</strong></span>
+                    <span class="echip @PlanSummary.EnergyClass(total.Type)"><span class="dot" aria-hidden="true"></span>@Words.EnergyType(total.Type) <strong>@total.Amount</strong></span>
                 }
             </div>
         }
@@ -124,21 +124,6 @@
     /// <summary>What the engine makes of it.</summary>
     [Parameter, EditorRequired]
     public PlanEvaluation Evaluation { get; set; }
-
-    /// <summary>The chip colour for an energy type: Guild Hall's energy tokens, ritual ones for ritual energy.</summary>
-    private static string EnergyClass(string type)
-    {
-        var name = (type ?? string.Empty).ToUpperInvariant();
-        var ritual = name.Contains("RITUAL", StringComparison.Ordinal);
-        return name switch
-        {
-            _ when name.StartsWith("ELEMENTAL", StringComparison.Ordinal) => ritual ? "cc-en-elemental-r" : "cc-en-elemental",
-            _ when name.StartsWith("SPIRITUAL", StringComparison.Ordinal) => ritual ? "cc-en-spiritual-r" : "cc-en-spiritual",
-            "WILLPOWER" => "cc-en-willpower",
-            "INSPIRATION" => "cc-en-inspiration",
-            _ => string.Empty,
-        };
-    }
 
     private static RenderFragment Fact(string label, string value) => builder =>
     {

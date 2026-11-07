@@ -624,9 +624,57 @@ fieldset.cc-field {
     margin-bottom: var(--s-4);
 }
 
+.cc-picker-tools {
+    align-items: center;
+}
+
 .cc-picker-tools .ctl {
     flex: 1 1 220px;
     width: auto;
+}
+
+.cc-picker-ticked {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+}
+
+/* A tick box with its words, the whole of it a 44 px target. */
+.cc-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 44px;
+    font-size: 15px;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+
+.cc-check input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--va-action);
+}
+
+/* Picking several at once: tick boxes on wide screens; on a phone behind "Pick several", which few
+   people need (UX-REVIEW.md P3). */
+.cc-multi-toggle {
+    display: none;
+}
+
+.cc-multi-toggle[aria-pressed="true"] {
+    background: var(--va-action-tint);
+    color: var(--va-action-text);
+}
+
+@media (max-width: 640px) {
+    .cc-multi-toggle {
+        display: inline-flex;
+    }
+
+    .cc-picker:not(.is-multi) .cc-tick-label {
+        display: none;
+    }
 }
 
 .cc-category + .cc-category {
@@ -653,28 +701,53 @@ fieldset.cc-field {
     color: var(--ink-3);
 }
 
+.cc-category-chosen {
+    font: 600 13px var(--f-text);
+    color: var(--success);
+}
+
 .cc-skills {
     list-style: none;
     margin: 0 0 var(--s-3);
     padding: 0;
 }
 
+/* A row (UX-REVIEW.md P3): the name, under it the cost and one status pill, one action on the right.
+   The whole row opens the details. */
 .cc-skill {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    grid-template-areas: "tick name cost add" ". state state state" "details details details details";
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "tick name add" "tick meta add" "more more more";
     align-items: center;
-    gap: var(--s-1) var(--s-3);
-    padding: var(--s-3) var(--s-2);
+    gap: 0 var(--s-3);
+    padding: var(--s-1) var(--s-2);
     border-radius: var(--r-sm);
+    cursor: pointer;
+}
+
+.cc-skill-meta {
+    grid-area: meta;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-3);
+    min-width: 0;
+    margin-bottom: var(--s-2);
 }
 
 .cc-skill:hover {
     background: var(--paper-sunken);
 }
 
-.cc-tick {
+.cc-tick-label {
     grid-area: tick;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    min-height: 44px;
+    margin-left: -6px;
+    cursor: pointer;
 }
 
 .cc-skill-name {
@@ -684,7 +757,7 @@ fieldset.cc-field {
     color: var(--ink);
     background: none;
     border: 0;
-    padding: 0;
+    padding: var(--s-2) 0 0;
     text-align: left;
     cursor: pointer;
     text-decoration: underline dotted var(--ink-faint);
@@ -692,25 +765,41 @@ fieldset.cc-field {
 }
 
 .cc-skill-cost {
-    grid-area: cost;
     font-family: var(--f-mono);
-    font-size: 13px;
+    font-size: 12.5px;
     color: var(--ink-2);
     white-space: nowrap;
 }
 
-.cc-skill-state {
-    grid-area: state;
-    font-size: 13.5px;
+/* Rows that can't be bought step back, the pill keeps its colour; book order stays (Jakob). */
+.cc-skill.is-dim .cc-skill-name,
+.cc-skill.is-dim .cc-skill-cost {
+    opacity: .7;
+}
+
+/* One pill with an icon and few words; none for "can buy". */
+.cc-pill {
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.35;
     color: var(--ink-3);
 }
 
-.cc-skill.is-ok .cc-skill-state {
+.cc-pill--chosen {
     color: var(--success);
+    font-weight: 600;
 }
 
-.cc-skill.is-blocked .cc-skill-state {
+.cc-pill--warning {
     color: var(--notice-ink);
+}
+
+.cc-pill--blocked {
+    color: var(--error);
+}
+
+.cc-pill--info {
+    color: var(--ink-2);
 }
 
 .cc-skill-add {
@@ -719,11 +808,49 @@ fieldset.cc-field {
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: var(--s-2);
+    cursor: default;
 }
 
-.cc-skill .cc-details {
-    grid-area: details;
-    margin-top: var(--s-2);
+/* The add button is a 44 px square; the chain button says what it adds and costs. */
+.cc-add {
+    min-width: 44px;
+    padding: 0;
+    font-size: 20px;
+}
+
+.cc-chain {
+    max-width: 18rem;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.25;
+    font-size: 14px;
+}
+
+.cc-skill-more {
+    grid-area: more;
+    margin: var(--s-2) 0 var(--s-3);
+    cursor: default;
+}
+
+.cc-skill-why {
+    margin: 0 0 var(--s-3);
+    font-size: 14px;
+    color: var(--notice-ink);
+}
+
+.cc-skill-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+}
+
+@media (max-width: 640px) {
+    .cc-chain {
+        max-width: 11rem;
+        font-size: 13px;
+        padding: 6px 10px;
+    }
 }
 
 /* A skill's details, in the picker and the chosen table. */
@@ -775,8 +902,8 @@ fieldset.cc-field {
 
 .cc-stepper button,
 .cc-remove {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     font: 600 16px var(--f-text);
     color: var(--ink-2);
     background: transparent;
@@ -961,16 +1088,123 @@ fieldset.cc-field {
     cursor: pointer;
 }
 
-.cc-confirm {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-2);
-    color: var(--ink-2);
-}
-
 .cc-saved {
     flex: 1 0 100%;
+}
+
+/* The dock (UX-REVIEW.md P4): toasts and the removal question, at the bottom of the screen where
+   the eye is after a click. The page keeps room for it at its foot. */
+.cc-build {
+    padding-bottom: var(--s-9);
+}
+
+.cc-dock {
+    position: fixed;
+    left: 50%;
+    bottom: var(--s-5);
+    z-index: 50;
+    display: grid;
+    gap: var(--s-3);
+    width: min(640px, calc(100% - 2 * var(--s-4)));
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.cc-dock > *,
+.cc-dock-live > * {
+    pointer-events: auto;
+}
+
+.cc-toast {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2) var(--s-4);
+    padding: var(--s-3) var(--s-3) var(--s-3) var(--s-5);
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-lg);
+    font-size: 15px;
+    background: var(--ink);
+    color: var(--paper);
+    animation: cc-rise 150ms ease-out;
+}
+
+.cc-toast-text {
+    flex: 1 1 16rem;
+}
+
+.cc-toast--success {
+    border-left: 4px solid var(--success);
+}
+
+.cc-toast--error {
+    background: var(--error-tint);
+    color: var(--error);
+    border: 1px solid var(--error);
+}
+
+.cc-toast--question {
+    background: var(--paper-raised);
+    color: var(--ink);
+    border: 1px solid var(--notice-border);
+}
+
+.cc-toast--question p {
+    flex: 1 0 100%;
+    margin: 0;
+}
+
+.cc-toast-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.cc-toast-undo,
+.cc-toast-close {
+    min-height: 44px;
+    font: 700 15px var(--f-text);
+    color: inherit;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+}
+
+.cc-toast-undo {
+    padding: 0 var(--s-3);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.cc-toast-close {
+    width: 44px;
+    font-weight: 400;
+    opacity: .75;
+}
+
+.cc-toast-undo:hover,
+.cc-toast-close:hover {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+@keyframes cc-rise {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cc-toast {
+        animation: none;
+    }
+}
+
+@media print {
+    .cc-dock {
+        display: none;
+    }
 }
 
 /* NL/EN in the crest bar, shaped like the theme toggle beside it (on the crest's own colours). */
@@ -1004,15 +1238,62 @@ fieldset.cc-field {
 
 /* ---- Presets and FAQ ---- */
 
+/* Filter chips: links, so they work without the browser running anything. */
+.cc-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin: var(--s-5) 0;
+}
+
+.cc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 44px;
+    padding: 0 var(--s-4);
+    font: 600 15px var(--f-text);
+    color: var(--ink-2);
+    background: var(--paper-raised);
+    border: var(--bd-ctl);
+    border-radius: var(--r-seal);
+    text-decoration: none;
+}
+
+.cc-chip:hover {
+    background: var(--paper-sunken);
+}
+
+.cc-chip[aria-current="page"] {
+    color: var(--va-action-text);
+    background: var(--va-action-tint);
+    border-color: var(--va-action-text);
+}
+
 .cc-presets {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--s-5);
+    align-items: start;
 }
 
+/* A card: the start button on top, the whole card clickable through it (its ::after covers the card);
+   "Lees meer" sits above that cover. */
 .cc-preset {
+    position: relative;
     display: flex;
     flex-direction: column;
+    gap: var(--s-2);
+}
+
+.cc-preset:hover {
+    box-shadow: var(--sh-md);
+}
+
+.cc-preset-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: var(--s-3);
 }
 
@@ -1020,26 +1301,121 @@ fieldset.cc-field {
     margin: 0;
 }
 
-.cc-preset .cc-description {
+.cc-preset-start::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-lg);
+}
+
+.cc-preset-stats {
+    gap: var(--s-2);
+}
+
+.cc-preset-stats .echip {
+    padding: 3px 10px;
+    font-size: 13px;
+}
+
+.cc-preset-text {
     margin: 0;
     color: var(--ink-2);
+    font-size: 15px;
+}
+
+.cc-preset-text.is-clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+.cc-preset-text:has(+ .cc-preset-skills + .cc-more[open]),
+.cc-preset-skills:has(+ .cc-more[open]) {
+    display: none;
 }
 
 .cc-preset-skills {
-    margin: 0 0 var(--s-3);
-    padding-left: 1.2em;
+    margin: 0;
+    font-size: 14px;
+}
+
+.cc-more {
+    position: relative;
+    z-index: 1;
     font-size: 15px;
-    flex: 1 0 auto;
 }
 
-.cc-preset .va-btn {
-    align-self: flex-start;
+.cc-more summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 600;
+    color: var(--va-action-text);
+    cursor: pointer;
 }
 
+.cc-more .cc-description {
+    margin: 0 0 var(--s-3);
+    color: var(--ink-2);
+}
+
+.cc-preset-all {
+    margin: 0;
+    padding-left: 1.2em;
+    font-size: 14px;
+}
+
+/* The FAQ as an accordion (UX-REVIEW.md P11): the questions folded, so the page can be scanned. */
 .cc-faq {
     display: grid;
-    gap: var(--s-5);
+    gap: var(--s-3);
     max-width: 900px;
+}
+
+.cc-faq details {
+    padding: 0 var(--s-5);
+}
+
+.cc-faq summary {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 56px;
+    font: 700 18px/1.3 var(--f-display);
+    cursor: pointer;
+    list-style: none;
+}
+
+.cc-faq summary::-webkit-details-marker {
+    display: none;
+}
+
+.cc-faq summary h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.cc-faq summary::before {
+    content: "\25B8";
+    flex: 0 0 1em;
+    color: var(--ink-3);
+    font-size: 15px;
+}
+
+.cc-faq details[open] summary::before {
+    content: "\25BE";
+}
+
+.cc-faq summary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--va-focus-ring);
+    border-radius: var(--r-sm);
+}
+
+.cc-faq details > :not(summary) {
+    margin: 0 0 var(--s-4);
 }
 
 .cc-faq p {

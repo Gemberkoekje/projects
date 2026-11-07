@@ -1,7 +1,10 @@
-@* The picker (DESIGN.md §5): every offered skill with its state in words, so finding out why not
-   never takes a click. A skill can be added anyway, then carries its warning in the chosen table;
-   its prerequisites can come along; several can be ticked and added at once. *@
-<section class="cc-card cc-picker" aria-labelledby="cc-picker-title">
+@inject Browser Browser
+
+@* The picker (DESIGN.md §5, UX-REVIEW.md P3): every offered skill with one status pill and one main
+   action. A skill whose prerequisites decide themselves comes with them in one click; one that leaves
+   a choice opens its details, where it can also be added anyway (plans refuse nothing). A skill the
+   plan has shows the same stepper as the chosen list. The whole row opens the details. *@
+<section class="cc-card cc-picker @(multi ? "is-multi" : string.Empty)" aria-labelledby="cc-picker-title">
     <div class="cc-card-head">
         <h2 id="cc-picker-title">@Ui.T("Vaardigheden", "Skills")</h2>
         <div class="cc-segmented" role="group" aria-label="@Ui.T("Welke vaardigheden", "Which skills")">
@@ -15,10 +18,17 @@
     <div class="cc-picker-tools">
         <label class="cc-visually-hidden" for="cc-search">@Ui.T("Zoeken", "Search")</label>
         <input id="cc-search" class="ctl" type="search" placeholder="@Ui.T("Zoek een vaardigheid…", "Search a skill…")" value="@search" @oninput="Search" />
+        <label class="cc-check">
+            <input type="checkbox" checked="@onlyBuyable" @onchange="() => onlyBuyable = !onlyBuyable" />
+            @Ui.T("Alleen wat kan", "Only what fits")
+        </label>
+        <button type="button" class="va-btn va-btn--ghost cc-multi-toggle" aria-pressed="@(multi ? "true" : "false")" @onclick="ToggleMulti">@Ui.T("Meerdere kiezen", "Pick several")</button>
         @if (ticked.Count > 0)
         {
-            <button type="button" class="va-btn va-btn--primary" @onclick="AddTickedAsync">@Ui.T($"Voeg {ticked.Count} toe", $"Add {ticked.Count}")</button>
-            <button type="button" class="va-btn va-btn--ghost" @onclick="ticked.Clear">@Ui.T("Wis keuze", "Clear")</button>
+            <span class="cc-picker-ticked">
+                <button type="button" class="va-btn va-btn--primary" @onclick="AddTickedAsync">@Ui.T($"Voeg {ticked.Count} toe", $"Add {ticked.Count}")</button>
+                <button type="button" class="va-btn va-btn--ghost" @onclick="ticked.Clear">@Ui.T("Wis keuze", "Clear")</button>
+            </span>
         }
     </div>
 
@@ -34,43 +44,93 @@
         @foreach (var group in groups)
         {
             var open = search.Length > 0 || opened.Contains(group.Name);
+            var chosen = group.Skills.Count(skill => Plan.Planned[skill.Key] > 0);
             <div class="cc-category">
                 <button type="button" class="cc-category-head" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleCategory(group.Name)">
                     <span class="cc-chevron" aria-hidden="true">@(open ? "▾" : "▸")</span>
                     <span>@group.Name</span>
                     <span class="cc-count">@group.Skills.Count</span>
+                    @if (chosen > 0)
+                    {
+                        <span class="cc-category-chosen">✓ @Ui.T($"{chosen} gekozen", $"{chosen} chosen")</span>
+                    }
                 </button>
                 @if (open)
                 {
                     <ul class="cc-skills">
                         @foreach (var skill in group.Skills)
                         {
-                            var rule = Rule(skill.Key);
-                            var option = Options.TryGetValue(skill.Key, out var found) ? found : null;
+                            var key = skill.Key;
+                            var rule = Rule(key);
+                            var option = Options.TryGetValue(key, out var found) ? found : null;
+                            var times = Plan.Planned[key];
+                            var held = times > 0;
                             var canBuy = option?.CanBuy == true;
-                            <li class="cc-skill @(canBuy ? "is-ok" : "is-blocked")">
-                                <input type="checkbox" class="cc-tick" aria-label="@Ui.T($"{Ui.T(skill.Name)} aanvinken", $"Tick {Ui.T(skill.Name)}")" checked="@ticked.Contains(skill.Key)" @onchange="() => Tick(skill.Key)" />
-                                <button type="button" class="cc-skill-name" aria-expanded="@(details.Contains(skill.Key) ? "true" : "false")" @onclick="() => ToggleDetails(skill.Key)">@Ui.T(skill.Name)</button>
-                                <span class="cc-skill-cost">@rule.Cost XP@(rule.IsExtra ? " · extra" : string.Empty)</span>
-                                <span class="cc-skill-state">@(option is null ? string.Empty : Words.State(option))</span>
-                                <span class="cc-skill-add">
-                                    @if (option is not null && option.Reasons.OfType<MissingPrerequisite>().Any())
+                            var status = option is null ? SkillStatus.None : Words.Status(option, held);
+                            var chain = !held && option is not null && option.Reasons.OfType<MissingPrerequisite>().Any() ? PlanEvaluator.Chain(Data.Rules, Plan, key) : null;
+                            var name = Ui.T(skill.Name);
+                            var expanded = details.Contains(key);
+                            <li id="@RowId(key)" class="cc-skill @RowClass(held, canBuy)" @onclick="() => ToggleDetails(key)">
+                                <label class="cc-tick-label" @onclick:stopPropagation="true">
+                                    <input type="checkbox" class="cc-tick" aria-label="@Ui.T($"{name} aanvinken", $"Tick {name}")" checked="@ticked.Contains(key)" @onchange="() => Tick(key)" />
+                                </label>
+                                <button type="button" class="cc-skill-name" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@($"{RowId(key)}-more")">@name</button>
+                                <span class="cc-skill-meta">
+                                    <span class="cc-skill-cost">@rule.Cost XP@(rule.IsExtra ? " · extra" : string.Empty)</span>
+                                    @if (status.Kind != StatusKind.None)
                                     {
-                                        var chain = PlanEvaluator.Chain(Data.Rules, Plan, skill.Key);
-                                        if (chain.Purchases.Skills.Count > 1)
-                                        {
-                                            <button type="button" class="va-btn va-btn--secondary cc-btn-sm" title="@ChainTitle(chain)" @onclick="() => OnAdd.InvokeAsync(chain.Purchases)">
-                                                @Ui.T($"+ met vereisten ({ChainCost(chain)} XP)", $"+ with prerequisites ({ChainCost(chain)} XP)")
-                                            </button>
-                                        }
+                                        <span class="cc-pill cc-pill--@status.Kind.ToString().ToLowerInvariant()" title="@status.Full">
+                                            <span aria-hidden="true">@status.Icon</span> @status.Text
+                                        </span>
                                     }
-                                    <button type="button" class="va-btn @(canBuy ? "va-btn--primary" : "va-btn--ghost") cc-btn-sm" aria-label="@Ui.T($"{Ui.T(skill.Name)} toevoegen", $"Add {Ui.T(skill.Name)}")" @onclick="() => OnAdd.InvokeAsync(Holdings.Of((skill.Key, 1)))">
-                                        @(canBuy ? "+" : Ui.T("+ toch", "+ anyway"))
-                                    </button>
                                 </span>
-                                @if (details.Contains(skill.Key))
+                                <span class="cc-skill-add" @onclick:stopPropagation="true">
+                                    @if (held)
+                                    {
+                                        <span class="cc-stepper">
+                                            <button type="button" aria-label="@Ui.T($"{name}: een minder", $"{name}: one less")" @onclick="() => LessAsync(key)">−</button>
+                                            <span>@times</span>
+                                            <button type="button" data-row-action aria-label="@Ui.T($"{name}: een meer", $"{name}: one more")" @onclick="() => AddAsync(key, Holdings.Of((key, 1)))">+</button>
+                                        </span>
+                                    }
+                                    else if (chain is not null && chain.IsComplete && chain.Purchases.Skills.Count > 1 && Fits(chain))
+                                    {
+                                        <button type="button" data-row-action class="va-btn va-btn--secondary cc-chain" title="@ChainTitle(key, chain)" @onclick="() => AddAsync(key, chain.Purchases)">
+                                            + @ChainLabel(key, chain)
+                                        </button>
+                                    }
+                                    else if (canBuy)
+                                    {
+                                        <button type="button" data-row-action class="va-btn va-btn--primary cc-add" aria-label="@Ui.T($"{name} toevoegen", $"Add {name}")" @onclick="() => AddAsync(key, Holdings.Of((key, 1)))">+</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" data-row-action class="va-btn va-btn--ghost cc-add" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@($"{RowId(key)}-more")" aria-label="@Ui.T($"{name}: kiezen of toch toevoegen", $"{name}: choose, or add anyway")" @onclick="() => ToggleDetails(key)">⋯</button>
+                                    }
+                                </span>
+                                @if (expanded)
                                 {
-                                    <SkillDetails Ui="Ui" Words="Words" Skill="skill" Rule="rule" />
+                                    <div id="@($"{RowId(key)}-more")" class="cc-skill-more" @onclick:stopPropagation="true">
+                                        @if (!held && option is not null && option.Reasons.Count > 0)
+                                        {
+                                            <p class="cc-skill-why">@status.Full</p>
+                                        }
+                                        @if (!held && !canBuy)
+                                        {
+                                            <div class="cc-skill-actions">
+                                                @if (chain is not null && chain.Purchases.Skills.Count > 1)
+                                                {
+                                                    <button type="button" class="va-btn va-btn--secondary cc-btn-sm" @onclick="() => AddAsync(key, chain.Purchases)">+ @ChainLabel(key, chain)</button>
+                                                }
+                                                <button type="button" class="va-btn va-btn--ghost cc-btn-sm" @onclick="() => AddAsync(key, Holdings.Of((key, 1)))">@Ui.T("Toch toevoegen", "Add anyway")</button>
+                                            </div>
+                                            @if (chain is not null && !chain.IsComplete)
+                                            {
+                                                <p class="cc-skill-why">@Ui.T("Kies daarna zelf", "Then choose yourself"): @string.Join("; ", chain.Unresolved.Select(Words.Requirement))</p>
+                                            }
+                                        }
+                                        <SkillDetails Ui="Ui" Words="Words" Skill="skill" Rule="rule" />
+                                    </div>
                                 }
                             </li>
                         }
@@ -87,6 +147,9 @@
     private readonly HashSet<string> opened = new (StringComparer.Ordinal);
     private string search = string.Empty;
     private PlanMode filteredFor;
+    private bool onlyBuyable;
+    private bool multi;
+    private SkillKey focusAfterRender;
 
     /// <summary>Which skills the picker lists.</summary>
     public enum PickerFilter
@@ -128,6 +191,14 @@
     [Parameter]
     public EventCallback<Holdings> OnAdd { get; set; }
 
+    /// <summary>Called to buy a skill once less.</summary>
+    [Parameter]
+    public EventCallback<SkillKey> OnLess { get; set; }
+
+    /// <summary>The XP the plan has left; a chain that costs more is not the row's main action.</summary>
+    [Parameter]
+    public decimal Remaining { get; set; }
+
     private PickerFilter Filter { get; set; }
 
     /// <inheritdoc />
@@ -139,6 +210,19 @@
         {
             Filter = Plan.Mode == PlanMode.NewCharacter ? PickerFilter.Basis : PickerFilter.All;
             filteredFor = Plan.Mode;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // An add or a "one less" replaces the row's button (a "+" becomes a stepper, and back), which
+        // drops focus to the top of the page; put it back on the row (UX-REVIEW.md P11).
+        if (!focusAfterRender.IsEmpty)
+        {
+            var row = $"#{RowId(focusAfterRender)}";
+            focusAfterRender = default;
+            await Browser.RestoreFocusAsync($"{row} [data-row-action]", $"{row} .cc-skill-name");
         }
     }
 
@@ -158,7 +242,10 @@
             PickerFilter.Extra => rule.IsExtra,
             _ => true,
         };
-        return listed && (search.Length == 0
+        var fits = !onlyBuyable
+            || Plan.Planned[skill.Key] > 0
+            || (Options.TryGetValue(skill.Key, out var option) && option.CanBuy);
+        return listed && fits && (search.Length == 0
             || skill.Name.Nl.Contains(search, StringComparison.OrdinalIgnoreCase)
             || skill.Name.En.Contains(search, StringComparison.OrdinalIgnoreCase)
             || Ui.T(skill.Category).Contains(search, StringComparison.OrdinalIgnoreCase));
@@ -167,18 +254,39 @@
     /// <summary>A category in the picker, named in the screen's language; grouped by its Dutch name.</summary>
     private sealed record Category(string Name, IReadOnlyList<SkillContent> Skills);
 
+    private static string RowId(SkillKey key) => $"cc-pick-{key}";
+
+    private static string RowClass(bool held, bool canBuy)
+    {
+        if (held)
+        {
+            return "is-held";
+        }
+
+        return canBuy ? string.Empty : "is-dim";
+    }
+
     private RuleSkill Rule(SkillKey key)
         => Data.Rules.TryGet(key, out var rule) ? rule : new RuleSkill { Key = key, Cost = 0, BaseMax = 0, TimesMax = 0 };
 
-    private string ChainCost(PrerequisiteChain chain) => Ui.Number(SkillRules.Spent(chain.Purchases, Data.Rules));
+    /// <summary>Whether the plan can pay for the whole chain; if not, it waits behind "⋯" with "add anyway".</summary>
+    private bool Fits(PrerequisiteChain chain) => SkillRules.Spent(chain.Purchases, Data.Rules) <= Remaining;
+
+    /// <summary>"met Harnas II · 4 XP": what comes along, and what the whole costs.</summary>
+    private string ChainLabel(SkillKey skill, PrerequisiteChain chain)
+    {
+        var along = chain.Purchases.Skills.Where(key => key != skill).ToList();
+        var names = along.Count <= 2
+            ? string.Join(Ui.T(" en ", " and "), along.Select(Words.Name))
+            : Ui.T($"{along.Count} vereisten", $"{along.Count} prerequisites");
+        return $"{Ui.T("met", "with")} {names} · {Ui.Number(SkillRules.Spent(chain.Purchases, Data.Rules))} XP";
+    }
 
     /// <summary>What the chain adds, and the choices it leaves to the player.</summary>
-    private string ChainTitle(PrerequisiteChain chain)
+    private string ChainTitle(SkillKey skill, PrerequisiteChain chain)
     {
-        var adds = string.Join(", ", chain.Purchases.Skills.Select(Words.Name));
-        return chain.IsComplete
-            ? adds
-            : $"{adds}. {Ui.T("Kies daarna zelf", "Then choose yourself")}: {string.Join("; ", chain.Unresolved.Select(Words.Requirement))}";
+        var adds = string.Join(", ", chain.Purchases.Skills.Where(key => key != skill).Select(Words.Name));
+        return $"{Ui.T("Voegt ook toe", "Also adds")}: {adds}";
     }
 
     private string FilterName(PickerFilter filter) => filter switch
@@ -206,12 +314,33 @@
         }
     }
 
+    private void ToggleMulti()
+    {
+        multi = !multi;
+        if (!multi)
+        {
+            ticked.Clear();
+        }
+    }
+
     private void Tick(SkillKey skill)
     {
         if (!ticked.Remove(skill))
         {
             ticked.Add(skill);
         }
+    }
+
+    private async Task AddAsync(SkillKey row, Holdings purchases)
+    {
+        focusAfterRender = row;
+        await OnAdd.InvokeAsync(purchases);
+    }
+
+    private async Task LessAsync(SkillKey row)
+    {
+        focusAfterRender = row;
+        await OnLess.InvokeAsync(row);
     }
 
     private async Task AddTickedAsync()

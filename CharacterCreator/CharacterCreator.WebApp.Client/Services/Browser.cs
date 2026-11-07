@@ -33,6 +33,19 @@ public sealed class Browser(IJSRuntime js) : IUiLanguage, IAsyncDisposable
     /// <returns>Whether it was stored.</returns>
     public ValueTask<bool> StoreAsync(string key, string value) => CallAsync<bool>("store", key, value);
 
+    /// <summary>Moves focus to the first element that matches one of the selectors, without scrolling.</summary>
+    /// <param name="selectors">CSS selectors, the preferred one first.</param>
+    /// <returns>Whether an element was focused.</returns>
+    public ValueTask<bool> FocusAsync(params string[] selectors) => CallAsync<bool>("focus", selectors, false);
+
+    /// <summary>
+    /// <see cref="FocusAsync"/>, but only when focus was lost: the focused element was removed by a
+    /// re-render and nothing else has taken focus since.
+    /// </summary>
+    /// <param name="selectors">CSS selectors, the preferred one first.</param>
+    /// <returns>Whether an element was focused.</returns>
+    public ValueTask<bool> RestoreFocusAsync(params string[] selectors) => CallAsync<bool>("focus", selectors, true);
+
     /// <summary>Hands the visitor a file to save.</summary>
     /// <param name="fileName">The file's name.</param>
     /// <param name="contentType">Its media type.</param>

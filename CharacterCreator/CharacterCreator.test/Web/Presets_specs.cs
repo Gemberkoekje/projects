@@ -37,6 +37,33 @@ public sealed partial class Presets_specs
     }
 
     [Test]
+    public async Task a_card_starts_with_its_button_and_folds_the_rest()
+    {
+        var html = await GetHtml("/voorbeelden");
+        var paladin = html[html.IndexOf("id=\"preset-paladijn\"", StringComparison.Ordinal)..];
+        paladin = paladin[..paladin.IndexOf("</article>", StringComparison.Ordinal)];
+
+        paladin.IndexOf("Begin hiermee", StringComparison.Ordinal).Should().BeLessThan(paladin.IndexOf("cc-preset-skills", StringComparison.Ordinal), "the button sits on top");
+        paladin.Should().Contain("<details class=\"cc-more\">").And.Contain("Lees meer").And.Contain(" 7 meer", "the plus comes HTML-encoded");
+        paladin.Should().Contain("Levenspunten");
+    }
+
+    [Test]
+    public async Task the_kind_chips_filter_the_cards()
+    {
+        var html = await GetHtml("/voorbeelden?soort=genezing");
+
+        StartLinks().Matches(html).Select(match => match.Groups[1].Value)
+            .Should().Contain(["paladijn", "genezer-elementair", "arts"])
+            .And.NotContain(["vechter-zwaar", "alchemist"]);
+        html.Should().Contain("href=\"voorbeelden?soort=genezing\" class=\"cc-chip\" aria-current=\"page\"");
+    }
+
+    [Test]
+    public async Task an_unknown_kind_shows_every_card()
+        => StartLinks().Matches(await GetHtml("/voorbeelden?soort=draken")).Should().HaveCount(15);
+
+    [Test]
     public async Task in_english_the_cards_are_english()
     {
         using var client = factory.CreateAnonymousClient();

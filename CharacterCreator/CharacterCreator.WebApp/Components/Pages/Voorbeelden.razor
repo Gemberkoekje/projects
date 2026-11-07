@@ -4,11 +4,13 @@
 @using CharacterCreator.core.Plans
 @using CharacterCreator.core.Rules
 @using CharacterCreator.core.Rulesets
+@using CharacterCreator.core.Skills
 @inject ReadCurrentRulesetHandler Rulesets
 @inject CookieUiLanguage Languages
 
-@* The presets (DESIGN.md §5): archetypes as cards, with their text and skills, and "start from
-   this", which opens the build screen with the preset (?voorbeeld=). *@
+@* The presets (DESIGN.md §5, UX-REVIEW.md P9): compact cards, the start button on top and the whole
+   card clickable; two lines of text and the four dearest skills, the rest folded; energy and hit
+   points to compare. Filter chips are links (?soort=), so they work on this statically rendered page. *@
 <PageTitle>Character Creator · @Ui.T("Voorbeelden", "Presets")</PageTitle>
 
 <h1>@Ui.T("Voorbeelden", "Presets")</h1>
@@ -25,39 +27,87 @@
 }
 else
 {
-    <div class="cc-presets">
-        @foreach (var preset in Ruleset.Presets)
+    <nav class="cc-filter" aria-label="@Ui.T("Soort personage", "Kind of character")">
+        <a href="voorbeelden" class="cc-chip" aria-current="@Current(PresetKind.None)">@Ui.T("Alle", "All") <span class="cc-count">@cards.Count</span></a>
+        @foreach (var kind in PresetFacts.AllKinds)
         {
+            <a href="@($"voorbeelden?soort={PresetFacts.Slug(kind)}")" class="cc-chip" aria-current="@Current(kind)">
+                @PresetFacts.Name(Ui, kind) <span class="cc-count">@cards.Count(card => card.Kinds.Contains(kind))</span>
+            </a>
+        }
+    </nav>
+
+    <div class="cc-presets">
+        @foreach (var card in cards.Where(card => filter == PresetKind.None || card.Kinds.Contains(filter)))
+        {
+            var preset = card.Preset;
+            var text = Ui.T(preset.Information).Trim();
+            var longText = text.Length > ShortText;
+            var more = preset.Skills.Count - card.Defining.Count;
             <article class="cc-card cc-preset">
-                <h2>@Ui.T(preset.Name)</h2>
+                <div class="cc-preset-head">
+                    <h2 id="@($"preset-{preset.Key}")">@Ui.T(preset.Name)</h2>
+                    <a class="va-btn va-btn--primary cc-btn-sm cc-preset-start" href="@($"./?voorbeeld={Uri.EscapeDataString(preset.Key)}")" aria-describedby="@($"preset-{preset.Key}")">@Ui.T("Begin hiermee", "Start from this")</a>
+                </div>
                 <p class="cc-sub">
                     @(preset.NewCharacter
-                        ? Ui.T($"Nieuw personage · {Ui.Number(Spent(preset))} van {Ui.Number(Ruleset.Creation.StartXp)} XP", $"New character · {Ui.Number(Spent(preset))} of {Ui.Number(Ruleset.Creation.StartXp)} XP")
-                        : Ui.T($"{Ui.Number(Spent(preset))} van {Ui.Number(preset.Xp)} XP", $"{Ui.Number(Spent(preset))} of {Ui.Number(preset.Xp)} XP"))
+                        ? Ui.T($"Nieuw personage · {Ui.Number(card.Spent)} van {Ui.Number(Ruleset.Creation.StartXp)} XP", $"New character · {Ui.Number(card.Spent)} of {Ui.Number(Ruleset.Creation.StartXp)} XP")
+                        : Ui.T($"{Ui.Number(card.Spent)} van {Ui.Number(preset.Xp)} XP", $"{Ui.Number(card.Spent)} of {Ui.Number(preset.Xp)} XP"))
                 </p>
-                @if (!string.IsNullOrWhiteSpace(Ui.T(preset.Information)))
-                {
-                    <p class="cc-description">@Ui.T(preset.Information)</p>
-                }
-                <ul class="cc-preset-skills">
-                    @foreach (var skill in preset.Skills)
+                <div class="cc-chips cc-preset-stats">
+                    @foreach (var total in card.Energy)
                     {
-                        <li>@Name(skill.Key)@(skill.Times > 1 ? $" ×{skill.Times}" : string.Empty)</li>
+                        <span class="echip @total.Class"><span class="dot" aria-hidden="true"></span>@total.Label <strong>@total.Amount</strong></span>
                     }
-                </ul>
-                <a class="va-btn va-btn--primary" href="@($"./?voorbeeld={Uri.EscapeDataString(preset.Key)}")">@Ui.T("Begin hiermee", "Start from this")</a>
+                    <span class="echip">@card.HitPoints.Label <strong>@card.HitPoints.Value</strong></span>
+                </div>
+                @if (text.Length > 0)
+                {
+                    <p class="cc-preset-text @(longText ? "is-clamped" : string.Empty)">@text</p>
+                }
+                <p class="cc-preset-skills">
+                    @string.Join(" · ", card.Defining.Select(Name))
+                    @if (more > 0)
+                    {
+                        <span class="muted"> · @Ui.T($"+ {more} meer", $"+ {more} more")</span>
+                    }
+                </p>
+                @if (longText || more > 0)
+                {
+                    <details class="cc-more">
+                        <summary>@Ui.T("Lees meer", "Read more")</summary>
+                        @if (longText)
+                        {
+                            <p class="cc-description">@text</p>
+                        }
+                        <ul class="cc-preset-all">
+                            @foreach (var skill in preset.Skills)
+                            {
+                                <li>@Name(skill.Key)@(skill.Times > 1 ? $" ×{skill.Times}" : string.Empty)</li>
+                            }
+                        </ul>
+                    </details>
+                }
             </article>
         }
     </div>
 }
 
 @code {
-    private Dictionary<CharacterCreator.core.Skills.SkillKey, SkillContent> skills = [];
-    private RuleBook rules = RuleBook.Create([]).Value;
+    /// <summary>About two lines of a card's text; longer text is folded behind "Lees meer".</summary>
+    private const int ShortText = 110;
+
+    private Dictionary<SkillKey, SkillContent> skills = [];
+    private List<Card> cards = [];
+    private PresetKind filter;
 
     private Ui Ui => Languages.Current;
 
     private PublishedRuleset? Ruleset { get; set; }
+
+    /// <summary>The kind to show (<c>?soort=vechten</c>); empty for all.</summary>
+    [SupplyParameterFromQuery(Name = "soort")]
+    public string Soort { get; set; } = string.Empty;
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
@@ -69,18 +119,48 @@ else
         }
 
         var book = current.Value.ToRuleBook();
-        if (!book.IsValid)
+        var content = current.Value.ToContentBook();
+        if (!book.IsValid || !content.IsValid)
         {
             return;
         }
 
         Ruleset = current.Value;
-        rules = book.Value;
         skills = current.Value.Skills.ToDictionary(skill => skill.Key);
+        var words = new FindingWords(Ui, content.Value);
+        cards = [.. current.Value.Presets.Select(preset => Describe(preset, book.Value, content.Value, words))];
     }
 
-    private string Name(CharacterCreator.core.Skills.SkillKey key) => skills.TryGetValue(key, out var skill) ? Ui.T(skill.Name) : key.ToString();
+    /// <inheritdoc />
+    protected override void OnParametersSet() => filter = PresetFacts.FromSlug(Soort ?? string.Empty);
 
-    private decimal Spent(PresetContent preset)
-        => SkillRules.Spent(Holdings.Of(preset.Skills.Select(skill => new KeyValuePair<CharacterCreator.core.Skills.SkillKey, int>(skill.Key, skill.Times))), rules);
+    private Card Describe(PresetContent preset, RuleBook rules, ContentBook content, FindingWords words)
+    {
+        var holdings = PresetFacts.Holdings(preset);
+        var plan = preset.NewCharacter ? Plan.NewCharacter(holdings) : Plan.Free(preset.Xp, holdings);
+        var evaluation = PlanEvaluator.Evaluate(rules, plan);
+        return new Card(
+            preset,
+            SkillRules.Spent(holdings, rules),
+            PresetFacts.Kinds(preset, content, rules),
+            PresetFacts.Defining(preset, rules, 4),
+            [.. evaluation.Energy.Where(total => total.Kind == EnergyKind.Energy).Select(total => new EnergyChip(PlanSummary.EnergyClass(total.Type), words.EnergyType(total.Type), Ui.Number(total.Amount)))],
+            PlanSummary.Properties(Ui, words, content, plan, evaluation)[0]);
+    }
+
+    private string Current(PresetKind kind) => kind == filter ? "page" : "false";
+
+    private string Name(SkillKey key) => skills.TryGetValue(key, out var skill) ? Ui.T(skill.Name) : key.ToString();
+
+    /// <summary>A preset as its card shows it.</summary>
+    private sealed record Card(
+        PresetContent Preset,
+        decimal Spent,
+        IReadOnlyList<PresetKind> Kinds,
+        IReadOnlyList<SkillKey> Defining,
+        IReadOnlyList<EnergyChip> Energy,
+        SummaryValue HitPoints);
+
+    /// <summary>An energy chip: its colour, the type in words, and the amount.</summary>
+    private sealed record EnergyChip(string Class, string Label, string Amount);
 }

@@ -109,6 +109,23 @@ public static class PlanSummary
         return [.. plan.All.Skills.Select(key => Find(content, key)).OfType<SkillContent>()];
     }
 
+    /// <summary>The chip colour for an energy type: Guild Hall's energy tokens, ritual ones for ritual energy.</summary>
+    /// <param name="type">VOID's name for the type, such as <c>Spiritual ritual</c>.</param>
+    /// <returns>The chip's class, such as <c>cc-en-spiritual-r</c>; empty for an unknown type.</returns>
+    public static string EnergyClass(string type)
+    {
+        var name = (type ?? string.Empty).ToUpperInvariant();
+        var ritual = name.Contains("RITUAL", StringComparison.Ordinal);
+        return name switch
+        {
+            _ when name.StartsWith("ELEMENTAL", StringComparison.Ordinal) => ritual ? "cc-en-elemental-r" : "cc-en-elemental",
+            _ when name.StartsWith("SPIRITUAL", StringComparison.Ordinal) => ritual ? "cc-en-spiritual-r" : "cc-en-spiritual",
+            "WILLPOWER" => "cc-en-willpower",
+            "INSPIRATION" => "cc-en-inspiration",
+            _ => string.Empty,
+        };
+    }
+
     private static SkillContent? Find(ContentBook content, SkillKey key) => content.TryGet(key, out var skill) ? skill : null;
 
     private static SummaryValue Value(string label, int value) => new () { Label = label, Value = value.ToString(CultureInfo.InvariantCulture) };

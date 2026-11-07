@@ -861,3 +861,135 @@ and the live demo.
 | `CharacterCreator.application/Void/VoidSnapshot.cs`, `Rulesets/RulesetBuilder.cs`, `ImportReport.cs` | creation rules from VOID |
 | `CharacterCreator.infrastructure/Void/*`, `Content/2026-v07/void-snapshot.json` | reading them |
 | gembernodes `apps/charactercreator/`, `ingress/charactercreator-ingress.yaml`, `namespaces/charactercreator-namespace.yaml` | the demo |
+
+---
+
+## UX batch 1 — quieter picker, Undo, compact presets, FAQ (2026-11-07)
+
+_To understand this, start by reading `UX-REVIEW.md` §0 and §3 (P3, P4, P9, P11), then
+`CharacterCreator.WebApp.Client/Components/SkillPicker.razor`, then the toast part of
+`Components/BuildScreen.razor.cs` (`ShowToast`, `UndoAsync`)._
+
+The first batch from the UX review's §4. Everything is local on `claude/charactercreator`, on top of
+the review's own commit. Nothing is pushed.
+
+### What it does
+
+- **Picker rows (P3):**
+  - the name, and under it the cost and one status pill (`FindingWords.Status`): ✓ gekozen,
+    ⚠ vereist …, ✗ te duur, ⓘ leraar nodig. No pill for "can buy";
+  - one main action on the right:
+    - "+";
+    - the stepper for a skill the plan has (the same control as the chosen list);
+    - a named chain, "+ met Harnas I en Harnas II · 4 XP";
+    - or "⋯", which opens the details, holding the chain, *Toch toevoegen* and the choices left;
+  - rows that can't be bought are dimmed to 70%; *Alleen wat kan* filters the list down to them;
+  - the whole row opens the details. Targets are 44 px: add, stepper, ✕, tick box label;
+  - the category head counts what is chosen ("✓ 3 gekozen");
+  - on a phone the tick boxes hide behind *Meerdere kiezen*.
+- **Choices in words:** `FindingWords.Requirement` folds variants of one skill:
+  - "een Magiërspreuken A (Wit, Grijs of Zwart)" instead of "één van: …" with three full names;
+  - groups of different skills still say "één van: …", with each skill's variants folded;
+  - "4 XP in: …" folds the same way.
+- **Feedback and Undo (P4):** a dock at the bottom of the screen.
+  - After an add or remove, a toast says what happened, including what a chain brought along, and
+    offers *Ongedaan maken*. *Nieuw plan* no longer asks; it gets Undo too.
+  - Removing what other skills need still asks, in the dock, and the question takes focus.
+  - Save and print outcomes are toasts too. Errors stay until closed.
+  - Opening, importing and starting from a preset keep their banners: they describe the whole
+    plan.
+- **Presets (P9):**
+  - the button on top, and the whole card clickable (the link's `::after` covers the card);
+  - energy and hit points as chips;
+  - two lines of text, and the four dearest skills with "+ n meer";
+  - *Lees meer* (a `details`) holds the full text and list;
+  - filter chips *Vechten · Magie · Genezing · Ambacht · Ritueel* are links, `?soort=`.
+- **FAQ (P11):** each question a `details`, the first open. **Focus (P11):** after an add or "one
+  less" replaces the row's button, focus goes back to the row.
+
+### Decisions
+
+1. **Toast for 5 s, not 4, and it waits** while the pointer or focus is on it: a keyboard user
+   needs time to reach *Ongedaan maken* (WCAG 2.2.1). Errors stay until closed.
+2. **The removal question moved into the dock.** The picker now has a stepper, so "one less" can
+   start far from the chosen table. The question belongs where the click was.
+3. **A chain is the main action only when the plan can pay for it.** Otherwise the row offers "⋯"
+   like any other blocked row, so one click never overspends without saying so.
+4. **Cost under the name, not in its own column:** the action buttons differ in width, so a cost
+   column wandered from row to row.
+5. **Preset kinds are derived, not stored:** a kind counts when the preset spends at least 4 XP in
+   its categories (`PresetFacts`). No content change and no republish. Every preset gets one kind
+   or two.
+6. **Tick boxes stay on wide screens** (the README wish "add several at once"). On a phone they wait
+   behind a toggle.
+7. **Left for later:**
+   - the XP bar's motion and the row flash (P4): there is no XP bar until P1;
+   - the folding phone head (P11): it waits for P1/P2;
+   - short names (P11): they need an SL/EC check.
+
+### Gotchas
+
+- **A parent's `OnAfterRenderAsync` runs before its child's.** When a click triggered both the
+  removal question (`BuildScreen`) and the row's focus restore (`SkillPicker`), the child won and
+  took focus from the question. The fix:
+  - `Browser.RestoreFocusAsync` focuses only when focus was lost (the focused element left the
+    DOM);
+  - `Browser.FocusAsync` always focuses, for the question.
+- **`@onclick:stopPropagation` without a handler** on the action span and the details keeps their
+  clicks from also toggling the row.
+- **Blazor encodes "+" as `&#x2B;`** in rendered HTML; match around it in specs.
+- **The requirement wording reaches the PDF too:** `SheetComposer_specs` now expects "een
+  Genezingsspreuken A (".
+- **No hot reload:** the preview runs `dotnet run`, so restart it after a client change. Its
+  `CharacterCreator/.claude/launch.json` is local and not committed, as no launch config is in this
+  repository.
+- Once, `localStorage.clear()` followed by `location.href = '/?voorbeeld=…'` in one script left
+  the plan empty. Clicking a card or loading the address normally works every time. I didn't
+  reproduce it.
+
+### How it was checked
+
+- **Specs:** 333 green: 22 new and 1 changed (`SheetComposer_specs`), covering:
+  - the folding and the pills (`FindingWords_specs`);
+  - kinds, defining skills and slugs on the real seed (`PresetFacts_specs`);
+  - the card layout and the filter (`Presets_specs`);
+  - the accordion (`Faq_specs`).
+- **Release publish** of the WebApp, trimmed client included.
+- **In the browser, at 1280×900 and 375×812:**
+  - a chain add, its toast, and focus landing on the row's stepper;
+  - Undo of *Nieuw plan*, which restores Arts with all 12 skills;
+  - the removal question by keyboard: it takes focus, Tab and Enter pick *Alleen deze*, the toast
+    appears, and focus returns to the row's "+";
+  - the filter chips and *Lees meer*.
+- **Measured:**
+
+  | | Before | After |
+  |---|---|---|
+  | Presets page, desktop | 4,180 px | 2,241 px |
+  | Button from the card's top | 822 px | 17 px |
+  | Card height | ≈880 px | 300–390 px |
+  | FAQ on a phone | | 866 px |
+
+  The cards miss the review's ≈260 px: energy chips wrap to a second line on some.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.WebApp.Client/Components/SkillPicker.razor` | the rows, *Alleen wat kan*, *Meerdere kiezen*, focus restore |
+| `CharacterCreator.WebApp.Client/Components/BuildScreen.razor(.cs)` | the dock: toast, Undo, the removal question; *Nieuw plan* without asking |
+| `CharacterCreator.WebApp.Client/Words/FindingWords.cs` | folding variants (`Stems`, `Said`), `Status` |
+| `CharacterCreator.WebApp.Client/Words/SkillStatus.cs` | the pill and its kinds |
+| `CharacterCreator.WebApp.Client/Words/PresetFacts.cs` | preset kinds, defining skills, slugs |
+| `CharacterCreator.WebApp.Client/Words/PlanSummary.cs` | `EnergyClass`, shared with the presets page |
+| `CharacterCreator.WebApp.Client/Services/Browser.cs`, `WebApp/wwwroot/js/charactercreator.js` | `FocusAsync`, `RestoreFocusAsync` |
+| `CharacterCreator.WebApp/Components/Pages/Voorbeelden.razor` | compact cards, filter chips |
+| `CharacterCreator.WebApp/Components/Pages/Vragen.razor` | the accordion; the "not allowed" answer names Undo |
+| `CharacterCreator.WebApp/wwwroot/app.css` | rows, pills, dock, chips, cards, accordion |
+| `CharacterCreator.test/Words/*`, `Web/Presets_specs.cs`, `Web/Faq_specs.cs`, `Printing/SheetComposer_specs.cs` | the specs |
+| `UX-REVIEW.md`, `DESIGN.md` §5 | status, and "as built after the UX review" |
+
+### Next
+
+Batch 2: P5 (the first visit's "Hoe wil je beginnen?") and P7 (two main actions, the rest under
+*Meer*). Then P1, the sticky XP bar, which gives the toast its place above the bar.

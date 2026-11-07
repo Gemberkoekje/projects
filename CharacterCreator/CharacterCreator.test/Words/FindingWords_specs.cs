@@ -11,11 +11,21 @@ public sealed class FindingWords_specs
     private static readonly SkillKey ArmourI = new ("armour-i");
     private static readonly SkillKey HealerEl = new ("healer-a-elemental");
     private static readonly SkillKey HealerSp = new ("healer-a-spiritual");
+    private static readonly SkillKey MageWhite = new ("mage-a-white");
+    private static readonly SkillKey MageGrey = new ("mage-a-grey");
+    private static readonly SkillKey MageBlack = new ("mage-a-black");
 
     private static readonly ContentBook Content = ContentBook.Create(
         "r",
         "b",
-        [Skill(ArmourI, "Harnas I", "Armour I"), Skill(HealerEl, "Genezingsspreuken A (elementair)", "Healing Spells A (elemental)"), Skill(HealerSp, "Genezingsspreuken A (spiritueel)", "Healing Spells A (spiritual)")],
+        [
+            Skill(ArmourI, "Harnas I", "Armour I"),
+            Skill(HealerEl, "Genezingsspreuken A (elementair)", "Healing Spells A (elemental)"),
+            Skill(HealerSp, "Genezingsspreuken A (spiritueel)", "Healing Spells A (spiritual)"),
+            Skill(MageWhite, "Magiërspreuken A - Wit", "Mage Spells A - White"),
+            Skill(MageGrey, "Magiërspreuken A - Grijs", "Mage Spells A - Gray"),
+            Skill(MageBlack, "Magiërspreuken A - Zwart", "Mage Spells A - Black"),
+        ],
         [],
         []).Value;
 
@@ -32,9 +42,60 @@ public sealed class FindingWords_specs
     }
 
     [Test]
-    public void a_choice_says_one_of()
-        => Dutch.Requirement(RequirementGroup.Any(1, HealerEl, HealerSp))
-            .Should().Be("één van: Genezingsspreuken A (elementair), Genezingsspreuken A (spiritueel)");
+    public void a_choice_between_variants_of_one_skill_names_it_once()
+    {
+        Dutch.Requirement(RequirementGroup.Any(1, HealerEl, HealerSp)).Should().Be("een Genezingsspreuken A (elementair of spiritueel)");
+        English.Requirement(RequirementGroup.Any(1, MageWhite, MageGrey, MageBlack)).Should().Be("a Mage Spells A (White, Gray or Black)");
+    }
+
+    [Test]
+    public void a_choice_between_different_skills_says_one_of_and_still_folds_the_variants()
+        => Dutch.Requirement(RequirementGroup.Any(1, ArmourI, MageWhite, MageGrey))
+            .Should().Be("één van: Harnas I, Magiërspreuken A (Wit of Grijs)");
+
+    [Test]
+    public void xp_in_variants_of_one_skill_is_folded_too()
+        => Dutch.Requirement(RequirementGroup.Points(4, MageWhite, MageGrey, MageBlack))
+            .Should().Be("4 XP in: Magiërspreuken A (Wit, Grijs of Zwart)");
+
+    [Test]
+    public void a_status_pill_says_nothing_for_a_skill_that_can_simply_be_bought()
+        => Dutch.Status(new SkillOption { Skill = ArmourI, Offered = true, Reasons = [] }, held: false).Should().Be(SkillStatus.None);
+
+    [Test]
+    public void a_status_pill_says_chosen_for_a_skill_the_plan_has()
+        => Dutch.Status(new SkillOption { Skill = ArmourI, Offered = true, Reasons = [new NotEnoughXp { Skill = ArmourI, Needed = 2, Available = 0 }] }, held: true)
+            .Should().BeEquivalentTo(new { Kind = StatusKind.Chosen, Text = "gekozen" });
+
+    [Test]
+    public void a_status_pill_puts_a_missing_prerequisite_first()
+    {
+        var option = new SkillOption
+        {
+            Skill = HealerEl,
+            Offered = true,
+            Reasons = [new NotEnoughXp { Skill = HealerEl, Needed = 4, Available = 1 }, new MissingPrerequisite { Skill = HealerEl, Group = RequirementGroup.Any(1, ArmourI) }],
+        };
+
+        var status = Dutch.Status(option, held: false);
+
+        status.Kind.Should().Be(StatusKind.Warning);
+        status.Text.Should().Be("vereist Harnas I");
+        status.Full.Should().Contain("niet genoeg XP").And.Contain("vereist Harnas I");
+    }
+
+    [Test]
+    public void a_status_pill_says_too_dear_in_few_words()
+    {
+        var status = English.Status(new SkillOption { Skill = ArmourI, Offered = true, Reasons = [new NotEnoughXp { Skill = ArmourI, Needed = 2, Available = 1 }] }, held: false);
+
+        status.Should().BeEquivalentTo(new { Kind = StatusKind.Blocked, Text = "too dear", Full = "not enough XP: needs 2, 1 left" });
+    }
+
+    [Test]
+    public void a_status_pill_says_a_teacher_is_needed_as_something_to_know()
+        => English.Status(new SkillOption { Skill = ArmourI, Offered = true, Reasons = [new NeedsTeacher { Skill = ArmourI }] }, held: false)
+            .Should().BeEquivalentTo(new { Kind = StatusKind.Info, Text = "needs a teacher" });
 
     [Test]
     public void a_group_needing_more_than_one_purchase_says_how_many()

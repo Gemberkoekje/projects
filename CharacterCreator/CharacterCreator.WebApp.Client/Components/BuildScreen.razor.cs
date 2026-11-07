@@ -40,10 +40,16 @@ public sealed partial class BuildScreen
     private Removal pending = Removal.None;
     private PresetContent offeredPreset = default!;
     private bool presetOffered;
-    private bool confirmNew;
     private bool showSaved;
     private bool printing;
     private Notice notice = Notice.None;
+
+    private Toast toast = Toast.None;
+    private int toastSerial;
+    private bool toastHeld;
+    private bool toastExpired;
+    private bool focusQuestion;
+    private SkillKey restoreRow;
 
     private bool MadeOnAnotherRuleset => madeOn.Length > 0 && madeOn != data.Ruleset.Id;
 
@@ -113,9 +119,36 @@ public sealed partial class BuildScreen
 
     private static DateTimeOffset Now() => new (Clock.UtcNow(), TimeSpan.Zero);
 
-    private Task AddAsync(Holdings purchases) => ChangeAsync(plan with { Planned = plan.Planned.Plus(purchases) });
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The removal question takes focus, so a keyboard user lands on its answers; once answered,
+        // focus goes back to the row it came from if the answer's buttons took it along.
+        if (focusQuestion)
+        {
+            focusQuestion = false;
+            await Browser.FocusAsync(".cc-dock [role=alertdialog] button");
+        }
+        else if (!restoreRow.IsEmpty)
+        {
+            var row = $"#cc-pick-{restoreRow}";
+            restoreRow = default;
+            await Browser.RestoreFocusAsync($"{row} [data-row-action]", $"{row} .cc-skill-name", "#cc-search");
+        }
+    }
 
-    private Task MoreAsync(SkillKey skill) => ChangeAsync(plan.WithPurchase(skill));
+    private async Task AddAsync(Holdings purchases)
+    {
+        var before = Snapshot();
+        await ChangeAsync(plan with { Planned = plan.Planned.Plus(purchases) });
+        var cost = Ui.Number(SkillRules.Spent(purchases, data.Rules));
+        var text = purchases.Skills.Count == 1
+            ? Ui.T($"{words.Name(purchases.Skills[0])} toegevoegd · {cost} XP", $"Added {words.Name(purchases.Skills[0])} · {cost} XP")
+            : Ui.T($"Toegevoegd: {Names(purchases.Skills)} · {cost} XP", $"Added: {Names(purchases.Skills)} · {cost} XP");
+        ShowToast(NoticeKind.Success, text, before);
+    }
+
+    private Task MoreAsync(SkillKey skill) => AddAsync(Holdings.Of((skill, 1)));
 
     /// <summary>One purchase less; when other planned skills need it, ask first.</summary>
     private Task LessAsync(SkillKey skill) => RemoveAsync(skill, all: false);
@@ -123,6 +156,10 @@ public sealed partial class BuildScreen
     /// <summary>Every purchase of the skill; when other planned skills need it, ask first.</summary>
     private Task RemoveAllAsync(SkillKey skill) => RemoveAsync(skill, all: true);
 
+    /// <summary>
+    /// A removal nothing depends on happens at once, with Undo (UX-REVIEW.md P4); one that others
+    /// need asks whether they go too, because that is a real choice, not a safety net.
+    /// </summary>
     private async Task RemoveAsync(SkillKey skill, bool all)
     {
         // Dependants looks at one purchase less; for all of them, look from a plan with one left.
@@ -131,16 +168,20 @@ public sealed partial class BuildScreen
         var dependants = PlanEvaluator.Dependants(data.Rules, from, skill);
         if (dependants.Count == 0)
         {
+            var before = Snapshot();
             await ChangeAsync(plan with { Planned = plan.Planned.Add(skill, all ? -times : -1) });
+            ShowToast(NoticeKind.Success, Removed(skill, all || times == 1, []), before);
             return;
         }
 
         pending = new Removal(skill, all, dependants);
+        focusQuestion = true;
     }
 
     private async Task ConfirmRemovalAsync(bool withDependants)
     {
         var removal = pending;
+        var before = Snapshot();
         var planned = plan.Planned.Add(removal.Skill, removal.All ? -plan.Planned[removal.Skill] : -1);
         if (withDependants)
         {
@@ -148,6 +189,98 @@ public sealed partial class BuildScreen
         }
 
         await ChangeAsync(plan with { Planned = planned });
+        restoreRow = removal.Skill;
+        ShowToast(NoticeKind.Success, Removed(removal.Skill, removal.All || before.Plan.Planned[removal.Skill] == 1, withDependants ? removal.Dependants : []), before);
+    }
+
+    private void CancelRemoval()
+    {
+        restoreRow = pending.Skill;
+        pending = Removal.None;
+    }
+
+    private string Removed(SkillKey skill, bool entirely, IReadOnlyList<SkillKey> along)
+    {
+        var skillName = words.Name(skill);
+        var text = entirely ? Ui.T($"{skillName} verwijderd", $"Removed {skillName}") : Ui.T($"{skillName}: een minder", $"{skillName}: one less");
+        return along.Count == 0 ? text : $"{text}, {Ui.T("met", "with")} {Names(along)}";
+    }
+
+    private string Names(IEnumerable<SkillKey> skills)
+    {
+        var names = skills.Select(words.Name).ToList();
+        return names.Count <= 1
+            ? string.Join(string.Empty, names)
+            : $"{string.Join(", ", names.SkipLast(1))} {Ui.T("en", "and")} {names[^1]}";
+    }
+
+    /// <summary>The plan as it is, for Undo.</summary>
+    private PlanSnapshot Snapshot() => new (name, plan, planId, madeOn);
+
+    /// <summary>
+    /// A toast above the bottom of the screen, where the eye is after a click (UX-REVIEW.md P4). It
+    /// leaves after five seconds, but never while the pointer or focus is on it; an error stays until
+    /// closed.
+    /// </summary>
+    private void ShowToast(NoticeKind kind, string text, PlanSnapshot undo)
+    {
+        toast = new Toast(kind, text, undo);
+        toastExpired = false;
+        var serial = ++toastSerial;
+        if (kind != NoticeKind.Error)
+        {
+            _ = HideToastLaterAsync(serial);
+        }
+    }
+
+    private async Task HideToastLaterAsync(int serial)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        if (serial != toastSerial)
+        {
+            return;
+        }
+
+        if (toastHeld)
+        {
+            toastExpired = true;
+            return;
+        }
+
+        toast = Toast.None;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void HoldToast(bool held)
+    {
+        toastHeld = held;
+        if (!held && toastExpired)
+        {
+            toast = Toast.None;
+            toastExpired = false;
+        }
+    }
+
+    private void CloseToast()
+    {
+        toast = Toast.None;
+        toastHeld = false;
+        toastExpired = false;
+    }
+
+    private async Task UndoAsync()
+    {
+        var before = toast.Undo;
+        name = before.Name;
+        plan = before.Plan;
+        planId = before.PlanId;
+        madeOn = before.MadeOn;
+        pending = Removal.None;
+        notice = Notice.None;
+        Evaluate();
+        await KeepAsync();
+        toastHeld = false;
+        ShowToast(NoticeKind.Success, Ui.T("Ongedaan gemaakt.", "Undone."), PlanSnapshot.None);
     }
 
     private async Task NameChangedAsync(ChangeEventArgs args)
@@ -207,18 +340,14 @@ public sealed partial class BuildScreen
         Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("voorbeeld", (string?)null), replace: true);
     }
 
+    /// <summary>A new plan at once, with Undo instead of "are you sure?" (UX-REVIEW.md P4).</summary>
     private async Task NewAsync()
     {
-        if (!plan.Planned.IsEmpty && !confirmNew)
-        {
-            confirmNew = true;
-            return;
-        }
-
-        confirmNew = false;
+        var before = Snapshot();
         name = string.Empty;
         planId = string.Empty;
         await ChangeAsync(Plan.NewCharacter(Holdings.None));
+        ShowToast(NoticeKind.Success, Ui.T("Nieuw plan begonnen.", "Started a new plan."), before.Plan.Planned.IsEmpty && before.Name.Length == 0 ? PlanSnapshot.None : before);
     }
 
     private async Task SaveAsync()
@@ -229,11 +358,11 @@ public sealed partial class BuildScreen
             planId = file.Id;
             saved = await Plans.ListAsync();
             await KeepAsync();
-            notice = new Notice(NoticeKind.Success, Ui.T("Opgeslagen in deze browser.", "Saved in this browser."), []);
+            ShowToast(NoticeKind.Success, Ui.T("Opgeslagen in deze browser.", "Saved in this browser."), PlanSnapshot.None);
         }
         else
         {
-            notice = new Notice(NoticeKind.Error, Ui.T("Opslaan lukte niet: deze browser bewaart niets voor deze site. Exporteer het plan als bestand.", "Saving failed: this browser keeps nothing for this site. Export the plan as a file."), []);
+            ShowToast(NoticeKind.Error, Ui.T("Opslaan lukte niet: deze browser bewaart niets voor deze site. Exporteer het plan als bestand.", "Saving failed: this browser keeps nothing for this site. Export the plan as a file."), PlanSnapshot.None);
         }
     }
 
@@ -260,7 +389,6 @@ public sealed partial class BuildScreen
     private async Task PrintAsync()
     {
         printing = true;
-        notice = Notice.None;
         try
         {
             using var response = await Http.PostAsJsonAsync(new Uri("api/plans/sheet", UriKind.Relative), Current(), RulesetJsonContext.Default.PlanFile);
@@ -269,7 +397,7 @@ public sealed partial class BuildScreen
                 var message = response.StatusCode == System.Net.HttpStatusCode.TooManyRequests
                     ? Ui.T("Even geduld: er zijn net veel PDF's gemaakt. Probeer het zo nog eens.", "Hold on: many PDFs were just made. Try again in a moment.")
                     : Ui.T("De PDF kon niet gemaakt worden. Probeer het later nog eens.", "The PDF could not be made. Try again later.");
-                notice = new Notice(NoticeKind.Error, message, []);
+                ShowToast(NoticeKind.Error, message, PlanSnapshot.None);
                 return;
             }
 
@@ -278,7 +406,7 @@ public sealed partial class BuildScreen
         }
         catch (System.Net.Http.HttpRequestException)
         {
-            notice = new Notice(NoticeKind.Error, Ui.T("De server is niet bereikbaar; de PDF kon niet gemaakt worden.", "The server can't be reached; the PDF could not be made."), []);
+            ShowToast(NoticeKind.Error, Ui.T("De server is niet bereikbaar; de PDF kon niet gemaakt worden.", "The server can't be reached; the PDF could not be made."), PlanSnapshot.None);
         }
         finally
         {
@@ -362,9 +490,25 @@ public sealed partial class BuildScreen
         Error,
     }
 
-    /// <summary>A message above the screen, after saving, opening, importing or starting from a preset.</summary>
+    /// <summary>A message above the screen, after opening, importing or starting from a preset.</summary>
     private sealed record Notice(NoticeKind Kind, string Text, IReadOnlyList<string> Items)
     {
         public static Notice None { get; } = new (NoticeKind.None, string.Empty, []);
+    }
+
+    /// <summary>A toast at the bottom of the screen, with what Undo goes back to.</summary>
+    private sealed record Toast(NoticeKind Kind, string Text, PlanSnapshot Undo)
+    {
+        public static Toast None { get; } = new (NoticeKind.None, string.Empty, PlanSnapshot.None);
+
+        public bool CanUndo => Undo.IsSet;
+    }
+
+    /// <summary>The plan as it was before a change, for Undo.</summary>
+    private sealed record PlanSnapshot(string Name, Plan Plan, string PlanId, string MadeOn)
+    {
+        public static PlanSnapshot None { get; } = new (string.Empty, Plan.NewCharacter(Holdings.None), string.Empty, string.Empty) { IsSet = false };
+
+        public bool IsSet { get; init; } = true;
     }
 }

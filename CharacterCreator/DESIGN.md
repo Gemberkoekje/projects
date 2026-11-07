@@ -729,9 +729,33 @@ The footer is the portal's.
 - **NL/EN:** a link in the crest bar sets a language cookie (`charactercreator.taal`) and reloads
   the page. Beheer and the sign-in pages stay Dutch.
 
+*As built after the UX review, batch 1 (UX-REVIEW.md P3, P4, P9, P11):*
+
+- **Picker rows:** one status pill (✓ chosen, ⚠ needs …, ✗ too dear, ⓘ teacher; none for "can
+  buy") and one main action:
+  - "+", or the stepper for a skill the plan has;
+  - a named chain ("+ met Harnas II · 4 XP") when it decides everything and fits the XP left;
+  - otherwise "⋯", which opens the details with the chain and *add anyway*.
+
+  Rows that can't be bought are dimmed. *Only what fits* filters the list, and the whole row opens
+  the details.
+- **Choices in words:** variants of one skill are said once: "een Magiërspreuken A (Wit, Grijs of
+  Zwart)". The screen and the PDF both use this.
+- **Undo instead of "are you sure?":** adding, removing and *new plan* happen at once. A toast at the
+  bottom then says what happened and offers *Undo*. Removing what other skills need still asks,
+  in that same spot.
+- **Several at once** stays: the tick boxes show on wide screens; on a phone they sit behind *Pick
+  several*.
+
 **Voorbeelden / Presets**: the presets as cards, with archetype, text and skills, and *start from
 this*. As built: *start from this* opens the build screen with `?voorbeeld={key}`, which asks
-first when the current plan has skills.
+first when the current plan has skills. After the UX review the cards are compact:
+- the button on top, and the whole card clickable;
+- energy and hit points;
+- two lines of text and the four dearest skills, the rest under *Lees meer*.
+
+Filter chips (*Vechten · Magie · Genezing · Ambacht · Ritueel*) are links (`?soort=`). A preset counts
+as a kind when it spends at least 4 XP in that kind's categories.
 
 **Mijn personages / My characters** (signed in):
 

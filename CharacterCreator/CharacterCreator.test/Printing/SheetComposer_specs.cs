@@ -64,7 +64,7 @@ public sealed class SheetComposer_specs
         var sheet = SheetComposer.Compose(Data, Paladin, Ui.Dutch, Now);
 
         sheet.SkillTexts.Should().HaveCount(Paladin.Skills.Count);
-        sheet.SkillTexts.Single(text => text.Title == "Paladijn").Facts.Should().Contain(fact => fact.Label == "Vereist" && fact.Value.StartsWith("één van: Genezingsspreuken A", StringComparison.Ordinal));
+        sheet.SkillTexts.Single(text => text.Title == "Paladijn").Facts.Should().Contain(fact => fact.Label == "Vereist" && fact.Value.StartsWith("een Genezingsspreuken A (", StringComparison.Ordinal));
         sheet.Spells.Should().HaveCount(8);
         sheet.Loresheets.Should().ContainSingle().Which.Url.Should().StartWith("https://the-vortex.nl/");
         sheet.XpPerEvent.Rows.Should().HaveCount(SheetComposer.Events);

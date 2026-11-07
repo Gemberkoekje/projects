@@ -116,22 +116,11 @@ else
 
         <div class="cc-build-grid">
             <div class="cc-area-chosen">
-                @if (pending.IsWaiting)
-                {
-                    <div class="cc-banner cc-banner--service" role="alertdialog" aria-label="@Ui.T("Verwijderen bevestigen", "Confirm removal")">
-                        <b>@Ui.T($"{words.Name(pending.Skill)} is nodig voor:", $"{words.Name(pending.Skill)} is needed for:") @string.Join(", ", pending.Dependants.Select(words.Name))</b>
-                        <span class="cc-banner-actions">
-                            <button type="button" class="va-btn va-btn--danger cc-btn-sm" @onclick="() => ConfirmRemovalAsync(true)">@Ui.T("Die ook verwijderen", "Remove those too")</button>
-                            <button type="button" class="va-btn va-btn--secondary cc-btn-sm" @onclick="() => ConfirmRemovalAsync(false)">@Ui.T("Alleen deze", "Only this one")</button>
-                            <button type="button" class="va-btn va-btn--ghost cc-btn-sm" @onclick="() => pending = Removal.None">@Ui.T("Annuleren", "Cancel")</button>
-                        </span>
-                    </div>
-                }
                 <ChosenSkills Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" OnMore="MoreAsync" OnLess="LessAsync" OnRemove="RemoveAllAsync" />
             </div>
 
             <div class="cc-area-picker">
-                <SkillPicker Ui="Ui" Words="words" Data="data" Plan="plan" Options="options" OnAdd="AddAsync" />
+                <SkillPicker Ui="Ui" Words="words" Data="data" Plan="plan" Options="options" Remaining="evaluation.Remaining" OnAdd="AddAsync" OnLess="LessAsync" />
             </div>
 
             <div class="cc-area-summary">
@@ -151,18 +140,7 @@ else
             </label>
             <button type="button" class="va-btn va-btn--ghost" aria-expanded="@(showSaved ? "true" : "false")" @onclick="() => showSaved = !showSaved">@Ui.T($"Opgeslagen ({saved.Count})", $"Saved ({saved.Count})")</button>
             <a class="va-btn va-btn--ghost" href="voorbeelden">@Ui.T("Voorbeelden", "Presets")</a>
-            @if (confirmNew)
-            {
-                <span class="cc-confirm">
-                    @Ui.T("Huidig plan wissen?", "Clear the current plan?")
-                    <button type="button" class="va-btn va-btn--danger cc-btn-sm" @onclick="NewAsync">@Ui.T("Ja, nieuw plan", "Yes, new plan")</button>
-                    <button type="button" class="va-btn va-btn--ghost cc-btn-sm" @onclick="() => confirmNew = false">@Ui.T("Annuleren", "Cancel")</button>
-                </span>
-            }
-            else
-            {
-                <button type="button" class="va-btn va-btn--ghost" @onclick="NewAsync">@Ui.T("Nieuw plan", "New plan")</button>
-            }
+            <button type="button" class="va-btn va-btn--ghost" @onclick="NewAsync">@Ui.T("Nieuw plan", "New plan")</button>
 
             @if (showSaved)
             {
@@ -189,6 +167,39 @@ else
                 </div>
             }
         </section>
+
+        @* Feedback where the eye is after a click (UX-REVIEW.md P4): a toast with Undo, and the one
+           question left (removing what other skills need), at the bottom of the screen. The live
+           region is always there, so screen readers hear the toast appear. *@
+        <div class="cc-dock">
+            @if (pending.IsWaiting)
+            {
+                <div class="cc-toast cc-toast--question" role="alertdialog" aria-labelledby="cc-question">
+                    <p id="cc-question">
+                        <b>@Ui.T($"{words.Name(pending.Skill)} is nodig voor", $"{words.Name(pending.Skill)} is needed for") @Names(pending.Dependants).</b>
+                        @Ui.T("Die ook verwijderen?", "Remove those too?")
+                    </p>
+                    <span class="cc-toast-actions">
+                        <button type="button" class="va-btn va-btn--danger cc-btn-sm" @onclick="() => ConfirmRemovalAsync(true)">@Ui.T("Die ook verwijderen", "Remove those too")</button>
+                        <button type="button" class="va-btn va-btn--secondary cc-btn-sm" @onclick="() => ConfirmRemovalAsync(false)">@Ui.T("Alleen deze", "Only this one")</button>
+                        <button type="button" class="va-btn va-btn--ghost cc-btn-sm" @onclick="CancelRemoval">@Ui.T("Annuleren", "Cancel")</button>
+                    </span>
+                </div>
+            }
+            <div class="cc-dock-live" aria-live="polite">
+                @if (toast.Kind != NoticeKind.None && !pending.IsWaiting)
+                {
+                    <div class="cc-toast cc-toast--@toast.Kind.ToString().ToLowerInvariant()" @onmouseenter="() => HoldToast(true)" @onmouseleave="() => HoldToast(false)" @onfocusin="() => HoldToast(true)" @onfocusout="() => HoldToast(false)">
+                        <span class="cc-toast-text">@toast.Text</span>
+                        @if (toast.CanUndo)
+                        {
+                            <button type="button" class="cc-toast-undo" @onclick="UndoAsync">@Ui.T("Ongedaan maken", "Undo")</button>
+                        }
+                        <button type="button" class="cc-toast-close" aria-label="@Ui.T("Sluiten", "Close")" @onclick="CloseToast">✕</button>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 }
 

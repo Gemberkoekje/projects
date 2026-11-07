@@ -30,18 +30,26 @@ public sealed class FindingWords(Ui ui, ContentBook content)
             : skill.ToString();
     }
 
-    /// <summary>What a prerequisite group asks for, without a verb: "Harnas I", "one of: …", "4 XP in: …".</summary>
+    /// <summary>
+    /// What a prerequisite group asks for, without a verb: "Harnas I", "one of: …", "4 XP in: …".
+    /// Skills that share a name up to " - " or " (" are said once, with their variants:
+    /// "een Magiërspreuken A (Wit, Grijs of Zwart)".
+    /// </summary>
     /// <param name="group">The group.</param>
     /// <returns>The words.</returns>
     public string Requirement(RequirementGroup group)
     {
         ArgumentNullException.ThrowIfNull(group);
 
-        var names = string.Join(", ", group.Skills.Select(Name).Distinct());
+        var stems = Stems(group.Skills.Select(Name).Distinct());
+        var names = string.Join(", ", stems.Select(Said));
         var times = group.Amount > 1 ? $" {group.Amount}×" : string.Empty;
+        var shared = stems.Count == 1 && stems[0].Names.Count > 1;
         return group.Kind switch
         {
             RequirementKind.Any when group.Skills.Count == 1 => $"{names}{times}",
+            RequirementKind.Any when shared && group.Amount == 1 => $"{ui.T("een", "a")} {names}",
+            RequirementKind.Any when shared => $"{names}{times}",
             RequirementKind.Any => $"{ui.T("één van", "one of")}: {names}{times}",
             RequirementKind.Points => $"{ui.Number(group.Amount)} XP {ui.T("in", "in")}: {names}",
             RequirementKind.Extra when group.Amount == 1 => ui.T("een extra vaardigheid", "an extra skill"),
@@ -87,6 +95,41 @@ public sealed class FindingWords(Ui ui, ContentBook content)
             : string.Join("; ", option.Reasons.Select(Describe).Distinct());
     }
 
+    /// <summary>
+    /// The picker's status pill (UX-REVIEW.md P3): the one reason that matters most, in few words.
+    /// Nothing for a skill that can simply be bought: its add button says so already.
+    /// </summary>
+    /// <param name="option">The skill's option.</param>
+    /// <param name="held">Whether the plan has the skill already.</param>
+    /// <returns>The pill; <see cref="SkillStatus.None"/> for none.</returns>
+    public SkillStatus Status(SkillOption option, bool held)
+    {
+        ArgumentNullException.ThrowIfNull(option);
+
+        if (held)
+        {
+            return Pill(StatusKind.Chosen, ui.T("gekozen", "chosen"), ui.T("gekozen", "chosen"));
+        }
+
+        var full = State(option);
+        var missing = option.Reasons.OfType<MissingPrerequisite>().Select(reason => Requirement(reason.Group)).Distinct().ToList();
+        if (missing.Count > 0)
+        {
+            return Pill(StatusKind.Warning, $"{ui.T("vereist", "needs")} {string.Join(ui.T(" en ", " and "), missing)}", full);
+        }
+
+        var main = option.Reasons.OrderByDescending(reason => reason.Severity).FirstOrDefault();
+        return main switch
+        {
+            null => SkillStatus.None,
+            NotEnoughXp => Pill(StatusKind.Blocked, ui.T("te duur", "too dear"), full),
+            NeedsTeacher => Pill(StatusKind.Info, ui.T("leraar nodig", "needs a teacher"), full),
+            _ when main.Severity == FindingSeverity.Problem => Pill(StatusKind.Blocked, Describe(main), full),
+            _ when main.Severity == FindingSeverity.Warning => Pill(StatusKind.Warning, Describe(main), full),
+            _ => Pill(StatusKind.Info, Describe(main), full),
+        };
+    }
+
     /// <summary>An energy or imbue type, as VOID names it, in the screen's language.</summary>
     /// <param name="type">VOID's name, such as <c>Elemental ritual</c>.</param>
     /// <returns>The words.</returns>
@@ -100,4 +143,53 @@ public sealed class FindingWords(Ui ui, ContentBook content)
         "SPIRITUAL RITUAL" => ui.T("Spiritueel ritueel", "Spiritual ritual"),
         _ => type ?? string.Empty,
     };
+
+    /// <summary>
+    /// Names grouped by the part before " - " or " (", in order: "Magiërspreuken A - Wit" and
+    /// "Magiërspreuken A - Grijs" become one stem with two variants. A name without either stays whole.
+    /// </summary>
+    private static List<Stem> Stems(IEnumerable<string> names)
+    {
+        var stems = new List<Stem>();
+        foreach (var name in names)
+        {
+            var (stem, variant) = Split(name);
+            var found = variant.Length > 0 ? stems.Find(candidate => candidate.Name == stem && candidate.Variants.Count > 0) : null;
+            if (found is null)
+            {
+                stems.Add(new Stem(stem, [name], variant.Length > 0 ? [variant] : []));
+            }
+            else
+            {
+                found.Names.Add(name);
+                found.Variants.Add(variant);
+            }
+        }
+
+        return stems;
+    }
+
+    private static (string Stem, string Variant) Split(string name)
+    {
+        var dash = name.IndexOf(" - ", StringComparison.Ordinal);
+        if (dash > 0)
+        {
+            return (name[..dash], name[(dash + 3)..].Trim());
+        }
+
+        var bracket = name.IndexOf(" (", StringComparison.Ordinal);
+        return bracket > 0 && name.EndsWith(')')
+            ? (name[..bracket], name[(bracket + 2)..^1].Trim())
+            : (name, string.Empty);
+    }
+
+    private static SkillStatus Pill(StatusKind kind, string text, string full) => new () { Kind = kind, Text = text, Full = full };
+
+    /// <summary>A stem in words: its one name as it is, or "stem (a, b or c)" for several.</summary>
+    private string Said(Stem stem) => stem.Names.Count == 1
+        ? stem.Names[0]
+        : $"{stem.Name} ({string.Join(", ", stem.Variants.SkipLast(1))} {ui.T("of", "or")} {stem.Variants[^1]})";
+
+    /// <summary>Skill names sharing a stem, and how they differ.</summary>
+    private sealed record Stem(string Name, List<string> Names, List<string> Variants);
 }

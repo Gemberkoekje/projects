@@ -1,50 +1,52 @@
 @page "/vragen"
 @inject CookieUiLanguage Languages
 
-@* The FAQ, with the differences from the old builder (DESIGN.md §3.6). *@
+@* The FAQ, with the differences from the old builder (DESIGN.md §3.6), as an accordion
+   (UX-REVIEW.md P11): the questions folded, so the page can be scanned. Plain details elements, so it
+   folds without the browser running anything. *@
 <PageTitle>Character Creator · @Ui.T("Vragen", "FAQ")</PageTitle>
 
 <h1>@Ui.T("Vragen", "FAQ")</h1>
 
 <div class="cc-faq">
-    <section class="cc-card">
-        <h2>@Ui.T("Wat is dit?", "What is this?")</h2>
+    <details class="cc-card" open>
+        <summary><h2>@Ui.T("Wat is dit?", "What is this?")</h2></summary>
         <p>
             @Ui.T(
                 "Een hulpmiddel om een personage voor Vortex Adventures te plannen: welke vaardigheden je kiest, wat ze kosten en wat ze nodig hebben. De regels komen uit VOID, de administratie van Vortex, zodat je plant wat de infobalie ook doet.",
                 "A tool to plan a character for Vortex Adventures: which skills you pick, what they cost and what they need. The rules come from VOID, Vortex's administration, so what you plan is what the desk will do.")
         </p>
-    </section>
+    </details>
 
-    <section class="cc-card">
-        <h2>@Ui.T("Waar blijft mijn personage?", "Where is my character kept?")</h2>
+    <details class="cc-card">
+        <summary><h2>@Ui.T("Waar blijft mijn personage?", "Where is my character kept?")</h2></summary>
         <p>
             @Ui.T(
                 "In deze browser: het plan waar je aan werkt wordt na elke wijziging bewaard, en met Opslaan zet je het in je lijst. Een andere browser of een privévenster ziet dat niet. Wil je het meenemen, gebruik dan Exporteren en Importeren.",
                 "In this browser: the plan you are working on is kept after every change, and Save puts it in your list. Another browser or a private window won't see it. To take it along, use Export and Import.")
         </p>
-    </section>
+    </details>
 
-    <section class="cc-card">
-        <h2>@Ui.T("Kan ik mijn personage uit de oude builder meenemen?", "Can I bring my character from the old builder?")</h2>
+    <details class="cc-card">
+        <summary><h2>@Ui.T("Kan ik mijn personage uit de oude builder meenemen?", "Can I bring my character from the old builder?")</h2></summary>
         <p>
             @Ui.T(
                 "Ja. Exporteer het in de oude builder (een .dat-bestand) en kies hier Importeren. Vaardigheden die niet meer in het boek staan, komen niet mee; het bouwscherm zegt welke.",
                 "Yes. Export it in the old builder (a .dat file) and choose Import here. Skills that are no longer in the book stay behind; the build screen says which.")
         </p>
-    </section>
+    </details>
 
-    <section class="cc-card">
-        <h2>@Ui.T("Kan ik een vaardigheid kiezen die niet mag?", "Can I pick a skill I'm not allowed?")</h2>
+    <details class="cc-card">
+        <summary><h2>@Ui.T("Kan ik een vaardigheid kiezen die niet mag?", "Can I pick a skill I'm not allowed?")</h2></summary>
         <p>
             @Ui.T(
-                "Ja: plannen weigert niets. Het bouwscherm zegt bij elke vaardigheid wat er niet klopt, en \"+ met vereisten\" voegt toe wat ze nodig heeft.",
-                "Yes: planning refuses nothing. The build screen says for each skill what doesn't fit, and \"+ with prerequisites\" adds what it needs.")
+                "Ja: plannen weigert niets. Het bouwscherm zegt bij elke vaardigheid wat er niet klopt. Een knop als \"+ met Harnas II\" voegt toe wat ze nodig heeft; onder ⋯ kies je zelf, of voeg je haar toch toe. Iets verkeerd toegevoegd? Kies \"Ongedaan maken\" onderin.",
+                "Yes: planning refuses nothing. The build screen says for each skill what doesn't fit. A button like \"+ with Armour II\" adds what it needs; under ⋯ you choose yourself, or add it anyway. Added something by mistake? Choose \"Undo\" at the bottom.")
         </p>
-    </section>
+    </details>
 
-    <section class="cc-card">
-        <h2>@Ui.T("Waarom zijn sommige regels anders dan in de oude builder?", "Why do some rules differ from the old builder?")</h2>
+    <details class="cc-card">
+        <summary><h2>@Ui.T("Waarom zijn sommige regels anders dan in de oude builder?", "Why do some rules differ from the old builder?")</h2></summary>
         <p>
             @Ui.T(
                 "De oude builder had zijn eigen kopie van de regels van 2023. Hier gelden de regels zoals VOID ze kent, voor het boek van 2026. Bij een verschil heeft VOID gelijk. De belangrijkste:",
@@ -76,25 +78,25 @@
                 </tr>
             </tbody>
         </table>
-    </section>
+    </details>
 
-    <section class="cc-card">
-        <h2>@Ui.T("Wat betekent \"voorlopige regels\"?", "What do \"provisional rules\" mean?")</h2>
+    <details class="cc-card">
+        <summary><h2>@Ui.T("Wat betekent \"voorlopige regels\"?", "What do \"provisional rules\" mean?")</h2></summary>
         <p>
             @Ui.T(
                 "Zolang de regels nog niet uit VOID zijn ingelezen, komen ze uit het concept van het regelboek. Kosten en vereisten kunnen dan nog veranderen.",
                 "Until the rules have been read from VOID, they come from the rulebook draft. Costs and prerequisites may still change.")
         </p>
-    </section>
+    </details>
 
-    <section class="cc-card">
-        <h2>@Ui.T("Kan ik mijn personage insturen?", "Can I send my character in?")</h2>
+    <details class="cc-card">
+        <summary><h2>@Ui.T("Kan ik mijn personage insturen?", "Can I send my character in?")</h2></summary>
         <p>
             @Ui.T(
                 "Nog niet. Neem je plan mee naar de infobalie, of gebruik de envelop bij het uitchecken.",
                 "Not yet. Take your plan to the desk, or use the envelope at checkout.")
         </p>
-    </section>
+    </details>
 </div>
 
 @code {
