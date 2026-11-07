@@ -1,6 +1,7 @@
 @inject RulesetClient Rulesets
 @inject PlanStore Plans
 @inject Browser Browser
+@inject HttpClient Http
 @inject NavigationManager Navigation
 
 @* The build screen (DESIGN.md §5); its logic is in BuildScreen.razor.cs. *@
@@ -140,6 +141,9 @@ else
 
         <section class="cc-card cc-actions" aria-label="@Ui.T("Plan bewaren", "Keep the plan")">
             <button type="button" class="va-btn va-btn--primary" @onclick="SaveAsync">@Ui.T("Opslaan", "Save")</button>
+            <button type="button" class="va-btn va-btn--secondary" disabled="@printing" @onclick="PrintAsync">
+                @(printing ? Ui.T("PDF wordt gemaakt…", "Making the PDF…") : Ui.T("Afdrukken (PDF)", "Print (PDF)"))
+            </button>
             <button type="button" class="va-btn va-btn--secondary" @onclick="ExportAsync">@Ui.T("Exporteren", "Export")</button>
             <label class="va-btn va-btn--secondary cc-file">
                 @Ui.T("Importeren", "Import")

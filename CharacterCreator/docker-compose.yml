@@ -46,6 +46,8 @@ services:
       Keycloak__Issuer: ${KEYCLOAK_ISSUER:-}
       Keycloak__ClientId: ${KEYCLOAK_CLIENT_ID:-}
       Keycloak__ClientSecret: ${KEYCLOAK_CLIENT_SECRET:-}
+      # Optional: without VOID's address Beheer can't import rules.
+      Void__BaseUrl: ${VOID_BASE_URL:-}
 
 volumes:
   postgres_data:

@@ -733,6 +733,31 @@ see §7.
 properties, energy), the skills, spells and techniques, recipes, loresheet links and XP per event.
 It is made on the server.
 
+*As built in phase 4:*
+
+- **The flow:** *Afdrukken (PDF)* on the build screen posts the plan the browser keeps to
+  `POST /api/plans/sheet`. The plan is checked against the current ruleset, as on the screen, and
+  comes back as `{name}.pdf`, in the visitor's language (the language cookie).
+- **Page 1 is the sheet:**
+  - name, kind of plan and XP, the rules it was checked against;
+  - the numbers (XP, spent, left, hit points, armour points, imbue and craft caps) as boxes;
+  - energy per day;
+  - a *Let op* box with what breaks or warns;
+  - the skills table: times, XP, page, notes.
+- **The following pages:** the skills' texts, spells and techniques, recipes, the loresheets
+  (real links) and XP per event (the next 10 events from the plan's XP). These flow on rather
+  than each starting a page.
+- **Wording:** the server words the sheet with the client's `FindingWords` and `PlanSummary`, so
+  the PDF and the screen say the same.
+- **The writer** is MigraDoc (PDFsharp 6.2.4, the last MIT release, pinned as in landerijen). It
+  embeds Spectral and Inknut Antiqua as TTF (OFL), so it needs no system fonts: checked in the
+  Linux container image.
+- **The endpoint is anonymous:**
+  - 64 KB body limit, at most 300 skills;
+  - 30 sheets per minute per address;
+  - `Cache-Control: no-store`;
+  - the plan is neither stored nor logged.
+
 **Beheer** (SL and EC, from phase 7): *Rulesets* (§4.2) and the content check.
 
 ---
@@ -828,10 +853,13 @@ CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shar
 - `Ruleset`: never changed after publishing; ids like `2026-v07@2026-11-20`.
 - `Plan`: PLIN, name, ruleset id, mode, start XP, skills, a link to the pushed character
   `{plin, chin}` (v2), and a version for optimistic concurrency.
-- Anonymous plans never reach the server.
+- Anonymous plans are never stored on the server. Printing sends one, only to make the PDF
+  (phase 4).
 
-**PDF:** PDFsharp-MigraDoc (as in landerijen's print pack), with the fonts from vortex-tools-style's
-`dist/fonts`.
+**PDF:** PDFsharp-MigraDoc (as in landerijen's print pack), with Guild Hall's fonts. As built:
+`dist/fonts` has only WOFF2, which PDFsharp can't read, so the TTFs come from the portal's crest bar
+(`assets/fonts`, OFL): Spectral Regular and SemiBold, Inknut Antiqua SemiBold and Bold. There is no
+italic face; PDFsharp slants Spectral.
 
 **Styling:**
 
@@ -1048,7 +1076,7 @@ There is no Character Creator GitLab project yet.
    - Summary panels and presets.
    - localStorage, file export and import (including old saves).
    - NL/EN, light and dark.
-4. **Print**: the PDF.
+4. **Print**: the PDF. *Done 2026-11-07.*
 5. **Demo on gembernodes.**
    - Arie creates the database role and the 1Password item.
    - Arie adds the demo's redirect URIs to `vortex-dev` (§6, Keycloak).

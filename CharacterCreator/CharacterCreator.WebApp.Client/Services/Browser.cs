@@ -44,6 +44,17 @@ public sealed class Browser(IJSRuntime js) : IUiLanguage, IAsyncDisposable
         await loaded.InvokeVoidAsync("download", fileName, contentType, text);
     }
 
+    /// <summary>Hands the visitor a binary file to save, such as a PDF.</summary>
+    /// <param name="fileName">The file's name.</param>
+    /// <param name="contentType">Its media type.</param>
+    /// <param name="bytes">Its contents.</param>
+    /// <returns>When done.</returns>
+    public async ValueTask DownloadBytesAsync(string fileName, string contentType, byte[] bytes)
+    {
+        var loaded = await ModuleAsync();
+        await loaded.InvokeVoidAsync("download", fileName, contentType, bytes);
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {

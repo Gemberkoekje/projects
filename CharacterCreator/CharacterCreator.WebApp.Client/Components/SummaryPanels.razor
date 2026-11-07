@@ -25,16 +25,16 @@
     <section class="cc-card">
         <h2>@Ui.T("Eigenschappen", "Properties")</h2>
         <dl class="cc-props">
-            @foreach (var (label, value) in Properties())
+            @foreach (var property in PlanSummary.Properties(Ui, Words, Data.Content, Plan, Evaluation))
             {
-                <div><dt>@label</dt><dd>@value</dd></div>
+                <div><dt>@property.Label</dt><dd>@property.Value</dd></div>
             }
         </dl>
     </section>
 
     @{
-        var spells = Spells();
-        var recipes = Recipes();
+        var spells = PlanSummary.Spells(Data.Content, Plan);
+        var recipes = PlanSummary.Recipes(Data.Content, Plan);
     }
     <section class="cc-card">
         <h2>@Ui.T("Spreuken en technieken", "Spells and techniques") <span class="cc-count">@spells.Count</span></h2>
@@ -156,50 +156,4 @@
         builder.CloseElement();
         builder.CloseElement();
     };
-
-    /// <summary>
-    /// Hit points (1 to start with, as in the old builder), armour points and craft caps from the
-    /// content's properties; imbue caps from VOID's rules. Energy is left out here: it comes from VOID.
-    /// </summary>
-    private List<(string Label, string Value)> Properties()
-    {
-        int Sum(string property) => Plan.All.Sum(pair => Data.Content.TryGet(pair.Key, out var skill)
-            ? skill.Properties.Where(item => item.Name == property).Sum(item => item.Value) * pair.Value
-            : 0);
-
-        var properties = new List<(string Label, string Value)>
-        {
-            (Ui.T("Levenspunten", "Hit points"), (1 + Sum("hitpoints")).ToString(System.Globalization.CultureInfo.InvariantCulture)),
-            (Ui.T("Pantserpunten", "Armour points"), Sum("armourpoints").ToString(System.Globalization.CultureInfo.InvariantCulture)),
-        };
-
-        properties.AddRange(Evaluation.Energy.Where(total => total.Kind == EnergyKind.ImbueCap)
-            .Select(total => (Ui.T($"Imbue-limiet {Words.EnergyType(total.Type).ToLowerInvariant()}", $"{Words.EnergyType(total.Type)} imbue cap"), total.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture))));
-
-        foreach (var (property, nl, en) in new[] { ("glyph_craft_cap", "Craft-limiet glyphs", "Glyph craft cap"), ("rune_craft_cap", "Craft-limiet runen", "Rune craft cap") })
-        {
-            var value = Sum(property);
-            if (value > 0)
-            {
-                properties.Add((Ui.T(nl, en), value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-            }
-        }
-
-        return properties;
-    }
-
-    private List<SpellContent> Spells()
-        => [.. Plan.All.Skills
-            .SelectMany(key => Data.Content.TryGet(key, out var skill) ? skill.Spells : [])
-            .DistinctBy(spell => spell.Id)];
-
-    /// <summary>The chosen skills' recipes, and a category's common recipes once the character has a skill in it.</summary>
-    private List<RecipeContent> Recipes()
-    {
-        var skills = Plan.All.Skills.Select(key => Data.Content.TryGet(key, out var skill) ? skill : null).OfType<SkillContent>().ToList();
-        var categories = skills.Select(skill => skill.Category.Nl).ToHashSet(StringComparer.Ordinal);
-        return [.. skills.SelectMany(skill => skill.Recipes)
-            .Concat(Data.Content.CommonRecipes.Where(group => categories.Contains(group.Category.Nl)).SelectMany(group => group.Recipes))
-            .DistinctBy(recipe => recipe.Id)];
-    }
 }

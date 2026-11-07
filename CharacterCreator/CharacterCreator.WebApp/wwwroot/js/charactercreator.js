@@ -23,8 +23,9 @@ export function store(key, value) {
     }
 }
 
-export function download(fileName, contentType, text) {
-    const url = URL.createObjectURL(new Blob([text], { type: contentType }));
+export function download(fileName, contentType, contents) {
+    // Text from DownloadAsync, a Uint8Array from DownloadBytesAsync (Blazor sends byte[] as one).
+    const url = URL.createObjectURL(new Blob([contents], { type: contentType }));
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;

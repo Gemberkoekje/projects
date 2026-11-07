@@ -654,3 +654,117 @@ action), then `SkillPicker.razor`, and `core/Plans/PlanImport.cs` for files._
 | `CharacterCreator.infrastructure/Content/2026-v07/legacy.json` | Thorfgin's skills per key (embedded) |
 | `scripts/import-thorfgin-content.py` | writes `legacy.json`; one spelling per category |
 | `CharacterCreator.test/Plans/`, `Words/`, `Rules/Options_specs.cs`, `Rulesets/RulesetJsonContext_specs.cs`, `Web/Language_specs.cs`, `Web/Presets_specs.cs` | the specs |
+
+---
+
+## Phase 4 — the PDF (2026-11-07)
+
+_To understand this, start by reading `DESIGN.md` §5 (Print, "as built in phase 4"), then
+`CharacterCreator.application/Sheets/CharacterSheet.cs` (what a sheet holds), then
+`CharacterCreator.WebApp/Printing/SheetComposer.cs` (how a plan becomes one), then
+`CharacterCreator.infrastructure/Printing/MigraDocSheetWriter.cs` (the layout)._
+
+### What it does
+
+- **Afdrukken (PDF)** on the build screen posts the plan to `POST /api/plans/sheet` and saves the
+  answer as `{name}.pdf`.
+- **The endpoint** words the plan into a `CharacterSheet` (`SheetComposer`), checked against the
+  current ruleset, in the visitor's language. `ISheetWriter` (`MigraDocSheetWriter`) lays it out.
+- **Page 1, the sheet:**
+  - eyebrow, the name in crimson Inknut Antiqua, the kind of plan and XP, date and rules;
+  - the numbers as boxes, then energy per day;
+  - a *Let op* box with what breaks or warns;
+  - the skills table: times, XP, page, notes, total.
+- **Then:**
+  - each skill's text, with cost, times, category, prerequisites and rulebook page;
+  - spells and techniques, with energy, incantation, effect, duration and page;
+  - recipes, the loresheets as links, and XP per event (the next 10 events).
+
+  The footer on every page: name, rules, page x of y.
+- **`PlanSummary`** (client `Words/`): properties, spells and recipes, for the screen's summary and
+  the sheet alike. `SummaryPanels` uses it now instead of its own copy.
+- **Compose and `.env.example`** pass `VOID_BASE_URL` (2b had missed it).
+
+### Decisions
+
+1. **The plan travels to the server to be printed**, as the design said (made on the server). It is
+   not stored and not logged; DESIGN.md §6 now says "never stored" rather than "never reaches".
+2. **Words on the server, layout in infrastructure.**
+   - `CharacterSheet` (application) holds only finished strings.
+   - The WebApp composes it with the client's `FindingWords` and `PlanSummary`, which infrastructure
+     can't reference; that keeps the screen and the PDF saying the same.
+   - The writer knows nothing of rules or languages.
+3. **The current ruleset**, not the one the plan names: the PDF shows what the screen shows.
+4. **PDFsharp-MigraDoc 6.2.4**, pinned with landerijen's licence note: 6.5.0 and later are AGPL. The
+   same transitive pin applies (`System.Security.Cryptography.Pkcs` 10.0.13).
+5. **Fonts from the portal's crest bar** (TTF, OFL). vortex-tools-style ships only WOFF2, which
+   PDFsharp can't read, and fontTools isn't installed here. The 24 KB Spline Sans Mono there is a
+   subset, so it stays out. No italic face: PDFsharp slants Spectral.
+6. **Only the skills' texts start a new page.** The sheet keeps page 1 to itself; the rest flows
+   on, which cut the Paladijn sheet from 6 pages to 4.
+7. **Anonymous, so limited:** 64 KB body, 300 skills, 30 sheets per minute per address (behind the
+   proxy that is the forwarded address), `no-store`.
+
+### Gotchas
+
+- **Status-code pages replay the request.** A bodiless 429 or 415 was re-executed as a POST against
+  `/niet-gevonden`, and came back as a 400 ("incorrect Content-type").
+  - Wrapping status-code pages in `UseWhen` broke the not-found page itself: re-execution needs the
+    main pipeline's routing.
+  - The fix is a middleware after it that sets `IStatusCodePagesFeature.Enabled = false` under
+    `/api`.
+  - The rate limiter also writes a JSON body and `Retry-After`.
+- **A form post gets 400 from antiforgery** before the endpoint runs (Blazor's `UseAntiforgery`).
+  Harmless; the spec tests 415 with `text/plain`.
+- **PDF font names escape spaces:** `Spectral Regular` is written `Spectral#20Regular`.
+- **Docker Desktop resets connections to a published port while the app isn't listening**, and
+  curl doesn't retry a reset. The container looked dead; it was starting.
+- **Postgres binds the host's loopback,** so a container can't reach it at
+  `host.docker.internal:5435`. Join its compose network (`charactercreator_default`) instead.
+
+### How it was checked
+
+- `dotnet build`: clean, warnings as errors. `dotnet test`: 303 specs, 25 new:
+  - `Printing/SheetWriter_specs` (6): a PDF, the embedded fonts, the link, many pages, an empty
+    plan, writing in parallel;
+  - `Printing/SheetComposer_specs` (9): title and rules, the screen's numbers, notes, the table,
+    texts, spells, loresheets, XP per event, English, unnamed, free planning;
+  - `Web/Sheet_specs` (10): the PDF and its file name, empty plan, 415, 400, too many skills, 429
+    after 30, file names.
+- **Read the PDFs** (Paladijn in Dutch, a broken plan in English): layout, Dutch characters,
+  notes, links.
+- **In the browser:** the button delivers `Paladijn.pdf`.
+- **In the Linux image** (CI's publish plus the runtime-only Dockerfile, on Postgres's network): the
+  build screen and a sheet, the same PDF as on Windows; the container has no fonts. Image and
+  container removed afterwards.
+- Locked restore passes, with the new lock entries.
+
+### Not done / next
+
+- **Phase 5, the demo:**
+  - the single VOID push and MR (first the 3-XP warning and the SL/EC rights, locally);
+  - Arie refreshes `void-test` and loads the draft;
+  - Arie adds the database role, the 1Password item and the `vortex-dev` redirect URIs;
+  - the gembernodes manifests, ingress and image-tag PR;
+  - then sign in, import, publish, and show Thorfgin.
+- **The envelope list** (*Mijn personages*, phase 7) can reuse `ISheetWriter` with another layout.
+- **Fonts:** if vortex-tools-style ever ships TTF in `dist/fonts`, take them from there.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.application/Sheets/CharacterSheet.cs` | the sheet: facts, notes, tables, entries, links, labels |
+| `CharacterCreator.application/Ports/ISheetWriter.cs` | the port |
+| `CharacterCreator.infrastructure/Printing/MigraDocSheetWriter.cs` | the layout |
+| `CharacterCreator.infrastructure/Printing/EmbeddedFonts.cs` | the font resolver |
+| `CharacterCreator.infrastructure/Printing/Fonts/` | Spectral, Inknut Antiqua (TTF) and their OFL texts |
+| `CharacterCreator.WebApp/Printing/SheetComposer.cs` | a plan into a sheet, worded |
+| `CharacterCreator.WebApp/Endpoints/SheetEndpoints.cs` | `POST /api/plans/sheet`, limits, file name |
+| `CharacterCreator.WebApp/Program.cs` | writer, rate limiter, status pages off under `/api` |
+| `CharacterCreator.WebApp.Client/Words/PlanSummary.cs` | properties, spells, recipes (screen and sheet) |
+| `CharacterCreator.WebApp.Client/Components/BuildScreen.razor(.cs)` | the button and `PrintAsync` |
+| `CharacterCreator.WebApp/wwwroot/js/charactercreator.js` | `download` takes bytes too |
+| `Directory.Packages.props` | PDFsharp-MigraDoc 6.2.4 and the Pkcs pin |
+| `docker-compose.yml`, `.env.example` | `VOID_BASE_URL` |
+| `CharacterCreator.test/Printing/`, `Web/Sheet_specs.cs` | the specs |

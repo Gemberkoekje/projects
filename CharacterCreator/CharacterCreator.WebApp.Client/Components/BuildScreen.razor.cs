@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text.Json;
 using CharacterCreator.core.Content;
 using CharacterCreator.core.Plans;
@@ -40,6 +42,7 @@ public sealed partial class BuildScreen
     private bool presetOffered;
     private bool confirmNew;
     private bool showSaved;
+    private bool printing;
     private Notice notice = Notice.None;
 
     private bool MadeOnAnotherRuleset => madeOn.Length > 0 && madeOn != data.Ruleset.Id;
@@ -250,6 +253,36 @@ public sealed partial class BuildScreen
         {
             planId = string.Empty;
             await KeepAsync();
+        }
+    }
+
+    /// <summary>The character sheet as a PDF, made on the server from the plan as it is now.</summary>
+    private async Task PrintAsync()
+    {
+        printing = true;
+        notice = Notice.None;
+        try
+        {
+            using var response = await Http.PostAsJsonAsync(new Uri("api/plans/sheet", UriKind.Relative), Current(), RulesetJsonContext.Default.PlanFile);
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = response.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+                    ? Ui.T("Even geduld: er zijn net veel PDF's gemaakt. Probeer het zo nog eens.", "Hold on: many PDFs were just made. Try again in a moment.")
+                    : Ui.T("De PDF kon niet gemaakt worden. Probeer het later nog eens.", "The PDF could not be made. Try again later.");
+                notice = new Notice(NoticeKind.Error, message, []);
+                return;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            await Browser.DownloadBytesAsync(Path.ChangeExtension(FileName(), ".pdf"), "application/pdf", bytes);
+        }
+        catch (System.Net.Http.HttpRequestException)
+        {
+            notice = new Notice(NoticeKind.Error, Ui.T("De server is niet bereikbaar; de PDF kon niet gemaakt worden.", "The server can't be reached; the PDF could not be made."), []);
+        }
+        finally
+        {
+            printing = false;
         }
     }
 

@@ -72,6 +72,12 @@ dotnet test CharacterCreator.slnx
 - **Language:** the `charactercreator.taal` cookie (`/taal/{nl|en}`), read on the server by
   `Localization/CookieUiLanguage` and in the browser from `html lang`. UI text is inline as
   `Ui.T("nl", "en")`; findings are worded by the client's `Words/FindingWords`.
+- **The PDF** (`infrastructure/Printing/MigraDocSheetWriter`) lays out a `CharacterSheet` that the
+  WebApp's `Printing/SheetComposer` words. PDFsharp-MigraDoc stays at 6.2.4, the last MIT release:
+  never bump it without a licence check. Fonts are embedded TTFs (`Printing/Fonts`); check a layout
+  change by reading the PDF, and font changes in the Linux image.
+- **API answers are never re-executed as the not-found page:** a middleware switches status-code
+  pages off under `/api` (a bodiless 415 or 429 would otherwise come back as a 400 from the page).
 - **Content changes reach a ruleset only when it is published:** a stored ruleset carries its
   content. Locally, delete the `mt_doc_publishedruleset` row to reseed.
 - The VOID side lives in the worktree `C:\git\gitlabs\void-charactercreator`, branch

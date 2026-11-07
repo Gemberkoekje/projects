@@ -1,10 +1,12 @@
 using System.IO.Compression;
+using System.Threading.RateLimiting;
 using CharacterCreator.application.Ports;
 using CharacterCreator.application.Rulesets;
 using CharacterCreator.core.Rulesets;
 using CharacterCreator.infrastructure.Adapters.DataProtection;
 using CharacterCreator.infrastructure.Content;
 using CharacterCreator.infrastructure.MartenDb;
+using CharacterCreator.infrastructure.Printing;
 using CharacterCreator.infrastructure.Void;
 using CharacterCreator.WebApp.Client.Services;
 using CharacterCreator.WebApp.Components;
@@ -16,7 +18,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -180,6 +184,24 @@ builder.Services.AddScoped<PublishRulesetHandler>();
 builder.Services.AddScoped<SeedRulesetHandler>();
 builder.Services.AddScoped<ReadCurrentRulesetHandler>();
 
+// The printed sheet (DESIGN.md §5, Print): MigraDoc, stateless, so one for the app. The endpoint is
+// open to anyone and a PDF costs real CPU, hence a limit per address; behind the proxy the address
+// is the forwarded one.
+builder.Services.AddSingleton<MigraDocSheetWriter>();
+builder.Services.AddSingleton<ISheetWriter>(sp => sp.GetRequiredService<MigraDocSheetWriter>());
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = (rejected, cancellationToken) =>
+    {
+        rejected.HttpContext.Response.Headers.RetryAfter = "60";
+        return new ValueTask(rejected.HttpContext.Response.WriteAsJsonAsync(new { message = "Too many sheets from here; try again in a minute." }, cancellationToken));
+    };
+    options.AddPolicy(SheetEndpoints.RateLimit, context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
+
 // The visitor's language, from the language cookie: for the server pages, and for the build screen
 // while the server prerenders it (the browser reads it from the page instead).
 builder.Services.AddHttpContextAccessor();
@@ -226,7 +248,21 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStatusCodePagesWithReExecute("/niet-gevonden", createScopeForStatusCodePages: true);
+
+// The not-found page is for the pages only. An API answer stays what it is: re-executing a bodiless
+// 415 or 429 against the page would replay the POST there and come back as a confusing 400.
+app.Use((context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+        && context.Features.Get<IStatusCodePagesFeature>() is { } pages)
+    {
+        pages.Enabled = false;
+    }
+
+    return next(context);
+});
 app.UseResponseCompression();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -240,6 +276,7 @@ app.MapRazorComponents<App>()
 app.MapAccountEndpoints();
 app.MapRulesetEndpoints();
 app.MapLanguageEndpoints();
+app.MapSheetEndpoints();
 app.MapGet("/healthz", () => "ok").AllowAnonymous();
 
 await app.RunAsync();
