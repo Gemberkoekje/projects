@@ -159,6 +159,18 @@ code, .mono {
     margin-top: var(--s-5);
 }
 
+/* Beheer's buttons: a form each, the publish one with its "I read the dry run" box. */
+.cc-panel form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3) var(--s-5);
+}
+
+.cc-publish-intro {
+    margin-top: var(--s-6);
+}
+
 .cc-card h2 {
     font-size: 19px;
 }

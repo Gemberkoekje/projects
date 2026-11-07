@@ -1,11 +1,14 @@
 using System.Net;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using CharacterCreator.WebApp.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace CharacterCreator.test.Web;
 
 /// <summary><c>Beheer → Rulesets</c>: SL and EC only (DESIGN.md decision 15), and what it shows them.</summary>
-public sealed class Beheer_rulesets_specs
+public sealed partial class Beheer_rulesets_specs
 {
     private static readonly Uri Rulesets = new ("/beheer/rulesets", UriKind.Relative);
 
@@ -78,6 +81,39 @@ public sealed class Beheer_rulesets_specs
         (await GetHtml(player, new Uri("/", UriKind.Relative))).Should().NotContain("beheer/rulesets");
         (await GetHtml(anonymous, new Uri("/", UriKind.Relative))).Should().NotContain("beheer/rulesets");
     }
+
+    /// <summary>
+    /// Each button is a form posted on its own: the page must render that form on the post too,
+    /// or Blazor answers 400 before anything runs. Publishing came after a dry run on screen, but
+    /// its post is a new request without one. The test sign-in carries no ERU token, so a page
+    /// that works says to sign in again.
+    /// </summary>
+    [TestCase("preview")]
+    [TestCase("publish")]
+    public async Task each_button_posts_on_its_own_without_an_earlier_dry_run(string form)
+    {
+        using var configured = factory.WithWebHostBuilder(builder => builder.UseSetting("Void:BaseUrl", "https://void.test/"));
+        using var client = configured.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add(TestSignIn.Header, TestSignIn.As("Sanne", EruPermissions.VoidReferee));
+
+        var page = await GetHtml(client, Rulesets);
+        var token = AntiforgeryToken().Match(page).Groups[1].Value;
+        page.Should().Contain($"name=\"_handler\" value=\"{form}\"", "the form is on the page before any dry run");
+
+        using var body = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["_handler"] = form,
+            ["__RequestVerificationToken"] = token,
+            ["confirm"] = "on",
+        });
+        using var response = await client.PostAsync(Rulesets, body);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("Not signed in through ERU.");
+    }
+
+    [GeneratedRegex("name=\"__RequestVerificationToken\" value=\"([^\"]+)\"")]
+    private static partial Regex AntiforgeryToken();
 
     private static async Task<string> GetHtml(HttpClient client, Uri path)
     {
