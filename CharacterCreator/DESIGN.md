@@ -1,4 +1,4 @@
-# Vortex Character Creator on the Vortex stack — design (draft 5)
+# Vortex Character Creator on the Vortex stack — design (draft 6)
 
 Design phase, 2026-11-06. Nothing is built yet.
 
@@ -30,6 +30,13 @@ Design phase, 2026-11-06. Nothing is built yet.
     2026-11-07), and to `develop` in time.
   - **The demo talks to VOID's develop instance, `void-test`** (API
     `https://test-void-api.the-vortex.nl/`), not to a recorded snapshot (§6, demo).
+- **Draft 6 (Arie, 2026-11-07):**
+  - **GitLab CI minutes are scarce.** All VOID work for the demo goes onto the one branch, which is
+    pushed once when complete. One MR into `develop`; no repeated pushes to `develop`.
+  - Arie refreshes `void-test` in Portainer once `develop` is built, and loads the rulebook draft
+    there himself.
+  - The demo signs in through `vortex-dev`, with its address added; the production client waits
+    for the GitLab repo.
 
 §11 lists everything that was settled.
 
@@ -360,9 +367,15 @@ The Character Creator uses these rules to look ahead, for example:
 - **What:** `GET /skills` and `GET /skills/{id}` also return the skill's requirement groups, as
   `requirements: [{kind, amount, skills: [ids]}]`.
 - **How:** one `contain` in `SkillsTable`, the entity's compact fields, and tests.
-- **Where:** branch `feature/skills-requirements-api` (commit `d4ed90a`), pushed 2026-11-07, and
-  merged into `develop` in time (Arie: "eventually"). `develop` deploys to `void-test`, the instance
-  the demo talks to.
+- **Where:** branch `feature/skills-requirements-api` (commits `d4ed90a`, `72e705f`, pushed
+  2026-11-07). `develop` builds the image that `void-test`, the instance the demo talks to, runs.
+- **One branch, one push, one MR** (Arie, draft 6: GitLab CI minutes are scarce):
+  - every VOID change for the demo collects on this branch, committed locally;
+  - the branch is pushed once, when it is complete;
+  - one MR goes into `develop`;
+  - Arie refreshes `void-test` in Portainer after `develop`'s build.
+
+  Nothing is pushed to `develop` piecemeal.
 - **Gotcha found on the way:** VOID's entities use `LazyLoadEntityTrait`, so `has()` and `get()` load
   a missing association. The skill's `requirements` are shown only when the endpoint loaded them,
   and the check reads the loaded fields, or every character response would gain a query per skill.
@@ -734,10 +747,13 @@ CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shar
   - Redirect URIs for builder.the-vortex.nl.
 - **Local development:** `vortex-dev`, as the other tools use. Only developers may use it, it is
   public with PKCE, and it takes localhost redirects only.
-- **The demo** needs a client that accepts `https://charactercreator.gemberkoekje.nl/signin-oidc`
-  (and `/signout-callback-oidc`), with the `vortex-api` audience. Either add those redirect URIs
-  to `vortex-dev` (developers only, which suits a demo), or create the production client early and
-  give it both hosts. That is a realm change for Arie; until then the demo runs anonymous only.
+- **The demo** signs in through `vortex-dev` (Arie, draft 6).
+  - Arie adds `https://charactercreator.gemberkoekje.nl/signin-oidc` and `/signout-callback-oidc`
+    to its redirect URIs. It already carries the `vortex-api` audience and is public with PKCE, so
+    the demo needs no secret.
+  - Only developers may sign in through `vortex-dev`, which suits a demo. Players can still use the
+    demo anonymously.
+  - The production client waits for the GitLab repo.
 
 **Marten:**
 
@@ -967,9 +983,15 @@ There is no Character Creator GitLab project yet.
 4. **Print**: the PDF.
 5. **Demo on gembernodes.**
    - Arie creates the database role and the 1Password item.
-   - Arie gives the demo host a Keycloak redirect (§6, Keycloak).
-   - VOID: the branch merged into `develop`, `void-test` running `develop`'s image, and the
-     rulebook draft loaded there (`bin/cake skill_requirements --apply`).
+   - Arie adds the demo's redirect URIs to `vortex-dev` (§6, Keycloak).
+   - **VOID, once** (draft 6):
+     - first complete the branch with the rest of v1's VOID work: the "3 XP left over" warning and
+       its number in the API (§3.3), and SL/EC seeing the rules with Referee and up changing them
+       (§3.7, verdict items 1 and 2);
+     - run VOID's full test set locally;
+     - push once, and open one MR into `develop`.
+   - After `develop`'s build, Arie refreshes `void-test` in Portainer and loads the rulebook draft
+     there (`bin/cake skill_requirements`, dry run first, then `--apply`).
    - The gembernodes manifests and the ingress, then an image-tag PR.
    - Sign in, import from `void-test`, publish.
    - Show Thorfgin at `charactercreator.gemberkoekje.nl`.
@@ -981,10 +1003,8 @@ There is no Character Creator GitLab project yet.
      (`git subtree split`).
    - Swap the GitHub workflow for GitLab CI.
    - Remove the folder from `projects` and the app from gembernodes.
-   - The rest of the VOID work, next to the requirements change already on `develop`:
-     - the "3 XP left over" warning (§3.3);
-     - SL/EC seeing the rules, and Referee and up changing them (§3.7, verdict items 1 and 2);
-     - the cases-file comparison in CI (§3.5).
+   - The cases-file comparison in CI (§3.5), now that both repos sit side by side. The rest of v1's
+     VOID work went in with the demo's single MR (phase 5).
 7. **Signed in** (read only): my characters, plans on the server, *next events*, the envelope
    list.
 8. **Go-live v1.**
@@ -1031,15 +1051,6 @@ Later, not in this design:
    publishing. He leans against it, because EC wants to delegate these changes.
 3. **Dependency:** the review of the 2026 V07 draft, and loading it (and the SL file) on live
    (§3.7, steps 1–3). Going live waits for it.
-4. **Does `void-test` run `develop`'s image yet?** void's `deploy/README.md` says both stacks
-   still run the old `eru_integration` image "until you deploy them deliberately" (*Cutting a
-   stack over, not done yet*). It may be out of date; if it isn't, merging into `develop` won't
-   reach the demo.
-5. **Who loads the rulebook draft on `void-test`**, from a shell in its container
-   (`bin/cake skill_requirements`, dry run first)?
-6. **The demo's Keycloak redirect:** on `vortex-dev`, or the production client created early
-   (§6, Keycloak)?
-7. **When to open the VOID MR** for `feature/skills-requirements-api`: now, or with the demo?
 
 ### Settled
 
@@ -1072,6 +1083,12 @@ Later, not in this design:
 - **Draft 5 (Arie, 2026-11-07):**
   - The VOID change goes to a pushed branch, and to `develop` in time.
   - The demo talks to `develop`'s instance, `void-test`, instead of a recorded snapshot.
+- **Draft 6 (Arie, 2026-11-07):**
+  - `void-test` pulls `develop`'s latest image when Arie refreshes it in Portainer.
+  - Arie loads the rulebook draft on `void-test` himself, in Portainer.
+  - The demo's sign-in goes on `vortex-dev`; the production client waits for the GitLab repo.
+  - All VOID work for the demo goes onto one branch, pushed once, then one MR into `develop`. That
+    saves GitLab CI minutes.
 
 ---
 
