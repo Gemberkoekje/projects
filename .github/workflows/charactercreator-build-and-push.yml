@@ -30,8 +30,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Into a folder of its own: the runner's preinstalled SDKs share the workload manifests per
+      # feature band, and a newer one there (10.0.403) changes the WebAssembly pack's version even
+      # for the pinned SDK.
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
         with:
           global-json-file: CharacterCreator/global.json
 
@@ -55,8 +60,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Into a folder of its own: the runner's preinstalled SDKs share the workload manifests per
+      # feature band, and a newer one there (10.0.403) changes the WebAssembly pack's version even
+      # for the pinned SDK.
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
         with:
           global-json-file: CharacterCreator/global.json
 
