@@ -379,10 +379,12 @@ The Character Creator uses these rules to look ahead, for example:
 - **Gotcha found on the way:** VOID's entities use `LazyLoadEntityTrait`, so `has()` and `get()` load
   a missing association. The skill's `requirements` are shown only when the endpoint loaded them,
   and the check reads the loaded fields, or every character response would gain a query per skill.
-- **Offline and in the specs**, the Character Creator reads a **recorded snapshot file** through
-  the same `IVoidClient` port (`SnapshotVoidClient`). A snapshot is recorded from `void-test` by
-  the same import. Only the skills the content names go into a committed file, because `projects`
-  is public.
+- **Offline and in the specs**, the Character Creator reads an **offline snapshot** in VOID's
+  `GET /skills` shape, embedded next to the content (`Content/{ruleset}/void-snapshot.json`,
+  port `IOfflineVoidSnapshot`). *As built in phase 2b* it is **synthesized** by
+  `scripts/make-offline-snapshot.py` from the public rulebook draft, the book's costs and
+  Thorfgin's data: `void-test` has no draft loaded yet to record from. It holds book skills only,
+  because `projects` is public, and what it seeds is marked provisional.
 - **The same MR** also carries:
   - the "3 XP left over" warning (§3.3);
   - whatever SL and EC need in VOID's screens to keep the prerequisites right (§3.7).
@@ -603,6 +605,21 @@ stored:
 *Publish* stores the ruleset: the content version, the VOID snapshot and the date. It is never
 changed afterwards. Anonymous visitors get the newest published ruleset.
 
+*As built in phase 2b:*
+
+- **One document per ruleset** (`PublishedRuleset`, in Marten), id `{content ruleset}@{UTC moment}`,
+  such as `2026-v07@20261107T084541Z`. It holds VOID's rules per book skill, the content, the
+  creation rules, who published it and from where, and whether it is **provisional** (from the
+  synthesized snapshot). A second publish in the same second is refused, never overwritten.
+- **A skill outside the book is never named in it.** A prerequisite on one refers to it as
+  `hidden-{VOID id}`. Its name appears only in the dry run, which only SL and EC see.
+- **The dry run also lists** costs that differ from the book (VOID's count), the energy and imbue
+  types VOID names, and why the rules could not be published (the engine refuses them, or not one
+  book skill was found in VOID).
+- **Publishing imports again** and stores the result, so what is stored is what VOID says at that
+  moment, not what the dry run showed earlier.
+- A skill VOID retired keeps its rules (characters that have it need them) but isn't offered.
+
 - **In the demo** (draft 5): an SL or EC signs in and imports from `void-test`, VOID's develop
   instance. Until somebody has, the first start publishes the bundled content with a recorded
   snapshot, so the build screen is never empty.
@@ -696,7 +713,7 @@ CharacterCreator.core            rules engine and model: Ruleset, RuleSkill, Req
 CharacterCreator.application     ports (IVoidClient, IRulesetStore, IPlanStore, IContentSource,
                                  ISheetWriter) and handlers
 CharacterCreator.infrastructure  MartenRulesetStore, MartenPlanStore, VoidHttpClient,
-                                 SnapshotVoidClient, JsonContentSource, MigraDocSheetWriter
+                                 EmbeddedOfflineSnapshot, EmbeddedContentSource, MigraDocSheetWriter
 CharacterCreator.WebApp          host: composition root, OIDC, server-rendered pages, /api endpoints
 CharacterCreator.WebApp.Client   the build screen (Blazor WebAssembly); references core only
 CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shared VOID cases
@@ -730,8 +747,10 @@ CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shar
 
 **Data flow:**
 
-- The client loads the current ruleset once (`/api/rulesets/current?lang=nl`, cached with an
-  ETag). I estimate about 150 KB gzipped per language.
+- The client loads the current ruleset once (`/api/rulesets/current`, its id as the ETag, then
+  304s). *As built in phase 2b* it carries both languages, so switching language reloads nothing.
+  Measured: 555 KB of JSON, 93 KB gzipped, 84 KB with Brotli (at the optimal level; the default,
+  fastest level gave 222 KB).
 - The client evaluates plans itself. The server evaluates again whatever it stores or pushes.
 
 **VOID is called from the server only**, a backend-for-frontend:
@@ -745,11 +764,11 @@ CharacterCreator.test            specs: engine, handlers, HTTP, schema, the shar
 - For the import: `GET /skills` and `GET /manatypes`.
 - For v2: `PUT /players/{plin}/characters`, then `/characters/{plin}/{chin}/skills[/{id}]` with
   `PUT` or `DELETE`.
-- **The demo calls `void-test`** (`Void:BaseUrl` = `https://test-void-api.the-vortex.nl/`), VOID's
-  develop instance. It trusts the same Keycloak realm as live (VoidWalker-test signs in with
+- **The demo calls `void-test`** (`Void:BaseUrl` = `https://test-void-api.the-vortex.nl/`; the
+  app refuses to start when it doesn't end with a slash), VOID's develop instance. It trusts the same Keycloak realm as live (VoidWalker-test signs in with
   `vortex-spa` on `auth.the-vortex.nl/realms/vortex`), so a real ERU token works there.
-- **Offline and in the specs**, `SnapshotVoidClient` (a recorded file) stands in for
-  `VoidHttpClient`.
+- **Offline and in the specs**, the embedded offline snapshot (§3.4) stands in for
+  `VoidHttpClient`: the first start publishes it, and the specs build rulesets from it.
 - **No CORS involved.** CORS is a browser rule; these are server-to-server calls.
   - Reachability checked 2026-11-06: a throwaway pod on gembernodes got `401` from
     `https://void-api.the-vortex.nl/skills` (no token, as expected) in 0.1 s.
@@ -983,14 +1002,14 @@ There is no Character Creator GitLab project yet.
    - The model, prerequisites, creation and growth rules, findings (problems and warnings), the
      XP table.
    - Specs and the VOID cases. No UI.
-2. **Content, rulesets and VOID.**
+2. **Content, rulesets and VOID.** *Done 2026-11-07* (2a the content, 2b the rest).
    - The content schema, and Thorfgin's text mapped to keys, checked against the current PDFs on the
      rules page (§12): the book's version, page numbers and loresheet links.
    - The seeded `void` names.
    - `VoidHttpClient`, the import dry run, publishing, and *Beheer → Rulesets* for a signed-in SL
      or EC. This comes forward from phase 7, because the demo imports from `void-test`.
-   - A recorded snapshot (book skills only) for the specs, for offline work and for the first
-     start.
+   - An offline snapshot (book skills only) for the specs, for offline work and for the first
+     start. Synthesized for now (§3.4); replaced by the first real import from `void-test`.
    - The ruleset API.
 3. **Build screen.**
    - Picker, the chosen-skills table, reasons, add with chain, remove with dependants.

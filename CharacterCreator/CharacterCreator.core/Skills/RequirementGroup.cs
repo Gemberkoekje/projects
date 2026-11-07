@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace CharacterCreator.core.Skills;
 
 /// <summary>
@@ -16,6 +18,21 @@ public sealed record RequirementGroup
         Kind = kind;
         Amount = amount;
         Skills = [.. skills ?? []];
+    }
+
+    /// <summary>Initializes a new instance of the <see cref="RequirementGroup"/> class, from JSON.</summary>
+    /// <remarks>
+    /// System.Text.Json (the API, and Marten) needs a constructor whose parameters have the properties'
+    /// types. It binds by name, so the order is free: a different order keeps <c>new (kind, amount, [])</c>
+    /// unambiguous.
+    /// </remarks>
+    /// <param name="skills">The skills it counts.</param>
+    /// <param name="kind">What the group counts.</param>
+    /// <param name="amount">Times, XP or extra skills.</param>
+    [JsonConstructor]
+    private RequirementGroup(IReadOnlyList<SkillKey> skills, RequirementKind kind, int amount)
+        : this(kind, amount, (IEnumerable<SkillKey>)skills)
+    {
     }
 
     /// <summary>What the group counts.</summary>

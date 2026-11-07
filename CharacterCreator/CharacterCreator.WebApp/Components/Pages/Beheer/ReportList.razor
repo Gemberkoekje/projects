@@ -1,0 +1,50 @@
+@* One section of the import report: a heading and its items, or a word that there are none. *@
+@if (Items.Count > 0 || !string.IsNullOrEmpty(Empty))
+{
+    <h3 class="cc-report-title">@Title <span class="muted">(@Items.Count)</span></h3>
+    @if (Items.Count == 0)
+    {
+        <p class="muted">@Empty</p>
+    }
+    else if (Collapsed)
+    {
+        <details>
+            <summary>Toon</summary>
+            <ul class="cc-list">
+                @foreach (var item in Items)
+                {
+                    <li>@item</li>
+                }
+            </ul>
+        </details>
+    }
+    else
+    {
+        <ul class="cc-list">
+            @foreach (var item in Items)
+            {
+                <li>@item</li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    /// <summary>The section's heading.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>The items.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<string> Items { get; set; } = [];
+
+    /// <summary>What to say when there are no items; nothing at all is shown when this is empty too.</summary>
+    [Parameter]
+    public string Empty { get; set; } = string.Empty;
+
+    /// <summary>Whether the items start folded away.</summary>
+    [Parameter]
+    public bool Collapsed { get; set; }
+}

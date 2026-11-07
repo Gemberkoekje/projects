@@ -1,6 +1,11 @@
+using System.IO.Compression;
 using CharacterCreator.application.Ports;
+using CharacterCreator.application.Rulesets;
+using CharacterCreator.core.Rulesets;
 using CharacterCreator.infrastructure.Adapters.DataProtection;
 using CharacterCreator.infrastructure.Content;
+using CharacterCreator.infrastructure.MartenDb;
+using CharacterCreator.infrastructure.Void;
 using CharacterCreator.WebApp.Components;
 using CharacterCreator.WebApp.Endpoints;
 using JasperFx;
@@ -10,6 +15,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -54,6 +60,7 @@ builder.Services.AddMarten(options =>
     options.UseSystemTextJsonForSerialization(EnumStorage.AsString);
 
     options.Schema.For<DataProtectionKeyDocument>().Identity(x => x.Id);
+    options.Schema.For<PublishedRuleset>().Identity(x => x.Id);
 });
 
 // Data protection. The pod has no volume, so the key ring lives in PostgreSQL; otherwise every image
@@ -73,6 +80,10 @@ var authentication = builder.Services
         options.Cookie.Name = "charactercreator.aanmelding";
         options.LoginPath = "/aanmelden";
         options.LogoutPath = "/afmelden";
+
+        // Signed in without the permission a page needs: say so, instead of ASP.NET's default
+        // /Account/AccessDenied, which does not exist here.
+        options.AccessDeniedPath = "/geen-toegang";
         options.ReturnUrlParameter = "returnUrl";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
@@ -137,11 +148,66 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddSingleton<EmbeddedContentSource>();
 builder.Services.AddSingleton<IContentSource>(sp => sp.GetRequiredService<EmbeddedContentSource>());
 
+// VOID (DESIGN.md §6): called from the server with the signed-in SL's or EC's token. Without
+// Void:BaseUrl the client says it is not configured, and nothing can be imported.
+var voidBaseUrl = builder.Configuration["Void:BaseUrl"];
+if (!string.IsNullOrWhiteSpace(voidBaseUrl) && !voidBaseUrl.EndsWith('/'))
+{
+    // The client asks for "skills" relative to the base; without the slash the base's last segment
+    // would be replaced instead of extended.
+    throw new InvalidOperationException("Void:BaseUrl must end with a slash.");
+}
+
+builder.Services.AddHttpClient<VoidHttpClient>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    if (!string.IsNullOrWhiteSpace(voidBaseUrl))
+    {
+        client.BaseAddress = new Uri(voidBaseUrl);
+    }
+});
+builder.Services.AddScoped<IVoidClient>(sp => sp.GetRequiredService<VoidHttpClient>());
+builder.Services.AddSingleton<EmbeddedOfflineSnapshot>();
+builder.Services.AddSingleton<IOfflineVoidSnapshot>(sp => sp.GetRequiredService<EmbeddedOfflineSnapshot>());
+
+// Published rulesets (DESIGN.md §4.2), and the handlers around them.
+builder.Services.AddScoped<MartenRulesetStore>();
+builder.Services.AddScoped<IRulesetStore>(sp => sp.GetRequiredService<MartenRulesetStore>());
+builder.Services.AddScoped<PreviewImportHandler>();
+builder.Services.AddScoped<PublishRulesetHandler>();
+builder.Services.AddScoped<SeedRulesetHandler>();
+builder.Services.AddScoped<ReadCurrentRulesetHandler>();
+
+// The ERU token for VOID, refreshed through Keycloak's token endpoint when it has expired.
+builder.Services.AddHttpClient(EruAccessTokens.HttpClientName);
+builder.Services.AddScoped<EruAccessTokens>();
+
+// The API writes what the build screen reads: camelCase, enums by name (RulesetJson), compressed.
+// A whole ruleset is about 650 KB of JSON, mostly text.
+builder.Services.ConfigureHttpJsonOptions(options => RulesetJson.Apply(options.SerializerOptions));
+builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
+
+// Brotli's default level is its fastest, which came out bigger than gzip for a ruleset (222 KB
+// against 141 KB). A browser fetches a ruleset once and then gets 304s, so the better level is cheap.
+builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = CompressionLevel.Optimal);
+builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = CompressionLevel.Optimal);
+
 // Server-rendered pages, with the build screen interactive in the browser (DESIGN.md decision 12).
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
 var app = builder.Build();
+
+// The first start publishes the content with the offline snapshot, so the build screen is never
+// empty before an SL or EC imported from VOID. Once a ruleset exists it does nothing.
+using (var scope = app.Services.CreateScope())
+{
+    var seeded = await scope.ServiceProvider.GetRequiredService<SeedRulesetHandler>().HandleAsync(CancellationToken.None);
+    if (!seeded.IsValid)
+    {
+        app.Logger.LogWarning("No ruleset could be seeded: {Reason}", string.Join("; ", seeded.Messages.Select(message => message.Message)));
+    }
+}
 
 app.UseForwardedHeaders();
 
@@ -152,6 +218,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStatusCodePagesWithReExecute("/niet-gevonden", createScopeForStatusCodePages: true);
+app.UseResponseCompression();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -163,6 +230,7 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(CharacterCreator.WebApp.Client._Imports).Assembly);
 
 app.MapAccountEndpoints();
+app.MapRulesetEndpoints();
 app.MapGet("/healthz", () => "ok").AllowAnonymous();
 
 await app.RunAsync();

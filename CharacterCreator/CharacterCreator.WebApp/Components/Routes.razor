@@ -4,7 +4,16 @@
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized>
-                <RedirectToSignIn />
+                @* Signed in but without the permission: say so, instead of a sign-in that would only
+                   bring them back here. *@
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <CharacterCreator.WebApp.Components.Account.NoAccess />
+                }
+                else
+                {
+                    <RedirectToSignIn />
+                }
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />

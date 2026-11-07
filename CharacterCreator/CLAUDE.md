@@ -33,7 +33,9 @@ gembernodes deploy. landerijen (`C:\git\gitlabs\landerijen-volken`) for Blazor a
   `CharacterCreator.WebApp/wwwroot/lib/vortex-tools` (`vendor.ps1 -Register GuildHall`). Colours by
   role token only; the app's own components live in `wwwroot/app.css`.
 - **Public repo.** `projects` and gembernodes are public: never commit the SL-only skills, the SL
-  file (`skill-requirements-sl.json`) or a secret. The recorded VOID snapshot holds book skills only.
+  file (`skill-requirements-sl.json`) or a secret. The offline VOID snapshot
+  (`Content/{ruleset}/void-snapshot.json`) holds book skills only, and a published ruleset names a
+  skill outside the book only as `hidden-{VOID id}`.
 - Dutch UI (English toggle from phase 3), English code names. Test methods are snake_case English
   sentences.
 - Local Postgres on **5435**, web on **8084** (`docker compose up -d postgres`, then run the WebApp;

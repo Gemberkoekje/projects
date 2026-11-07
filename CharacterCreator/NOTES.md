@@ -359,3 +359,151 @@ Phase 2 is split: 2a is the content, 2b the VOID import, rulesets and *Beheer �
 | `CharacterCreator.core/Content/` | `ContentBook`, `SkillContent` and the records under it, `LocalizedText` |
 | `CharacterCreator.core/Skills/SkillKeyJsonConverter.cs` | `SkillKey` as plain text in JSON |
 | `CharacterCreator.test/Content/Content_2026_specs.cs` | the content as committed |
+
+---
+
+## Phase 2b — VOID, rulesets and Beheer (2026-11-07)
+
+_To understand this, start by reading `DESIGN.md` §4.2 and §3.4, then
+`CharacterCreator.application/Rulesets/RulesetBuilder.cs` (the join), then
+`RulesetHandlers.cs` (seed, preview, publish), then `Components/Pages/Beheer/Rulesets.razor`._
+
+### What it does
+
+- **`RulesetBuilder.Build`** joins VOID's skills to the content by VOID name (ignoring case) into a
+  `PublishedRuleset`, with an `ImportReport` (the dry run). VOID's numbers count; the content
+  supplies keys and text. Pure: it reads and stores nothing.
+- **`PublishedRuleset`** (core): one immutable document per ruleset, id
+  `{content ruleset}@{UTC moment}`. It holds VOID's rules per book skill, the content, the creation
+  rules, who published it, from where, and whether it is provisional. `Offered()` is what the
+  picker offers: rules and content both present, not retired.
+- **Handlers:**
+  - `SeedRulesetHandler`: on the first start, the content with the offline snapshot, only when
+    nothing is published;
+  - `PreviewImportHandler`: the dry run, against the current ruleset;
+  - `PublishRulesetHandler`: imports again, refuses what the report refuses, stores;
+  - `ReadCurrentRulesetHandler`.
+- **VOID:** `IVoidClient` with `VoidHttpClient`, a typed `HttpClient` that calls `GET skills` with
+  the signed-in person's bearer token. 401/403, other statuses, network and JSON errors all become
+  `Result` messages. `VoidSkillsJson` reads VOID's snake_case list envelope.
+- **Offline snapshot:** `Content/2026-v07/void-snapshot.json`, made by
+  `scripts/make-offline-snapshot.py`, read by `EmbeddedOfflineSnapshot` (`IOfflineVoidSnapshot`).
+  171 skills, 146 prerequisite groups, book skills only, `synthesized: true`.
+- **`MartenRulesetStore`** (`IRulesetStore`): newest by `PublishedAt`; an existing id is refused.
+- **`GET /api/rulesets/current`**, anonymous:
+  - the whole ruleset in camelCase JSON (`RulesetJson`);
+  - its id as the ETag, with `Cache-Control: no-cache`, and a 304 on a matching `If-None-Match`;
+  - a 404 before anything is published;
+  - response compression on, Brotli and gzip at the optimal level.
+- **Beheer → Rulesets** (`/beheer/rulesets`, policy `Beheer`) shows:
+  - what is published;
+  - a dry-run button, when `Void:BaseUrl` is set;
+  - the report and a publish button;
+  - the history.
+
+  The crest bar shows *Beheer* to SL and EC only.
+- **`EruAccessTokens`:** the signed-in person's ERU access token from the cookie ticket, refreshed
+  through Keycloak's token endpoint when it has expired, and the cookie re-issued with the new pair.
+- **`/geen-toegang`:** where the cookie sends a signed-in person who lacks a page's permission.
+
+### Decisions
+
+1. **A skill outside the book is never named in a published ruleset.** A prerequisite on one becomes
+   `hidden-{VOID id}`; the name shows only in the dry run (SL and EC). The specs check that the
+   serialized ruleset contains no such name.
+2. **The offline snapshot is synthesized, not recorded.** `void-test` has no rulebook draft loaded
+   yet, so there was nothing to record. Whatever it seeds is `Provisional`, and *Beheer* says so
+   until an SL or EC imports from a VOID.
+3. **Publishing imports again** instead of storing the earlier dry run: what is stored is VOID's
+   state at that moment, and nothing has to be kept between the two posts.
+4. **One document carries both languages.** No `?lang=`: switching language reloads nothing, and
+   Brotli brings 555 KB down to 84 KB.
+5. **A retired skill keeps its rules** but isn't offered; characters that have it still need them.
+6. **`Void:BaseUrl` must end with a slash**, checked at startup: relative `skills` would otherwise
+   replace the base's last path segment.
+7. **Pages in *Beheer* are server-rendered forms**, not interactive: each button is a post, which
+   keeps the ERU token on the server.
+
+### Gotchas
+
+- **`RequirementGroup` couldn't be read back from JSON.**
+  - Cause: System.Text.Json wants a constructor whose parameter types match the properties
+    (`IReadOnlyList`, not `IEnumerable`).
+  - Impact: Marten could not have read back any stored ruleset, and the API would have failed too.
+  - Fix: a private `[JsonConstructor]` with its parameters in a different order. JSON binds by
+    name, and the order keeps `new (kind, amount, [])` unambiguous.
+
+  Only the round-trip spec caught it.
+- **The authorization middleware enforces a page's `[Authorize]` before the router renders.** A
+  signed-in player without the role was redirected to ASP.NET's default `/Account/AccessDenied`,
+  a 404. The cookie now has `AccessDeniedPath = /geen-toegang`.
+- **The offline snapshot wrote `takenAt`** while its reader expects VOID's snake_case: `TakenAt`
+  silently fell back to 1970. Now `taken_at`.
+- **Brotli's default level is its fastest:** 222 KB against gzip's 141 KB for a ruleset.
+- **S1075 also flags `url + '/'`** (a hardcoded path delimiter), hence the startup check instead.
+- **`git status` warns about LF and CRLF**: `core.autocrlf` is on and the repo stores LF. That is
+  expected, not a change.
+- **Bash heredocs on this machine choke on apostrophes** (this entry too): append with the edit
+  tool.
+
+### How it was checked
+
+- `dotnet build`: clean, warnings as errors. `dotnet test`: 216 specs, 65 new:
+  - `Rulesets/RulesetBuilder_specs` (16): the join, case, hidden ids, the report's lists, energy,
+    changes against a previous ruleset, duplicates, unpublishable rules;
+  - `Rulesets/Offline_seed_specs` (10), on the real content plus the embedded snapshot:
+    - 171 skills offered, publishable, marked provisional;
+    - book skills only, with no cost differences;
+    - every key is a book skill or a hidden id;
+    - the JSON round trip;
+  - `Rulesets/Ruleset_handler_specs` (10): seed once, preview stores nothing, publish, refusals,
+    the same second twice;
+  - `Void/VoidSkillsJson_specs` (8) and `Void/VoidHttpClient_specs` (8);
+  - `Web/Ruleset_api_specs` (6): JSON, ETag, 304, Brotli, 404 before a publish;
+  - `Web/Beheer_rulesets_specs` (7): anonymous to sign-in, a player or infobalie to
+    `/geen-toegang`, an SL or EC sees the page, *Beheer* in the crest bar.
+- **Test setup:**
+  - Marten's store is swapped for `InMemoryRulesetStore`, at the same Scoped lifetime;
+  - sign-in goes through a `TestSignIn` scheme driven by a header;
+  - challenge and forbid stay the cookie's.
+- **Run locally against Docker Postgres:**
+  - the first start seeded `2026-v07@20261107T084541Z` (171 rules);
+  - the API served it from Postgres;
+  - a restart didn't seed again (still one document);
+  - the 304 and the anonymous redirect worked;
+  - `/geen-toegang` renders in Guild Hall.
+- Locked restore and the Release publish pass.
+
+### Not done / next
+
+- **A real import from `void-test`:** it waits for the single VOID push (phase 5), then for Arie to
+  refresh `void-test` and load the draft. Until then nobody can sign in to the demo either: the
+  `vortex-dev` redirect URIs (Arie).
+- **Energy names:** map Thorfgin's energy properties onto VOID's manatypes once a real import shows
+  their names (`EnergyTypes` in the report lists them).
+- **Phase 3, the build screen:** it loads `/api/rulesets/current`. The WebAssembly publish is
+  trimmed ("optimizing assemblies for size"), so read the ruleset with a System.Text.Json
+  source-generated context. Reflection plus a private `[JsonConstructor]` may not survive trimming.
+- **The rest of the VOID branch**, local commits only until the single push: the "3 XP left over"
+  warning and its number in the API, and SL/EC rights on the rules overview.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.core/Rulesets/` | `PublishedRuleset` (with `RulesetSummary`), `RulesetJson` |
+| `CharacterCreator.core/Skills/RequirementGroup.cs` | the JSON constructor |
+| `CharacterCreator.application/Void/VoidSnapshot.cs` | VOID's skills at one moment |
+| `CharacterCreator.application/Ports/` | `IVoidClient`, `IOfflineVoidSnapshot`, `IRulesetStore` |
+| `CharacterCreator.application/Rulesets/` | `RulesetBuilder`, `ImportReport` (and its records), the four handlers |
+| `CharacterCreator.infrastructure/Void/` | `VoidHttpClient`, `VoidSkillsJson`, `EmbeddedOfflineSnapshot` |
+| `CharacterCreator.infrastructure/MartenDb/MartenRulesetStore.cs` | the store |
+| `CharacterCreator.infrastructure/Content/2026-v07/void-snapshot.json` | the offline snapshot (embedded) |
+| `scripts/make-offline-snapshot.py` | synthesizes it |
+| `CharacterCreator.WebApp/Endpoints/RulesetEndpoints.cs` | `/api/rulesets/current` |
+| `CharacterCreator.WebApp/Components/Pages/Beheer/` | `Rulesets.razor`, `ReportList.razor` |
+| `CharacterCreator.WebApp/Components/Account/NoAccess.razor` | `/geen-toegang` |
+| `CharacterCreator.WebApp/Authorization/EruAccessTokens.cs` | the ERU token, refreshed |
+| `CharacterCreator.WebApp/Program.cs` | VOID client, store, handlers, seed, compression, `AccessDeniedPath` |
+| `CharacterCreator.test/TestHelpers/` | `InMemoryRulesetStore`, `TestSignIn`, the factory |
+| `CharacterCreator.test/Rulesets/`, `Void/`, `Web/Ruleset_api_specs.cs`, `Web/Beheer_rulesets_specs.cs` | the specs |

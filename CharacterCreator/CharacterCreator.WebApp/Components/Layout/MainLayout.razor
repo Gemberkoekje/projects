@@ -45,6 +45,9 @@
         <NavLink href="" Match="NavLinkMatch.All">Bouwen</NavLink>
         <NavLink href="voorbeelden">Voorbeelden</NavLink>
         <NavLink href="vragen">Vragen</NavLink>
+        <AuthorizeView Policy="@CharacterCreatorPolicies.Beheer">
+            <NavLink href="beheer/rulesets">Beheer</NavLink>
+        </AuthorizeView>
     </nav>
 </header>
 
