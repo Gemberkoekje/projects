@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using CharacterCreator.application.Ports;
 using CharacterCreator.application.Void;
+using CharacterCreator.core.Rules;
 using Qowaiv;
 
 namespace CharacterCreator.infrastructure.Void;
@@ -65,6 +66,8 @@ public sealed class VoidHttpClient(HttpClient http) : IVoidClient
                 TakenAt = new DateTimeOffset(Clock.UtcNow(), TimeSpan.Zero),
                 Synthesized = false,
                 Skills = envelope.Skills,
+                Creation = envelope.Creation ?? CreationRules.Vortex,
+                CreationFromVoid = envelope.Creation is not null,
             });
         }
         catch (HttpRequestException exception)

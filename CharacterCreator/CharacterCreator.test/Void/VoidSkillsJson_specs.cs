@@ -101,6 +101,19 @@ public sealed class VoidSkillsJson_specs
         envelope.Synthesized.Should().BeTrue();
     }
 
+    [Test]
+    public async Task voids_rules_for_a_new_character_come_beside_the_list()
+    {
+        var envelope = await Parse("""{ "class": "List", "url": "/skills", "creation": { "start_xp": 15, "max_left_over": 3 }, "list": [] }""");
+
+        envelope.Creation.StartXp.Should().Be(15m);
+        envelope.Creation.MaxLeftOver.Should().Be(3m);
+    }
+
+    [Test]
+    public async Task an_older_void_gives_no_rules_for_a_new_character()
+        => (await Parse(Answer)).Creation.Should().BeNull();
+
     [TestCase("[]")]
     [TestCase("null")]
     [TestCase("{ \"list\": 5 }")]

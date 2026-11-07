@@ -1,3 +1,4 @@
+using CharacterCreator.core.Rules;
 using CharacterCreator.core.Rulesets;
 using CharacterCreator.core.Skills;
 
@@ -21,6 +22,12 @@ public sealed record ImportReport
 
     /// <summary>How many skills the picker would offer: content and VOID rules both present.</summary>
     required public int Offered { get; init; }
+
+    /// <summary>The rules for a new character the ruleset would hold.</summary>
+    required public CreationRules Creation { get; init; }
+
+    /// <summary>Whether VOID gave those rules, rather than the Character Creator assuming its own.</summary>
+    required public bool CreationFromVoid { get; init; }
 
     /// <summary>Book skills VOID has no skill for, by the content's VOID name; not offered.</summary>
     required public IReadOnlyList<string> NotInVoid { get; init; }

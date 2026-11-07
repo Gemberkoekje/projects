@@ -72,7 +72,7 @@ public static class RulesetBuilder
             }
         }
 
-        var errors = Errors(rules);
+        var errors = Errors(rules, snapshot.Creation);
 
         var ruleset = new PublishedRuleset
         {
@@ -83,7 +83,7 @@ public static class RulesetBuilder
             PublishedBy = publishedBy ?? string.Empty,
             Source = snapshot.Source,
             Provisional = snapshot.Synthesized,
-            Creation = CreationRules.Vortex,
+            Creation = snapshot.Creation,
             Rules = rules,
             Skills = content.Skills,
             CommonRecipes = content.CommonRecipes,
@@ -97,6 +97,8 @@ public static class RulesetBuilder
             TakenAt = snapshot.TakenAt,
             Synthesized = snapshot.Synthesized,
             Offered = ruleset.Offered().Count,
+            Creation = snapshot.Creation,
+            CreationFromVoid = snapshot.CreationFromVoid,
             NotInVoid = notInVoid,
             NotInBook = [.. snapshot.Skills.Where(skill => !content.TryGetByVoidName(skill.Name, out _))
                 .Select(skill => skill.Deprecated ? $"{skill.Name} (deprecated)" : skill.Name)
@@ -131,10 +133,10 @@ public static class RulesetBuilder
             Energy = Energy(skill),
         };
 
-    private static List<string> Errors(List<RuleSkill> rules)
+    private static List<string> Errors(List<RuleSkill> rules, CreationRules creation)
     {
         var errors = new List<string>();
-        var book = RuleBook.Create(rules, CreationRules.Vortex);
+        var book = RuleBook.Create(rules, creation);
         if (!book.IsValid)
         {
             errors.AddRange(book.Messages.Select(message => message.Message));

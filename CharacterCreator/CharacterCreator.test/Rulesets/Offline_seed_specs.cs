@@ -26,6 +26,8 @@ public sealed partial class Offline_seed_specs
         var snapshot = new EmbeddedOfflineSnapshot().LoadAsync("2026-v07", CancellationToken.None).Result.Value;
 
         snapshot.Synthesized.Should().BeTrue();
+        snapshot.CreationFromVoid.Should().BeTrue("the snapshot states them as VOID does");
+        snapshot.Creation.Should().Be(core.Rules.CreationRules.Vortex);
         snapshot.TakenAt.Should().Be(new DateTimeOffset(2026, 11, 07, 00, 00, 00, TimeSpan.Zero));
         snapshot.Source.Should().StartWith("offline snapshot (2026-v07)");
     }

@@ -4,6 +4,10 @@
   "source": "offline snapshot (2026-v07), synthesized from the public rulebook draft, the 2026 book's costs and Thorfgin's data",
   "synthesized": true,
   "taken_at": "2026-11-07T00:00:00Z",
+  "creation": {
+    "start_xp": 15,
+    "max_left_over": 3
+  },
   "list": [
     {
       "class": "Skill",

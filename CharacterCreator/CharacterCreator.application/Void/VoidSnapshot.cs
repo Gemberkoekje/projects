@@ -1,3 +1,5 @@
+using CharacterCreator.core.Rules;
+
 namespace CharacterCreator.application.Void;
 
 /// <summary>VOID's skills at one moment, as <c>GET /skills</c> gives them (DESIGN.md §3.1).</summary>
@@ -15,6 +17,16 @@ public sealed record VoidSnapshot
 
     /// <summary>Every skill VOID has, including the SL-only and deprecated ones.</summary>
     required public IReadOnlyList<VoidSkill> Skills { get; init; }
+
+    /// <summary>
+    /// The rules for a new character: the XP it starts with and how much may be left over. VOID
+    /// gives them beside its skills (void <c>feature/skills-requirements-api</c>); a VOID without
+    /// them leaves the Character Creator's own (<see cref="CreationRules.Vortex"/>).
+    /// </summary>
+    public CreationRules Creation { get; init; } = CreationRules.Vortex;
+
+    /// <summary>Whether <see cref="Creation"/> came from VOID rather than the Character Creator's own numbers.</summary>
+    public bool CreationFromVoid { get; init; }
 }
 
 /// <summary>One skill as VOID knows it.</summary>

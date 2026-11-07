@@ -119,6 +119,8 @@ def main(content_dir, book_path, thorfgin_dir):
         "source": f"offline snapshot ({content['ruleset']}), synthesized from the public rulebook draft, the 2026 book's costs and Thorfgin's data",
         "synthesized": True,
         "taken_at": "2026-11-07T00:00:00Z",
+        # VOID gives a new character's rules beside its skills (SkillRules::CONCEPT_XP, MAX_LEFT_OVER).
+        "creation": {"start_xp": 15, "max_left_over": 3},
         "list": listing,
     }
     (content_dir / "void-snapshot.json").write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")

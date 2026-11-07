@@ -2,12 +2,14 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CharacterCreator.application.Void;
+using CharacterCreator.core.Rules;
 
 namespace CharacterCreator.infrastructure.Void;
 
 /// <summary>
 /// Reads VOID's answer to <c>GET /skills</c>: a <c>List</c> envelope of compact skills, each with its
-/// <c>requirements</c> (void <c>feature/skills-requirements-api</c>). The offline snapshot has the same
+/// <c>requirements</c>, and the rules for a new character as <c>creation</c> (void
+/// <c>feature/skills-requirements-api</c>). The offline snapshot has the same
 /// shape, with <c>source</c>, <c>taken_at</c> and <c>synthesized</c> next to the list.
 /// </summary>
 /// <remarks>Stateless and thread-safe.</remarks>
@@ -35,6 +37,9 @@ internal static class VoidSkillsJson
             Source = envelope.Source ?? string.Empty,
             TakenAt = envelope.TakenAt,
             Synthesized = envelope.Synthesized,
+            Creation = envelope.Creation is { StartXp: { } start, MaxLeftOver: { } left }
+                ? new CreationRules { StartXp = start, MaxLeftOver = left }
+                : null,
             Skills = [.. envelope.List.Select(skill => new VoidSkill
             {
                 Id = skill.Id,
@@ -67,6 +72,9 @@ internal static class VoidSkillsJson
 
         required public bool Synthesized { get; init; }
 
+        /// <summary>The rules for a new character, when VOID gave them; <c>null</c> for an older VOID.</summary>
+        required public CreationRules Creation { get; init; }
+
         required public IReadOnlyList<VoidSkill> Skills { get; init; }
     }
 
@@ -80,6 +88,16 @@ internal static class VoidSkillsJson
         public bool Synthesized { get; init; }
 
         public List<SkillJson> List { get; init; } = [];
+
+        public CreationJson Creation { get; init; }
+    }
+
+    /// <summary>GET /skills's rules for a new character.</summary>
+    internal sealed record CreationJson
+    {
+        public decimal? StartXp { get; init; }
+
+        public decimal? MaxLeftOver { get; init; }
     }
 
     internal sealed record SkillJson

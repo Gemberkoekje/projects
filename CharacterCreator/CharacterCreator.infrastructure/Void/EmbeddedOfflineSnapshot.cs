@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CharacterCreator.application.Ports;
 using CharacterCreator.application.Void;
+using CharacterCreator.core.Rules;
 
 namespace CharacterCreator.infrastructure.Void;
 
@@ -34,6 +35,8 @@ public sealed class EmbeddedOfflineSnapshot : IOfflineVoidSnapshot
                 TakenAt = envelope.TakenAt ?? DateTimeOffset.UnixEpoch,
                 Synthesized = envelope.Synthesized,
                 Skills = envelope.Skills,
+                Creation = envelope.Creation ?? CreationRules.Vortex,
+                CreationFromVoid = envelope.Creation is not null,
             });
         }
         catch (JsonException exception)

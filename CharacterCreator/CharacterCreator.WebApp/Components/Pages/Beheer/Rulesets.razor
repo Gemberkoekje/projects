@@ -74,6 +74,10 @@
             Uit @report.Source, @When(report.TakenAt)@(report.Synthesized ? " (offline snapshot)" : string.Empty).
             <strong>@report.Offered vaardigheden</strong> worden aangeboden.
         </p>
+        <p>
+            Nieuw personage: @Xp(report.Creation.StartXp) XP, hoogstens @Xp(report.Creation.MaxLeftOver) XP over
+            @(report.CreationFromVoid ? "(uit VOID)." : "(aangenomen: deze VOID geeft ze nog niet).")
+        </p>
 
         <ReportList Title="Niet te publiceren" Items="report.Errors" />
         <ReportList Title="Wijzigingen ten opzichte van wat nu gepubliceerd is" Items="Changes(report)" Empty="Geen." />
@@ -181,6 +185,8 @@
 
     private static string When(DateTimeOffset moment)
         => moment.ToOffset(TimeSpan.FromHours(1)).ToString("d MMMM yyyy HH:mm", CultureInfo.GetCultureInfo("nl-NL"));
+
+    private static string Xp(decimal xp) => xp.ToString("0.##", CultureInfo.GetCultureInfo("nl-NL"));
 
     private static List<string> Hidden(ImportReport report)
         => [.. report.HiddenPrerequisites.Select(hidden => $"{hidden.Skill} → {hidden.VoidName}")];

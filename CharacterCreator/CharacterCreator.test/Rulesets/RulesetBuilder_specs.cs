@@ -2,6 +2,7 @@ using System.Text.Json;
 using CharacterCreator.application.Rulesets;
 using CharacterCreator.application.Void;
 using CharacterCreator.core.Content;
+using CharacterCreator.core.Rules;
 using CharacterCreator.core.Rulesets;
 using CharacterCreator.core.Skills;
 
@@ -125,6 +126,28 @@ public sealed class RulesetBuilder_specs
         ruleset.Provisional.Should().BeTrue("the rules came from a synthesized snapshot");
         ruleset.ToRuleBook().IsValid.Should().BeTrue();
         ruleset.ToContentBook().IsValid.Should().BeTrue();
+    }
+
+    [Test]
+    public void voids_rules_for_a_new_character_are_the_ones_published()
+    {
+        var creation = new CreationRules { StartXp = 16m, MaxLeftOver = 2m };
+
+        var outcome = Build(Void() with { Creation = creation, CreationFromVoid = true });
+
+        outcome.Ruleset.Creation.Should().Be(creation);
+        outcome.Ruleset.ToRuleBook().Value.Creation.Should().Be(creation);
+        outcome.Report.Creation.Should().Be(creation);
+        outcome.Report.CreationFromVoid.Should().BeTrue();
+    }
+
+    [Test]
+    public void a_void_without_them_publishes_the_character_creators_own_and_says_so()
+    {
+        var report = Build(Void()).Report;
+
+        report.Creation.Should().Be(CreationRules.Vortex);
+        report.CreationFromVoid.Should().BeFalse();
     }
 
     [Test]

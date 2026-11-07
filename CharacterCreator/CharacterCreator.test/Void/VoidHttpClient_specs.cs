@@ -26,6 +26,25 @@ public sealed class VoidHttpClient_specs
         snapshot.Value.Synthesized.Should().BeFalse();
     }
 
+    [Test]
+    public async Task voids_rules_for_a_new_character_are_taken_when_it_gives_them()
+    {
+        var snapshot = await Ask(HttpStatusCode.OK, """{ "list": [], "creation": { "start_xp": 16, "max_left_over": 2 } }""");
+
+        snapshot.Value.CreationFromVoid.Should().BeTrue();
+        snapshot.Value.Creation.StartXp.Should().Be(16m);
+        snapshot.Value.Creation.MaxLeftOver.Should().Be(2m);
+    }
+
+    [Test]
+    public async Task without_them_the_character_creators_own_hold()
+    {
+        var snapshot = await Ask(HttpStatusCode.OK, VoidSkillsJson_specs.Answer);
+
+        snapshot.Value.CreationFromVoid.Should().BeFalse();
+        snapshot.Value.Creation.Should().Be(core.Rules.CreationRules.Vortex);
+    }
+
     [TestCase(HttpStatusCode.Unauthorized)]
     [TestCase(HttpStatusCode.Forbidden)]
     public async Task a_refusal_says_to_sign_in_again(HttpStatusCode status)
