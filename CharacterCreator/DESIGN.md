@@ -505,6 +505,11 @@ only by Super. For SL and EC to own the rules, VOID needs, in order of importanc
 5. **Bring the text up to 2026.** Thorfgin's text is the 2023-10b book with fixes up to 2026-04.
    SL and EC go through the 2026 book and note what changed: descriptions, spells and techniques,
    recipes, pages, loresheet links, presets.
+   - The current books are the PDFs on the rules page, https://the-vortex.nl/het-spel/regels/ (§12).
+   - The page shows no version numbers; the version is in the PDFs, and *Recente wijzigingen
+     regelsysteem* lists what changed.
+   - The books are Dutch only. The English text in the content is Thorfgin's translation, so
+     keeping it current is part of the same job.
 6. **Get the changes into the content.** Arie, 2026-11-06: this should not be a developer's job,
    but it needn't be in v1.
    - **Until v4:** on the private GitLab, a developer turns the notes into a merge request. An SL
@@ -946,7 +951,8 @@ There is no Character Creator GitLab project yet.
      XP table.
    - Specs and the VOID cases. No UI.
 2. **Content, rulesets and VOID.**
-   - The content schema, and Thorfgin's text mapped to keys.
+   - The content schema, and Thorfgin's text mapped to keys, checked against the current PDFs on the
+     rules page (§12): the book's version, page numbers and loresheet links.
    - The seeded `void` names.
    - `VoidHttpClient`, the import dry run, publishing, and *Beheer → Rulesets* for a signed-in SL
      or EC. This comes forward from phase 7, because the demo imports from `void-test`.
@@ -987,6 +993,8 @@ There is no Character Creator GitLab project yet.
    - Publish the first ruleset from live VOID.
    - The `vortex-character-creator` Keycloak client, the Portainer stack, Caddy, and Thorfgin's
      redirect.
+   - The rules page's "Character Creator" link moves from builder.qequoia.nl to
+     builder.the-vortex.nl.
    - FAQ and release notes, including §3.6, and an announcement.
 9. **v2: push new characters** (§7.3).
    - Its design pass first.
@@ -1074,6 +1082,17 @@ Later, not in this design:
   - github.com/Thorfgin/charactercreator, v0.7.4 of 2026-04-04: README, `src/json`,
     `SharedActions.js`, `Toolbar.jsx`, `ExportToPDF.js`, `public/locales`;
   - github.com/Thorfgin/charactercreator2.
+- **The current rulebooks** (Arie, 2026-11-07): https://the-vortex.nl/het-spel/regels/. As listed
+  there on 2026-11-07, with the upload month as the only version hint:
+  - `wp-content/uploads/2026/03/Vaardigheden.pdf` (skills);
+  - `2026/03/Spreuken_en_Technieken.pdf` (spells and fighter techniques);
+  - `2026/03/Spelregels.pdf`;
+  - `2026/03/Crafting_loresheets.pdf`;
+  - `2026/03/Geschiedenis.pdf` (*Recente wijzigingen regelsysteem*, March 2026);
+  - the imbue and alchemy loresheets (`2024/06/…`);
+  - Priest Runes and Mage Glyphs, with their fonts (`2022/03`, `2022/04`).
+
+  All in Dutch; there are no English books.
 - **The checkout design:** `C:\git\gitlabs\CHECKOUT-DESIGN.md` §0, §6 and §9.
 - **void** (all paths in the void repo):
   - `CHECKOUT-STEP4-NOTES.md` and `PLAYER-NO-ACCESS-NOTES.md`;
