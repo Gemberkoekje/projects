@@ -747,6 +747,23 @@ The footer is the portal's.
 - **Several at once** stays: the tick boxes show on wide screens; on a phone they sit behind *Pick
   several*.
 
+*As built after the UX review, batch 2 (P5, P7):*
+
+- **The head** holds the name with *Mijn plannen ▾* (the saved plans, as a document app lists its
+  files) and the kind of plan. Under them is a bar with:
+  - the XP counters;
+  - a *Voorlopige regels ⓘ* badge instead of the banner;
+  - *Opslaan* and *Afdrukken*;
+  - *⋯ Meer*: export, import, new plan.
+
+  P1 will make this bar sticky.
+- **A first visit** (an empty plan) shows *Hoe wil je beginnen?* instead of empty cards:
+  - one preset per main kind, and *Alle 15*;
+  - reading a file from the old builder;
+  - *Zelf kiezen*, which goes to the search box.
+- **Undo everywhere a plan is replaced:** starting from a preset, opening a saved plan, importing.
+  The old builder's import keeps its banner, which explains what changed.
+
 **Voorbeelden / Presets**: the presets as cards, with archetype, text and skills, and *start from
 this*. As built: *start from this* opens the build screen with `?voorbeeld={key}`, which asks
 first when the current plan has skills. After the UX review the cards are compact:

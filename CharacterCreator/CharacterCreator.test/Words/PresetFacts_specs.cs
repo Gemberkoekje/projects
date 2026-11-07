@@ -37,6 +37,17 @@ public sealed class PresetFacts_specs
         => PresetFacts.Defining(Preset("paladijn"), Rules, 4).Select(key => key.ToString())
             .Should().Equal("healer-a-spiritual", "paladin-spells-a", "shield-use", "armour-ii");
 
+    [TestCase("paladijn", PresetKind.Fighting)]
+    [TestCase("oorlogsmagier", PresetKind.Magic)]
+    [TestCase("arts", PresetKind.Healing)]
+    public void a_presets_main_kind_is_where_it_spends_the_most(string key, PresetKind kind)
+        => PresetFacts.Primary(Preset(key), Content, Rules).Should().Be(kind);
+
+    [Test]
+    public void a_first_visit_offers_the_first_preset_of_each_main_kind()
+        => PresetFacts.Starters(Content, Rules).Select(preset => preset.Key)
+            .Should().Equal("vechter-licht", "oorlogsmagier", "genezer-elementair", "alchemist");
+
     [TestCase("vechten", PresetKind.Fighting)]
     [TestCase("RITUEEL", PresetKind.Ritual)]
     [TestCase("", PresetKind.None)]

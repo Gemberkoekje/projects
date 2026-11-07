@@ -993,3 +993,98 @@ the review's own commit. Nothing is pushed.
 
 Batch 2: P5 (the first visit's "Hoe wil je beginnen?") and P7 (two main actions, the rest under
 *Meer*). Then P1, the sticky XP bar, which gives the toast its place above the bar.
+
+---
+
+## UX batch 2 — the first visit and two main actions (2026-11-07)
+
+_To understand this, start by reading `UX-REVIEW.md` P5 and P7, then the head and the
+`cc-build-grid` in `CharacterCreator.WebApp.Client/Components/BuildScreen.razor`._
+
+Local on `claude/charactercreator`, after batch 1. Nothing is pushed.
+
+### What it does
+
+- **The head (P7)** has two parts:
+  - the plan: the name with *Mijn plannen (n) ▾* beside it (open or delete a saved plan), and the
+    kind of plan;
+  - a bar: the XP counters, a *Voorlopige regels ⓘ* badge, *Opslaan*, *Afdrukken*, and *⋯ Meer*
+    with *Exporteren als bestand*, *Importeren…* and *Nieuw plan*.
+
+  The seven-button row at the foot of the page is gone, and *Voorbeelden* stays in the crest bar's
+  nav. On a phone, Opslaan sits at 501 px instead of 3,078.
+- **The first visit (P5):** while the plan is empty, *Hoe wil je beginnen?* takes the place of the
+  empty chosen table and the four "Geen." cards:
+  - *Met een voorbeeld*: one preset per main kind (`PresetFacts.Starters`: Vechter (Licht),
+    Oorlogsmagiër, Genezer (Elementair), Alchemist) and *Alle 15 ›*;
+  - *Uit de oude builder*: *Bestand inlezen*;
+  - *Zelf kiezen*: *Naar de lijst* scrolls to the search box and focuses it.
+
+  It sits on the right on a wide screen, and first on a phone.
+- **Undo wherever a plan is replaced:** starting from a preset (from the panel, the presets page or
+  the offer banner), opening a saved plan, importing. Each gives a toast with *Ongedaan maken*, or
+  none when the plan replaced was empty and unnamed.
+  - The old builder's import keeps its banner, because it explains which rules changed and which
+    skills stayed behind.
+  - The offer banner now says Undo brings the plan back, instead of "save it first".
+- **The FAQ** names *Mijn plannen*, *Meer* and *Bestand inlezen*.
+
+### Decisions
+
+1. **The bar is built where P1 will need it:** in the head, holding the counters. P1 makes it
+   sticky and adds the budget line and the status, so the actions don't move twice.
+2. **Menus are disclosures, not ARIA menus:**
+   - a button with `aria-expanded`, and a panel of ordinary buttons;
+   - Escape closes them while focus is inside;
+   - a click elsewhere lands on a transparent scrim, which closes them.
+3. **The *Meer* panel is hidden, never removed.** Its file input must outlive the menu closing on
+   the click that opened the file dialog, or the chosen file never arrives. Checked: an import
+   through the closed panel lands.
+4. **Starter presets are derived.** For each kind, it is the first preset whose biggest spend is
+   in that kind. No preset is mostly ritual, so the panel offers four kinds.
+5. **The provisional explanation is a `details` popover**, not a banner. The FAQ explains it too.
+
+### Gotchas
+
+- **`dotnet test` fails with MSB3027 while the preview runs**, because the server locks the Debug
+  DLLs. Filtering the output for "Passed/Failed" hid that once: there were no lines at all. Stop
+  the preview first.
+- **A right-aligned panel under a left-hand button runs off a phone's left edge:** *Mijn plannen*
+  is left-aligned, *Meer* right-aligned.
+- **The name field and *Mijn plannen* share a row that wraps** (`flex: 1 1 13rem`), or the field
+  shrinks to a stub on a phone.
+
+### How it was checked
+
+- **Specs:** 337 green, 4 new: main kind and starters (`PresetFacts_specs`). Release publish
+  clean.
+- **In the browser, at 1280×900 and 375×812:**
+  - on an empty plan, the panel shows, and a chip starts the preset;
+  - *Meer*: it opens and closes on an outside click, *Nieuw plan* gives Undo, and Undo restores the
+    plan;
+  - *Naar de lijst* focuses the search box;
+  - *Opslaan* updates *Mijn plannen (1)*, and the panel marks the current plan;
+  - the badge opens its explanation;
+  - an import through the closed *Meer* panel works, with a toast and Undo;
+  - on a phone, both panels fit and nothing scrolls sideways.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.WebApp.Client/Components/BuildScreen.razor` | the head and its bar, menus, the start panel, the grid without empty cards |
+| `CharacterCreator.WebApp.Client/Components/BuildScreen.razor.cs` | menu state, `Undoable`, toasts for start, open and import; `ToTheListAsync` |
+| `CharacterCreator.WebApp.Client/Words/PresetFacts.cs` | `Primary`, `Starters` |
+| `CharacterCreator.WebApp.Client/Services/Browser.cs`, `WebApp/wwwroot/js/charactercreator.js` | `ShowAndFocusAsync` (scroll, then focus) |
+| `CharacterCreator.WebApp/wwwroot/app.css` | head, bar, badge, menus, scrim, start panel, empty grid |
+| `CharacterCreator.WebApp/Components/Pages/Vragen.razor` | answers name the new places |
+| `CharacterCreator.test/Words/PresetFacts_specs.cs` | the specs |
+| `UX-REVIEW.md`, `DESIGN.md` §5 | status, "as built, batch 2" |
+
+### Next
+
+Batch 3: P1. Make the head's bar sticky:
+- under the crest bar on a wide screen, and 56 px at the bottom on a phone, where the toast then
+  sits above it;
+- a budget line with the ≤3 XP zone marked;
+- a status line that jumps to the first problem.

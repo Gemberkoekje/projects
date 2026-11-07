@@ -11,6 +11,7 @@ using CharacterCreator.WebApp.Client.Services;
 using CharacterCreator.WebApp.Client.Words;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Web;
 using Qowaiv;
 
 namespace CharacterCreator.WebApp.Client.Components;
@@ -40,7 +41,9 @@ public sealed partial class BuildScreen
     private Removal pending = Removal.None;
     private PresetContent offeredPreset = default!;
     private bool presetOffered;
-    private bool showSaved;
+    private bool showPlans;
+    private bool showMore;
+    private IReadOnlyList<PresetContent> starters = [];
     private bool printing;
     private Notice notice = Notice.None;
 
@@ -67,6 +70,7 @@ public sealed partial class BuildScreen
 
         data = loaded.Value;
         words = new FindingWords(Ui, data.Content);
+        starters = PresetFacts.Starters(data.Content, data.Rules);
         Open(await Plans.LoadWorkAsync());
         saved = await Plans.ListAsync();
         ready = true;
@@ -323,16 +327,63 @@ public sealed partial class BuildScreen
         return ChangeAsync(plan with { Xp = data.Rules.Xp.After(data.Rules.Creation.StartXp, events) });
     }
 
+    /// <summary>Replaces the plan with a preset, with Undo; from the presets page, the first visit panel, or the offer banner.</summary>
     private async Task StartFromAsync(PresetContent preset)
     {
         presetOffered = false;
-        var holdings = Holdings.Of(preset.Skills.Select(skill => new KeyValuePair<SkillKey, int>(skill.Key, skill.Times)));
+        var before = Snapshot();
+        var holdings = PresetFacts.Holdings(preset);
         name = Ui.T(preset.Name);
         planId = string.Empty;
         await ChangeAsync(preset.NewCharacter ? Plan.NewCharacter(holdings) : Plan.Free(preset.Xp, holdings));
-        notice = new Notice(NoticeKind.Success, Ui.T($"Begonnen met het voorbeeld {Ui.T(preset.Name)}.", $"Started from the preset {Ui.T(preset.Name)}."), []);
+        ShowToast(NoticeKind.Success, Ui.T($"Begonnen met het voorbeeld {Ui.T(preset.Name)}.", $"Started from the preset {Ui.T(preset.Name)}."), Undoable(before));
         Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("voorbeeld", (string?)null), replace: true);
     }
+
+    /// <summary>Undo only where there is something to go back to: an empty, unnamed plan needs none.</summary>
+    private static PlanSnapshot Undoable(PlanSnapshot before)
+        => before.Plan.Planned.IsEmpty && before.Name.Length == 0 ? PlanSnapshot.None : before;
+
+    private void TogglePlans()
+    {
+        showPlans = !showPlans;
+        showMore = false;
+    }
+
+    private void ToggleMore()
+    {
+        showMore = !showMore;
+        showPlans = false;
+    }
+
+    private void CloseMenus()
+    {
+        showPlans = false;
+        showMore = false;
+    }
+
+    private void MenuKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            CloseMenus();
+        }
+    }
+
+    private async Task ExportFromMenuAsync()
+    {
+        CloseMenus();
+        await ExportAsync();
+    }
+
+    private async Task NewFromMenuAsync()
+    {
+        CloseMenus();
+        await NewAsync();
+    }
+
+    /// <summary>"Zelf kiezen": to the picker's search box.</summary>
+    private async Task ToTheListAsync() => await Browser.ShowAndFocusAsync("#cc-search");
 
     private void KeepMyPlan()
     {
@@ -347,7 +398,7 @@ public sealed partial class BuildScreen
         name = string.Empty;
         planId = string.Empty;
         await ChangeAsync(Plan.NewCharacter(Holdings.None));
-        ShowToast(NoticeKind.Success, Ui.T("Nieuw plan begonnen.", "Started a new plan."), before.Plan.Planned.IsEmpty && before.Name.Length == 0 ? PlanSnapshot.None : before);
+        ShowToast(NoticeKind.Success, Ui.T("Nieuw plan begonnen.", "Started a new plan."), Undoable(before));
     }
 
     private async Task SaveAsync()
@@ -368,10 +419,12 @@ public sealed partial class BuildScreen
 
     private async Task OpenSavedAsync(PlanFile file)
     {
+        var before = Snapshot();
         Open(file);
-        showSaved = false;
+        CloseMenus();
+        notice = Notice.None;
         await KeepAsync();
-        notice = new Notice(NoticeKind.Success, Ui.T($"{Title(file)} geopend.", $"Opened {Title(file)}."), []);
+        ShowToast(NoticeKind.Success, Ui.T($"{Title(file)} geopend.", $"Opened {Title(file)}."), Undoable(before));
     }
 
     private async Task DeleteSavedAsync(PlanFile file)
@@ -443,9 +496,14 @@ public sealed partial class BuildScreen
         }
 
         var result = imported.Value;
+        var before = Snapshot();
         Open(result.File with { Id = string.Empty });
         await KeepAsync();
-        notice = result.Source == PlanSource.OldBuilder ? OldBuilderNotice(result) : new Notice(NoticeKind.Success, Ui.T($"{Title(result.File)} ingelezen.", $"Read {Title(result.File)}."), []);
+
+        // The old builder's save needs its story told (the rules changed, skills were left out), so
+        // that stays a banner; every import says it in a toast, with Undo.
+        notice = result.Source == PlanSource.OldBuilder ? OldBuilderNotice(result) : Notice.None;
+        ShowToast(NoticeKind.Success, Ui.T($"{Title(result.File)} ingelezen.", $"Read {Title(result.File)}."), Undoable(before));
     }
 
     /// <summary>What an old builder's save brought along, and what it left behind.</summary>

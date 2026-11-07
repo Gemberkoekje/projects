@@ -25,8 +25,8 @@ export function store(key, value) {
 
 // Focus the first element matching one of the selectors, in order. With onlyIfLost, only when focus
 // was lost: a re-render that removed the focused button (an add turns "+" into a stepper) drops it to
-// the page, and nothing else has claimed it since.
-export function focus(selectors, onlyIfLost) {
+// the page, and nothing else has claimed it since. With scroll, bring it into view as well.
+export function focus(selectors, onlyIfLost, scroll) {
     const active = document.activeElement;
     if (onlyIfLost && active && active !== document.body && active.isConnected) {
         return false;
@@ -34,6 +34,10 @@ export function focus(selectors, onlyIfLost) {
     for (const selector of selectors) {
         const element = document.querySelector(selector);
         if (element) {
+            if (scroll) {
+                const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                element.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
+            }
             element.focus({ preventScroll: true });
             return true;
         }

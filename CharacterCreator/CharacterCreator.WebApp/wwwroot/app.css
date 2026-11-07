@@ -498,17 +498,196 @@ fieldset.cc-field {
 
 /* ---- The build screen (DESIGN.md §5) ---- */
 
+/* The head: the plan's name and kind, then the bar with the XP, the rules' status and the two main
+   actions (UX-REVIEW.md P7; P1 makes the bar sticky). */
 .cc-build-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: var(--s-5) var(--s-6);
+    display: grid;
+    gap: var(--s-4);
     margin-bottom: var(--s-5);
 }
 
+.cc-head-plan {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-4) var(--s-6);
+}
+
 .cc-field--name {
-    flex: 1 1 260px;
-    max-width: 380px;
+    flex: 1 1 320px;
+    max-width: 560px;
+}
+
+/* The name and "Mijn plannen" side by side; on a narrow screen the menu wraps under the name. */
+.cc-name-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.cc-name-row .ctl {
+    flex: 1 1 13rem;
+    min-width: 0;
+}
+
+.cc-build-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3) var(--s-5);
+    padding-top: var(--s-4);
+    border-top: var(--bd-hair);
+}
+
+.cc-bar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    margin-left: auto;
+}
+
+/* "Voorlopige regels ⓘ": the explanation folds open beneath it. */
+.cc-badge {
+    position: relative;
+    font-size: 14px;
+}
+
+.cc-badge summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 32px;
+    padding: 2px 12px;
+    color: var(--notice-ink);
+    background: var(--notice-bg);
+    border: 1px solid var(--notice-border);
+    border-radius: var(--r-seal);
+    cursor: pointer;
+    list-style: none;
+}
+
+.cc-badge summary::-webkit-details-marker {
+    display: none;
+}
+
+.cc-badge summary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--va-focus-ring);
+}
+
+.cc-badge p {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + var(--s-2));
+    left: 0;
+    width: min(22rem, 80vw);
+    margin: 0;
+    padding: var(--s-3) var(--s-4);
+    color: var(--notice-ink);
+    background: var(--notice-bg);
+    border: 1px solid var(--notice-border);
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-md);
+}
+
+/* Menus: "Mijn plannen" and "Meer". A disclosure with a panel below its button; a click anywhere
+   else lands on the scrim and closes it. */
+.cc-menu {
+    position: relative;
+}
+
+.cc-menu-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+}
+
+.cc-menu-panel {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + var(--s-2));
+    right: 0;
+    min-width: 14rem;
+    padding: var(--s-2);
+    background: var(--paper-raised);
+    border: var(--bd-hair);
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-lg);
+}
+
+.cc-menu-panel[hidden] {
+    display: none;
+}
+
+.cc-menu-panel--plans {
+    right: auto;
+    left: 0;
+    width: min(30rem, calc(100vw - 2 * var(--s-4) - 2 * var(--s-5)));
+    padding: var(--s-2) var(--s-4);
+}
+
+.cc-menu-panel--plans .cc-list li:last-child {
+    border-bottom: 0;
+}
+
+.cc-menu-panel--plans p {
+    margin: var(--s-3) 0;
+}
+
+.cc-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 var(--s-3);
+    font: 400 15px var(--f-text);
+    color: var(--ink);
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+}
+
+.cc-menu-item:hover,
+.cc-menu-item:focus-within {
+    background: var(--paper-sunken);
+}
+
+/* The first visit: three ways to start (UX-REVIEW.md P5). */
+.cc-start {
+    display: grid;
+    gap: var(--s-5);
+}
+
+.cc-start h2 {
+    margin: 0;
+}
+
+.cc-start h3 {
+    margin: 0 0 var(--s-2);
+    font-size: 16px;
+}
+
+.cc-start p {
+    margin: 0 0 var(--s-3);
+    font-size: 15px;
+}
+
+.cc-start-way + .cc-start-way {
+    padding-top: var(--s-4);
+    border-top: var(--bd-hair);
+}
+
+.cc-start-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+button.cc-chip {
+    cursor: pointer;
 }
 
 .cc-field--xp {
@@ -526,11 +705,11 @@ fieldset.cc-field {
 .cc-xp {
     display: flex;
     gap: var(--s-5);
-    margin: 0 0 0 auto;
+    margin: 0;
 }
 
 .cc-xp div {
-    text-align: right;
+    text-align: left;
 }
 
 .cc-xp dt {
@@ -567,12 +746,27 @@ fieldset.cc-field {
     margin-bottom: var(--s-5);
 }
 
+/* An empty plan: the ways to start take the chosen table's place first on a phone, and the
+   summary's place on a wide screen. */
+.cc-build-grid.is-empty {
+    grid-template-areas: "start" "picker";
+}
+
 @media (min-width: 1000px) {
     .cc-build-grid {
         grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
         grid-template-areas: "picker summary" "chosen chosen";
         align-items: start;
     }
+
+    .cc-build-grid.is-empty {
+        grid-template-areas: "picker start";
+    }
+}
+
+.cc-area-start {
+    grid-area: start;
+    min-width: 0;
 }
 
 .cc-area-chosen {
@@ -1075,21 +1269,10 @@ fieldset.cc-field {
     font-size: 17px;
 }
 
-/* Keeping the plan. */
-.cc-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-3);
-}
-
+/* A file input dressed as a button or menu item. */
 .cc-file {
     position: relative;
     cursor: pointer;
-}
-
-.cc-saved {
-    flex: 1 0 100%;
 }
 
 /* The dock (UX-REVIEW.md P4): toasts and the removal question, at the bottom of the screen where

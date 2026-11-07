@@ -78,20 +78,39 @@ public static class PresetFacts
     /// <returns>Its kinds; empty when it spends that much in none.</returns>
     public static IReadOnlyList<PresetKind> Kinds(PresetContent preset, ContentBook content, RuleBook rules)
     {
-        ArgumentNullException.ThrowIfNull(preset);
-        ArgumentNullException.ThrowIfNull(content);
-        ArgumentNullException.ThrowIfNull(rules);
-
-        var spent = new Dictionary<PresetKind, decimal>();
-        foreach (var skill in preset.Skills)
-        {
-            if (content.TryGet(skill.Key, out var known) && Families.TryGetValue(known.Category.Nl, out var kind) && rules.TryGet(skill.Key, out var rule))
-            {
-                spent[kind] = spent.GetValueOrDefault(kind) + (rule.Cost * skill.Times);
-            }
-        }
-
+        var spent = SpentPerKind(preset, content, rules);
         return [.. AllKinds.Where(kind => spent.GetValueOrDefault(kind) >= KindThreshold)];
+    }
+
+    /// <summary>The kind the preset spends the most XP in; the earlier kind in filter order on a tie.</summary>
+    /// <param name="preset">The preset.</param>
+    /// <param name="content">The content, for the skills' categories.</param>
+    /// <param name="rules">The rules, for the skills' costs.</param>
+    /// <returns>Its main kind; <see cref="PresetKind.None"/> when it spends nothing in any kind.</returns>
+    public static PresetKind Primary(PresetContent preset, ContentBook content, RuleBook rules)
+    {
+        var spent = SpentPerKind(preset, content, rules);
+        return AllKinds
+            .Where(kind => spent.GetValueOrDefault(kind) > 0)
+            .OrderByDescending(kind => spent[kind])
+            .FirstOrDefault();
+    }
+
+    /// <summary>
+    /// The presets a first visit offers (UX-REVIEW.md P5): per kind, in filter order, the first preset
+    /// that is mostly that kind. A kind no preset is mostly of is left out.
+    /// </summary>
+    /// <param name="content">The content, with its presets.</param>
+    /// <param name="rules">The rules, for the costs.</param>
+    /// <returns>One preset per kind at most.</returns>
+    public static IReadOnlyList<PresetContent> Starters(ContentBook content, RuleBook rules)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        var primaries = content.Presets.Select(preset => (Preset: preset, Kind: Primary(preset, content, rules))).ToList();
+        return [.. AllKinds
+            .Select(kind => primaries.FirstOrDefault(candidate => candidate.Kind == kind).Preset)
+            .OfType<PresetContent>()];
     }
 
     /// <summary>The skills that define the preset: the dearest ones, in the preset's order when they cost the same.</summary>
@@ -138,6 +157,24 @@ public static class PresetFacts
         PresetKind.Ritual => "ritueel",
         _ => string.Empty,
     };
+
+    private static Dictionary<PresetKind, decimal> SpentPerKind(PresetContent preset, ContentBook content, RuleBook rules)
+    {
+        ArgumentNullException.ThrowIfNull(preset);
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(rules);
+
+        var spent = new Dictionary<PresetKind, decimal>();
+        foreach (var skill in preset.Skills)
+        {
+            if (content.TryGet(skill.Key, out var known) && Families.TryGetValue(known.Category.Nl, out var kind) && rules.TryGet(skill.Key, out var rule))
+            {
+                spent[kind] = spent.GetValueOrDefault(kind) + (rule.Cost * skill.Times);
+            }
+        }
+
+        return spent;
+    }
 
     /// <summary>The kind a slug stands for.</summary>
     /// <param name="slug">The slug, in any case.</param>

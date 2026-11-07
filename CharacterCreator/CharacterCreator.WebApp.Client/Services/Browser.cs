@@ -36,7 +36,12 @@ public sealed class Browser(IJSRuntime js) : IUiLanguage, IAsyncDisposable
     /// <summary>Moves focus to the first element that matches one of the selectors, without scrolling.</summary>
     /// <param name="selectors">CSS selectors, the preferred one first.</param>
     /// <returns>Whether an element was focused.</returns>
-    public ValueTask<bool> FocusAsync(params string[] selectors) => CallAsync<bool>("focus", selectors, false);
+    public ValueTask<bool> FocusAsync(params string[] selectors) => CallAsync<bool>("focus", selectors, false, false);
+
+    /// <summary>Scrolls the first element that matches one of the selectors into view, and focuses it.</summary>
+    /// <param name="selectors">CSS selectors, the preferred one first.</param>
+    /// <returns>Whether an element was focused.</returns>
+    public ValueTask<bool> ShowAndFocusAsync(params string[] selectors) => CallAsync<bool>("focus", selectors, false, true);
 
     /// <summary>
     /// <see cref="FocusAsync"/>, but only when focus was lost: the focused element was removed by a
@@ -44,7 +49,7 @@ public sealed class Browser(IJSRuntime js) : IUiLanguage, IAsyncDisposable
     /// </summary>
     /// <param name="selectors">CSS selectors, the preferred one first.</param>
     /// <returns>Whether an element was focused.</returns>
-    public ValueTask<bool> RestoreFocusAsync(params string[] selectors) => CallAsync<bool>("focus", selectors, true);
+    public ValueTask<bool> RestoreFocusAsync(params string[] selectors) => CallAsync<bool>("focus", selectors, true, false);
 
     /// <summary>Hands the visitor a file to save.</summary>
     /// <param name="fileName">The file's name.</param>
