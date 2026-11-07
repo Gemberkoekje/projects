@@ -1,0 +1,29 @@
+@page "/"
+@rendermode InteractiveWebAssembly
+@inject IUiLanguage Languages
+
+@* The build screen (DESIGN.md §5). The server prerenders the heading and a loading line; the
+   browser takes over and loads the rules, the plan and the screen itself. *@
+<PageTitle>Character Creator · @ui.T("Bouwen", "Build")</PageTitle>
+
+<h1>@ui.T("Personage bouwen", "Build a character")</h1>
+
+@if (RendererInfo.IsInteractive)
+{
+    <BuildScreen Ui="ui" Preset="@(Voorbeeld ?? string.Empty)" />
+}
+else
+{
+    <p class="muted" data-render-state="server">@ui.T("Het bouwscherm wordt geladen…", "Loading the build screen…")</p>
+}
+
+@code {
+    private Ui ui = Ui.Dutch;
+
+    /// <summary>A preset to start from, from the presets page (<c>?voorbeeld=</c>); null when absent.</summary>
+    [SupplyParameterFromQuery(Name = "voorbeeld")]
+    public string? Voorbeeld { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync() => ui = await Languages.CurrentAsync();
+}

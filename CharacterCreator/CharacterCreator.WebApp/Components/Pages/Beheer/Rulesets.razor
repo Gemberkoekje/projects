@@ -1,0 +1,218 @@
+@page "/beheer/rulesets"
+@attribute [Authorize(Policy = CharacterCreatorPolicies.Beheer)]
+@using System.Globalization
+@using CharacterCreator.application.Ports
+@using CharacterCreator.application.Rulesets
+@using CharacterCreator.core.Rulesets
+@inject IVoidClient Voids
+@inject IRulesetStore Store
+@inject PreviewImportHandler Preview
+@inject PublishRulesetHandler Publish
+@inject EruAccessTokens Tokens
+
+@* Beheer → Rulesets (DESIGN.md §4.2): import from VOID, read the dry run, publish. SL and EC only.
+   Server-rendered with plain forms: each button is a post, and the page shows the outcome. *@
+<PageTitle>Character Creator · Rulesets</PageTitle>
+
+<h1>Rulesets</h1>
+
+@if (Current is not null)
+{
+    <section class="cc-panel">
+        <h2>Nu gepubliceerd</h2>
+        <p>
+            <span class="mono">@Current.Id</span>, @When(Current.PublishedAt) door @Current.PublishedBy,
+            uit @Current.Source.
+        </p>
+        @if (Current.Provisional)
+        {
+            <p class="cc-notice">
+                Voorlopig: deze regels komen uit de meegeleverde offline snapshot, niet uit een VOID. Importeer
+                uit VOID om ze te vervangen.
+            </p>
+        }
+    </section>
+}
+
+<section class="cc-panel">
+    <h2>Importeren uit VOID</h2>
+    @if (!Voids.IsConfigured)
+    {
+        <p class="secondary">Er is geen VOID ingesteld (<span class="mono">Void:BaseUrl</span>), dus importeren kan hier niet.</p>
+    }
+    else
+    {
+        <p class="secondary">Leest de vaardigheden uit <span class="mono">@Voids.Source</span> en laat zien wat publiceren zou doen. Er wordt nog niets opgeslagen.</p>
+        <form method="post" @formname="preview" @onsubmit="PreviewAsync">
+            <AntiforgeryToken />
+            <button type="submit" class="cc-button">Proefimport</button>
+        </form>
+    }
+
+    @if (Problems.Count > 0)
+    {
+        <div class="cc-error" role="alert">
+            @foreach (var problem in Problems)
+            {
+                <p>@problem</p>
+            }
+        </div>
+    }
+
+    @if (Published)
+    {
+        <p class="cc-success" role="status">Gepubliceerd: <span class="mono">@Outcome?.Ruleset.Id</span>. De bouwpagina gebruikt hem vanaf nu.</p>
+    }
+</section>
+
+@if (Outcome is not null && !Published)
+{
+    var report = Outcome.Report;
+    <section class="cc-panel">
+        <h2>Proefimport</h2>
+        <p>
+            Uit @report.Source, @When(report.TakenAt)@(report.Synthesized ? " (offline snapshot)" : string.Empty).
+            <strong>@report.Offered vaardigheden</strong> worden aangeboden.
+        </p>
+        <p>
+            Nieuw personage: @Xp(report.Creation.StartXp) XP, hoogstens @Xp(report.Creation.MaxLeftOver) XP over
+            @(report.CreationFromVoid ? "(uit VOID)." : "(aangenomen: deze VOID geeft ze nog niet).")
+        </p>
+
+        <ReportList Title="Niet te publiceren" Items="report.Errors" />
+        <ReportList Title="Wijzigingen ten opzichte van wat nu gepubliceerd is" Items="Changes(report)" Empty="Geen." />
+        <ReportList Title="Kosten in VOID anders dan in het boek (VOID telt)" Items="Costs(report)" Empty="Geen." />
+        <ReportList Title="Boekvaardigheden zonder VOID-vaardigheid (niet aangeboden)" Items="report.NotInVoid" Empty="Geen." />
+        <ReportList Title="Boekvaardigheden die VOID heeft afgeschaft" Items="Deprecated(report)" Empty="Geen." />
+        <ReportList Title="Vereisten op vaardigheden buiten het boek (in de ruleset als hidden-{id})" Items="Hidden(report)" Empty="Geen." />
+        <ReportList Title="VOID-namen die meer dan eens voorkomen" Items="report.DuplicateVoidNames" Empty="Geen." />
+        <ReportList Title="Energie- en imbuetypen in VOID" Items="report.EnergyTypes" Empty="Geen." />
+        <ReportList Title="VOID-vaardigheden die niet in het boek staan (SL-only, of nieuw)" Items="report.NotInBook" Empty="Geen." Collapsed="true" />
+
+        @if (report.CanPublish)
+        {
+            <form method="post" @formname="publish" @onsubmit="PublishAsync">
+                <AntiforgeryToken />
+                <button type="submit" class="cc-button cc-button--primary">Publiceren</button>
+            </form>
+            <p class="muted">Publiceren importeert opnieuw en slaat het resultaat op. Een gepubliceerde ruleset verandert daarna nooit meer.</p>
+        }
+    </section>
+}
+
+@if (History.Count > 0)
+{
+    <section class="cc-panel">
+        <h2>Eerder gepubliceerd</h2>
+        <ul class="cc-list">
+            @foreach (var summary in History)
+            {
+                <li><span class="mono">@summary.Id</span>, @When(summary.PublishedAt) door @summary.PublishedBy@(summary.Provisional ? " (voorlopig)" : string.Empty)</li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    /// <summary>The current request; this page renders statically.</summary>
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    /// <summary>The request, which a statically rendered page always has.</summary>
+    private HttpContext Http => HttpContext ?? throw new InvalidOperationException("Beheer pages render statically, with a request.");
+
+    private PublishedRuleset? Current { get; set; }
+
+    private IReadOnlyList<RulesetSummary> History { get; set; } = [];
+
+    private ImportOutcome? Outcome { get; set; }
+
+    private List<string> Problems { get; } = [];
+
+    private bool Published { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var current = await Store.CurrentAsync(Http.RequestAborted);
+        Current = current.IsValid ? current.Value : null;
+        History = await Store.ListAsync(20, Http.RequestAborted);
+    }
+
+    private async Task PreviewAsync()
+    {
+        var token = await Tokens.ForAsync(Http);
+        if (!token.IsValid)
+        {
+            Problems.AddRange(token.Messages.Select(message => message.Message ?? string.Empty));
+            return;
+        }
+
+        var outcome = await Preview.HandleAsync(new PreviewImport { AccessToken = token.Value, PublishedBy = Http.User.DisplayName() }, Http.RequestAborted);
+        if (outcome.IsValid)
+        {
+            Outcome = outcome.Value;
+        }
+        else
+        {
+            Problems.AddRange(outcome.Messages.Select(message => message.Message ?? string.Empty));
+        }
+    }
+
+    private async Task PublishAsync()
+    {
+        var token = await Tokens.ForAsync(Http);
+        if (!token.IsValid)
+        {
+            Problems.AddRange(token.Messages.Select(message => message.Message ?? string.Empty));
+            return;
+        }
+
+        var outcome = await Publish.HandleAsync(new PublishRuleset { AccessToken = token.Value, PublishedBy = Http.User.DisplayName() }, Http.RequestAborted);
+        if (outcome.IsValid)
+        {
+            Outcome = outcome.Value;
+            Published = true;
+            await LoadAsync();
+        }
+        else
+        {
+            Problems.AddRange(outcome.Messages.Select(message => message.Message ?? string.Empty));
+        }
+    }
+
+    private static string When(DateTimeOffset moment)
+        => moment.ToOffset(TimeSpan.FromHours(1)).ToString("d MMMM yyyy HH:mm", CultureInfo.GetCultureInfo("nl-NL"));
+
+    private static string Xp(decimal xp) => xp.ToString("0.##", CultureInfo.GetCultureInfo("nl-NL"));
+
+    private static List<string> Hidden(ImportReport report)
+        => [.. report.HiddenPrerequisites.Select(hidden => $"{hidden.Skill} → {hidden.VoidName}")];
+
+    private static List<string> Deprecated(ImportReport report)
+        => [.. report.DeprecatedOffered.Select(key => key.ToString())];
+
+    private static List<string> Costs(ImportReport report)
+        => [.. report.CostDifferences.Select(cost => $"{cost.Skill}: VOID {cost.VoidCost}, boek {cost.BookCost}")];
+
+    private static List<string> Changes(ImportReport report)
+        => [.. report.Changes.Select(change => change.Kind switch
+        {
+            RuleChangeKind.Added => $"{change.Skill}: nieuw ({change.After})",
+            RuleChangeKind.Removed => $"{change.Skill}: vervalt ({change.Before})",
+            _ => $"{change.Skill}: {Label(change.Kind)} {change.Before} → {change.After}",
+        })];
+
+    private static string Label(RuleChangeKind kind) => kind switch
+    {
+        RuleChangeKind.Cost => "kosten",
+        RuleChangeKind.BaseMax => "bij creatie",
+        RuleChangeKind.TimesMax => "maximaal",
+        RuleChangeKind.Deprecated => "afgeschaft",
+        RuleChangeKind.Requirements => "vereisten",
+        RuleChangeKind.Energy => "energie",
+        _ => kind.ToString(),
+    };
+}

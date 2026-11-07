@@ -1,0 +1,12 @@
+@page "/niet-gevonden"
+@inject CookieUiLanguage Languages
+
+<PageTitle>Character Creator · @Ui.T("Niet gevonden", "Not found")</PageTitle>
+
+<h1>@Ui.T("Niet gevonden", "Not found")</h1>
+
+<p class="secondary">@Ui.T("Deze pagina bestaat niet.", "This page doesn't exist.") <a href="">@Ui.T("Terug naar het bouwscherm.", "Back to the build screen.")</a></p>
+
+@code {
+    private Ui Ui => Languages.Current;
+}

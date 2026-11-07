@@ -1,0 +1,26 @@
+@page "/fout"
+@using System.Diagnostics
+
+<PageTitle>Character Creator · Fout</PageTitle>
+
+<h1>Er ging iets mis</h1>
+
+<p class="secondary">Probeer het zo nog eens. <a href="">Terug naar het bouwscherm.</a></p>
+
+@if (!string.IsNullOrEmpty(RequestId))
+{
+    <p class="muted">Kenmerk: <span class="mono">@RequestId</span></p>
+}
+
+@code {
+    /// <summary>The current request; this page always renders statically.</summary>
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    /// <summary>The trace id, so a report can be matched to the log.</summary>
+    private string RequestId { get; set; } = string.Empty;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+        => RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier ?? string.Empty;
+}

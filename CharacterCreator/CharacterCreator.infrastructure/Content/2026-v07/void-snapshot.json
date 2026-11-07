@@ -1,0 +1,4589 @@
+{
+  "class": "List",
+  "url": "/skills",
+  "source": "offline snapshot (2026-v07), synthesized from the public rulebook draft, the 2026 book's costs and Thorfgin's data",
+  "synthesized": true,
+  "taken_at": "2026-11-07T00:00:00Z",
+  "creation": {
+    "start_xp": 15,
+    "max_left_over": 3
+  },
+  "list": [
+    {
+      "class": "Skill",
+      "url": "/skills/1",
+      "id": 1,
+      "name": "ambidexterity",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/2",
+      "id": 2,
+      "name": "literacy",
+      "cost": 0,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/3",
+      "id": 3,
+      "name": "rune use",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": 20,
+      "imbue_type": {
+        "name": "Spiritual"
+      },
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/4",
+      "id": 4,
+      "name": "rune attunement",
+      "cost": 1,
+      "base_max": 99,
+      "times_max": 99,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": 20,
+      "imbue_type": {
+        "name": "Spiritual"
+      },
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/5",
+      "id": 5,
+      "name": "glyph use",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": 20,
+      "imbue_type": {
+        "name": "Elemental"
+      },
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/6",
+      "id": 6,
+      "name": "glyph attunement",
+      "cost": 1,
+      "base_max": 99,
+      "times_max": 99,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": 20,
+      "imbue_type": {
+        "name": "Elemental"
+      },
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/7",
+      "id": 7,
+      "name": "numeracy",
+      "cost": 0,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/8",
+      "id": 8,
+      "name": "lifeforce A",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/9",
+      "id": 9,
+      "name": "lifeforce B",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            8
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/10",
+      "id": 10,
+      "name": "lifeforce C",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/11",
+      "id": 11,
+      "name": "teaching expertise",
+      "cost": 1,
+      "base_max": 3,
+      "times_max": 3,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "extra",
+          "amount": 1,
+          "skills": null
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/12",
+      "id": 12,
+      "name": "shield use",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/13",
+      "id": 13,
+      "name": "armour I",
+      "cost": 0,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/14",
+      "id": 14,
+      "name": "armour II",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            13
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/15",
+      "id": 15,
+      "name": "armour III",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/16",
+      "id": 16,
+      "name": "armour IV",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/17",
+      "id": 17,
+      "name": "armour casting",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            13
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/18",
+      "id": 18,
+      "name": "paladin",
+      "cost": 1,
+      "base_max": 3,
+      "times_max": 3,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        },
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            13
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/19",
+      "id": 19,
+      "name": "small weapons",
+      "cost": 0,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/20",
+      "id": 20,
+      "name": "1-handed weapons",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/21",
+      "id": 21,
+      "name": "2-handed weapons",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/22",
+      "id": 22,
+      "name": "pole arms",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            20
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/23",
+      "id": 23,
+      "name": "thrown weapons",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/24",
+      "id": 24,
+      "name": "archery",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/25",
+      "id": 25,
+      "name": "perseverance",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/26",
+      "id": 26,
+      "name": "strength A",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/27",
+      "id": 27,
+      "name": "toughness A",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/28",
+      "id": 28,
+      "name": "leadership A",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/29",
+      "id": 29,
+      "name": "protection A",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            25
+          ]
+        },
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            12
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/30",
+      "id": 30,
+      "name": "berserker A",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/31",
+      "id": 31,
+      "name": "military training A",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            25
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/32",
+      "id": 32,
+      "name": "first aid",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/33",
+      "id": 33,
+      "name": "quick and dirty treatment",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 1,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/34",
+      "id": 34,
+      "name": "battlefield surgery",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/35",
+      "id": 35,
+      "name": "diagnostics",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/36",
+      "id": 36,
+      "name": "balance humors",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/37",
+      "id": 37,
+      "name": "bezoarist",
+      "cost": 3,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/38",
+      "id": 38,
+      "name": "hypnotherapy",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/39",
+      "id": 39,
+      "name": "harmful hypnotism",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 4,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            38
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/40",
+      "id": 40,
+      "name": "herb lore",
+      "cost": 1,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/41",
+      "id": 41,
+      "name": "preserve herbs",
+      "cost": 2,
+      "base_max": 99,
+      "times_max": 99,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/42",
+      "id": 42,
+      "name": "brew healing potions A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/43",
+      "id": 43,
+      "name": "brew herbal elixers A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/44",
+      "id": 44,
+      "name": "brew magic elixers A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/45",
+      "id": 45,
+      "name": "brew hallucinogens A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/46",
+      "id": 46,
+      "name": "brew poison A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/47",
+      "id": 47,
+      "name": "mastersmith A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/48",
+      "id": 48,
+      "name": "carpenter A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/49",
+      "id": 49,
+      "name": "tailor A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/50",
+      "id": 50,
+      "name": "bookbinder A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/51",
+      "id": 51,
+      "name": "leatherworker A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/52",
+      "id": 52,
+      "name": "jeweler A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/53",
+      "id": 53,
+      "name": "gemsetter A",
+      "cost": 2,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/54",
+      "id": 54,
+      "name": "mage A (white)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/55",
+      "id": 55,
+      "name": "mage A (gray)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/56",
+      "id": 56,
+      "name": "mage A (black)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/57",
+      "id": 57,
+      "name": "mage B (air)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            54,
+            55,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/58",
+      "id": 58,
+      "name": "mage B (metal)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            54,
+            55,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/59",
+      "id": 59,
+      "name": "mage B (earth)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            54,
+            55,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/60",
+      "id": 60,
+      "name": "mage B (water)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            54,
+            55,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/61",
+      "id": 61,
+      "name": "mage B (fire)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            54,
+            55,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/62",
+      "id": 62,
+      "name": "mage B (wood)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            54,
+            55,
+            56
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/63",
+      "id": 63,
+      "name": "paladin spells A",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            18
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/64",
+      "id": 64,
+      "name": "paladin spells B",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            63
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/65",
+      "id": 65,
+      "name": "priest A (purity)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/66",
+      "id": 66,
+      "name": "priest A (wrath)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/67",
+      "id": 67,
+      "name": "priest A (death)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/68",
+      "id": 68,
+      "name": "priest B (purity)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            65,
+            66,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/69",
+      "id": 69,
+      "name": "priest B (wrath)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            65,
+            66,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/70",
+      "id": 70,
+      "name": "priest B (death)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            65,
+            66,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/71",
+      "id": 71,
+      "name": "priest B (mind)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            65,
+            66,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/72",
+      "id": 72,
+      "name": "priest B (nature)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            65,
+            66,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/73",
+      "id": 73,
+      "name": "healer A (elemental)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/74",
+      "id": 74,
+      "name": "healer A (spiritual)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/75",
+      "id": 75,
+      "name": "healer B (elemental)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/76",
+      "id": 76,
+      "name": "healer B (spiritual)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/77",
+      "id": 77,
+      "name": "poison healer (elemental)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/78",
+      "id": 78,
+      "name": "poison healer (spiritual)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/79",
+      "id": 79,
+      "name": "disease healer (elemental)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/80",
+      "id": 80,
+      "name": "disease healer (spiritual)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/81",
+      "id": 81,
+      "name": "mind healer (elemental)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/82",
+      "id": 82,
+      "name": "mind healer (spiritual)",
+      "cost": 4,
+      "base_max": 1,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/83",
+      "id": 83,
+      "name": "elemental ritualist",
+      "cost": 1,
+      "base_max": 99,
+      "times_max": 99,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Elemental ritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/84",
+      "id": 84,
+      "name": "spiritual ritualist",
+      "cost": 1,
+      "base_max": 99,
+      "times_max": 99,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Spiritual ritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": []
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/85",
+      "id": 85,
+      "name": "extra willpower",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 99,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            25,
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/86",
+      "id": 86,
+      "name": "heal other beings",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            35,
+            54,
+            55,
+            56,
+            65,
+            66,
+            67,
+            73,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/87",
+      "id": 87,
+      "name": "combine bodies",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            34
+          ]
+        },
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/88",
+      "id": 88,
+      "name": "detachable growth",
+      "cost": 3,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            87
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/89",
+      "id": 89,
+      "name": "create abonimation",
+      "cost": 3,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            87
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/90",
+      "id": 90,
+      "name": "brew expertise",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 99,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 3,
+          "skills": [
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            90,
+            91,
+            92,
+            93,
+            94,
+            95,
+            96,
+            97,
+            98,
+            99,
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/91",
+      "id": 91,
+      "name": "brew healing elixers B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            42
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/92",
+      "id": 92,
+      "name": "brew healing elixers C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            91
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/93",
+      "id": 93,
+      "name": "brew herbal elixers B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            43
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/94",
+      "id": 94,
+      "name": "brew herbal elixers C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            93
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/95",
+      "id": 95,
+      "name": "brew magic elixers B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            44
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/96",
+      "id": 96,
+      "name": "brew magic elixers C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            95
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/97",
+      "id": 97,
+      "name": "brew hallucinogens B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            45
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/98",
+      "id": 98,
+      "name": "brew hallucinogens C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            97
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/99",
+      "id": 99,
+      "name": "brew poison B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            46
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/100",
+      "id": 100,
+      "name": "brew poison C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            99
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/101",
+      "id": 101,
+      "name": "artificer’s expertise",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 99,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 2,
+          "skills": [
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/102",
+      "id": 102,
+      "name": "mastersmith B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            47
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/103",
+      "id": 103,
+      "name": "mastersmith C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            102
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/104",
+      "id": 104,
+      "name": "carpenter B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/105",
+      "id": 105,
+      "name": "carpenter C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            104
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/106",
+      "id": 106,
+      "name": "tailor B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            49
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/107",
+      "id": 107,
+      "name": "tailor C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            106
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/108",
+      "id": 108,
+      "name": "bookbinder B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            50
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/109",
+      "id": 109,
+      "name": "bookbinder C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            108
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/110",
+      "id": 110,
+      "name": "leatherworker B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            51
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/111",
+      "id": 111,
+      "name": "leatherworker C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/112",
+      "id": 112,
+      "name": "jeweler B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            52
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/113",
+      "id": 113,
+      "name": "jeweler C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            112
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/114",
+      "id": 114,
+      "name": "gemsetter B",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            53
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/115",
+      "id": 115,
+      "name": "gemsetter C",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Inspiration"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            114
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/116",
+      "id": 116,
+      "name": "extra elemental mana",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 99,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 4,
+          "skills": [
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            73,
+            124,
+            125,
+            126,
+            127,
+            128,
+            129,
+            130,
+            131,
+            132
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/117",
+      "id": 117,
+      "name": "extra spiritual mana",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 99,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 4,
+          "skills": [
+            65,
+            66,
+            67,
+            68,
+            69,
+            70,
+            71,
+            72,
+            74,
+            136,
+            137,
+            138,
+            139,
+            140,
+            141,
+            142,
+            143
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/118",
+      "id": 118,
+      "name": "healer C (elemental)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 8,
+          "skills": [
+            73,
+            74,
+            75,
+            76,
+            118,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/119",
+      "id": 119,
+      "name": "healer C (spiritual)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 8,
+          "skills": [
+            73,
+            74,
+            75,
+            76,
+            118,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/120",
+      "id": 120,
+      "name": "immune to poisons",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            77,
+            78
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/121",
+      "id": 121,
+      "name": "immune to diseases",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            79,
+            80
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/122",
+      "id": 122,
+      "name": "immune to mind-influencing A",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            81,
+            82
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/123",
+      "id": 123,
+      "name": "immune to mind-influencing B",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            122
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/124",
+      "id": 124,
+      "name": "mage C (air)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            57
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/125",
+      "id": 125,
+      "name": "mage C (metal)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            58
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/126",
+      "id": 126,
+      "name": "mage C (earth)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            59
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/127",
+      "id": 127,
+      "name": "mage C (water)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/128",
+      "id": 128,
+      "name": "mage C (fire)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            61
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/129",
+      "id": 129,
+      "name": "mage C (wood)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            62
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/130",
+      "id": 130,
+      "name": "mage D (destruction)",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            124,
+            125,
+            126,
+            127,
+            128,
+            129
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/131",
+      "id": 131,
+      "name": "mage D (domination)",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            124,
+            125,
+            126,
+            127,
+            128,
+            129
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/132",
+      "id": 132,
+      "name": "mage D (epidemic)",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            124,
+            125,
+            126,
+            127,
+            128,
+            129
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/133",
+      "id": 133,
+      "name": "glyph scroll craft",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 4,
+          "skills": [
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            73,
+            75,
+            118,
+            124,
+            125,
+            126,
+            127,
+            128,
+            129,
+            130,
+            131,
+            132
+          ]
+        },
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/134",
+      "id": 134,
+      "name": "glyph mastery",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 99,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 8,
+          "skills": [
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            73,
+            75,
+            118,
+            124,
+            125,
+            126,
+            127,
+            128,
+            129,
+            130,
+            131,
+            132
+          ]
+        },
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            133
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/135",
+      "id": 135,
+      "name": "excorcism",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            65,
+            66,
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/136",
+      "id": 136,
+      "name": "priest C (purity)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            68
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/137",
+      "id": 137,
+      "name": "priest C (wrath)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            69
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/138",
+      "id": 138,
+      "name": "priest C (death)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/139",
+      "id": 139,
+      "name": "priest C (mind)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            71
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/140",
+      "id": 140,
+      "name": "priest C (nature)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            72
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/141",
+      "id": 141,
+      "name": "priest D (consecrate)",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            136,
+            137,
+            138,
+            139,
+            140
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/142",
+      "id": 142,
+      "name": "priest D (healing prayers)",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            136,
+            137,
+            138,
+            139,
+            140
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/143",
+      "id": 143,
+      "name": "priest D (wrath of the gods)",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 2,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            136,
+            137,
+            138,
+            139,
+            140
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/144",
+      "id": 144,
+      "name": "rune scroll craft",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 4,
+          "skills": [
+            65,
+            66,
+            67,
+            68,
+            69,
+            70,
+            71,
+            72,
+            74,
+            76,
+            119,
+            136,
+            137,
+            138,
+            139,
+            140,
+            141,
+            142,
+            143
+          ]
+        },
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            3
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/145",
+      "id": 145,
+      "name": "rune mastery",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 99,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": true,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "points",
+          "amount": 8,
+          "skills": [
+            65,
+            66,
+            67,
+            68,
+            69,
+            70,
+            71,
+            72,
+            74,
+            76,
+            119,
+            136,
+            137,
+            138,
+            139,
+            140,
+            141,
+            142,
+            143
+          ]
+        },
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            144
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/146",
+      "id": 146,
+      "name": "woad of blood",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            83,
+            84
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/147",
+      "id": 147,
+      "name": "group ritual specialist",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 99,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 3,
+          "skills": [
+            83,
+            84
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/148",
+      "id": 148,
+      "name": "pure ritual",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 4,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 3,
+          "skills": [
+            83,
+            84
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/149",
+      "id": 149,
+      "name": "find circle",
+      "cost": 1,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 5,
+          "skills": [
+            83,
+            84
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/150",
+      "id": 150,
+      "name": "strength B",
+      "cost": 3,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            26
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/151",
+      "id": 151,
+      "name": "toughness B",
+      "cost": 3,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            27
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/152",
+      "id": 152,
+      "name": "leadership B",
+      "cost": 3,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            28
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/153",
+      "id": 153,
+      "name": "protection B",
+      "cost": 3,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            29
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/154",
+      "id": 154,
+      "name": "beserker B",
+      "cost": 3,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            30
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/155",
+      "id": 155,
+      "name": "military training B",
+      "cost": 3,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 3,
+      "manatype": {
+        "name": "Willpower"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            31
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/156",
+      "id": 156,
+      "name": "demonology A",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            61,
+            68
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/157",
+      "id": 157,
+      "name": "demonology B (elemental)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            156
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/158",
+      "id": 158,
+      "name": "demonology B (spiritual)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            156
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/159",
+      "id": 159,
+      "name": "demonology C (elemental)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            157,
+            158
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/160",
+      "id": 160,
+      "name": "demonology C (spiritual)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            157,
+            158
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/161",
+      "id": 161,
+      "name": "druidism A (life)",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            62,
+            72
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/162",
+      "id": 162,
+      "name": "druidism A (death)",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            58,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/163",
+      "id": 163,
+      "name": "druidism B (elemental)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            161,
+            162
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/164",
+      "id": 164,
+      "name": "druidism B (spiritual)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            161,
+            162
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/165",
+      "id": 165,
+      "name": "druidism C (elemental)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            163,
+            164
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/166",
+      "id": 166,
+      "name": "druidism C (spiritual)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            163,
+            164
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/167",
+      "id": 167,
+      "name": "necromancy A",
+      "cost": 2,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": null,
+      "manatype": null,
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            58,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/168",
+      "id": 168,
+      "name": "necromancy B (elemental)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            167
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/169",
+      "id": 169,
+      "name": "necromancy B (spiritual)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            167
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/170",
+      "id": 170,
+      "name": "necromancy C (elemental)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Elemental"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            168,
+            169
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Skill",
+      "url": "/skills/171",
+      "id": 171,
+      "name": "necromancy C (spiritual)",
+      "cost": 4,
+      "base_max": 0,
+      "times_max": 1,
+      "mana_amount": 5,
+      "manatype": {
+        "name": "Spiritual"
+      },
+      "imbue_cap": null,
+      "imbue_type": null,
+      "loresheet": false,
+      "blanks": false,
+      "deprecated": false,
+      "requirements": [
+        {
+          "kind": "any",
+          "amount": 1,
+          "skills": [
+            168,
+            169
+          ]
+        }
+      ]
+    }
+  ]
+}

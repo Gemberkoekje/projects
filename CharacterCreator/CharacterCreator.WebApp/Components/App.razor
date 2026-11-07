@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="@LanguageCode" @attributes="ThemeAttributes">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="@($"{HttpContext?.Request.PathBase}/")" />
+    <meta name="theme-color" content="#6e0808" />
+    <ResourcePreloader />
+    @* Before the stylesheets and without defer: it sets the theme before the first paint. *@
+    <script src="@Assets["lib/vortex-tools/vortex-theme.js"]"></script>
+    <link rel="stylesheet" href="@Assets["lib/vortex-tools/guildhall.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/svg+xml" href="@Assets["lib/vortex-tools/img/vortex-crest.svg"]" />
+    <HeadOutlet />
+</head>
+
+<body>
+    @* Static by default; the build screen asks for InteractiveWebAssembly on its own page. *@
+    <Routes />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    /// <summary>The current request. App always renders statically, so in practice it is always there.</summary>
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    /// <summary>
+    /// The visitor's language (the language cookie). The build screen reads it back from here once it
+    /// runs in the browser.
+    /// </summary>
+    private string LanguageCode => HttpContext is { } context ? CookieUiLanguage.From(context).Code : Ui.Dutch.Code;
+
+    /// <summary>
+    /// The theme is one choice shared by every Vortex app: the <c>vortex-theme</c> cookie, written by
+    /// vortex-theme.js. Rendering it here as well spares a dark page the white flash before the script
+    /// runs. Without the cookie the attribute is left off altogether, and the script follows the system
+    /// setting. The value is one of two literals, never the cookie itself.
+    /// </summary>
+    private IReadOnlyDictionary<string, object> ThemeAttributes => HttpContext?.Request.Cookies["vortex-theme"] switch
+    {
+        "light" => LightTheme,
+        "dark" => DarkTheme,
+        _ => NoTheme,
+    };
+
+    private static readonly IReadOnlyDictionary<string, object> LightTheme = new Dictionary<string, object> { ["data-bs-theme"] = "light" };
+    private static readonly IReadOnlyDictionary<string, object> DarkTheme = new Dictionary<string, object> { ["data-bs-theme"] = "dark" };
+    private static readonly IReadOnlyDictionary<string, object> NoTheme = new Dictionary<string, object>();
+}

@@ -1,0 +1,21 @@
+<Router AppAssembly="typeof(Program).Assembly"
+        AdditionalAssemblies="new[] { typeof(CharacterCreator.WebApp.Client._Imports).Assembly }"
+        NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                @* Signed in but without the permission: say so, instead of a sign-in that would only
+                   bring them back here. *@
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <CharacterCreator.WebApp.Components.Account.NoAccess />
+                }
+                else
+                {
+                    <RedirectToSignIn />
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

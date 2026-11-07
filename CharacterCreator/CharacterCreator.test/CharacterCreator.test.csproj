@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CharacterCreator.test</RootNamespace>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="AwesomeAssertions.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp" PrivateAssets="all" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="NUnit3TestAdapter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CharacterCreator.application/CharacterCreator.application.csproj" />
+    <ProjectReference Include="../CharacterCreator.core/CharacterCreator.core.csproj" />
+    <ProjectReference Include="../CharacterCreator.infrastructure/CharacterCreator.infrastructure.csproj" />
+    <ProjectReference Include="../CharacterCreator.WebApp/CharacterCreator.WebApp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- VOID's shared skill rule cases (DESIGN.md §3.5), copied by scripts/sync-void-cases.ps1. -->
+    <None Update="Rules/skill-rules-cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Rules/skill-rules-cases.source" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+</Project>

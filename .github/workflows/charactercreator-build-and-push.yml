@@ -1,0 +1,99 @@
+name: Build and Push CharacterCreator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'CharacterCreator/**'
+      - '.github/workflows/charactercreator-build-and-push.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'CharacterCreator/**'
+      - '.github/workflows/charactercreator-build-and-push.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Run inside CharacterCreator/, so its global.json pins the SDK. The lock files record packages
+    # the SDK adds itself (the WebAssembly trimmer, the web assets) at the SDK's runtime version: a
+    # different SDK fails the locked restore (NU1004).
+    defaults:
+      run:
+        working-directory: CharacterCreator
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Into a folder of its own: the runner's preinstalled SDKs share the workload manifests per
+      # feature band, and a newer one there (10.0.403) changes the WebAssembly pack's version even
+      # for the pinned SDK.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
+        with:
+          global-json-file: CharacterCreator/global.json
+
+      - name: Restore
+        run: dotnet restore CharacterCreator.slnx
+
+      - name: Build
+        run: dotnet build CharacterCreator.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test CharacterCreator.slnx --no-build --configuration Release
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: CharacterCreator
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Into a folder of its own: the runner's preinstalled SDKs share the workload manifests per
+      # feature band, and a newer one there (10.0.403) changes the WebAssembly pack's version even
+      # for the pinned SDK.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
+        with:
+          global-json-file: CharacterCreator/global.json
+
+      # The Dockerfile is runtime-only: it copies what this step publishes.
+      - name: Publish
+        run: dotnet publish CharacterCreator.WebApp/CharacterCreator.WebApp.csproj --configuration Release --output ./publish
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize repository owner for image tags
+        id: owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push CharacterCreator image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./CharacterCreator
+          file: ./CharacterCreator/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.owner }}/charactercreator:latest
+            ghcr.io/${{ steps.owner.outputs.owner }}/charactercreator:${{ github.sha }}
