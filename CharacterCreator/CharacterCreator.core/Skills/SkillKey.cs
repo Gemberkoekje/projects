@@ -1,10 +1,13 @@
+using System.Text.Json.Serialization;
+
 namespace CharacterCreator.core.Skills;
 
 /// <summary>
 /// Identifies a skill in a rule book: the content's stable key, such as <c>levenskracht-b</c>
 /// (DESIGN.md §4.1). Plans store keys, never VOID ids, because ids differ between VOID instances.
 /// </summary>
-/// <remarks>Immutable and thread-safe. The default value is <see cref="Empty"/>.</remarks>
+/// <remarks>Immutable and thread-safe. The default value is <see cref="Empty"/>. In JSON it is its plain text.</remarks>
+[JsonConverter(typeof(SkillKeyJsonConverter))]
 public readonly record struct SkillKey
 {
     private readonly string value;

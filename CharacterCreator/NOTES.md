@@ -257,3 +257,105 @@ rules in plain English._
 | `CharacterCreator.test/Rules/` | `VoidCases_specs` (with the copied cases and their `.source`), `NewCharacter_specs`, `Existing_specs`, `Picker_specs`, `ChainAndDependants_specs`, `Building_blocks_specs` |
 | `scripts/sync-void-cases.ps1` | copies VOID's shared cases and records commit and hash |
 | VOID `tests/data/skill-rules-cases.json`, `tests/TestCase/Checkout/SkillRulesCasesTest.php` | the award cases (commit `72e705f`) |
+
+---
+
+## Phase 2a — the content (2026-11-07)
+
+_To understand this, start by reading `DESIGN.md` §4.1, then
+`CharacterCreator.infrastructure/Content/2026-v07/IMPORT-REPORT.md`, then the two scripts in
+`scripts/` (top docstrings first), then `CharacterCreator.core/Content/SkillContent.cs`._
+
+Phase 2 is split: 2a is the content, 2b the VOID import, rulesets and *Beheer → Rulesets*.
+
+### What it does
+
+- **`scripts/import-thorfgin-content.py`** builds the content from two sources:
+  - Thorfgin's data (his `src/json/{nl,en}`: skills, spells, recipes, presets);
+  - VOID's public rulebook draft (`config/SkillRequirements/vaardigheden-2026-v07.json`).
+
+  The result is 171 entries, one per VOID skill in the 2026 book, keyed by a slug of the VOID name
+  and named after the book. It also yields 251 spells and techniques, 132 recipes (plus the common
+  ones) and 15 presets. Every one of Thorfgin's skills matched; 11 entries merged several of his
+  skills and are flagged for review.
+- **`scripts/check-against-rulebook.py`** reads the current PDFs (`Vaardigheden.pdf`,
+  `Spreuken_en_Technieken.pdf`, both 2026 V07):
+  - it refuses to run when their version differs from the content's;
+  - it sets each skill's page from its heading, and records the points the heading prints as
+    `bookCost`;
+  - it sets each spell's page.
+
+  It found all 171 skills; three spells weren't found, listed in the report.
+- **`CharacterCreator.core/Content/`:** `ContentBook` (built through a Qowaiv `Result`: unique keys
+  and VOID names, presets only naming known skills), `SkillContent`, `LocalizedText` with a Dutch
+  fallback, spells, recipes, presets, `Loresheet`. Plain records, so the browser can use them.
+- **`SkillKey`** is plain text in JSON (`SkillKeyJsonConverter`).
+- **`IContentSource`** (application port), and **`EmbeddedContentSource`** (infrastructure), which
+  reads the JSON embedded in the assembly and keeps each ruleset after the first read. It is
+  registered as a singleton.
+
+### Decisions
+
+1. **Keys are slugs of VOID's names** (`healer-a-elemental`), not of the Dutch book names:
+   - one entry per VOID skill makes VOID's name the natural join, as in VOID's own loader;
+   - a VOID rename will show up in the import's dry run (phase 2b).
+
+   DESIGN.md §4.1 is updated to this.
+2. **Names come from the 2026 book**, text from Thorfgin. A split skill gets "(elementair)" /
+   "(spiritueel)"; two book skills under one VOID skill share an entry and list both in `book`.
+3. **Only skills in VOID's public rulebook draft go in.** So no SL-only skill can reach this public
+   repo, even if Thorfgin's older data had one. (It had none: nothing was left out.)
+4. **The content is embedded in the infrastructure assembly**, because the runtime-only image has no
+   volume. The import report sits next to it but isn't embedded.
+5. **No `null` in the content.** An absent loresheet is an empty one (`Loresheet.Exists`); a cost the
+   book doesn't print would be -1. A free skill really costs 0 ("Lezen & schrijven (0 punten)").
+6. **The PDFs are read, not stored.** They were downloaded into the scratchpad for the check, and the
+   repo keeps only what the check wrote into the content.
+
+### Gotchas
+
+- **Thorfgin's English spell file wraps Demonology's and Necromancy's skills in an extra list.**
+  Positional NL/EN matching breaks there, so the import matches English to Dutch by skill ids.
+- **The book's contents pages also print "Naam (N punten)".** A skill's heading is the last page with
+  that text: prerequisites name skills without their points.
+- **Thorfgin's text carries escaped newlines** as the two characters `\` and `n`; the import turns
+  them into real newlines.
+- **`EmbeddedResource LogicalName` with `%(RecursiveDir)`** keeps the build machine's separator: a
+  backslash on Windows, a slash on Linux CI. The adapter normalizes names before matching.
+
+### How it was checked
+
+- `dotnet build`: clean, warnings as errors. `dotnet test`: 151 specs; 11 new in
+  `Content/Content_2026_specs`:
+  - 171 skills, all with names, categories and 2026 pages and costs;
+  - the healer split, matched by VOID name ignoring case;
+  - spells, recipes and loresheet links;
+  - presets naming only known skills;
+  - an unknown ruleset refused.
+- **Locked restore and the Release publish** still pass.
+
+### Not done / next
+
+- **Phase 2b:**
+  - `IVoidClient` with `VoidHttpClient` (`void-test`, the signed-in user's token) and
+    `SnapshotVoidClient`;
+  - the import: VOID skills joined to the content by VOID name into a `RuleBook`, with a dry-run
+    report (unmatched names, cost versus `bookCost`, deprecated, prerequisites outside the book);
+  - publishing a `Ruleset` to Marten, *Beheer → Rulesets*, the first-start seed, and
+    `/api/rulesets/current`.
+- **Mapping Thorfgin's energy properties** (`elemental_mana`, `willpower`, …) onto VOID's manatypes
+  waits for VOID's actual manatype names, which the first import from `void-test` will show.
+- **The three spells not found** and the 11 merged entries are for SL and EC (the report).
+
+### File map
+
+| Path | What |
+|---|---|
+| `scripts/import-thorfgin-content.py` | Thorfgin's data and VOID's rulebook draft into the content |
+| `scripts/check-against-rulebook.py` | pages and book costs from the current PDFs |
+| `CharacterCreator.infrastructure/Content/2026-v07/` | `skills.json`, `presets.json` (embedded), `IMPORT-REPORT.md` |
+| `CharacterCreator.infrastructure/Content/EmbeddedContentSource.cs` | reads the embedded content |
+| `CharacterCreator.application/Ports/IContentSource.cs` | the port |
+| `CharacterCreator.core/Content/` | `ContentBook`, `SkillContent` and the records under it, `LocalizedText` |
+| `CharacterCreator.core/Skills/SkillKeyJsonConverter.cs` | `SkillKey` as plain text in JSON |
+| `CharacterCreator.test/Content/Content_2026_specs.cs` | the content as committed |

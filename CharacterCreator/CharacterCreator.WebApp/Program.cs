@@ -1,4 +1,6 @@
+using CharacterCreator.application.Ports;
 using CharacterCreator.infrastructure.Adapters.DataProtection;
+using CharacterCreator.infrastructure.Content;
 using CharacterCreator.WebApp.Components;
 using CharacterCreator.WebApp.Endpoints;
 using JasperFx;
@@ -129,6 +131,11 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(CharacterCreatorPolicies.Beheer, CharacterCreatorPolicies.BeheerPolicy());
 
 builder.Services.AddCascadingAuthenticationState();
+
+// The content per ruleset (DESIGN.md §4.1), embedded in the infrastructure assembly: stateless after
+// the first read, so one for the app.
+builder.Services.AddSingleton<EmbeddedContentSource>();
+builder.Services.AddSingleton<IContentSource>(sp => sp.GetRequiredService<EmbeddedContentSource>());
 
 // Server-rendered pages, with the build screen interactive in the browser (DESIGN.md decision 12).
 builder.Services.AddRazorComponents()

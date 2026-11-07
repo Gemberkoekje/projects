@@ -23,6 +23,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The content per ruleset (DESIGN.md §4.1), read by EmbeddedContentSource. The import report is
+         for SL and EC, not for the app. -->
+    <EmbeddedResource Include="Content/**/*.json" LogicalName="Content/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../CharacterCreator.application/CharacterCreator.application.csproj" />
     <ProjectReference Include="../CharacterCreator.core/CharacterCreator.core.csproj" />
   </ItemGroup>

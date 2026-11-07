@@ -543,33 +543,50 @@ dry run.
 
 ## 4. Content: what the Character Creator adds
 
-### 4.1 One entry per book skill
+### 4.1 One entry per offered skill
 
-The content lives per ruleset in the repo (`content/2026-v07/skills.json`, plus spells, recipes,
-presets and FAQ), checked against a schema in CI:
+*As built in phase 2a.* The content lives per ruleset in
+`CharacterCreator.infrastructure/Content/2026-v07/` (`skills.json`, `presets.json`, and
+`IMPORT-REPORT.md` for SL and EC), embedded in the assembly. There is one entry per skill the
+picker offers, which is one per VOID skill (decision 8):
 
 ```json
 {
-  "key": "levenskracht-b",
-  "void": ["lifeforce B"],
-  "name": {"nl": "Levenskracht B", "en": "Lifeforce B"},
-  "category": "algemeen",
-  "page": 12,
+  "key": "healer-a-elemental",
+  "void": "healer A (elemental)",
+  "book": ["Genezingsspreuken A"],
+  "name": {"nl": "Genezingsspreuken A (elementair)", "en": "Healing Spells A (elemental)"},
+  "category": {"nl": "Genezingsvaardigheden (EL)", "en": "Healing Skills (EL)"},
+  "page": 38, "pageFrom": "2026-v07", "bookCost": 4,
   "description": {"nl": "…", "en": "…"},
-  "properties": [{"name": "hitpoints", "value": 1}],
-  "spells": ["…"],
-  "recipes": ["…"],
-  "loresheet": {"url": "https://the-vortex.nl/wp-content/uploads/…", "page": 1}
+  "properties": [{"name": "elemental_mana", "value": 5}],
+  "spells": [{"id": 101, "name": {"nl": "Discern Wounds", "en": "…"}, "cost": "1", "page": 41, "…": "…"}],
+  "recipes": [],
+  "loresheet": {"url": "", "page": 0, "extra": ""}
 }
 ```
 
-- **`key`** is the Character Creator's own and stays the same across books. Plans store keys, not
-  VOID ids: ids differ between void-test and live, and VOID's own loader matches on names.
-- **`void`** lists the VOID names an entry stands for, as VOID's rulebook draft does. It is seeded
-  from each entry's `name`, `english` and `void` in
-  `config/SkillRequirements/vaardigheden-2026-v07.json`, so both start from the same matches.
-- **The text** comes from Thorfgin's files (2023-10b, fixed up to 2026-04). A one-off script maps
-  his ids to keys. SL and EC bring it up to the 2026 book (§3.7, steps 5 and 6).
+- **`key`** is a slug of the VOID name. One entry per VOID skill makes VOID's name the natural join,
+  and VOID's own loader matches on names too. Plans store keys, not VOID ids: ids differ between
+  `void-test` and live. A VOID rename shows up in the import's dry run.
+- **`book`** names the 2026 book's entry or entries. Two book skills VOID files under one (*Extra
+  Elementaire mana* and *Extra Genezingsmana*) share an entry. A book skill VOID splits
+  (*Genezingsspreuken A*) becomes two entries with the same text, named "(elementair)" and
+  "(spiritueel)".
+- **Names** come from the 2026 book, through VOID's rulebook draft
+  (`config/SkillRequirements/vaardigheden-2026-v07.json`, public). Only skills in that draft go in,
+  so no SL-only skill can reach this public repo.
+- **The text, spells, recipes, properties and loresheets** are Thorfgin's (2023-10b, fixed up to
+  2026-04). `scripts/import-thorfgin-content.py` matches his skills to the book by name, including his
+  "(EL)"/"(SP)" variants. For the 2026 draft it matched every skill: 143 by name, the rest through
+  the variants. 11 entries took the text of several of his skills; IMPORT-REPORT.md lists them for
+  review.
+- **`page` and `bookCost`** come from the current PDFs (2026 V07):
+  `scripts/check-against-rulebook.py` finds each skill's heading ("Naam (2 punten)") and each spell.
+  All 171 skills were found; three spells weren't (probably renamed) and are in the report.
+  `bookCost` lets the VOID import flag where VOID's cost differs from the book's (VOID's wins,
+  decision 3).
+- **SL and EC** bring the text up to the 2026 book (§3.7, steps 5 and 6).
 
 ### 4.2 Import and publish
 
