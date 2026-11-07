@@ -41,6 +41,11 @@ gembernodes deploy. landerijen (`C:\git\gitlabs\landerijen-volken`) for Blazor a
 - Local Postgres on **5435**, web on **8084** (`docker compose up -d postgres`, then run the WebApp;
   the dev password is in `appsettings.Development.json` and must match your `.env`).
 - CI is GitHub Actions in this repo (`charactercreator-build-and-push.yml`), image on GHCR.
+- **The SDK is pinned** in `global.json` (exact, `rollForward: disable`), and CI installs that one.
+  The lock files hold packages the SDK adds itself (the WebAssembly trimmer, the web assets) at
+  its runtime version, so another SDK fails CI's locked restore (NU1004). To move to a newer SDK:
+  install it, change `global.json`, run `dotnet restore --force-evaluate`, and commit the lock
+  files together.
 
 ## Working here
 
