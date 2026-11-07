@@ -15,6 +15,8 @@ namespace CharacterCreator.core.Rulesets;
 /// </remarks>
 public sealed record PublishedRuleset
 {
+    private readonly IReadOnlyList<LegacySkill> legacy = [];
+
     /// <summary>The ruleset's id: the content ruleset and the moment of publishing, such as <c>2026-v07@20261107T091500Z</c>.</summary>
     required public string Id { get; init; }
 
@@ -54,13 +56,21 @@ public sealed record PublishedRuleset
     /// <summary>The archetypes to start from.</summary>
     required public IReadOnlyList<PresetContent> Presets { get; init; }
 
+    /// <summary>Thorfgin's skills and the entries they became, for importing his saves.</summary>
+    /// <remarks>
+    /// Not <c>required</c>, and so are fields added later: rulesets already stored lack them, and a
+    /// missing required member would make the stored document unreadable. The setter guards the
+    /// default, as compile-time JSON metadata sets a missing init-only member to <c>null</c>.
+    /// </remarks>
+    public IReadOnlyList<LegacySkill> Legacy { get => legacy; init => legacy = value ?? []; }
+
     /// <summary>The rules as a rule book for the engine.</summary>
     /// <returns>The rule book, or why its rules cannot be right.</returns>
     public Result<RuleBook> ToRuleBook() => RuleBook.Create(Rules, Creation);
 
     /// <summary>The content as a content book.</summary>
     /// <returns>The content book, or why it cannot be right.</returns>
-    public Result<ContentBook> ToContentBook() => ContentBook.Create(ContentRuleset, Book, Skills, CommonRecipes, Presets);
+    public Result<ContentBook> ToContentBook() => ContentBook.Create(ContentRuleset, Book, Skills, CommonRecipes, Presets, Legacy);
 
     /// <summary>
     /// The skills the picker offers: those with both rules and content, and not retired by VOID. A

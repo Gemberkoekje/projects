@@ -1,10 +1,86 @@
 @page "/voorbeelden"
+@using CharacterCreator.application.Rulesets
+@using CharacterCreator.core.Content
+@using CharacterCreator.core.Plans
+@using CharacterCreator.core.Rules
+@using CharacterCreator.core.Rulesets
+@inject ReadCurrentRulesetHandler Rulesets
+@inject CookieUiLanguage Languages
 
-@* The presets (DESIGN.md §5): archetypes as cards, each with "start from this". Phase 3. *@
-<PageTitle>Character Creator · Voorbeelden</PageTitle>
+@* The presets (DESIGN.md §5): archetypes as cards, with their text and skills, and "start from
+   this", which opens the build screen with the preset (?voorbeeld=). *@
+<PageTitle>Character Creator · @Ui.T("Voorbeelden", "Presets")</PageTitle>
 
-<h1>Voorbeelden</h1>
+<h1>@Ui.T("Voorbeelden", "Presets")</h1>
 
-<p class="secondary">
-    Hier komen voorbeeldpersonages: veelvoorkomende archetypes om vanuit te beginnen.
+<p class="secondary cc-lede">
+    @Ui.T(
+        "Veelvoorkomende soorten personages om mee te beginnen. Kies er een, en pas hem daarna aan in het bouwscherm.",
+        "Common kinds of characters to start from. Pick one, then make it your own on the build screen.")
 </p>
+
+@if (Ruleset is null)
+{
+    <p class="muted">@Ui.T("Er zijn nog geen regels gepubliceerd.", "No rules have been published yet.")</p>
+}
+else
+{
+    <div class="cc-presets">
+        @foreach (var preset in Ruleset.Presets)
+        {
+            <article class="cc-card cc-preset">
+                <h2>@Ui.T(preset.Name)</h2>
+                <p class="cc-sub">
+                    @(preset.NewCharacter
+                        ? Ui.T($"Nieuw personage · {Ui.Number(Spent(preset))} van {Ui.Number(Ruleset.Creation.StartXp)} XP", $"New character · {Ui.Number(Spent(preset))} of {Ui.Number(Ruleset.Creation.StartXp)} XP")
+                        : Ui.T($"{Ui.Number(Spent(preset))} van {Ui.Number(preset.Xp)} XP", $"{Ui.Number(Spent(preset))} of {Ui.Number(preset.Xp)} XP"))
+                </p>
+                @if (!string.IsNullOrWhiteSpace(Ui.T(preset.Information)))
+                {
+                    <p class="cc-description">@Ui.T(preset.Information)</p>
+                }
+                <ul class="cc-preset-skills">
+                    @foreach (var skill in preset.Skills)
+                    {
+                        <li>@Name(skill.Key)@(skill.Times > 1 ? $" ×{skill.Times}" : string.Empty)</li>
+                    }
+                </ul>
+                <a class="va-btn va-btn--primary" href="@($"./?voorbeeld={Uri.EscapeDataString(preset.Key)}")">@Ui.T("Begin hiermee", "Start from this")</a>
+            </article>
+        }
+    </div>
+}
+
+@code {
+    private Dictionary<CharacterCreator.core.Skills.SkillKey, SkillContent> skills = [];
+    private RuleBook rules = RuleBook.Create([]).Value;
+
+    private Ui Ui => Languages.Current;
+
+    private PublishedRuleset? Ruleset { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        var current = await Rulesets.HandleAsync(CancellationToken.None);
+        if (!current.IsValid)
+        {
+            return;
+        }
+
+        var book = current.Value.ToRuleBook();
+        if (!book.IsValid)
+        {
+            return;
+        }
+
+        Ruleset = current.Value;
+        rules = book.Value;
+        skills = current.Value.Skills.ToDictionary(skill => skill.Key);
+    }
+
+    private string Name(CharacterCreator.core.Skills.SkillKey key) => skills.TryGetValue(key, out var skill) ? Ui.T(skill.Name) : key.ToString();
+
+    private decimal Spent(PresetContent preset)
+        => SkillRules.Spent(Holdings.Of(preset.Skills.Select(skill => new KeyValuePair<CharacterCreator.core.Skills.SkillKey, int>(skill.Key, skill.Times))), rules);
+}

@@ -634,6 +634,24 @@ changed afterwards. Anonymous visitors get the newest published ruleset.
 - Thorfgin's saves import through his id-to-key map (§4.1). The differences between 2023-10b and
   the current ruleset are listed the same way.
 
+*As built in phase 3:*
+
+- **The plan file** (`PlanFile`) is `{format: "vortex-character-creator", version, id, name, mode,
+  xp, ruleset, savedAt, skills: [{key, times}]}`.
+  - The browser keeps the plan being worked on (`charactercreator.werk`, after every change) and
+    a list of saved plans (`charactercreator.opgeslagen`).
+  - Export and import use the same JSON.
+- **Thorfgin's saves:** `legacy.json` next to the content maps each of his 182 skills (id and
+  Dutch name) to a key. `PlanImport` reads:
+  - his `.dat` export, which is base64 of the URI-encoded JSON;
+  - his 2023-10b format, which names skills by id;
+  - his 2023-10a format and the 2023-10 array, which name skills by name.
+
+  A skill with no entry now is reported by its old name. His `is_checked` becomes a new
+  character; otherwise it is free planning with his `max_xp`.
+- **Opened on another ruleset**, the build screen says so, and the findings show what breaks. The
+  per-skill list of differences against the old ruleset waits for `GET /api/rulesets/{id}`.
+
 ---
 
 ## 5. Screens
@@ -678,8 +696,22 @@ The footer is the portal's.
 - **Spells and recipes** are tiles with a details panel: incantation, cost, effect, duration,
   page.
 
+*As built in phase 3:*
+
+- **Layout:** as sketched on a wide screen; on a phone, the chosen table comes first.
+- **No loresheet column:** the loresheet link sits under the skill's name.
+- **Modes:** *new character* and *free*; *existing* comes with *Mijn personages* (phase 7).
+  - Free planning has an "after N events" helper, which fills the XP from the XP table.
+- **Chains:** the chain button says when a choice is left to the player.
+- **Removing:** a removal that breaks other skills asks *remove those too / only this one /
+  cancel*.
+- **Several at once:** ticked skills are added with one button.
+- **NL/EN:** a link in the crest bar sets a language cookie (`charactercreator.taal`) and reloads
+  the page. Beheer and the sign-in pages stay Dutch.
+
 **Voorbeelden / Presets**: the presets as cards, with archetype, text and skills, and *start from
-this*.
+this*. As built: *start from this* opens the build screen with `?voorbeeld={key}`, which asks
+first when the current plan has skills.
 
 **Mijn personages / My characters** (signed in):
 
@@ -1011,7 +1043,7 @@ There is no Character Creator GitLab project yet.
    - An offline snapshot (book skills only) for the specs, for offline work and for the first
      start. Synthesized for now (§3.4); replaced by the first real import from `void-test`.
    - The ruleset API.
-3. **Build screen.**
+3. **Build screen.** *Done 2026-11-07.*
    - Picker, the chosen-skills table, reasons, add with chain, remove with dependants.
    - Summary panels and presets.
    - localStorage, file export and import (including old saves).

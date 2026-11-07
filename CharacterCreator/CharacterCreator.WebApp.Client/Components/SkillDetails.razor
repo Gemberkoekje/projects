@@ -1,0 +1,84 @@
+@* What the old builder put in a tooltip (DESIGN.md §1): the description, the numbers, the
+   prerequisites, where it is in the book, and the loresheet. Shown under a skill in the picker and
+   in the chosen table. *@
+<div class="cc-details">
+    <dl class="cc-facts">
+        <div>
+            <dt>@Ui.T("Kosten", "Cost")</dt>
+            <dd>@Rule.Cost XP</dd>
+        </div>
+        <div>
+            <dt>@Ui.T("Maximaal", "At most")</dt>
+            <dd>@Maxima()</dd>
+        </div>
+        @if (Rule.Requirements.Count > 0)
+        {
+            <div>
+                <dt>@Ui.T("Vereist", "Needs")</dt>
+                <dd>
+                    @foreach (var group in Rule.Requirements)
+                    {
+                        <span class="cc-requirement">@Words.Requirement(group)</span>
+                    }
+                </dd>
+            </div>
+        }
+        @if (Skill.Page > 0)
+        {
+            <div>
+                <dt>@Ui.T("Regelboek", "Rulebook")</dt>
+                <dd>@string.Join(" / ", Skill.Book), @Ui.T("blz.", "p.") @Skill.Page</dd>
+            </div>
+        }
+    </dl>
+
+    @if (!string.IsNullOrWhiteSpace(Ui.T(Skill.Description)))
+    {
+        <p class="cc-description">@Ui.T(Skill.Description)</p>
+    }
+    else
+    {
+        <p class="muted">@Ui.T("Nog geen beschrijving; zie het regelboek.", "No description yet; see the rulebook.")</p>
+    }
+
+    @if (Skill.Spells.Count > 0)
+    {
+        <p class="cc-small"><strong>@Ui.T("Spreuken en technieken", "Spells and techniques"):</strong> @string.Join(", ", Skill.Spells.Select(spell => Ui.T(spell.Name)))</p>
+    }
+
+    @if (Skill.Loresheet.Exists)
+    {
+        <p class="cc-small"><a href="@Skill.Loresheet.Url" target="_blank" rel="noopener">@Ui.T("Loresheet", "Loresheet") ⧉</a></p>
+    }
+</div>
+
+@code {
+    /// <summary>The language.</summary>
+    [Parameter, EditorRequired]
+    public Ui Ui { get; set; }
+
+    /// <summary>The words for prerequisites.</summary>
+    [Parameter, EditorRequired]
+    public FindingWords Words { get; set; }
+
+    /// <summary>The skill's content.</summary>
+    [Parameter, EditorRequired]
+    public SkillContent Skill { get; set; }
+
+    /// <summary>The skill's rules.</summary>
+    [Parameter, EditorRequired]
+    public RuleSkill Rule { get; set; }
+
+    private string Maxima()
+    {
+        var total = $"{Rule.TimesMax}×";
+        if (Rule.IsExtra)
+        {
+            return Ui.T($"{total}; extra vaardigheid, niet bij creatie", $"{total}; an extra skill, not at creation");
+        }
+
+        return Rule.BaseMax == Rule.TimesMax
+            ? total
+            : Ui.T($"{Rule.BaseMax}× bij creatie, {total} in totaal", $"{Rule.BaseMax}× at creation, {total} in all");
+    }
+}

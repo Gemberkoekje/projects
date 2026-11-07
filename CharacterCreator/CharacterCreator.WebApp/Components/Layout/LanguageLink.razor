@@ -1,0 +1,20 @@
+@* NL/EN in the crest bar (DESIGN.md §5): a link to the other language, which sets the language
+   cookie and comes back to this page. Shaped like the theme toggle next to it. A full page load,
+   not Blazor's enhanced navigation: the whole page, html lang and the build screen included, must
+   start again in the new language. *@
+<a class="cc-lang-toggle" data-enhance-nav="false" href="@($"taal/{Other}?returnUrl={Uri.EscapeDataString(ReturnUrl)}")"
+   hreflang="@Other" lang="@Other" title="@Title" aria-label="@Title">@Other.ToUpperInvariant()</a>
+
+@code {
+    /// <summary>The current language.</summary>
+    [Parameter]
+    public Ui Ui { get; set; } = Ui.Dutch;
+
+    /// <summary>The page to come back to.</summary>
+    [Parameter]
+    public string ReturnUrl { get; set; } = "/";
+
+    private string Other => Ui.IsEnglish ? "nl" : "en";
+
+    private string Title => Ui.IsEnglish ? "Nederlands" : "English";
+}

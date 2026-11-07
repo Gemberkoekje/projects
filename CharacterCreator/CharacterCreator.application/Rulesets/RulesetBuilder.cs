@@ -88,6 +88,7 @@ public static class RulesetBuilder
             Skills = content.Skills,
             CommonRecipes = content.CommonRecipes,
             Presets = content.Presets,
+            Legacy = content.Legacy,
         };
 
         var report = new ImportReport

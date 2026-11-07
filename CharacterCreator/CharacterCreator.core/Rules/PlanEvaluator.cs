@@ -58,6 +58,29 @@ public static class PlanEvaluator
         ArgumentNullException.ThrowIfNull(book);
         ArgumentNullException.ThrowIfNull(plan);
 
+        return Option(book, plan, Evaluate(book, plan), skill);
+    }
+
+    /// <summary>
+    /// <see cref="Option(RuleBook, Plan, SkillKey)"/> for many skills at once, as the picker shows them:
+    /// the plan as it is is evaluated once, not once per skill.
+    /// </summary>
+    /// <param name="book">The rule book.</param>
+    /// <param name="plan">The plan as it is.</param>
+    /// <param name="skills">The skills.</param>
+    /// <returns>Each skill's option.</returns>
+    public static IReadOnlyDictionary<SkillKey, SkillOption> Options(RuleBook book, Plan plan, IEnumerable<SkillKey> skills)
+    {
+        ArgumentNullException.ThrowIfNull(book);
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(skills);
+
+        var before = Evaluate(book, plan);
+        return skills.Distinct().ToDictionary(skill => skill, skill => Option(book, plan, before, skill));
+    }
+
+    private static SkillOption Option(RuleBook book, Plan plan, PlanEvaluation before, SkillKey skill)
+    {
         if (!book.TryGet(skill, out var known))
         {
             return new SkillOption { Skill = skill, Offered = false, Reasons = [new UnknownSkill { Skill = skill, Held = false }] };
@@ -68,7 +91,6 @@ public static class PlanEvaluator
             return new SkillOption { Skill = skill, Offered = false, Reasons = [new DeprecatedSkill { Skill = skill }] };
         }
 
-        var before = Evaluate(book, plan);
         var after = Evaluate(book, plan.WithPurchase(skill));
         var reasons = after.For(skill).ToList();
 

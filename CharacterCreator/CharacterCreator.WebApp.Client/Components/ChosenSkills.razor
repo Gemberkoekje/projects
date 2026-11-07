@@ -1,0 +1,136 @@
+@* The chosen skills (DESIGN.md §5): per skill its XP, how often, the loresheet and what the rules
+   say about it. Removing a skill others depend on is handled by the build screen, which asks first. *@
+<section class="cc-card cc-chosen" aria-labelledby="cc-chosen-title">
+    <div class="cc-card-head">
+        <h2 id="cc-chosen-title">@Ui.T("Gekozen", "Chosen")</h2>
+        <span class="cc-count">@Ui.T($"{Plan.Planned.Skills.Count} vaardigheden", $"{Plan.Planned.Skills.Count} skills")</span>
+    </div>
+
+    @if (Plan.Planned.IsEmpty)
+    {
+        <p class="muted">
+            @Ui.T("Nog niets gekozen. Kies vaardigheden in de lijst, of begin met een ", "Nothing chosen yet. Pick skills from the list, or start from a ")
+            <a href="voorbeelden">@Ui.T("voorbeeld", "preset")</a>.
+        </p>
+    }
+    else
+    {
+        <table class="cc-table">
+            <thead>
+                <tr>
+                    <th scope="col">@Ui.T("Vaardigheid", "Skill")</th>
+                    <th scope="col" class="cc-num">XP</th>
+                    <th scope="col" class="cc-center">@Ui.T("Aantal", "Times")</th>
+                    <th scope="col">@Ui.T("Opmerkingen", "Notes")</th>
+                    <th scope="col"><span class="cc-visually-hidden">@Ui.T("Verwijderen", "Remove")</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var (key, times) in Plan.Planned)
+                {
+                    var known = Data.Content.TryGet(key, out var skill);
+                    var rule = Data.Rules.TryGet(key, out var found) ? found : null;
+                    var notes = Evaluation.For(key).ToList();
+                    <tr class="@RowClass(notes)">
+                        <td data-label="@Ui.T("Vaardigheid", "Skill")">
+                            @if (known && rule is not null)
+                            {
+                                <button type="button" class="cc-skill-name" aria-expanded="@(details.Contains(key) ? "true" : "false")" @onclick="() => ToggleDetails(key)">@Ui.T(skill.Name)</button>
+                                <span class="cc-sub">@Ui.T(skill.Category)</span>
+                            }
+                            else
+                            {
+                                <span>@Words.Name(key)</span>
+                            }
+                            @if (known && skill.Loresheet.Exists)
+                            {
+                                <a class="cc-sub" href="@skill.Loresheet.Url" target="_blank" rel="noopener">Loresheet ⧉</a>
+                            }
+                        </td>
+                        <td class="cc-num" data-label="XP">@Ui.Number((rule?.Cost ?? 0) * times)</td>
+                        <td class="cc-center" data-label="@Ui.T("Aantal", "Times")">
+                            <span class="cc-stepper">
+                                <button type="button" aria-label="@Ui.T("Een minder", "One less")" @onclick="() => OnLess.InvokeAsync(key)">−</button>
+                                <span>@times</span>
+                                <button type="button" aria-label="@Ui.T("Een meer", "One more")" @onclick="() => OnMore.InvokeAsync(key)">+</button>
+                            </span>
+                        </td>
+                        <td data-label="@Ui.T("Opmerkingen", "Notes")">
+                            @foreach (var note in notes)
+                            {
+                                <span class="cc-note cc-note--@note.Severity.ToString().ToLowerInvariant()">@Words.Describe(note)</span>
+                            }
+                        </td>
+                        <td class="cc-center">
+                            <button type="button" class="cc-remove" aria-label="@Ui.T($"{Words.Name(key)} verwijderen", $"Remove {Words.Name(key)}")" @onclick="() => OnRemove.InvokeAsync(key)">✕</button>
+                        </td>
+                    </tr>
+                    @if (details.Contains(key) && known && rule is not null)
+                    {
+                        <tr class="cc-details-row">
+                            <td colspan="5"><SkillDetails Ui="Ui" Words="Words" Skill="skill" Rule="rule" /></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th scope="row">@Ui.T("Totaal", "Total")</th>
+                    <td class="cc-num">@Ui.Number(SkillRules.Spent(Plan.Planned, Data.Rules))</td>
+                    <td colspan="3"></td>
+                </tr>
+            </tfoot>
+        </table>
+    }
+</section>
+
+@code {
+    private readonly HashSet<SkillKey> details = [];
+
+    /// <summary>The language.</summary>
+    [Parameter, EditorRequired]
+    public Ui Ui { get; set; }
+
+    /// <summary>The words for findings.</summary>
+    [Parameter, EditorRequired]
+    public FindingWords Words { get; set; }
+
+    /// <summary>The ruleset.</summary>
+    [Parameter, EditorRequired]
+    public LoadedRuleset Data { get; set; }
+
+    /// <summary>The plan.</summary>
+    [Parameter, EditorRequired]
+    public Plan Plan { get; set; }
+
+    /// <summary>What the engine makes of it.</summary>
+    [Parameter, EditorRequired]
+    public PlanEvaluation Evaluation { get; set; }
+
+    /// <summary>Called to buy a skill once more.</summary>
+    [Parameter]
+    public EventCallback<SkillKey> OnMore { get; set; }
+
+    /// <summary>Called to buy a skill once less.</summary>
+    [Parameter]
+    public EventCallback<SkillKey> OnLess { get; set; }
+
+    /// <summary>Called to take a skill out altogether.</summary>
+    [Parameter]
+    public EventCallback<SkillKey> OnRemove { get; set; }
+
+    private static string RowClass(List<Finding> notes) => notes.Select(note => note.Severity).DefaultIfEmpty().Max() switch
+    {
+        FindingSeverity.Problem => "is-problem",
+        FindingSeverity.Warning => "is-warning",
+        _ => string.Empty,
+    };
+
+    private void ToggleDetails(SkillKey skill)
+    {
+        if (!details.Remove(skill))
+        {
+            details.Add(skill);
+        }
+    }
+}

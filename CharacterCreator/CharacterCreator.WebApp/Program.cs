@@ -6,8 +6,10 @@ using CharacterCreator.infrastructure.Adapters.DataProtection;
 using CharacterCreator.infrastructure.Content;
 using CharacterCreator.infrastructure.MartenDb;
 using CharacterCreator.infrastructure.Void;
+using CharacterCreator.WebApp.Client.Services;
 using CharacterCreator.WebApp.Components;
 using CharacterCreator.WebApp.Endpoints;
+using CharacterCreator.WebApp.Localization;
 using JasperFx;
 using Marten;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -178,6 +180,12 @@ builder.Services.AddScoped<PublishRulesetHandler>();
 builder.Services.AddScoped<SeedRulesetHandler>();
 builder.Services.AddScoped<ReadCurrentRulesetHandler>();
 
+// The visitor's language, from the language cookie: for the server pages, and for the build screen
+// while the server prerenders it (the browser reads it from the page instead).
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<CookieUiLanguage>();
+builder.Services.AddScoped<IUiLanguage>(sp => sp.GetRequiredService<CookieUiLanguage>());
+
 // The ERU token for VOID, refreshed through Keycloak's token endpoint when it has expired.
 builder.Services.AddHttpClient(EruAccessTokens.HttpClientName);
 builder.Services.AddScoped<EruAccessTokens>();
@@ -231,6 +239,7 @@ app.MapRazorComponents<App>()
 
 app.MapAccountEndpoints();
 app.MapRulesetEndpoints();
+app.MapLanguageEndpoints();
 app.MapGet("/healthz", () => "ok").AllowAnonymous();
 
 await app.RunAsync();

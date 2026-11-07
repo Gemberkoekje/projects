@@ -5,8 +5,10 @@ VOID name, named after the 2026 book, with the text, spells, recipes, properties
 Thorfgin's matching skills (ruleset 2023-10b, text fixes up to 2026-04). Only skills in VOID's
 public rulebook draft go in, so no SL-only skill can reach this public repository.
 
-Writes skills.json and presets.json (embedded in CharacterCreator.infrastructure) and
-IMPORT-REPORT.md, the list SL and EC review (§3.7, steps 5 and 6).
+Writes skills.json, presets.json and legacy.json (Thorfgin's skill ids and names per key, for his
+saves; all embedded in CharacterCreator.infrastructure) and IMPORT-REPORT.md, the list SL and EC
+review (§3.7, steps 5 and 6). Run scripts/check-against-rulebook.py afterwards: it sets the pages
+and book costs this script leaves at the 2023-10b book's.
 
 Usage:
     python -I scripts/import-thorfgin-content.py <thorfgin src/json> <vaardigheden-2026-v07.json> <out dir>
@@ -17,6 +19,8 @@ import re
 import sys
 import unicodedata
 from pathlib import Path
+
+CATEGORY_FIXES = {"Vechtervaardigheden": "Vechtersvaardigheden"}
 
 RULESET = "2026-v07"
 BOOK = "Vaardigheden, Vortex Adventures 2026 V07"
@@ -174,6 +178,19 @@ def main(thorfgin_dir, book_path, out_dir):
                 "extra": PDF_URL.get(lore.get("special", ""), ""),
             }
 
+    # Thorfgin's category names vary: a typo ("Vechtervaardigheden" next to "Vechtersvaardigheden")
+    # and English in two casings. One spelling per category, so the picker doesn't split one in two:
+    # the Dutch fixed, and per Dutch category its most common English, with "Skills" capitalized.
+    for target in content.values():
+        target["category"]["nl"] = CATEGORY_FIXES.get(target["category"]["nl"], target["category"]["nl"])
+    english_by_dutch = {}
+    for target in content.values():
+        english_by_dutch.setdefault(target["category"]["nl"], []).append(target["category"]["en"])
+    for target in content.values():
+        names = english_by_dutch[target["category"]["nl"]]
+        english = max(sorted(set(names)), key=names.count)
+        target["category"]["en"] = re.sub(r"\bskills\b", "Skills", english)
+
     for target in content.values():
         if len(target["sources"]) > 1:
             report["merged"].append(f"{target['key']}: Thorfgin skills {target['sources']} merged; check the text")
@@ -276,7 +293,12 @@ def main(thorfgin_dir, book_path, out_dir):
             "skills": skills,
         })
 
-    # 6. Write.
+    # 6. Write. Thorfgin's skills by id and name, for importing his saves (DESIGN.md §4.3): 2023-10b
+    # saves name skills by id, older ones by name.
+    legacy = [
+        {"id": skill["id"], "name": skill["skill"], "key": sources_by_id[skill["id"]]["key"]}
+        for skill in t_nl if skill["id"] in sources_by_id
+    ]
     for target in content.values():
         del target["sources"]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -288,6 +310,7 @@ def main(thorfgin_dir, book_path, out_dir):
     skills_doc = dict(header, skills=list(content.values()), commonRecipes=common)
     (out_dir / "skills.json").write_text(json.dumps(skills_doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     (out_dir / "presets.json").write_text(json.dumps(dict(header, presets=presets), ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    (out_dir / "legacy.json").write_text(json.dumps(dict(header, legacyRuleset="2023-10b", skills=legacy), ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
     lines = [
         f"# Content import report — {RULESET}",

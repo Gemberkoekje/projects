@@ -28,6 +28,9 @@ public static class RulesetJson
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         Apply(options);
+
+        // The compile-time metadata first, as the build screen uses it; reflection for anything else.
+        options.TypeInfoResolverChain.Insert(0, RulesetJsonContext.Default);
         return options;
     }
 }

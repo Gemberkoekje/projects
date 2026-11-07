@@ -1,0 +1,206 @@
+@inject RulesetClient Rulesets
+@inject PlanStore Plans
+@inject Browser Browser
+@inject NavigationManager Navigation
+
+@* The build screen (DESIGN.md §5); its logic is in BuildScreen.razor.cs. *@
+@if (!ready)
+{
+    @if (problem.Length > 0)
+    {
+        <div class="cc-banner cc-banner--error" role="alert">
+            <b>@Ui.T("De regels konden niet geladen worden", "The rules could not be loaded")</b>
+            @problem
+        </div>
+    }
+    else
+    {
+        <p class="muted" data-render-state="browser">@Ui.T("De regels worden geladen…", "Loading the rules…")</p>
+    }
+}
+else
+{
+    <div class="cc-build" data-render-state="browser">
+        @if (data.Ruleset.Provisional)
+        {
+            <div class="cc-banner cc-banner--service">
+                <b>@Ui.T("Voorlopige regels", "Provisional rules")</b>
+                @Ui.T(
+                    "Deze regels komen nog niet uit VOID, maar uit het concept van het regelboek. Kosten en vereisten kunnen nog veranderen.",
+                    "These rules don't come from VOID yet, but from the rulebook draft. Costs and prerequisites may still change.")
+            </div>
+        }
+
+        @if (MadeOnAnotherRuleset)
+        {
+            <div class="cc-banner cc-banner--service">
+                <b>@Ui.T("Gemaakt op oudere regels", "Made on older rules")</b>
+                @Ui.T(
+                    $"Dit plan is gemaakt op {madeOn}; nu geldt {data.Ruleset.Id}. De opmerkingen tonen wat daardoor niet meer klopt.",
+                    $"This plan was made on {madeOn}; {data.Ruleset.Id} applies now. The notes show what no longer fits.")
+            </div>
+        }
+
+        @if (presetOffered)
+        {
+            <div class="cc-banner cc-banner--service">
+                <b>@Ui.T($"Beginnen met {Ui.T(offeredPreset.Name)}?", $"Start from {Ui.T(offeredPreset.Name)}?")</b>
+                @Ui.T("Dat vervangt het plan waar je nu aan werkt. Sla dat eerst op als je het wilt houden.", "That replaces the plan you are working on. Save it first if you want to keep it.")
+                <span class="cc-banner-actions">
+                    <button type="button" class="va-btn va-btn--primary cc-btn-sm" @onclick="() => StartFromAsync(offeredPreset)">@Ui.T("Ja, begin ermee", "Yes, start from it")</button>
+                    <button type="button" class="va-btn va-btn--ghost cc-btn-sm" @onclick="KeepMyPlan">@Ui.T("Houd mijn plan", "Keep my plan")</button>
+                </span>
+            </div>
+        }
+
+        @if (notice.Kind != NoticeKind.None)
+        {
+            <div class="cc-banner @NoticeClass()" role="status">
+                @notice.Text
+                @foreach (var item in notice.Items)
+                {
+                    <span class="cc-banner-item">@item</span>
+                }
+            </div>
+        }
+
+        <section class="cc-card cc-build-head">
+            <div class="cc-field cc-field--name">
+                <label for="cc-name">@Ui.T("Naam", "Name")</label>
+                <input id="cc-name" class="ctl" value="@name" placeholder="@Ui.T("Naam van je personage", "Your character's name")" @onchange="NameChangedAsync" />
+            </div>
+
+            <fieldset class="cc-field cc-modes">
+                <legend>@Ui.T("Soort plan", "Kind of plan")</legend>
+                <label class="cc-radio">
+                    <input type="radio" name="cc-mode" checked="@(plan.Mode == PlanMode.NewCharacter)" @onchange="() => ModeChangedAsync(PlanMode.NewCharacter)" />
+                    @Ui.T($"Nieuw personage ({Ui.Number(data.Rules.Creation.StartXp)} XP)", $"New character ({Ui.Number(data.Rules.Creation.StartXp)} XP)")
+                </label>
+                <label class="cc-radio">
+                    <input type="radio" name="cc-mode" checked="@(plan.Mode == PlanMode.Free)" @onchange="() => ModeChangedAsync(PlanMode.Free)" />
+                    @Ui.T("Vrij plannen", "Free planning")
+                </label>
+            </fieldset>
+
+            @if (plan.Mode == PlanMode.Free)
+            {
+                <div class="cc-field cc-field--xp">
+                    <label for="cc-xp">XP</label>
+                    <input id="cc-xp" class="ctl" type="number" min="0" step="0.25" value="@plan.Xp.ToString(System.Globalization.CultureInfo.InvariantCulture)" @onchange="XpChangedAsync" />
+                </div>
+                <div class="cc-field cc-field--events">
+                    <label for="cc-events">@Ui.T("Na evenementen", "After events")</label>
+                    <input id="cc-events" class="ctl" type="number" min="0" step="1" value="@events" @onchange="EventsChangedAsync" />
+                    <span class="hint">@Ui.T($"Vult de XP in: {Ui.Number(data.Rules.Creation.StartXp)} plus wat elk evenement geeft.", $"Fills in the XP: {Ui.Number(data.Rules.Creation.StartXp)} plus each event's award.")</span>
+                </div>
+            }
+
+            <dl class="cc-xp" aria-live="polite">
+                <div><dt>XP</dt><dd>@Ui.Number(evaluation.Xp)</dd></div>
+                <div><dt>@Ui.T("Uitgegeven", "Spent")</dt><dd>@Ui.Number(evaluation.Spent)</dd></div>
+                <div class="@(evaluation.Remaining < 0 ? "is-negative" : string.Empty)"><dt>@Ui.T("Over", "Left")</dt><dd>@Ui.Number(evaluation.Remaining)</dd></div>
+            </dl>
+
+            @* Not on an empty plan: "15 XP left over" before anything is chosen says nothing new. *@
+            @if (!plan.Planned.IsEmpty && General.Any())
+            {
+                <ul class="cc-general">
+                    @foreach (var finding in General)
+                    {
+                        <li class="cc-note cc-note--@finding.Severity.ToString().ToLowerInvariant()">@words.Describe(finding)</li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <div class="cc-build-grid">
+            <div class="cc-area-chosen">
+                @if (pending.IsWaiting)
+                {
+                    <div class="cc-banner cc-banner--service" role="alertdialog" aria-label="@Ui.T("Verwijderen bevestigen", "Confirm removal")">
+                        <b>@Ui.T($"{words.Name(pending.Skill)} is nodig voor:", $"{words.Name(pending.Skill)} is needed for:") @string.Join(", ", pending.Dependants.Select(words.Name))</b>
+                        <span class="cc-banner-actions">
+                            <button type="button" class="va-btn va-btn--danger cc-btn-sm" @onclick="() => ConfirmRemovalAsync(true)">@Ui.T("Die ook verwijderen", "Remove those too")</button>
+                            <button type="button" class="va-btn va-btn--secondary cc-btn-sm" @onclick="() => ConfirmRemovalAsync(false)">@Ui.T("Alleen deze", "Only this one")</button>
+                            <button type="button" class="va-btn va-btn--ghost cc-btn-sm" @onclick="() => pending = Removal.None">@Ui.T("Annuleren", "Cancel")</button>
+                        </span>
+                    </div>
+                }
+                <ChosenSkills Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" OnMore="MoreAsync" OnLess="LessAsync" OnRemove="RemoveAllAsync" />
+            </div>
+
+            <div class="cc-area-picker">
+                <SkillPicker Ui="Ui" Words="words" Data="data" Plan="plan" Options="options" OnAdd="AddAsync" />
+            </div>
+
+            <div class="cc-area-summary">
+                <SummaryPanels Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" />
+            </div>
+        </div>
+
+        <section class="cc-card cc-actions" aria-label="@Ui.T("Plan bewaren", "Keep the plan")">
+            <button type="button" class="va-btn va-btn--primary" @onclick="SaveAsync">@Ui.T("Opslaan", "Save")</button>
+            <button type="button" class="va-btn va-btn--secondary" @onclick="ExportAsync">@Ui.T("Exporteren", "Export")</button>
+            <label class="va-btn va-btn--secondary cc-file">
+                @Ui.T("Importeren", "Import")
+                <InputFile class="cc-visually-hidden" accept=".json,.dat" OnChange="ImportAsync" />
+            </label>
+            <button type="button" class="va-btn va-btn--ghost" aria-expanded="@(showSaved ? "true" : "false")" @onclick="() => showSaved = !showSaved">@Ui.T($"Opgeslagen ({saved.Count})", $"Saved ({saved.Count})")</button>
+            <a class="va-btn va-btn--ghost" href="voorbeelden">@Ui.T("Voorbeelden", "Presets")</a>
+            @if (confirmNew)
+            {
+                <span class="cc-confirm">
+                    @Ui.T("Huidig plan wissen?", "Clear the current plan?")
+                    <button type="button" class="va-btn va-btn--danger cc-btn-sm" @onclick="NewAsync">@Ui.T("Ja, nieuw plan", "Yes, new plan")</button>
+                    <button type="button" class="va-btn va-btn--ghost cc-btn-sm" @onclick="() => confirmNew = false">@Ui.T("Annuleren", "Cancel")</button>
+                </span>
+            }
+            else
+            {
+                <button type="button" class="va-btn va-btn--ghost" @onclick="NewAsync">@Ui.T("Nieuw plan", "New plan")</button>
+            }
+
+            @if (showSaved)
+            {
+                <div class="cc-saved">
+                    @if (saved.Count == 0)
+                    {
+                        <p class="muted">@Ui.T("Nog niets opgeslagen in deze browser.", "Nothing saved in this browser yet.")</p>
+                    }
+                    else
+                    {
+                        <ul class="cc-list">
+                            @foreach (var file in saved)
+                            {
+                                <li class="@(file.Id == planId ? "is-current" : string.Empty)">
+                                    <span><strong>@Title(file)</strong> <span class="cc-sub">@When(file.SavedAt) · @Ui.T($"{file.Skills.Count} vaardigheden", $"{file.Skills.Count} skills")</span></span>
+                                    <span class="cc-row-actions">
+                                        <button type="button" class="va-btn va-btn--secondary cc-btn-sm" @onclick="() => OpenSavedAsync(file)">@Ui.T("Openen", "Open")</button>
+                                        <button type="button" class="va-btn va-btn--ghost cc-btn-sm" aria-label="@Ui.T($"{Title(file)} verwijderen", $"Delete {Title(file)}")" @onclick="() => DeleteSavedAsync(file)">✕</button>
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    /// <summary>The language.</summary>
+    [Parameter, EditorRequired]
+    public Ui Ui { get; set; }
+
+    /// <summary>A preset to start from (<c>?voorbeeld=</c>); empty for none.</summary>
+    [Parameter]
+    public string Preset { get; set; } = string.Empty;
+
+    private string NoticeClass() => notice.Kind switch
+    {
+        NoticeKind.Error => "cc-banner--error",
+        NoticeKind.Warning => "cc-banner--service",
+        _ => "cc-banner--success",
+    };
+}

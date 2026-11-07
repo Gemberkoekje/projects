@@ -106,3 +106,930 @@ code, .mono {
     position: absolute;
     right: var(--s-4);
 }
+
+/* ---- Components, after Guild Hall's reference sketch (vortex-tools-style reference/guildhall.html) ---- */
+
+.cc-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.cc-lede {
+    max-width: 70ch;
+}
+
+.cc-sub {
+    display: block;
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.cc-small {
+    font-size: 14px;
+    margin: var(--s-3) 0 0;
+}
+
+.cc-count {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ink-3);
+}
+
+.cc-description {
+    white-space: pre-line;
+    margin: var(--s-3) 0 0;
+}
+
+.cc-card,
+.cc-panel {
+    background: var(--paper-raised);
+    border: var(--bd-hair);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-sm);
+    padding: var(--s-5);
+    min-width: 0;
+}
+
+.cc-panel + .cc-panel {
+    margin-top: var(--s-5);
+}
+
+.cc-card h2 {
+    font-size: 19px;
+}
+
+.cc-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+}
+
+.cc-card-head h2 {
+    margin: 0;
+}
+
+/* Buttons: Guild Hall's va-btn. */
+.va-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    font: 600 15px var(--f-text);
+    border: 0;
+    border-radius: var(--r-md);
+    padding: 10px 18px;
+    min-height: 44px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.va-btn--primary {
+    background: var(--va-action);
+    color: var(--pure-white);
+    box-shadow: var(--sh-sm);
+}
+
+.va-btn--primary:hover {
+    background: var(--va-action-hover);
+}
+
+.va-btn--secondary {
+    background: transparent;
+    color: var(--va-action-text);
+    box-shadow: inset 0 0 0 1.5px var(--va-action-text);
+}
+
+.va-btn--secondary:hover {
+    background: var(--va-action-tint);
+}
+
+.va-btn--ghost {
+    background: transparent;
+    color: var(--ink-2);
+    box-shadow: inset 0 0 0 1.5px var(--ink-faint);
+}
+
+.va-btn--ghost:hover {
+    background: var(--paper-sunken);
+}
+
+.va-btn--danger {
+    background: var(--error-fill);
+    color: var(--pure-white);
+}
+
+.va-btn[disabled] {
+    background: var(--paper-sunken);
+    color: var(--ink-faint);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.va-btn:focus-visible,
+.cc-file:focus-within {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--va-focus-ring);
+}
+
+.cc-btn-sm {
+    min-height: 34px;
+    padding: 5px 12px;
+    font-size: 14px;
+}
+
+/* The 2b Beheer page's button names. */
+.cc-button {
+    font: 600 15px var(--f-text);
+    border: 0;
+    border-radius: var(--r-md);
+    padding: 10px 18px;
+    min-height: 44px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--va-action-text);
+    box-shadow: inset 0 0 0 1.5px var(--va-action-text);
+}
+
+.cc-button--primary {
+    background: var(--va-action);
+    color: var(--pure-white);
+    box-shadow: var(--sh-sm);
+}
+
+/* Fields: Guild Hall's ctl. */
+.ctl {
+    width: 100%;
+    font: 400 16px var(--f-text);
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: var(--bd-ctl);
+    border-radius: var(--r-md);
+    padding: 9px 12px;
+    min-height: 44px;
+}
+
+.ctl::placeholder {
+    color: var(--ink-faint);
+}
+
+.ctl:focus {
+    outline: none;
+    border-color: var(--va-action-text);
+    box-shadow: 0 0 0 4px var(--va-focus-ring);
+}
+
+.cc-field label,
+.cc-field legend {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-2);
+    margin-bottom: var(--s-2);
+    padding: 0;
+}
+
+fieldset.cc-field {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.hint {
+    display: block;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    margin-top: var(--s-2);
+}
+
+.cc-radio {
+    display: inline-flex !important;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 44px;
+    margin-right: var(--s-5);
+    font-weight: 400 !important;
+    color: var(--ink) !important;
+    cursor: pointer;
+}
+
+.cc-radio input,
+.cc-tick {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--va-action);
+}
+
+/* Banners: Guild Hall's service, success and error. */
+.cc-banner,
+.cc-notice,
+.cc-error,
+.cc-success {
+    border-radius: var(--r-md);
+    padding: var(--s-4) var(--s-5);
+    font-size: 15px;
+    margin-bottom: var(--s-4);
+}
+
+.cc-banner b {
+    display: block;
+}
+
+.cc-banner--service,
+.cc-notice {
+    background: var(--notice-bg);
+    border: 1px solid var(--notice-border);
+    color: var(--notice-ink);
+}
+
+.cc-banner--success,
+.cc-success {
+    background: var(--success-tint);
+    border: 1px solid var(--success);
+    color: var(--success);
+}
+
+.cc-banner--error,
+.cc-error {
+    background: var(--error-tint);
+    border: 1px solid var(--error);
+    color: var(--error);
+}
+
+.cc-banner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    margin-top: var(--s-3);
+}
+
+.cc-banner-item {
+    display: block;
+    margin-top: var(--s-2);
+}
+
+/* Lists and tables. */
+.cc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cc-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: var(--s-3) 0;
+    border-bottom: var(--bd-hair);
+}
+
+.cc-list li.is-current strong::after {
+    content: " ●";
+    color: var(--va-action-text);
+}
+
+.cc-row-actions {
+    display: inline-flex;
+    gap: var(--s-2);
+}
+
+.cc-report-title {
+    font-size: 16px;
+    margin-top: var(--s-5);
+}
+
+.cc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+}
+
+.cc-table th,
+.cc-table td {
+    text-align: left;
+    vertical-align: top;
+    padding: var(--s-3);
+    border-bottom: var(--bd-hair);
+}
+
+.cc-table thead th {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.cc-table tfoot th,
+.cc-table tfoot td {
+    font-weight: 700;
+    border-bottom: 0;
+}
+
+.cc-num {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cc-center {
+    text-align: center !important;
+}
+
+.cc-table tr.is-problem td:first-child {
+    box-shadow: inset 3px 0 0 var(--error);
+}
+
+.cc-table tr.is-warning td:first-child {
+    box-shadow: inset 3px 0 0 var(--warning);
+}
+
+.cc-details-row td {
+    background: var(--paper-sunken);
+}
+
+/* Findings in words: a problem breaks a rule VOID enforces, a warning only warns, info is to know. */
+.cc-note {
+    display: block;
+    font-size: 14px;
+}
+
+.cc-note--problem {
+    color: var(--error);
+    font-weight: 600;
+}
+
+.cc-note--problem::before,
+.cc-note--warning::before {
+    content: "\26A0\FE0E  ";
+}
+
+.cc-note--warning {
+    color: var(--notice-ink);
+}
+
+.cc-note--info {
+    color: var(--ink-2);
+}
+
+/* ---- The build screen (DESIGN.md §5) ---- */
+
+.cc-build-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-5) var(--s-6);
+    margin-bottom: var(--s-5);
+}
+
+.cc-field--name {
+    flex: 1 1 260px;
+    max-width: 380px;
+}
+
+.cc-field--xp {
+    width: 110px;
+}
+
+.cc-field--events {
+    width: 240px;
+}
+
+.cc-field--events .ctl {
+    width: 110px;
+}
+
+.cc-xp {
+    display: flex;
+    gap: var(--s-5);
+    margin: 0 0 0 auto;
+}
+
+.cc-xp div {
+    text-align: right;
+}
+
+.cc-xp dt {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.cc-xp dd {
+    margin: 0;
+    font: 700 26px/1.1 var(--f-display);
+    font-variant-numeric: tabular-nums;
+}
+
+.cc-xp .is-negative dd {
+    color: var(--error);
+}
+
+.cc-general {
+    flex: 1 0 100%;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Wide: the picker and the summary side by side, the chosen table across; narrow: stacked, chosen
+   first. */
+.cc-build-grid {
+    display: grid;
+    gap: var(--s-5);
+    grid-template-areas: "chosen" "picker" "summary";
+    margin-bottom: var(--s-5);
+}
+
+@media (min-width: 1000px) {
+    .cc-build-grid {
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        grid-template-areas: "picker summary" "chosen chosen";
+        align-items: start;
+    }
+}
+
+.cc-area-chosen {
+    grid-area: chosen;
+    min-width: 0;
+}
+
+.cc-area-picker {
+    grid-area: picker;
+    min-width: 0;
+}
+
+.cc-area-summary {
+    grid-area: summary;
+    min-width: 0;
+}
+
+/* The picker. */
+.cc-segmented {
+    display: inline-flex;
+    border: var(--bd-ctl);
+    border-radius: var(--r-md);
+    overflow: hidden;
+}
+
+.cc-segmented button {
+    font: 600 14px var(--f-text);
+    background: transparent;
+    color: var(--ink-2);
+    border: 0;
+    padding: 6px 14px;
+    min-height: 36px;
+    cursor: pointer;
+}
+
+.cc-segmented button + button {
+    border-left: var(--bd-ctl);
+}
+
+.cc-segmented button.is-on {
+    background: var(--va-action-tint);
+    color: var(--va-action-text);
+}
+
+.cc-picker-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+}
+
+.cc-picker-tools .ctl {
+    flex: 1 1 220px;
+    width: auto;
+}
+
+.cc-category + .cc-category {
+    border-top: var(--bd-hair);
+}
+
+.cc-category-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    min-height: 44px;
+    padding: var(--s-2) 0;
+    font: 700 16px var(--f-display);
+    color: var(--ink);
+    background: none;
+    border: 0;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cc-chevron {
+    width: 1em;
+    color: var(--ink-3);
+}
+
+.cc-skills {
+    list-style: none;
+    margin: 0 0 var(--s-3);
+    padding: 0;
+}
+
+.cc-skill {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "tick name cost add" ". state state state" "details details details details";
+    align-items: center;
+    gap: var(--s-1) var(--s-3);
+    padding: var(--s-3) var(--s-2);
+    border-radius: var(--r-sm);
+}
+
+.cc-skill:hover {
+    background: var(--paper-sunken);
+}
+
+.cc-tick {
+    grid-area: tick;
+}
+
+.cc-skill-name {
+    grid-area: name;
+    justify-self: start;
+    font: 600 15px var(--f-text);
+    color: var(--ink);
+    background: none;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+    text-decoration: underline dotted var(--ink-faint);
+    text-underline-offset: 3px;
+}
+
+.cc-skill-cost {
+    grid-area: cost;
+    font-family: var(--f-mono);
+    font-size: 13px;
+    color: var(--ink-2);
+    white-space: nowrap;
+}
+
+.cc-skill-state {
+    grid-area: state;
+    font-size: 13.5px;
+    color: var(--ink-3);
+}
+
+.cc-skill.is-ok .cc-skill-state {
+    color: var(--success);
+}
+
+.cc-skill.is-blocked .cc-skill-state {
+    color: var(--notice-ink);
+}
+
+.cc-skill-add {
+    grid-area: add;
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-2);
+}
+
+.cc-skill .cc-details {
+    grid-area: details;
+    margin-top: var(--s-2);
+}
+
+/* A skill's details, in the picker and the chosen table. */
+.cc-details {
+    background: var(--paper-sunken);
+    border: var(--bd-hair);
+    border-radius: var(--r-md);
+    padding: var(--s-4);
+    font-size: 15px;
+}
+
+.cc-details-row .cc-details {
+    border: 0;
+    padding: 0;
+}
+
+.cc-facts {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--s-1) var(--s-4);
+    margin: 0;
+}
+
+.cc-facts div {
+    display: contents;
+}
+
+.cc-facts dt {
+    font-weight: 600;
+    color: var(--ink-2);
+}
+
+.cc-facts dd {
+    margin: 0;
+    white-space: pre-line;
+}
+
+.cc-requirement {
+    display: block;
+}
+
+/* The chosen table. */
+.cc-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.cc-stepper button,
+.cc-remove {
+    width: 32px;
+    height: 32px;
+    font: 600 16px var(--f-text);
+    color: var(--ink-2);
+    background: transparent;
+    border: var(--bd-ctl);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+}
+
+.cc-stepper button:hover,
+.cc-remove:hover {
+    background: var(--paper-sunken);
+    color: var(--ink);
+}
+
+.cc-remove:hover {
+    color: var(--error);
+    border-color: var(--error);
+}
+
+.cc-chosen .cc-skill-name {
+    display: block;
+}
+
+@media (max-width: 640px) {
+    .cc-chosen .cc-table thead {
+        display: none;
+    }
+
+    .cc-chosen .cc-table tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto auto;
+        border-bottom: var(--bd-hair);
+        padding: var(--s-3) 0;
+    }
+
+    .cc-chosen .cc-table td,
+    .cc-chosen .cc-table th {
+        border: 0;
+        padding: var(--s-1) var(--s-2);
+    }
+
+    .cc-chosen .cc-table td:nth-child(4) {
+        grid-column: 1 / -1;
+        order: 5;
+    }
+
+    .cc-chosen .cc-table .cc-details-row td {
+        grid-column: 1 / -1;
+    }
+}
+
+/* The summary. */
+.cc-summary {
+    display: grid;
+    gap: var(--s-5);
+}
+
+.cc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+}
+
+.echip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: var(--r-seal);
+    background: var(--paper);
+    border: var(--bd-hair);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+}
+
+.echip .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: var(--r-seal);
+    background: var(--chip, var(--ink-3));
+}
+
+.cc-en-elemental {
+    --chip: var(--en-elemental);
+}
+
+.cc-en-elemental-r {
+    --chip: var(--en-elemental-r);
+}
+
+.cc-en-spiritual {
+    --chip: var(--en-spiritual);
+}
+
+.cc-en-spiritual-r {
+    --chip: var(--en-spiritual-r);
+}
+
+.cc-en-willpower {
+    --chip: var(--en-willpower);
+}
+
+.cc-en-inspiration {
+    --chip: var(--en-inspiration);
+}
+
+.cc-props {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--s-3);
+    margin: 0;
+}
+
+.cc-props div {
+    background: var(--paper);
+    border: var(--bd-hair);
+    border-radius: var(--r-md);
+    padding: var(--s-3);
+}
+
+.cc-props dt {
+    font-size: 13px;
+    color: var(--ink-3);
+}
+
+.cc-props dd {
+    margin: 0;
+    font: 700 20px var(--f-display);
+}
+
+.cc-tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+}
+
+.cc-tile {
+    font: 600 14px var(--f-text);
+    color: var(--ink);
+    background: var(--paper);
+    border: var(--bd-hair);
+    border-radius: var(--r-md);
+    padding: 6px 12px;
+    min-height: 36px;
+    cursor: pointer;
+}
+
+.cc-tile:hover {
+    border-color: var(--va-action-text);
+}
+
+.cc-tile.is-on {
+    background: var(--va-crimson);
+    color: var(--pure-white);
+    border-color: var(--va-crimson);
+}
+
+.cc-tile-details {
+    margin-top: var(--s-4);
+    background: var(--paper-sunken);
+    border: var(--bd-hair);
+    border-radius: var(--r-md);
+    padding: var(--s-4);
+    font-size: 15px;
+}
+
+.cc-tile-details h3 {
+    font-size: 17px;
+}
+
+/* Keeping the plan. */
+.cc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.cc-file {
+    position: relative;
+    cursor: pointer;
+}
+
+.cc-confirm {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--ink-2);
+}
+
+.cc-saved {
+    flex: 1 0 100%;
+}
+
+/* NL/EN in the crest bar, shaped like the theme toggle beside it (on the crest's own colours). */
+.cc-lang-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 2.375rem;
+    height: 2.375rem;
+    font: 600 13px var(--f-mono);
+    letter-spacing: .06em;
+    color: var(--gilt-light);
+    background-color: color-mix(in srgb, var(--on-crest) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--on-crest) 22%, transparent);
+    border-radius: 5px;
+    text-decoration: none;
+}
+
+.cc-lang-toggle:hover,
+.cc-lang-toggle:focus-visible {
+    color: var(--on-crest);
+    background-color: color-mix(in srgb, var(--on-crest) 15%, transparent);
+}
+
+@media print {
+    .cc-lang-toggle {
+        display: none;
+    }
+}
+
+/* ---- Presets and FAQ ---- */
+
+.cc-presets {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--s-5);
+}
+
+.cc-preset {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+}
+
+.cc-preset h2 {
+    margin: 0;
+}
+
+.cc-preset .cc-description {
+    margin: 0;
+    color: var(--ink-2);
+}
+
+.cc-preset-skills {
+    margin: 0 0 var(--s-3);
+    padding-left: 1.2em;
+    font-size: 15px;
+    flex: 1 0 auto;
+}
+
+.cc-preset .va-btn {
+    align-self: flex-start;
+}
+
+.cc-faq {
+    display: grid;
+    gap: var(--s-5);
+    max-width: 900px;
+}
+
+.cc-faq p {
+    margin: 0 0 var(--s-3);
+}

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl" @attributes="ThemeAttributes">
+<html lang="@LanguageCode" @attributes="ThemeAttributes">
 
 <head>
     <meta charset="utf-8" />
@@ -28,6 +28,12 @@
     /// <summary>The current request. App always renders statically, so in practice it is always there.</summary>
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
+
+    /// <summary>
+    /// The visitor's language (the language cookie). The build screen reads it back from here once it
+    /// runs in the browser.
+    /// </summary>
+    private string LanguageCode => HttpContext is { } context ? CookieUiLanguage.From(context).Code : Ui.Dutch.Code;
 
     /// <summary>
     /// The theme is one choice shared by every Vortex app: the <c>vortex-theme</c> cookie, written by

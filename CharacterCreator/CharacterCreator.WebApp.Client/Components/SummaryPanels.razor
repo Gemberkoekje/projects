@@ -1,0 +1,205 @@
+@* The summary (DESIGN.md §5): energy per day and imbue caps from VOID's rules, the character's
+   properties, and the spells, techniques and recipes the chosen skills bring, as tiles with a
+   details panel. *@
+<aside class="cc-summary" aria-label="@Ui.T("Overzicht", "Summary")">
+    <section class="cc-card">
+        <h2>@Ui.T("Energie per dag", "Energy per day")</h2>
+        @{
+            var energy = Evaluation.Energy.Where(total => total.Kind == EnergyKind.Energy).ToList();
+        }
+        @if (energy.Count == 0)
+        {
+            <p class="muted">@Ui.T("Geen.", "None.")</p>
+        }
+        else
+        {
+            <div class="cc-chips">
+                @foreach (var total in energy)
+                {
+                    <span class="echip @EnergyClass(total.Type)"><span class="dot" aria-hidden="true"></span>@Words.EnergyType(total.Type) <strong>@total.Amount</strong></span>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="cc-card">
+        <h2>@Ui.T("Eigenschappen", "Properties")</h2>
+        <dl class="cc-props">
+            @foreach (var (label, value) in Properties())
+            {
+                <div><dt>@label</dt><dd>@value</dd></div>
+            }
+        </dl>
+    </section>
+
+    @{
+        var spells = Spells();
+        var recipes = Recipes();
+    }
+    <section class="cc-card">
+        <h2>@Ui.T("Spreuken en technieken", "Spells and techniques") <span class="cc-count">@spells.Count</span></h2>
+        @if (spells.Count == 0)
+        {
+            <p class="muted">@Ui.T("Geen.", "None.")</p>
+        }
+        else
+        {
+            <div class="cc-tiles">
+                @foreach (var spell in spells)
+                {
+                    <button type="button" class="cc-tile @(selectedSpell == spell.Id ? "is-on" : string.Empty)" aria-pressed="@(selectedSpell == spell.Id ? "true" : "false")" @onclick="() => selectedSpell = selectedSpell == spell.Id ? 0 : spell.Id">@Ui.T(spell.Name)</button>
+                }
+            </div>
+            var shown = spells.FirstOrDefault(spell => spell.Id == selectedSpell);
+            if (shown is not null)
+            {
+                <div class="cc-tile-details">
+                    <h3>@Ui.T(shown.Name)</h3>
+                    <dl class="cc-facts">
+                        @Fact(Ui.T("Energie", "Energy"), $"{Ui.T(shown.EnergyType)} {shown.Cost}".Trim())
+                        @Fact(Ui.T("Incantatie", "Incantation"), Ui.T(shown.Incantation))
+                        @Fact(Ui.T("Effect", "Effect"), Ui.T(shown.Effect))
+                        @Fact(Ui.T("Duur", "Duration"), Ui.T(shown.Duration))
+                        @Fact(Ui.T("Regelboek", "Rulebook"), shown.Page > 0 ? $"{Ui.T("Spreuken en Technieken, blz.", "Spells and Techniques, p.")} {shown.Page}" : string.Empty)
+                    </dl>
+                    @if (!string.IsNullOrWhiteSpace(Ui.T(shown.Description)))
+                    {
+                        <p class="cc-description">@Ui.T(shown.Description)</p>
+                    }
+                </div>
+            }
+        }
+    </section>
+
+    <section class="cc-card">
+        <h2>@Ui.T("Recepten", "Recipes") <span class="cc-count">@recipes.Count</span></h2>
+        @if (recipes.Count == 0)
+        {
+            <p class="muted">@Ui.T("Geen.", "None.")</p>
+        }
+        else
+        {
+            <div class="cc-tiles">
+                @foreach (var recipe in recipes)
+                {
+                    <button type="button" class="cc-tile @(selectedRecipe == recipe.Id ? "is-on" : string.Empty)" aria-pressed="@(selectedRecipe == recipe.Id ? "true" : "false")" @onclick="() => selectedRecipe = selectedRecipe == recipe.Id ? 0 : recipe.Id">@Ui.T(recipe.Name)</button>
+                }
+            </div>
+            var shown = recipes.FirstOrDefault(recipe => recipe.Id == selectedRecipe);
+            if (shown is not null)
+            {
+                <div class="cc-tile-details">
+                    <h3>@Ui.T(shown.Name)</h3>
+                    <dl class="cc-facts">
+                        @Fact(Ui.T("Effect", "Effect"), Ui.T(shown.Effect))
+                        @Fact(Ui.T("Inspiratie", "Inspiration"), shown.Inspiration)
+                        @Fact(Ui.T("Componenten", "Components"), Ui.T(shown.Components))
+                    </dl>
+                </div>
+            }
+        }
+    </section>
+</aside>
+
+@code {
+    private int selectedSpell;
+    private int selectedRecipe;
+
+    /// <summary>The language.</summary>
+    [Parameter, EditorRequired]
+    public Ui Ui { get; set; }
+
+    /// <summary>The words for energy types.</summary>
+    [Parameter, EditorRequired]
+    public FindingWords Words { get; set; }
+
+    /// <summary>The ruleset.</summary>
+    [Parameter, EditorRequired]
+    public LoadedRuleset Data { get; set; }
+
+    /// <summary>The plan.</summary>
+    [Parameter, EditorRequired]
+    public Plan Plan { get; set; }
+
+    /// <summary>What the engine makes of it.</summary>
+    [Parameter, EditorRequired]
+    public PlanEvaluation Evaluation { get; set; }
+
+    /// <summary>The chip colour for an energy type: Guild Hall's energy tokens, ritual ones for ritual energy.</summary>
+    private static string EnergyClass(string type)
+    {
+        var name = (type ?? string.Empty).ToUpperInvariant();
+        var ritual = name.Contains("RITUAL", StringComparison.Ordinal);
+        return name switch
+        {
+            _ when name.StartsWith("ELEMENTAL", StringComparison.Ordinal) => ritual ? "cc-en-elemental-r" : "cc-en-elemental",
+            _ when name.StartsWith("SPIRITUAL", StringComparison.Ordinal) => ritual ? "cc-en-spiritual-r" : "cc-en-spiritual",
+            "WILLPOWER" => "cc-en-willpower",
+            "INSPIRATION" => "cc-en-inspiration",
+            _ => string.Empty,
+        };
+    }
+
+    private static RenderFragment Fact(string label, string value) => builder =>
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        builder.OpenElement(0, "div");
+        builder.OpenElement(1, "dt");
+        builder.AddContent(2, label);
+        builder.CloseElement();
+        builder.OpenElement(3, "dd");
+        builder.AddContent(4, value);
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    /// <summary>
+    /// Hit points (1 to start with, as in the old builder), armour points and craft caps from the
+    /// content's properties; imbue caps from VOID's rules. Energy is left out here: it comes from VOID.
+    /// </summary>
+    private List<(string Label, string Value)> Properties()
+    {
+        int Sum(string property) => Plan.All.Sum(pair => Data.Content.TryGet(pair.Key, out var skill)
+            ? skill.Properties.Where(item => item.Name == property).Sum(item => item.Value) * pair.Value
+            : 0);
+
+        var properties = new List<(string Label, string Value)>
+        {
+            (Ui.T("Levenspunten", "Hit points"), (1 + Sum("hitpoints")).ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            (Ui.T("Pantserpunten", "Armour points"), Sum("armourpoints").ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        };
+
+        properties.AddRange(Evaluation.Energy.Where(total => total.Kind == EnergyKind.ImbueCap)
+            .Select(total => (Ui.T($"Imbue-limiet {Words.EnergyType(total.Type).ToLowerInvariant()}", $"{Words.EnergyType(total.Type)} imbue cap"), total.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+
+        foreach (var (property, nl, en) in new[] { ("glyph_craft_cap", "Craft-limiet glyphs", "Glyph craft cap"), ("rune_craft_cap", "Craft-limiet runen", "Rune craft cap") })
+        {
+            var value = Sum(property);
+            if (value > 0)
+            {
+                properties.Add((Ui.T(nl, en), value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+        }
+
+        return properties;
+    }
+
+    private List<SpellContent> Spells()
+        => [.. Plan.All.Skills
+            .SelectMany(key => Data.Content.TryGet(key, out var skill) ? skill.Spells : [])
+            .DistinctBy(spell => spell.Id)];
+
+    /// <summary>The chosen skills' recipes, and a category's common recipes once the character has a skill in it.</summary>
+    private List<RecipeContent> Recipes()
+    {
+        var skills = Plan.All.Skills.Select(key => Data.Content.TryGet(key, out var skill) ? skill : null).OfType<SkillContent>().ToList();
+        var categories = skills.Select(skill => skill.Category.Nl).ToHashSet(StringComparer.Ordinal);
+        return [.. skills.SelectMany(skill => skill.Recipes)
+            .Concat(Data.Content.CommonRecipes.Where(group => categories.Contains(group.Category.Nl)).SelectMany(group => group.Recipes))
+            .DistinctBy(recipe => recipe.Id)];
+    }
+}

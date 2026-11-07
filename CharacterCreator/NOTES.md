@@ -507,3 +507,150 @@ _To understand this, start by reading `DESIGN.md` §4.2 and §3.4, then
 | `CharacterCreator.WebApp/Program.cs` | VOID client, store, handlers, seed, compression, `AccessDeniedPath` |
 | `CharacterCreator.test/TestHelpers/` | `InMemoryRulesetStore`, `TestSignIn`, the factory |
 | `CharacterCreator.test/Rulesets/`, `Void/`, `Web/Ruleset_api_specs.cs`, `Web/Beheer_rulesets_specs.cs` | the specs |
+
+---
+
+## Phase 3 — the build screen (2026-11-07)
+
+_To understand this, start by reading `DESIGN.md` §5 and §4.3 (both have an "as built in phase 3"
+part), then `CharacterCreator.WebApp.Client/Components/BuildScreen.razor.cs` (the state and every
+action), then `SkillPicker.razor`, and `core/Plans/PlanImport.cs` for files._
+
+### What it does
+
+- **The build screen** (`/`, Blazor WebAssembly): the server prerenders the heading and a loading
+  line; in the browser `BuildScreen` loads the published ruleset, then shows:
+  - **the head:** name, the mode (new character or free planning, with "after N events"), and
+    the XP, spent and left counters with the plan-wide findings;
+  - **the picker:**
+    - search, and Basis/Extra/All (Basis by default for a new character);
+    - categories folded open on demand;
+    - every skill's state in words;
+    - "+" (or "+ anyway") and "+ with prerequisites (n XP)";
+    - ticking several and adding them at once;
+    - details per skill: cost, maxima, prerequisites, rulebook page, description, spells,
+      loresheet;
+  - **the chosen table:** XP, −/+, the notes in words, remove; removing what others need asks
+    first;
+  - **the summary:** energy chips (Guild Hall's energy tokens), properties (HP from 1, AP, imbue
+    caps from VOID, craft caps), spell and recipe tiles with a details panel;
+  - **keeping it:** the working plan in localStorage after every change, Save to a list (open,
+    delete), Export and Import as a file, New plan.
+- **Old saves:** `PlanImport` reads our JSON and Thorfgin's three formats, `.dat` included, through
+  `legacy.json` (182 of his skills, by id and name).
+- **Presets** (`/voorbeelden`): cards with text, skills and XP. *Start from this* opens
+  `/?voorbeeld={key}`, which asks first if the current plan has skills.
+- **NL/EN:**
+  - `/taal/{nl|en}` sets `charactercreator.taal` for a year and comes back;
+  - the crest bar has the switch;
+  - `html lang`, the layout, the build screen, the presets, the FAQ and the not-found page follow
+    it.
+- **FAQ** (`/vragen`), written in both languages, with §3.6's table of rule changes.
+- **Core additions:**
+  - `PlanEvaluator.Options`: the whole picker on one evaluation of the plan;
+  - `PlanFile` and `PlanImport`;
+  - `LegacySkill` on `ContentBook` and `PublishedRuleset`;
+  - `RulesetJsonContext`, the source-generated JSON.
+- **Guild Hall components** in `app.css`: buttons, fields, banners, cards, tables, chips, tiles,
+  all on role tokens. Dark mode follows. The 2b Beheer page's classes are styled now too.
+
+### Decisions
+
+1. **The engine's facts are worded in the client** (`Words/FindingWords`), Dutch and English. A
+   skill outside the book is "a skill outside the book", never named.
+2. **The build screen asks the engine after every change.** `Options` evaluates the plan once, then
+   one more purchase per skill. That costs 171 small evaluations per click in WebAssembly, with no
+   noticeable delay.
+3. **Language by cookie and a full reload**, not interactive switching:
+   - the server pages follow it without JavaScript;
+   - the build screen reads `html lang`;
+   - the plan survives, being in the browser;
+   - the switch link opts out of enhanced navigation (`data-enhance-nav="false"`).
+4. **One JS module** (`wwwroot/js/charactercreator.js`, in the WebApp) for language, storage and
+   download. Storage failures (a private window) return empty or false, never throw.
+5. **The prerender is a heading and a loading line.** The plan is in the browser, so a fully
+   prerendered screen would flash an empty plan first, and cost server time per visit.
+6. **Thorfgin's categories are cleaned up in the import script**, not in the UI:
+   - `Vechtervaardigheden` is folded into `Vechtersvaardigheden`;
+   - each Dutch category gets one English name, with "Skills" capitalized;
+   - the picker groups by the Dutch name.
+7. **Existing characters wait for phase 7.** A file in that mode opens as free planning.
+8. **Empty plan, no plan-wide warning:** "15 XP left over" before anything is chosen says nothing.
+
+### Gotchas
+
+- **Source-generated JSON overwrites `init` defaults.** For a missing member it passes `null` or
+  0 rather than keeping the initializer. `PlanFile` and `PublishedRuleset.Legacy` came back null,
+  and only the specs caught it. Their setters now guard the default; CLAUDE.md has the rule.
+- **A `[JsonConstructor]` used by source generation can't be private:** `RequirementGroup`'s is
+  internal now.
+- **The test host serves static files as empty 200s.** The content root is the test's bin folder
+  (Kluskat's lesson), so a spec can't check a static asset's contents.
+- **Blazor HTML-encodes non-ASCII:** `·` arrives as `&#xB7;`, `ë` as `&#xEB;`. Specs match around
+  them.
+- **Razor `@code` vs a `.razor.cs` partial:**
+  - in `.razor` files, `= default!` on a parameter trips S8970 (nullable is off there), so leave
+    the initializer out;
+  - in the partial, `[Parameter]` setters trip QW0011, so parameters and `@inject` stay in the
+    `.razor` file.
+- **`JsonElement.EnumerateArray()` is IDisposable** (IDISP004), even in `foreach`: use `using var`.
+- **Cookies are per host, localStorage per origin:** on `localhost:8086` the language from 8084
+  came along, the plans didn't.
+- **A stored ruleset carries its content,** so a content fix needs a new publish (locally: delete
+  the row to reseed).
+
+### How it was checked
+
+- `dotnet build`: clean, warnings as errors. `dotnet test`: 278 specs, 62 new:
+  - `Plans/PlanImport_specs` (14), `Plans/PlanFile_specs` (7);
+  - `Rules/Options_specs` (5): the same as one at a time, on four kinds of plan;
+  - `Rulesets/RulesetJsonContext_specs` (5): the round trip without reflection, the same JSON as
+    the API, no computed members, an old stored ruleset, `RulesetClient.Prepare`;
+  - `Content/Content_2026_specs` (+3): the legacy map, one name per category;
+  - `Words/FindingWords_specs` (17), `Web/Language_specs` (8), `Web/Presets_specs` (3).
+- **Walked through in the browser (dev):**
+  - the chain (Harnas III brings I and II);
+  - removing with dependants, and "only this one", which leaves Harnas II flagged;
+  - a reload keeps the plan; saving; the switch to English;
+  - a preset with the "replace?" question;
+  - spell details;
+  - importing a `.dat` save of the old builder, with a skill that no longer exists left out and
+    named;
+  - export;
+  - phone width and dark mode, after which the chosen table's grid and the events hint were
+    fixed.
+- **Release publish (trimmed), run from the publish folder:** the build screen loads, the chain,
+  the `.dat` import and saving work. No trim warnings. Locked restore passes.
+
+### Not done / next
+
+- **Phase 4, print:** the PDF (server-side, Guild Hall's print look).
+- **Differences per plan across rulesets** (§4.3): needs `GET /api/rulesets/{id}` and a comparison
+  of the plan's skills. The screen now only says the plan was made on another ruleset.
+- **Mijn personages / existing characters:** phase 7, signed in.
+- **Beheer and the sign-in pages** are Dutch only.
+- **Thorfgin's energy properties** are still not mapped onto VOID's manatypes: energy comes from
+  VOID only.
+- **The VOID branch:** unchanged, local only (the 3-XP warning, the SL/EC rights), one push in
+  phase 5.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.WebApp.Client/Pages/Bouwen.razor` | the page: prerendered heading, then `BuildScreen` |
+| `CharacterCreator.WebApp.Client/Components/` | `BuildScreen` (+ `.razor.cs`), `SkillPicker`, `ChosenSkills`, `SummaryPanels`, `SkillDetails` |
+| `CharacterCreator.WebApp.Client/Services/` | `Browser` (JS module), `RulesetClient`, `PlanStore`, `IUiLanguage` |
+| `CharacterCreator.WebApp.Client/Words/` | `Ui` (language, numbers), `FindingWords` |
+| `CharacterCreator.WebApp/wwwroot/js/charactercreator.js` | language, localStorage, download |
+| `CharacterCreator.WebApp/wwwroot/app.css` | the Guild Hall components and the build screen |
+| `CharacterCreator.WebApp/Localization/CookieUiLanguage.cs`, `Endpoints/LanguageEndpoints.cs` | the language cookie |
+| `CharacterCreator.WebApp/Components/Layout/` | `MainLayout` (translated), `LanguageLink`, `ThemeToggle` |
+| `CharacterCreator.WebApp/Components/Pages/` | `Voorbeelden`, `Vragen`, `NotFound` |
+| `CharacterCreator.core/Plans/` | `PlanFile` (+ `PlanSkill`), `PlanImport` (+ `ImportedPlan`, `PlanSource`) |
+| `CharacterCreator.core/Rulesets/RulesetJsonContext.cs` | source-generated JSON |
+| `CharacterCreator.core/Rules/PlanEvaluator.cs` | `Options` |
+| `CharacterCreator.core/Content/` | `LegacySkill`; `ContentBook.Legacy` |
+| `CharacterCreator.infrastructure/Content/2026-v07/legacy.json` | Thorfgin's skills per key (embedded) |
+| `scripts/import-thorfgin-content.py` | writes `legacy.json`; one spelling per category |
+| `CharacterCreator.test/Plans/`, `Words/`, `Rules/Options_specs.cs`, `Rulesets/RulesetJsonContext_specs.cs`, `Web/Language_specs.cs`, `Web/Presets_specs.cs` | the specs |

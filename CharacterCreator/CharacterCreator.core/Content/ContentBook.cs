@@ -12,13 +12,14 @@ public sealed class ContentBook
     private readonly Dictionary<SkillKey, SkillContent> byKey;
     private readonly Dictionary<string, SkillContent> byVoidName;
 
-    private ContentBook(string ruleset, string book, IReadOnlyList<SkillContent> skills, IReadOnlyList<RecipeGroup> commonRecipes, IReadOnlyList<PresetContent> presets)
+    private ContentBook(string ruleset, string book, IReadOnlyList<SkillContent> skills, IReadOnlyList<RecipeGroup> commonRecipes, IReadOnlyList<PresetContent> presets, IReadOnlyList<LegacySkill> legacy)
     {
         Ruleset = ruleset;
         Book = book;
         Skills = skills;
         CommonRecipes = commonRecipes;
         Presets = presets;
+        Legacy = legacy;
         byKey = skills.ToDictionary(skill => skill.Key);
         byVoidName = skills.ToDictionary(skill => skill.Void, StringComparer.OrdinalIgnoreCase);
     }
@@ -38,14 +39,21 @@ public sealed class ContentBook
     /// <summary>The archetypes to start from.</summary>
     public IReadOnlyList<PresetContent> Presets { get; }
 
+    /// <summary>Thorfgin's skills and the entries they became, for importing his saves.</summary>
+    public IReadOnlyList<LegacySkill> Legacy { get; }
+
     /// <summary>Builds the content, refusing what cannot be right.</summary>
     /// <param name="ruleset">The ruleset it is for.</param>
     /// <param name="book">The book it follows.</param>
     /// <param name="skills">The skills.</param>
     /// <param name="commonRecipes">The common recipes.</param>
     /// <param name="presets">The presets.</param>
-    /// <returns>The content, or why not: a key or VOID name used twice, or a preset naming a skill that is not there.</returns>
-    public static Result<ContentBook> Create(string ruleset, string book, IEnumerable<SkillContent> skills, IEnumerable<RecipeGroup> commonRecipes, IEnumerable<PresetContent> presets)
+    /// <param name="legacy">Thorfgin's skills and the entries they became; none when left out.</param>
+    /// <returns>
+    /// The content, or why not: a key or VOID name used twice, or a preset or one of Thorfgin's skills
+    /// naming a skill that is not there.
+    /// </returns>
+    public static Result<ContentBook> Create(string ruleset, string book, IEnumerable<SkillContent> skills, IEnumerable<RecipeGroup> commonRecipes, IEnumerable<PresetContent> presets, IEnumerable<LegacySkill> legacy = null)
     {
         ArgumentNullException.ThrowIfNull(skills);
         ArgumentNullException.ThrowIfNull(commonRecipes);
@@ -53,6 +61,7 @@ public sealed class ContentBook
 
         var skillList = skills.ToList();
         var presetList = presets.ToList();
+        var legacyList = (legacy ?? []).ToList();
         var messages = new List<IValidationMessage>();
 
         messages.AddRange(skillList.GroupBy(skill => skill.Key).Where(group => group.Count() > 1)
@@ -63,10 +72,12 @@ public sealed class ContentBook
         var keys = skillList.Select(skill => skill.Key).ToHashSet();
         messages.AddRange(presetList.SelectMany(preset => preset.Skills.Where(skill => !keys.Contains(skill.Key))
             .Select(skill => ValidationMessage.Error($"The preset '{preset.Key}' names '{skill.Key}', which is not in the content."))));
+        messages.AddRange(legacyList.Where(old => !keys.Contains(old.Key))
+            .Select(old => ValidationMessage.Error($"Thorfgin's skill {old.Id} ({old.Name}) names '{old.Key}', which is not in the content.")));
 
         return messages.Count > 0
             ? Result.WithMessages<ContentBook>(messages)
-            : Result.For(new ContentBook(ruleset ?? string.Empty, book ?? string.Empty, skillList, [.. commonRecipes], presetList));
+            : Result.For(new ContentBook(ruleset ?? string.Empty, book ?? string.Empty, skillList, [.. commonRecipes], presetList, legacyList));
     }
 
     /// <summary>Looks up a skill's content by its key.</summary>

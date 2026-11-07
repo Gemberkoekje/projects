@@ -24,13 +24,14 @@ public sealed record RequirementGroup
     /// <remarks>
     /// System.Text.Json (the API, and Marten) needs a constructor whose parameters have the properties'
     /// types. It binds by name, so the order is free: a different order keeps <c>new (kind, amount, [])</c>
-    /// unambiguous.
+    /// unambiguous. Internal rather than private, so the compile-time metadata
+    /// (<see cref="Rulesets.RulesetJsonContext"/>) can call it.
     /// </remarks>
     /// <param name="skills">The skills it counts.</param>
     /// <param name="kind">What the group counts.</param>
     /// <param name="amount">Times, XP or extra skills.</param>
     [JsonConstructor]
-    private RequirementGroup(IReadOnlyList<SkillKey> skills, RequirementKind kind, int amount)
+    internal RequirementGroup(IReadOnlyList<SkillKey> skills, RequirementKind kind, int amount)
         : this(kind, amount, (IEnumerable<SkillKey>)skills)
     {
     }

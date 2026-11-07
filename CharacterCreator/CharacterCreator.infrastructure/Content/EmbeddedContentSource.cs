@@ -7,7 +7,8 @@ using CharacterCreator.core.Content;
 namespace CharacterCreator.infrastructure.Content;
 
 /// <summary>
-/// The content files in this assembly (<c>Content/{ruleset}/skills.json</c> and <c>presets.json</c>),
+/// The content files in this assembly (<c>Content/{ruleset}/skills.json</c>, <c>presets.json</c> and
+/// <c>legacy.json</c>),
 /// made by <c>scripts/import-thorfgin-content.py</c> and checked by <c>scripts/check-against-rulebook.py</c>.
 /// </summary>
 /// <remarks>
@@ -55,7 +56,9 @@ public sealed class EmbeddedContentSource : IContentSource
             return Result.WithMessages<ContentBook>(ValidationMessage.Error($"There is no content for ruleset '{ruleset}'."));
         }
 
-        return ContentBook.Create(skills.Ruleset, skills.Book, skills.Skills, skills.CommonRecipes, presets.Presets);
+        // Thorfgin's skills per key: optional, a ruleset without his data has none.
+        var legacy = Read<LegacyDocument>(ruleset, "legacy.json") ?? new LegacyDocument();
+        return ContentBook.Create(skills.Ruleset, skills.Book, skills.Skills, skills.CommonRecipes, presets.Presets, legacy.Skills);
     }
 
     private T Read<T>(string ruleset, string file)
@@ -93,5 +96,10 @@ public sealed class EmbeddedContentSource : IContentSource
     private sealed record PresetsDocument
     {
         public List<PresetContent> Presets { get; init; } = [];
+    }
+
+    private sealed record LegacyDocument
+    {
+        public List<LegacySkill> Skills { get; init; } = [];
     }
 }

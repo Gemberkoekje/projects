@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using CharacterCreator.core.Skills;
 
 namespace CharacterCreator.core.Content;
@@ -80,6 +81,7 @@ public sealed record Loresheet
     required public string Extra { get; init; }
 
     /// <summary>Whether there is a loresheet.</summary>
+    [JsonIgnore]
     public bool Exists => !string.IsNullOrEmpty(Url);
 }
 
@@ -178,4 +180,21 @@ public sealed record PresetSkill
 
     /// <summary>How often it is bought.</summary>
     required public int Times { get; init; }
+}
+
+/// <summary>
+/// One of Thorfgin's skills (ruleset 2023-10b) and the entry it became, for importing his saves
+/// (DESIGN.md §4.3): 2023-10b saves name skills by id, older ones by name.
+/// </summary>
+/// <remarks>Immutable and thread-safe.</remarks>
+public sealed record LegacySkill
+{
+    /// <summary>Thorfgin's id.</summary>
+    required public int Id { get; init; }
+
+    /// <summary>Thorfgin's Dutch name.</summary>
+    required public string Name { get; init; }
+
+    /// <summary>The entry it became.</summary>
+    required public SkillKey Key { get; init; }
 }

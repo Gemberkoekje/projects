@@ -1,25 +1,29 @@
 @page "/"
 @rendermode InteractiveWebAssembly
+@inject IUiLanguage Languages
 
-@* The build screen (DESIGN.md §5). Phase 0 only proves the route: prerendered on the server, then
-   taken over by the browser. The picker, the chosen skills and the summary arrive in phase 3. *@
-<PageTitle>Character Creator · Bouwen</PageTitle>
+@* The build screen (DESIGN.md §5). The server prerenders the heading and a loading line; the
+   browser takes over and loads the rules, the plan and the screen itself. *@
+<PageTitle>Character Creator · @ui.T("Bouwen", "Build")</PageTitle>
 
-<h1>Personage bouwen</h1>
+<h1>@ui.T("Personage bouwen", "Build a character")</h1>
 
-<p class="secondary">
-    Hier komt het bouwscherm: vaardigheden kiezen, XP, vereisten, energie per dag, spreuken en
-    recepten.
-</p>
-
-<p class="muted" data-render-state="@RenderState">@RenderText</p>
+@if (RendererInfo.IsInteractive)
+{
+    <BuildScreen Ui="ui" Preset="@(Voorbeeld ?? string.Empty)" />
+}
+else
+{
+    <p class="muted" data-render-state="server">@ui.T("Het bouwscherm wordt geladen…", "Loading the build screen…")</p>
+}
 
 @code {
-    /// <summary>Where this page runs right now: on the server while prerendering, then in the browser.</summary>
-    private string RenderState => RendererInfo.IsInteractive ? "browser" : "server";
+    private Ui ui = Ui.Dutch;
 
-    /// <summary>The same, for a reader.</summary>
-    private string RenderText => RendererInfo.IsInteractive
-        ? "Dit scherm draait nu in je browser."
-        : "Dit scherm wordt geladen…";
+    /// <summary>A preset to start from, from the presets page (<c>?voorbeeld=</c>); null when absent.</summary>
+    [SupplyParameterFromQuery(Name = "voorbeeld")]
+    public string? Voorbeeld { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync() => ui = await Languages.CurrentAsync();
 }

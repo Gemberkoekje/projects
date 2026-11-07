@@ -36,7 +36,7 @@ gembernodes deploy. landerijen (`C:\git\gitlabs\landerijen-volken`) for Blazor a
   file (`skill-requirements-sl.json`) or a secret. The offline VOID snapshot
   (`Content/{ruleset}/void-snapshot.json`) holds book skills only, and a published ruleset names a
   skill outside the book only as `hidden-{VOID id}`.
-- Dutch UI (English toggle from phase 3), English code names. Test methods are snake_case English
+- Dutch and English UI (Beheer and sign-in pages Dutch only), English code names. Test methods are snake_case English
   sentences.
 - Local Postgres on **5435**, web on **8084** (`docker compose up -d postgres`, then run the WebApp;
   the dev password is in `appsettings.Development.json` and must match your `.env`).
@@ -58,7 +58,22 @@ dotnet test CharacterCreator.slnx
 - The client's `Program` is an explicit class in its own namespace: a second top-level `Program`
   would clash with the host's in the specs' `WebApplicationFactory<Program>`.
 - Whatever a client page injects must be registered in both `Program.cs` files: the server
-  prerenders the page first.
+  prerenders the page first. Components a page shows only once interactive (`BuildScreen`) are
+  registered in the client only.
+- **The client is trimmed when published.** JSON between server and client goes through
+  `core/Rulesets/RulesetJsonContext` (source-generated). Two consequences:
+  - a `[JsonConstructor]` there must be at least internal;
+  - a non-required `init` property must guard its default in its setter
+    (`init => x = value ?? []`), because generated code passes `null` for a missing member.
+
+  Check a client change in a Release publish, not only under `dotnet run`.
+- **Browser access** goes through `CharacterCreator.WebApp/wwwroot/js/charactercreator.js` and the
+  client's `Services/Browser.cs` (language, localStorage, download).
+- **Language:** the `charactercreator.taal` cookie (`/taal/{nl|en}`), read on the server by
+  `Localization/CookieUiLanguage` and in the browser from `html lang`. UI text is inline as
+  `Ui.T("nl", "en")`; findings are worded by the client's `Words/FindingWords`.
+- **Content changes reach a ruleset only when it is published:** a stored ruleset carries its
+  content. Locally, delete the `mt_doc_publishedruleset` row to reseed.
 - The VOID side lives in the worktree `C:\git\gitlabs\void-charactercreator`, branch
   `feature/skills-requirements-api`. It is pushed, and on its way to `develop`, whose instance
   `void-test` the demo talks to.

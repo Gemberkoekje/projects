@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace CharacterCreator.core.Skills;
 
 /// <summary>
@@ -32,5 +34,6 @@ public sealed record RuleSkill
     /// Whether this is an extra skill: not to be bought at creation, and bought the first time
     /// through a teacher. VOID says so with <c>base_max</c> 0.
     /// </summary>
+    [JsonIgnore]
     public bool IsExtra => BaseMax == 0;
 }

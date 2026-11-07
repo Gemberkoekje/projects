@@ -87,6 +87,30 @@ public sealed class Content_2026_specs
     }
 
     [Test]
+    public void every_one_of_thorfgins_skills_has_an_entry_for_his_saves()
+    {
+        Book.Legacy.Should().HaveCount(182, "his builder had 84 basis and 98 extra skills");
+        Book.Legacy.Select(old => old.Id).Should().OnlyHaveUniqueItems();
+        Book.Legacy.Should().AllSatisfy(old => Book.TryGet(old.Key, out _).Should().BeTrue(old.Name));
+    }
+
+    [Test]
+    public void a_legacy_skill_naming_an_unknown_entry_is_refused()
+    {
+        var result = ContentBook.Create("r", "b", Book.Skills, [], [], [new LegacySkill { Id = 1, Name = "Oud", Key = new ("not-there") }]);
+
+        result.IsValid.Should().BeFalse();
+    }
+
+    [Test]
+    public void each_category_has_one_name_in_each_language()
+    {
+        Book.Skills.GroupBy(skill => skill.Category.Nl).Should().AllSatisfy(group =>
+            group.Select(skill => skill.Category.En).Distinct().Should().ContainSingle(group.Key));
+        Book.Skills.Should().NotContain(skill => skill.Category.Nl == "Vechtervaardigheden", "Thorfgin's typo is folded into Vechtersvaardigheden");
+    }
+
+    [Test]
     public void an_unknown_ruleset_has_no_content()
     {
         var result = new EmbeddedContentSource().LoadAsync("1999-v01", CancellationToken.None).Result;
