@@ -62,6 +62,10 @@ dotnet test CharacterCreator.slnx
 ```
 
 - **Every phase ends with a written summary appended to `NOTES.md`.**
+- **A statically rendered page renders every form on every request.** Blazor dispatches a post to
+  the form with that `@formname` in the page as it renders for the post. A form shown only after
+  an earlier post (like a publish button under a report) gets a 400 without a log line. Spec each
+  form's post on its own (`Beheer_rulesets_specs`).
 - Razor components have nullable on, but avoid `?`: render an attribute that may be absent with
   `@attributes` (see `App.razor`'s theme), not with a `null` value.
 - The client's `Program` is an explicit class in its own namespace: a second top-level `Program`

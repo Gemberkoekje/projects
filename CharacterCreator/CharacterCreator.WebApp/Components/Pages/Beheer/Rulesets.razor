@@ -42,10 +42,29 @@
     }
     else
     {
-        <p class="secondary">Leest de vaardigheden uit <span class="mono">@Voids.Source</span> en laat zien wat publiceren zou doen. Er wordt nog niets opgeslagen.</p>
+        <p class="secondary">
+            <strong>Proefimport</strong> leest de vaardigheden uit <span class="mono">@Voids.Source</span> en laat zien
+            wat publiceren zou doen; er wordt niets opgeslagen.
+        </p>
         <form method="post" @formname="preview" @onsubmit="PreviewAsync">
             <AntiforgeryToken />
             <button type="submit" class="cc-button">Proefimport</button>
+        </form>
+
+        @* Always on the page, not only under the report: each button is a post of its own, and Blazor
+           answers 400 to a post whose form the page doesn't render on that request. Publishing
+           imports again, so it never needed the report; the box asks for it to be read first. *@
+        <p class="secondary cc-publish-intro">
+            <strong>Publiceren</strong> importeert opnieuw en slaat het resultaat op; de bouwpagina gebruikt het
+            meteen. Een gepubliceerde ruleset verandert daarna nooit meer.
+        </p>
+        <form method="post" @formname="publish" @onsubmit="PublishAsync">
+            <AntiforgeryToken />
+            <label class="cc-radio">
+                <input type="checkbox" name="confirm" required />
+                Ik heb de proefimport gelezen
+            </label>
+            <button type="submit" class="cc-button cc-button--primary">Publiceren</button>
         </form>
     }
 
@@ -89,14 +108,11 @@
         <ReportList Title="Energie- en imbuetypen in VOID" Items="report.EnergyTypes" Empty="Geen." />
         <ReportList Title="VOID-vaardigheden die niet in het boek staan (SL-only, of nieuw)" Items="report.NotInBook" Empty="Geen." Collapsed="true" />
 
-        @if (report.CanPublish)
-        {
-            <form method="post" @formname="publish" @onsubmit="PublishAsync">
-                <AntiforgeryToken />
-                <button type="submit" class="cc-button cc-button--primary">Publiceren</button>
-            </form>
-            <p class="muted">Publiceren importeert opnieuw en slaat het resultaat op. Een gepubliceerde ruleset verandert daarna nooit meer.</p>
-        }
+        <p class="muted">
+            @(report.CanPublish
+                ? "Klopt dit? Publiceer dan hierboven."
+                : "Zo kan het niet gepubliceerd worden; los eerst op wat onder \"Niet te publiceren\" staat.")
+        </p>
     </section>
 }
 
