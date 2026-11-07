@@ -779,6 +779,27 @@ The footer is the portal's.
 - **A row just added** flashes once in the chosen table, and the budget moves in 150 ms. Both stay
   still under `prefers-reduced-motion`.
 
+*As built after the UX review, batch 4 (P2, P6):*
+
+- **From 1000 px:** the picker on the left, *Jouw personage* on the right, in a column that stays
+  under the XP bar and scrolls on its own. It holds:
+  - *Klopt je personage?*;
+  - the compact chosen list (name, XP, times, remove, notes beneath);
+  - the summary: energy and properties on a line each, spells and recipes folded with their counts.
+- **Below 1000 px:** tabs *Kiezen · Mijn personage (n) · Overzicht*, sticky at the top, with the XP
+  bar docked at the bottom. A whole plan arriving (a preset, a saved plan, a file) opens *Mijn
+  personage*. Once the plan has a name and skills, the head folds to one line with *Wijzigen*.
+- **"Klopt je personage?"** has three lines:
+  - the XP: over budget, or too much left over;
+  - the prerequisites;
+  - every other rule.
+
+  Each open finding (problem or warning) lands on exactly one line. A ⚠ line names its first
+  culprit, with "(en nog n)", and jumps to the skill's row. When all three are ✓ the card becomes
+  *Je personage is klaar*, with *Afdrukken* and *Opslaan*.
+- **The plan's general notes** moved from the head into the checklist. The XP bar's status jumps
+  to a skill's row, or to the checklist line for a note about the whole plan.
+
 **Voorbeelden / Presets**: the presets as cards, with archetype, text and skills, and *start from
 this*. As built: *start from this* opens the build screen with `?voorbeeld={key}`, which asks
 first when the current plan has skills. After the UX review the cards are compact:

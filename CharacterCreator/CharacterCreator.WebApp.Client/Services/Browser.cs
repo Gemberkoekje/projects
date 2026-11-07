@@ -51,6 +51,15 @@ public sealed class Browser(IJSRuntime js) : IUiLanguage, IAsyncDisposable
     /// <returns>Whether an element was focused.</returns>
     public ValueTask<bool> RestoreFocusAsync(params string[] selectors) => CallAsync<bool>("focus", selectors, true, false);
 
+    /// <summary>Scrolls back to an element's top if the page has scrolled past it.</summary>
+    /// <param name="selector">A CSS selector.</param>
+    /// <returns>When done.</returns>
+    public async ValueTask RevealAsync(string selector)
+    {
+        var loaded = await ModuleAsync();
+        await loaded.InvokeVoidAsync("reveal", selector);
+    }
+
     /// <summary>Hands the visitor a file to save.</summary>
     /// <param name="fileName">The file's name.</param>
     /// <param name="contentType">Its media type.</param>

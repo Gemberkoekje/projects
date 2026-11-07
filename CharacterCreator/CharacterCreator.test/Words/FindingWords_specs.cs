@@ -188,6 +188,34 @@ public sealed class FindingWords_specs
     public void the_budget_is_english_too()
         => English.BudgetLeft(Evaluation(13, 15)).Should().Be("2 left");
 
+    [Test]
+    public void a_plan_that_keeps_every_rule_ticks_all_three_lines()
+    {
+        var lines = Dutch.Checklist(Evaluation(13, 15, new NeedsTeacher { Skill = ArmourI }), CreationRules.Vortex);
+
+        lines.Select(line => line.Kind).Should().Equal(CheckKind.Budget, CheckKind.Prerequisites, CheckKind.Rules);
+        lines.Should().AllSatisfy(line => line.IsOk.Should().BeTrue());
+        lines[0].Text.Should().Be("13 van 15 XP besteed (hoogstens 3 over)");
+    }
+
+    [Test]
+    public void each_open_finding_lands_on_one_line_named_with_its_skill()
+    {
+        var lines = English.Checklist(
+            Evaluation(
+                12,
+                15,
+                new TooMuchLeftOver { Left = 3.5m, Limit = 3 },
+                new MissingPrerequisite { Skill = HealerEl, Group = RequirementGroup.Any(1, ArmourI) },
+                new MissingPrerequisite { Skill = HealerSp, Group = RequirementGroup.Any(1, ArmourI) },
+                new AboveCreationMaximum { Skill = ArmourI, Times = 2, Maximum = 1 }),
+            CreationRules.Vortex);
+
+        lines[0].Should().BeEquivalentTo(new { IsOk = false, Text = "3.5 XP left over; everything above 3 is lost", More = 0 });
+        lines[1].Should().BeEquivalentTo(new { IsOk = false, Text = "Healing Spells A (elemental): needs Armour I", More = 1 });
+        lines[2].Should().BeEquivalentTo(new { IsOk = false, Text = "Armour I: at most 1× at creation", More = 0 });
+    }
+
     [TestCase("Elemental", "Elementair")]
     [TestCase("Spiritual ritual", "Spiritueel ritueel")]
     [TestCase("Willpower", "Wilskracht")]

@@ -43,6 +43,9 @@ public sealed partial class BuildScreen
     private bool presetOffered;
     private bool showPlans;
     private bool showMore;
+    private BuildView tab = BuildView.Choose;
+    private bool headOpen;
+    private string[] jumpTargets = [];
     private IReadOnlyList<PresetContent> starters = [];
     private bool printing;
     private Notice notice = Notice.None;
@@ -57,7 +60,8 @@ public sealed partial class BuildScreen
 
     private bool MadeOnAnotherRuleset => madeOn.Length > 0 && madeOn != data.Ruleset.Id;
 
-    private IEnumerable<Finding> General => evaluation.Findings.Where(finding => finding.Skill.IsEmpty);
+    /// <summary>Whether a small screen shows the head as one line: once the plan has a name and skills.</summary>
+    private bool HeadFolded => !headOpen && name.Length > 0 && !plan.Planned.IsEmpty;
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
@@ -134,6 +138,13 @@ public sealed partial class BuildScreen
         {
             focusQuestion = false;
             await Browser.FocusAsync(".cc-dock [role=alertdialog] button");
+        }
+        else if (jumpTargets.Length > 0)
+        {
+            // A jump switched to the "Mijn personage" tab first; only now is its target shown.
+            var targets = jumpTargets;
+            jumpTargets = [];
+            await Browser.ShowAndFocusAsync(targets);
         }
         else if (!restoreRow.IsEmpty)
         {
@@ -339,6 +350,7 @@ public sealed partial class BuildScreen
         name = Ui.T(preset.Name);
         planId = string.Empty;
         await ChangeAsync(preset.NewCharacter ? Plan.NewCharacter(holdings) : Plan.Free(preset.Xp, holdings));
+        ShowCharacter();
         ShowToast(NoticeKind.Success, Ui.T($"Begonnen met het voorbeeld {Ui.T(preset.Name)}.", $"Started from the preset {Ui.T(preset.Name)}."), Undoable(before));
         Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("voorbeeld", (string?)null), replace: true);
     }
@@ -398,16 +410,52 @@ public sealed partial class BuildScreen
     /// The XP bar's status jumps to the first thing that isn't right (UX-REVIEW.md P1): the skill's row
     /// in the chosen table, or the plan's general notes in the head.
     /// </summary>
-    private async Task JumpToProblemAsync()
+    /// <summary>After a whole plan arrives (a preset, a saved plan, a file), a small screen shows it, head folded.</summary>
+    private void ShowCharacter()
+    {
+        tab = BuildView.Character;
+        headOpen = false;
+    }
+
+    private void JumpToProblem()
     {
         var first = FindingWords.Open(evaluation).FirstOrDefault();
-        if (first is null)
+        if (first is not null)
         {
-            return;
+            JumpTo(first);
         }
+    }
 
-        var target = first.Skill.IsEmpty ? "#cc-general" : $"#cc-chosen-{first.Skill}";
-        await Browser.ShowAndFocusAsync(target, "#cc-general", ".cc-chosen");
+    /// <summary>
+    /// Shows a finding: its skill's row in the chosen list, or its line in the checklist for a finding
+    /// about the whole plan. On a small screen that is the "Mijn personage" tab, so the focus waits
+    /// for the render that shows it.
+    /// </summary>
+    private void JumpTo(Finding finding)
+    {
+        var line = $"#cc-check-{FindingWords.Line(finding).ToString().ToLowerInvariant()}";
+        tab = BuildView.Character;
+        jumpTargets = finding.Skill.IsEmpty ? [line] : [$"#cc-chosen-{finding.Skill}", line];
+    }
+
+    private Task JumpToAsync(Finding finding)
+    {
+        JumpTo(finding);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The small screen's tabs: the view, its label, and the panel it shows.</summary>
+    private IEnumerable<(BuildView View, string Label, string Panel)> Views()
+    {
+        yield return (BuildView.Choose, Ui.T("Kiezen", "Choose"), "cc-panel-choose");
+        yield return (BuildView.Character, Ui.T($"Mijn personage ({plan.Planned.Skills.Count})", $"My character ({plan.Planned.Skills.Count})"), "cc-panel-character");
+        yield return (BuildView.Overview, Ui.T("Overzicht", "Summary"), "cc-panel-overview");
+    }
+
+    private async Task ShowViewAsync(BuildView view)
+    {
+        tab = view;
+        await Browser.RevealAsync(".cc-build-grid");
     }
 
     /// <summary>The kind of plan, for the XP bar.</summary>
@@ -443,6 +491,8 @@ public sealed partial class BuildScreen
         name = string.Empty;
         planId = string.Empty;
         await ChangeAsync(Plan.NewCharacter(Holdings.None));
+        tab = BuildView.Choose;
+        headOpen = false;
         ShowToast(NoticeKind.Success, Ui.T("Nieuw plan begonnen.", "Started a new plan."), Undoable(before));
     }
 
@@ -467,6 +517,7 @@ public sealed partial class BuildScreen
         var before = Snapshot();
         Open(file);
         CloseMenus();
+        ShowCharacter();
         notice = Notice.None;
         await KeepAsync();
         ShowToast(NoticeKind.Success, Ui.T($"{Title(file)} geopend.", $"Opened {Title(file)}."), Undoable(before));
@@ -543,6 +594,7 @@ public sealed partial class BuildScreen
         var result = imported.Value;
         var before = Snapshot();
         Open(result.File with { Id = string.Empty });
+        ShowCharacter();
         await KeepAsync();
 
         // The old builder's save needs its story told (the rules changed, skills were left out), so
@@ -582,6 +634,15 @@ public sealed partial class BuildScreen
         public static Removal None { get; } = new (default, false, []);
 
         public bool IsWaiting => !Skill.IsEmpty;
+    }
+
+    /// <summary>What a small screen shows (UX-REVIEW.md P2); a wide screen shows all three.</summary>
+    private enum BuildView
+    {
+        None = 0,
+        Choose,
+        Character,
+        Overview,
     }
 
     /// <summary>What a notice is about.</summary>

@@ -61,8 +61,14 @@ else
             <div class="cc-menu-scrim" @onclick="CloseMenus"></div>
         }
 
-        <section class="cc-card cc-build-head" aria-label="@Ui.T("Je plan", "Your plan")">
-            <div class="cc-head-plan">
+        <section class="cc-card cc-build-head @(HeadFolded ? "is-folded" : string.Empty)" aria-label="@Ui.T("Je plan", "Your plan")">
+            @* On a small screen, once the plan has a name and skills, the head folds into one line
+               (UX-REVIEW.md P11), so the tabs and the list come first. A wide screen ignores this. *@
+            <div class="cc-head-line">
+                <span><strong>@name</strong> <span class="cc-sub">@ModeName()</span></span>
+                <button type="button" class="va-btn va-btn--ghost cc-btn-sm" aria-expanded="false" aria-controls="cc-head-plan" @onclick="() => headOpen = true">@Ui.T("Wijzigen", "Edit")</button>
+            </div>
+            <div id="cc-head-plan" class="cc-head-plan">
                 <div class="cc-field cc-field--name">
                     <label for="cc-name">@Ui.T("Naam", "Name")</label>
                     <div class="cc-name-row">
@@ -134,16 +140,6 @@ else
                 }
             </div>
 
-            @* Not on an empty plan: "15 XP left over" before anything is chosen says nothing new. *@
-            @if (!plan.Planned.IsEmpty && General.Any())
-            {
-                <ul id="cc-general" class="cc-general" tabindex="-1">
-                    @foreach (var finding in General)
-                    {
-                        <li class="cc-note cc-note--@finding.Severity.ToString().ToLowerInvariant()">@words.Describe(finding)</li>
-                    }
-                </ul>
-            }
         </section>
 
         @* The XP bar (UX-REVIEW.md P1): it stays in view, at the top on a wide screen and at the bottom on
@@ -181,7 +177,7 @@ else
                 }
                 else
                 {
-                    <button type="button" class="cc-verdict is-open" aria-label="@($"{words.Verdict(evaluation)}: {Ui.T("toon het eerste", "show the first")}")" @onclick="JumpToProblemAsync">
+                    <button type="button" class="cc-verdict is-open" aria-label="@($"{words.Verdict(evaluation)}: {Ui.T("toon het eerste", "show the first")}")" @onclick="JumpToProblem">
                         <span aria-hidden="true">⚠&#xFE0E;</span>
                         <span class="cc-verdict-words">@words.Verdict(evaluation)</span>
                         <span class="cc-verdict-count" aria-hidden="true">@open.Count</span>
@@ -215,7 +211,19 @@ else
         </div>
 
         @* An empty plan shows three ways to start instead of empty cards (UX-REVIEW.md P5). *@
-        <div class="cc-build-grid @(plan.Planned.IsEmpty ? "is-empty" : string.Empty)">
+        @* Small screens: three tabs over one column (UX-REVIEW.md P2); a wide screen shows all three
+           side by side and hides these. Not before the plan has skills: then the ways to start lead. *@
+        @if (!plan.Planned.IsEmpty)
+        {
+            <nav class="cc-tabs" aria-label="@Ui.T("Onderdelen", "Parts")">
+                @foreach (var (view, label, panel) in Views())
+                {
+                    <button type="button" class="@(tab == view ? "is-on" : string.Empty)" aria-pressed="@(tab == view ? "true" : "false")" aria-controls="@panel" @onclick="() => ShowViewAsync(view)">@label</button>
+                }
+            </nav>
+        }
+
+        <div class="cc-build-grid @(plan.Planned.IsEmpty ? "is-empty" : $"shows-{tab.ToString().ToLowerInvariant()}")">
             @if (plan.Planned.IsEmpty)
             {
                 <div class="cc-area-start">
@@ -247,21 +255,23 @@ else
                     </section>
                 </div>
             }
-            else
-            {
-                <div class="cc-area-chosen">
-                    <ChosenSkills Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" Fresh="fresh" OnMore="MoreAsync" OnLess="LessAsync" OnRemove="RemoveAllAsync" />
-                </div>
-            }
 
-            <div class="cc-area-picker">
+            <div id="cc-panel-choose" class="cc-area-picker">
                 <SkillPicker Ui="Ui" Words="words" Data="data" Plan="plan" Options="options" Remaining="evaluation.Remaining" OnAdd="AddAsync" OnLess="LessAsync" />
             </div>
 
+            @* "Jouw personage" (UX-REVIEW.md P2): beside the picker on a wide screen, in a column that
+               stays in view and scrolls on its own; on a small screen two of the three tabs. *@
             @if (!plan.Planned.IsEmpty)
             {
-                <div class="cc-area-summary">
-                    <SummaryPanels Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" />
+                <div class="cc-personage">
+                    <div id="cc-panel-character" class="cc-area-chosen">
+                        <PlanChecklist Ui="Ui" Words="words" Evaluation="evaluation" Creation="data.Rules.Creation" Printing="printing" OnJump="JumpToAsync" OnPrint="PrintAsync" OnSave="SaveAsync" />
+                        <ChosenSkills Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" Fresh="fresh" OnMore="MoreAsync" OnLess="LessAsync" OnRemove="RemoveAllAsync" />
+                    </div>
+                    <div id="cc-panel-overview" class="cc-area-summary">
+                        <SummaryPanels Ui="Ui" Words="words" Data="data" Plan="plan" Evaluation="evaluation" />
+                    </div>
                 </div>
             }
         </div>

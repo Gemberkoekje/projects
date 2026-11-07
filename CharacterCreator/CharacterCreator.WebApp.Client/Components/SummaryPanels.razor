@@ -1,43 +1,41 @@
-@* The summary (DESIGN.md §5): energy per day and imbue caps from VOID's rules, the character's
-   properties, and the spells, techniques and recipes the chosen skills bring, as tiles with a
-   details panel. *@
-<aside class="cc-summary" aria-label="@Ui.T("Overzicht", "Summary")">
-    <section class="cc-card">
-        <h2>@Ui.T("Energie per dag", "Energy per day")</h2>
-        @{
-            var energy = Evaluation.Energy.Where(total => total.Kind == EnergyKind.Energy).ToList();
-        }
-        @if (energy.Count == 0)
-        {
-            <p class="muted">@Ui.T("Geen.", "None.")</p>
-        }
-        else
-        {
-            <div class="cc-chips">
+@* The summary (DESIGN.md §5), compact for the "Jouw personage" column and the phone's Overzicht tab
+   (UX-REVIEW.md P2): energy per day and the properties on a line each, the spells, techniques and
+   recipes folded with their counts, as tiles with a details panel. *@
+@{
+    var energy = Evaluation.Energy.Where(total => total.Kind == EnergyKind.Energy).ToList();
+    var spells = PlanSummary.Spells(Data.Content, Plan);
+    var recipes = PlanSummary.Recipes(Data.Content, Plan);
+}
+<section class="cc-card cc-summary" aria-labelledby="cc-summary-title">
+    <h2 id="cc-summary-title">@Ui.T("Overzicht", "Summary")</h2>
+
+    <dl class="cc-sumlines">
+        <div>
+            <dt>@Ui.T("Energie per dag", "Energy per day")</dt>
+            <dd>
+                @if (energy.Count == 0)
+                {
+                    <span class="muted">@Ui.T("Geen", "None")</span>
+                }
                 @foreach (var total in energy)
                 {
                     <span class="echip @PlanSummary.EnergyClass(total.Type)"><span class="dot" aria-hidden="true"></span>@Words.EnergyType(total.Type) <strong>@total.Amount</strong></span>
                 }
-            </div>
-        }
-    </section>
+            </dd>
+        </div>
+        <div>
+            <dt>@Ui.T("Eigenschappen", "Properties")</dt>
+            <dd>
+                @foreach (var property in PlanSummary.Properties(Ui, Words, Data.Content, Plan, Evaluation))
+                {
+                    <span class="cc-prop">@property.Label <strong>@property.Value</strong></span>
+                }
+            </dd>
+        </div>
+    </dl>
 
-    <section class="cc-card">
-        <h2>@Ui.T("Eigenschappen", "Properties")</h2>
-        <dl class="cc-props">
-            @foreach (var property in PlanSummary.Properties(Ui, Words, Data.Content, Plan, Evaluation))
-            {
-                <div><dt>@property.Label</dt><dd>@property.Value</dd></div>
-            }
-        </dl>
-    </section>
-
-    @{
-        var spells = PlanSummary.Spells(Data.Content, Plan);
-        var recipes = PlanSummary.Recipes(Data.Content, Plan);
-    }
-    <section class="cc-card">
-        <h2>@Ui.T("Spreuken en technieken", "Spells and techniques") <span class="cc-count">@spells.Count</span></h2>
+    <details class="cc-fold">
+        <summary>@Ui.T("Spreuken en technieken", "Spells and techniques") <span class="cc-count">@spells.Count</span></summary>
         @if (spells.Count == 0)
         {
             <p class="muted">@Ui.T("Geen.", "None.")</p>
@@ -69,10 +67,10 @@
                 </div>
             }
         }
-    </section>
+    </details>
 
-    <section class="cc-card">
-        <h2>@Ui.T("Recepten", "Recipes") <span class="cc-count">@recipes.Count</span></h2>
+    <details class="cc-fold">
+        <summary>@Ui.T("Recepten", "Recipes") <span class="cc-count">@recipes.Count</span></summary>
         @if (recipes.Count == 0)
         {
             <p class="muted">@Ui.T("Geen.", "None.")</p>
@@ -98,8 +96,8 @@
                 </div>
             }
         }
-    </section>
-</aside>
+    </details>
+</section>
 
 @code {
     private int selectedSpell;

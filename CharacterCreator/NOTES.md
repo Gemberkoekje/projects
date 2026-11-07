@@ -1180,3 +1180,114 @@ Batch 4:
 - P2: "Jouw personage" as a sticky column beside the picker on a wide screen, with tabs *Kiezen ·
   Mijn personage (n) · Overzicht* on a phone. The phone bar then gets its "Mijn personage" button.
 - P6: the "Klopt je personage?" checklist at the top of that column.
+
+---
+
+## UX batch 4 — "Jouw personage" and the checklist (2026-11-07)
+
+_To understand this, start by reading `UX-REVIEW.md` P2 and P6, then the `cc-build-grid` and
+`cc-tabs` in `CharacterCreator.WebApp.Client/Components/BuildScreen.razor`, then
+`Components/PlanChecklist.razor` and `FindingWords.Checklist`._
+
+Local on `claude/charactercreator`, after batch 3. Nothing is pushed.
+
+### What it does
+
+- **From 1000 px: two columns.**
+  - The picker is on the left.
+  - *Jouw personage* is on the right (`.cc-personage`). It is sticky under the XP bar
+    (`top: 54px + gap`), no taller than the screen, and scrolls on its own. It holds:
+    - *Klopt je personage?* (`PlanChecklist`);
+    - *Jouw vaardigheden*: the chosen list, now compact at every width. Each row has name, XP,
+      times and remove, with its notes on the line beneath;
+    - *Overzicht* (`SummaryPanels`, rewritten as one card): energy and properties on a line each,
+      spells and recipes in `details` folds with their counts.
+- **Below 1000 px: three tabs**, *Kiezen · Mijn personage (n) · Overzicht* (`.cc-tabs`).
+  - They are sticky at the top, with the XP bar docked at the bottom, which is now docked below
+    1000 px rather than 640.
+  - The grid shows one panel by class (`shows-choose|character|overview`).
+  - A whole plan arriving (a preset, a saved plan, a file) opens *Mijn personage*; *Nieuw plan*
+    returns to *Kiezen*.
+  - Switching tabs brings the panel's top back into view when the page had scrolled past it
+    (`Browser.RevealAsync`, with `scroll-margin-top` for the sticky tabs).
+- **The folding head (P11):** below 1000 px, once the plan has a name and skills, the head is one
+  line, "Paladijn · nieuw personage [Wijzigen]". A whole plan arriving folds it again.
+- **The checklist (P6),** from `FindingWords.Checklist`, has three lines:
+  - the XP (`NotEnoughXp`, `TooMuchLeftOver`, `TeachingNotPaidOff`), worded when ✓ as "15 van 15
+    XP besteed (hoogstens 3 over)";
+  - the prerequisites (`MissingPrerequisite`);
+  - every other rule.
+
+  A ⚠ line names its first culprit ("Harnas II: vereist Harnas I (en nog 1)"), and is a button to
+  the skill's row when there is a skill. With all three ✓ the card turns green: *Je personage is
+  klaar*, with *Afdrukken* and *Opslaan*.
+- **The head's general notes are gone:** the checklist holds them. The XP bar's status jumps to a
+  skill's row, or to the checklist line (`#cc-check-{kind}`). On a small screen it switches to
+  *Mijn personage* first, and focuses after the render that shows it (`jumpTargets`).
+
+### Decisions
+
+1. **Tabs below 1000 px, not only on a phone:** one breakpoint for the layout. That is why the XP
+   bar docks at the bottom up to 999 px: the tabs need the top. Bar compaction steps:
+   - 1199 px: the name drops out;
+   - 860 px: the status shows only icon and count;
+   - 640 px: Afdrukken moves into Meer.
+2. **No "Mijn personage" button on the phone bar** (P1's sketch): the sticky tabs at the top
+   already switch, one tap away.
+3. **Tabs are buttons with `aria-pressed`, not ARIA tabs:** on a wide screen the tab strip is hidden
+   and all panels show, which a tab pattern can't describe honestly.
+4. **Every open finding belongs to exactly one checklist line** (`FindingWords.Line`), so nothing
+   the engine says gets lost; information (needs a teacher) stays out, as in the verdict.
+5. **The summary is compact everywhere**, the Overzicht tab included. P10 (grouped spells) is the
+   next change there.
+
+### Gotchas
+
+- **Class names collide silently:** `.cc-check` was already the "Alleen wat kan" label
+  (inline-flex), and the checklist card laid out sideways. The card is `.cc-checkcard`.
+- **A focus ring as `box-shadow` loses to the row's problem marker,** also a `box-shadow` (more
+  specific). Rows focus with an `outline` instead.
+- **A sticky column only sticks while its grid is taller than the screen.** On a short page (all
+  categories closed) it scrolls away. That is correct, but a measurement there looks like a bug.
+- **Display-none panels can't take focus:** a jump into the other tab sets the tab, and focuses in
+  `OnAfterRenderAsync`.
+
+### How it was checked
+
+- **Specs:** 345 green, 2 new (all three lines ✓ with their words; each finding on one line,
+  named with its skill, "(and 1 more)"). Release publish clean.
+- **In the browser:**
+  - 1280×900: two columns. The checklist reads "Je personage is klaar" for Paladijn. The column
+    sticks at 66 px, 822 px high, and scrolls on its own (1,360 px of content). Removing Harnas I
+    with "Alleen deze" gives "Harnas II: vereist Harnas I (en nog 1)", whose jump focuses that
+    row inside the column.
+  - 1000×800: the bar stays one row (54 px), and the column sits at 66–788 px.
+  - 768×1024: tabs, and the bar docked with all three actions.
+  - 375×812:
+    - the head folds, the tabs stay on one line, and the bar is docked;
+    - the status jumps from *Kiezen* to *Mijn personage*, onto the Harnas II row;
+    - *Overzicht* shows the compact summary;
+    - nothing scrolls sideways.
+
+### File map
+
+| Path | What |
+|---|---|
+| `CharacterCreator.WebApp.Client/Components/BuildScreen.razor` | tabs, the two-column grid, `.cc-personage`, the folding head line; general notes removed |
+| `CharacterCreator.WebApp.Client/Components/BuildScreen.razor.cs` | `BuildView`, `ShowViewAsync`, `ShowCharacter`, `JumpTo` with `jumpTargets`, `HeadFolded` |
+| `CharacterCreator.WebApp.Client/Components/PlanChecklist.razor` | new: "Klopt je personage?" / "Je personage is klaar" |
+| `CharacterCreator.WebApp.Client/Components/SummaryPanels.razor` | one compact card with folds |
+| `CharacterCreator.WebApp.Client/Components/ChosenSkills.razor` | "Jouw vaardigheden", XP units |
+| `CharacterCreator.WebApp.Client/Words/FindingWords.cs`, `CheckLine.cs` | `Checklist`, `Line`, `About`; `CheckLine`, `CheckKind` |
+| `CharacterCreator.WebApp.Client/Services/Browser.cs`, `WebApp/wwwroot/js/charactercreator.js` | `RevealAsync` |
+| `CharacterCreator.WebApp/wwwroot/app.css` | grid, tabs, sticky column, compact chosen list, summary lines and folds, checklist, folding head, bar breakpoints |
+| `CharacterCreator.test/Words/FindingWords_specs.cs` | the specs |
+| `UX-REVIEW.md`, `DESIGN.md` §5 | status, "as built, batch 4" |
+
+### Next
+
+Batch 5:
+- P8: search by spell, by Thorfgin's old names and without accents.
+- P10: spells grouped under their skill, with details beside the tile.
+
+Then §4's check: five players with one task each, and Thorfgin's eye.

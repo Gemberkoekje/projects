@@ -45,6 +45,15 @@ export function focus(selectors, onlyIfLost, scroll) {
     return false;
 }
 
+// Bring an element's top into view if the page has scrolled past it (its CSS scroll-margin-top
+// leaves room for anything sticky above it).
+export function reveal(selector) {
+    const element = document.querySelector(selector);
+    if (element && element.getBoundingClientRect().top < 0) {
+        element.scrollIntoView({ block: "start" });
+    }
+}
+
 export function download(fileName, contentType, contents) {
     // Text from DownloadAsync, a Uint8Array from DownloadBytesAsync (Blazor sends byte[] as one).
     const url = URL.createObjectURL(new Blob([contents], { type: contentType }));

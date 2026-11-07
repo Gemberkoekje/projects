@@ -1,0 +1,82 @@
+@* "Klopt je personage?" (UX-REVIEW.md P6): the XP, the prerequisites and every other rule, each ✓ or
+   ⚠ with a way to the culprit. When all three are ✓ it becomes the end of the road: "Je personage is
+   klaar", with printing and saving right there. *@
+@{
+    var lines = Words.Checklist(Evaluation, Creation);
+}
+<section class="cc-card cc-checkcard @(lines.All(line => line.IsOk) ? "is-ready" : string.Empty)" aria-labelledby="cc-check-title">
+    @if (lines.All(line => line.IsOk))
+    {
+        <h2 id="cc-check-title"><span aria-hidden="true">✓</span> @Ui.T("Je personage is klaar", "Your character is ready")</h2>
+        <p class="secondary">@Ui.T("Alles klopt met de regels. Druk het af voor de infobalie, of sla het op.", "Everything keeps the rules. Print it for the desk, or save it.")</p>
+        <div class="cc-check-actions">
+            <button type="button" class="va-btn va-btn--primary" disabled="@Printing" @onclick="OnPrint">@(Printing ? Ui.T("PDF wordt gemaakt…", "Making the PDF…") : Ui.T("Afdrukken", "Print"))</button>
+            <button type="button" class="va-btn va-btn--secondary" @onclick="OnSave">@Ui.T("Opslaan", "Save")</button>
+        </div>
+    }
+    else
+    {
+        <h2 id="cc-check-title">@Ui.T("Klopt je personage?", "Is your character right?")</h2>
+    }
+    <ul class="cc-checklist">
+        @foreach (var line in lines)
+        {
+            <li id="@($"cc-check-{line.Kind.ToString().ToLowerInvariant()}")" class="@(line.IsOk ? "is-ok" : "is-open")" tabindex="-1">
+                @if (line.IsOk)
+                {
+                    <span class="cc-check-icon" aria-hidden="true">✓</span>
+                    <span>@line.Text</span>
+                }
+                else if (line.Findings[0].Skill.IsEmpty)
+                {
+                    <span class="cc-check-icon" aria-hidden="true">⚠&#xFE0E;</span>
+                    <span>@line.Text@More(line)</span>
+                }
+                else
+                {
+                    <button type="button" class="cc-check-jump" @onclick="() => OnJump.InvokeAsync(line.Findings[0])">
+                        <span class="cc-check-icon" aria-hidden="true">⚠&#xFE0E;</span>
+                        <span>@line.Text@More(line)</span>
+                        <span class="cc-check-go" aria-hidden="true">›</span>
+                    </button>
+                }
+            </li>
+        }
+    </ul>
+</section>
+
+@code {
+    /// <summary>The language.</summary>
+    [Parameter, EditorRequired]
+    public Ui Ui { get; set; }
+
+    /// <summary>The words for findings.</summary>
+    [Parameter, EditorRequired]
+    public FindingWords Words { get; set; }
+
+    /// <summary>What the engine makes of the plan.</summary>
+    [Parameter, EditorRequired]
+    public PlanEvaluation Evaluation { get; set; }
+
+    /// <summary>The creation rules, for "at most 3 left over".</summary>
+    [Parameter, EditorRequired]
+    public CreationRules Creation { get; set; }
+
+    /// <summary>Whether a PDF is being made.</summary>
+    [Parameter]
+    public bool Printing { get; set; }
+
+    /// <summary>Called to show a finding's skill in the chosen list.</summary>
+    [Parameter]
+    public EventCallback<Finding> OnJump { get; set; }
+
+    /// <summary>Called to print.</summary>
+    [Parameter]
+    public EventCallback OnPrint { get; set; }
+
+    /// <summary>Called to save.</summary>
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    private string More(CheckLine line) => line.More == 0 ? string.Empty : Ui.T($" (en nog {line.More})", $" (and {line.More} more)");
+}

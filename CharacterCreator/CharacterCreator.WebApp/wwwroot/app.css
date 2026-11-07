@@ -506,6 +506,33 @@ fieldset.cc-field {
     margin-bottom: var(--s-5);
 }
 
+/* The head folded to one line on a small screen (UX-REVIEW.md P11); a wide screen never folds it. */
+.cc-head-line {
+    display: none;
+}
+
+@media (max-width: 999px) {
+    .cc-build-head.is-folded {
+        padding: var(--s-2) var(--s-2) var(--s-2) var(--s-4);
+    }
+
+    .cc-build-head.is-folded .cc-head-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--s-3);
+    }
+
+    .cc-build-head.is-folded .cc-head-line .cc-sub {
+        display: inline;
+        margin-left: var(--s-2);
+    }
+
+    .cc-build-head.is-folded .cc-head-plan {
+        display: none;
+    }
+}
+
 .cc-head-plan {
     display: flex;
     flex-wrap: wrap;
@@ -667,11 +694,11 @@ fieldset.cc-field {
     display: none !important;
 }
 
-/* Where the jump lands: a row of the chosen table, or the general notes. */
-.cc-chosen tr:focus,
-.cc-general:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px var(--va-focus-ring);
+/* Where a jump lands: a row of the chosen table (a checklist line has its own). An outline, as the
+   row's problem marker is a box-shadow. */
+.cc-chosen tr:focus {
+    outline: 3px solid var(--va-focus-ring);
+    outline-offset: -3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -680,13 +707,32 @@ fieldset.cc-field {
     }
 }
 
-@media (max-width: 640px) {
+/* Wide: one row, always, so "Jouw personage" can sit right under it; the name goes first when room
+   runs short (it is in the head anyway). */
+@media (min-width: 1000px) {
+    .cc-xpbar {
+        flex-wrap: nowrap;
+    }
+
+    .cc-bar-actions {
+        flex-wrap: nowrap;
+    }
+}
+
+@media (max-width: 1199px) {
+    .cc-xpbar-id {
+        display: none;
+    }
+}
+
+/* Below 1000 px the tabs take the top, so the bar docks at the bottom (thumb reach on a phone). */
+@media (max-width: 999px) {
     .cc-xpbar {
         position: fixed;
         inset: auto 0 0;
         z-index: 40;
         flex-wrap: nowrap;
-        gap: var(--s-2);
+        gap: var(--s-2) var(--s-3);
         min-height: 56px;
         margin: 0;
         padding: var(--s-1) var(--s-3) calc(var(--s-1) + env(safe-area-inset-bottom)) var(--s-4);
@@ -694,20 +740,27 @@ fieldset.cc-field {
         border-radius: 0;
     }
 
-    .cc-xpbar-id,
-    .cc-budget-left,
-    .cc-wide-only {
-        display: none !important;
-    }
-
-    .cc-phone-only {
-        display: flex !important;
-    }
-
     .cc-budget {
         flex: 1 1 auto;
     }
 
+    .cc-bar-actions {
+        flex-wrap: nowrap;
+        margin-left: 0;
+    }
+
+    .cc-xpbar .cc-menu-panel {
+        top: auto;
+        bottom: calc(100% + var(--s-2));
+    }
+
+    /* Room at the foot of the page for the docked bar (the toasts sit above it: see the dock). */
+    body:has(.cc-xpbar) {
+        padding-bottom: 64px;
+    }
+}
+
+@media (max-width: 860px) {
     .cc-verdict {
         justify-content: center;
         min-width: 44px;
@@ -726,20 +779,20 @@ fieldset.cc-field {
     .cc-verdict-count {
         display: inline;
     }
+}
 
-    .cc-bar-actions {
-        flex-wrap: nowrap;
-        margin-left: 0;
+@media (max-width: 640px) {
+    .cc-budget-left,
+    .cc-wide-only {
+        display: none !important;
     }
 
-    .cc-xpbar .cc-menu-panel {
-        top: auto;
-        bottom: calc(100% + var(--s-2));
+    .cc-phone-only {
+        display: flex !important;
     }
 
-    /* Room at the foot of the page for the docked bar (the toasts sit above it: see the dock). */
-    body:has(.cc-xpbar) {
-        padding-bottom: 64px;
+    .cc-xpbar {
+        gap: var(--s-2);
     }
 }
 
@@ -905,47 +958,25 @@ button.cc-chip {
     width: 110px;
 }
 
-.cc-general {
-    flex: 1 0 100%;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-/* Wide: the picker and the summary side by side, the chosen table across; narrow: stacked, chosen
-   first. */
+/* The build screen's body (UX-REVIEW.md P2). Wide: the picker on the left, "Jouw personage" on the
+   right in a column that stays in view under the XP bar and scrolls on its own. Narrow: one column,
+   and the tabs show one of the picker, "Mijn personage" and the summary. An empty plan shows the
+   ways to start instead, first on a phone and on the right on a wide screen. */
 .cc-build-grid {
     display: grid;
     gap: var(--s-5);
-    grid-template-areas: "chosen" "picker" "summary";
+    grid-template-areas: "picker" "side";
     margin-bottom: var(--s-5);
+    scroll-margin-top: 64px;
 }
 
-/* An empty plan: the ways to start take the chosen table's place first on a phone, and the
-   summary's place on a wide screen. */
 .cc-build-grid.is-empty {
-    grid-template-areas: "start" "picker";
+    grid-template-areas: "side" "picker";
 }
 
-@media (min-width: 1000px) {
-    .cc-build-grid {
-        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-        grid-template-areas: "picker summary" "chosen chosen";
-        align-items: start;
-    }
-
-    .cc-build-grid.is-empty {
-        grid-template-areas: "picker start";
-    }
-}
-
-.cc-area-start {
-    grid-area: start;
-    min-width: 0;
-}
-
-.cc-area-chosen {
-    grid-area: chosen;
+.cc-area-start,
+.cc-personage {
+    grid-area: side;
     min-width: 0;
 }
 
@@ -954,9 +985,95 @@ button.cc-chip {
     min-width: 0;
 }
 
-.cc-area-summary {
-    grid-area: summary;
+.cc-personage,
+.cc-area-chosen {
+    display: grid;
+    gap: var(--s-4);
+    align-content: start;
     min-width: 0;
+}
+
+.cc-area-summary {
+    min-width: 0;
+}
+
+/* The tabs: a segmented row that stays at the top while the long list scrolls. */
+.cc-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    display: flex;
+    margin: 0 calc(-1 * var(--s-2)) var(--s-4);
+    padding: var(--s-2);
+    background: var(--paper);
+}
+
+.cc-tabs button {
+    flex: 1 1 auto;
+    min-height: 44px;
+    padding: 0 var(--s-2);
+    white-space: nowrap;
+    font: 600 15px var(--f-text);
+    color: var(--ink-2);
+    background: var(--paper-raised);
+    border: var(--bd-ctl);
+    cursor: pointer;
+}
+
+.cc-tabs button:first-child {
+    border-radius: var(--r-md) 0 0 var(--r-md);
+}
+
+.cc-tabs button:last-child {
+    border-radius: 0 var(--r-md) var(--r-md) 0;
+}
+
+.cc-tabs button + button {
+    border-left: 0;
+}
+
+.cc-tabs button.is-on {
+    color: var(--va-action-text);
+    background: var(--va-action-tint);
+    border-color: var(--va-action-text);
+}
+
+.cc-tabs button.is-on + button {
+    border-left: 0;
+}
+
+@media (max-width: 999px) {
+    .cc-build-grid.shows-choose .cc-personage,
+    .cc-build-grid.shows-character .cc-area-picker,
+    .cc-build-grid.shows-character .cc-area-summary,
+    .cc-build-grid.shows-overview .cc-area-picker,
+    .cc-build-grid.shows-overview .cc-area-chosen {
+        display: none;
+    }
+}
+
+@media (min-width: 1000px) {
+    .cc-tabs {
+        display: none;
+    }
+
+    .cc-build-grid,
+    .cc-build-grid.is-empty {
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        grid-template-areas: "picker side";
+        align-items: start;
+    }
+
+    /* Under the XP bar (54 px), and no taller than the screen, so the column scrolls on its own. */
+    .cc-personage {
+        position: sticky;
+        top: calc(54px + var(--s-4));
+        max-height: calc(100vh - 54px - 2 * var(--s-4));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 2px 6px 2px 2px;
+        scrollbar-width: thin;
+    }
 }
 
 /* The picker. */
@@ -1313,38 +1430,243 @@ button.cc-chip {
     }
 }
 
+/* The chosen list is compact everywhere now: it lives in the narrow "Jouw personage" column or a
+   phone's tab (UX-REVIEW.md P2). Each row: name, XP, times, remove; its notes on a line beneath. */
+.cc-chosen .cc-table thead {
+    display: none;
+}
+
+.cc-chosen .cc-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    border-bottom: var(--bd-hair);
+    padding: var(--s-2) 0;
+}
+
+.cc-chosen .cc-table td,
+.cc-chosen .cc-table th {
+    border: 0;
+    padding: var(--s-1) var(--s-2);
+}
+
+.cc-chosen .cc-table td:nth-child(4) {
+    grid-column: 1 / -1;
+    order: 5;
+    padding-top: 0;
+}
+
+.cc-chosen .cc-table td:nth-child(4):empty {
+    display: none;
+}
+
+.cc-chosen .cc-table .cc-details-row td {
+    grid-column: 1 / -1;
+}
+
+.cc-chosen .cc-table tfoot tr {
+    border-bottom: 0;
+}
+
+.cc-chosen .cc-table tr.is-problem,
+.cc-chosen .cc-table tr.is-warning {
+    padding-left: var(--s-2);
+}
+
+.cc-chosen .cc-table tr.is-problem {
+    box-shadow: inset 3px 0 0 var(--error);
+}
+
+.cc-chosen .cc-table tr.is-warning {
+    box-shadow: inset 3px 0 0 var(--warning);
+}
+
+.cc-chosen .cc-table tr.is-problem td:first-child,
+.cc-chosen .cc-table tr.is-warning td:first-child {
+    box-shadow: none;
+}
+
+/* The summary: one line each for energy and properties; spells and recipes folded. */
+.cc-summary {
+    display: grid;
+    gap: var(--s-3);
+}
+
+.cc-summary h2 {
+    margin: 0;
+}
+
+.cc-sumlines {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+}
+
+.cc-sumlines div {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr);
+    gap: var(--s-3);
+    align-items: baseline;
+}
+
+.cc-sumlines dt {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-2);
+}
+
+.cc-sumlines dd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1) var(--s-3);
+    margin: 0;
+    font-size: 15px;
+}
+
+.cc-sumlines .echip {
+    padding: 2px 10px;
+    font-size: 13px;
+}
+
+.cc-prop strong {
+    font-family: var(--f-display);
+}
+
+.cc-fold {
+    border-top: var(--bd-hair);
+}
+
+.cc-fold summary {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 44px;
+    font: 700 16px var(--f-display);
+    cursor: pointer;
+    list-style: none;
+}
+
+.cc-fold summary::-webkit-details-marker {
+    display: none;
+}
+
+.cc-fold summary::before {
+    content: "\25B8";
+    width: 1em;
+    color: var(--ink-3);
+    font-size: 14px;
+}
+
+.cc-fold[open] summary::before {
+    content: "\25BE";
+}
+
+.cc-fold summary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--va-focus-ring);
+    border-radius: var(--r-sm);
+}
+
+.cc-fold > :not(summary) {
+    margin-bottom: var(--s-3);
+}
+
 @media (max-width: 640px) {
-    .cc-chosen .cc-table thead {
-        display: none;
-    }
-
-    .cc-chosen .cc-table tr {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto auto;
-        border-bottom: var(--bd-hair);
-        padding: var(--s-3) 0;
-    }
-
-    .cc-chosen .cc-table td,
-    .cc-chosen .cc-table th {
-        border: 0;
-        padding: var(--s-1) var(--s-2);
-    }
-
-    .cc-chosen .cc-table td:nth-child(4) {
-        grid-column: 1 / -1;
-        order: 5;
-    }
-
-    .cc-chosen .cc-table .cc-details-row td {
-        grid-column: 1 / -1;
+    .cc-sumlines div {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--s-1);
     }
 }
 
-/* The summary. */
-.cc-summary {
+/* "Klopt je personage?" (UX-REVIEW.md P6), and "Je personage is klaar" when it all is. */
+.cc-checkcard h2 {
+    margin: 0 0 var(--s-2);
+}
+
+.cc-checkcard.is-ready {
+    border-color: var(--success);
+    background: var(--success-tint);
+}
+
+.cc-checkcard.is-ready h2 {
+    color: var(--success);
+}
+
+.cc-checkcard.is-ready p {
+    margin: 0 0 var(--s-3);
+}
+
+.cc-check-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin-bottom: var(--s-3);
+}
+
+.cc-checklist {
     display: grid;
-    gap: var(--s-5);
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 15px;
+}
+
+.cc-checklist li {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 36px;
+    border-radius: var(--r-sm);
+}
+
+.cc-checklist li:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--va-focus-ring);
+}
+
+.cc-checklist li.is-ok {
+    color: var(--ink-2);
+}
+
+.cc-checklist li.is-open {
+    color: var(--notice-ink);
+}
+
+.cc-check-icon {
+    flex: 0 0 1.2em;
+    text-align: center;
+}
+
+.cc-checklist li.is-ok .cc-check-icon {
+    color: var(--success);
+    font-weight: 700;
+}
+
+.cc-check-jump {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: var(--s-2);
+    min-height: 44px;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    background: none;
+    border: 0;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+}
+
+.cc-check-jump:hover span:nth-child(2) {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.cc-check-go {
+    margin-left: auto;
+    padding: 0 var(--s-2);
 }
 
 .cc-chips {
@@ -1395,30 +1717,6 @@ button.cc-chip {
 
 .cc-en-inspiration {
     --chip: var(--en-inspiration);
-}
-
-.cc-props {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: var(--s-3);
-    margin: 0;
-}
-
-.cc-props div {
-    background: var(--paper);
-    border: var(--bd-hair);
-    border-radius: var(--r-md);
-    padding: var(--s-3);
-}
-
-.cc-props dt {
-    font-size: 13px;
-    color: var(--ink-3);
-}
-
-.cc-props dd {
-    margin: 0;
-    font: 700 20px var(--f-display);
 }
 
 .cc-tiles {
@@ -1490,8 +1788,8 @@ button.cc-chip {
     pointer-events: auto;
 }
 
-/* On a phone the XP bar is docked at the bottom; the toasts sit above it. */
-@media (max-width: 640px) {
+/* Below 1000 px the XP bar is docked at the bottom; the toasts sit above it. */
+@media (max-width: 999px) {
     .cc-dock {
         bottom: calc(64px + var(--s-3) + env(safe-area-inset-bottom));
     }

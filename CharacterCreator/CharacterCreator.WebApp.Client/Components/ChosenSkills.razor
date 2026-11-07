@@ -2,7 +2,7 @@
    say about it. Removing a skill others depend on is handled by the build screen, which asks first. *@
 <section class="cc-card cc-chosen" aria-labelledby="cc-chosen-title">
     <div class="cc-card-head">
-        <h2 id="cc-chosen-title">@Ui.T("Gekozen", "Chosen")</h2>
+        <h2 id="cc-chosen-title">@Ui.T("Jouw vaardigheden", "Your skills")</h2>
         <span class="cc-count">@Ui.T($"{Plan.Planned.Skills.Count} vaardigheden", $"{Plan.Planned.Skills.Count} skills")</span>
     </div>
 
@@ -47,7 +47,7 @@
                                 <a class="cc-sub" href="@skill.Loresheet.Url" target="_blank" rel="noopener">Loresheet ⧉</a>
                             }
                         </td>
-                        <td class="cc-num" data-label="XP">@Ui.Number((rule?.Cost ?? 0) * times)</td>
+                        <td class="cc-num" data-label="XP">@Ui.Number((rule?.Cost ?? 0) * times) XP</td>
                         <td class="cc-center" data-label="@Ui.T("Aantal", "Times")">
                             <span class="cc-stepper">
                                 <button type="button" aria-label="@Ui.T("Een minder", "One less")" @onclick="() => OnLess.InvokeAsync(key)">−</button>
@@ -76,7 +76,7 @@
             <tfoot>
                 <tr>
                     <th scope="row">@Ui.T("Totaal", "Total")</th>
-                    <td class="cc-num">@Ui.Number(SkillRules.Spent(Plan.Planned, Data.Rules))</td>
+                    <td class="cc-num">@Ui.Number(SkillRules.Spent(Plan.Planned, Data.Rules)) XP</td>
                     <td colspan="3"></td>
                 </tr>
             </tfoot>

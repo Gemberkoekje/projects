@@ -114,6 +114,61 @@ public sealed class FindingWords(Ui ui, ContentBook content)
         var open => ui.T($"{open} dingen kloppen nog niet", $"{open} things aren't right yet"),
     };
 
+    /// <summary>
+    /// "Klopt je personage?" (UX-REVIEW.md P6): three lines, the XP, the prerequisites and every other
+    /// rule. Each open finding (a problem or a warning) belongs to exactly one line; a line without
+    /// any is ✓.
+    /// </summary>
+    /// <param name="evaluation">What the engine made of the plan.</param>
+    /// <param name="creation">The creation rules, for "at most 3 left over".</param>
+    /// <returns>The three lines, in that order.</returns>
+    public IReadOnlyList<CheckLine> Checklist(PlanEvaluation evaluation, CreationRules creation)
+    {
+        ArgumentNullException.ThrowIfNull(evaluation);
+        ArgumentNullException.ThrowIfNull(creation);
+
+        var open = Open(evaluation).ToLookup(finding => Line(finding));
+        var spent = ui.T(
+            $"{ui.Number(evaluation.Spent)} van {ui.Number(evaluation.Xp)} XP besteed",
+            $"{ui.Number(evaluation.Spent)} of {ui.Number(evaluation.Xp)} XP spent");
+        var budget = evaluation.Plan.Mode == core.Plans.PlanMode.NewCharacter
+            ? ui.T($"{spent} (hoogstens {ui.Number(creation.MaxLeftOver)} over)", $"{spent} (at most {ui.Number(creation.MaxLeftOver)} left over)")
+            : spent;
+
+        return
+        [
+            Make(CheckKind.Budget, budget, open[CheckKind.Budget]),
+            Make(CheckKind.Prerequisites, ui.T("Alle vereisten in orde", "Every prerequisite met"), open[CheckKind.Prerequisites]),
+            Make(CheckKind.Rules, ui.T("Alle andere regels in orde", "Every other rule kept"), open[CheckKind.Rules]),
+        ];
+    }
+
+    /// <summary>The checklist line a finding belongs to.</summary>
+    /// <param name="finding">The finding.</param>
+    /// <returns>Its line.</returns>
+    public static CheckKind Line(Finding finding) => finding switch
+    {
+        NotEnoughXp or TooMuchLeftOver or TeachingNotPaidOff => CheckKind.Budget,
+        MissingPrerequisite => CheckKind.Prerequisites,
+        null => CheckKind.None,
+        _ => CheckKind.Rules,
+    };
+
+    /// <summary>A finding with the skill it is about: "Harnas II: vereist Harnas I".</summary>
+    /// <param name="finding">The finding.</param>
+    /// <returns>The words.</returns>
+    public string About(Finding finding)
+    {
+        ArgumentNullException.ThrowIfNull(finding);
+        return finding.Skill.IsEmpty ? Describe(finding) : $"{Name(finding.Skill)}: {Describe(finding)}";
+    }
+
+    private CheckLine Make(CheckKind kind, string ok, IEnumerable<Finding> findings)
+    {
+        var list = findings.ToList();
+        return new CheckLine { Kind = kind, Text = list.Count == 0 ? ok : About(list[0]), Findings = list };
+    }
+
     /// <summary>The XP spent out of the total, for the XP bar: "13 / 15 XP".</summary>
     /// <param name="evaluation">What the engine made of the plan.</param>
     /// <returns>The words.</returns>
