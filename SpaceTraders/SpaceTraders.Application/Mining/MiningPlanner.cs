@@ -712,6 +712,115 @@ public static class MiningPlanner
     }
 
     /// <summary>
+    /// The asteroids where drones park while a shuttle collects (PLAN.md slice 6.53, D142), asked on 2026-11-08: "Can we set up
+    /// that miners and siphoners don't move at all anymore, and they move stuff to some kind of hauler which does the actual
+    /// selling?" As <see cref="CollectionPoints"/>, near asteroids too: for each ore a market buys below ABUNDANT (D77), the
+    /// asteroid nearest that market that yields it, when a drone gets there and a shuttle flies there and back from the market
+    /// nearest the asteroid that sells fuel, the point's market. One point per asteroid, with every such ore, and the SCARCE or
+    /// LIMITED ones among them (D22), a drone each (D48). The shuttle sells each good where it is wanted, not only at the
+    /// point's market (<see cref="TradeRoutePlanner.TryFindBestSale"/> with the gate first).
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="drone">A mining drone, for its tank; where it is doesn't matter.</param>
+    /// <param name="shuttle">A collecting shuttle, for its tank.</param>
+    /// <returns>The points, by market and asteroid.</returns>
+    public static IReadOnlyList<CollectionPoint> ParkedPoints(TradeMarketMap map, ShipModel drone, ShipModel shuttle)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(drone);
+        ArgumentNullException.ThrowIfNull(shuttle);
+        return Parked(
+            map,
+            AsteroidDeposits.Ores,
+            (good, market, allowed) => TryFindNearestAsteroid(map, good, market, allowed, out var asteroid) ? asteroid : string.Empty,
+            drone,
+            shuttle);
+    }
+
+    /// <summary>
+    /// The parked points of a system for goods some waypoints yield (D142, <see cref="ParkedPoints"/>): for each good a market
+    /// buys below ABUNDANT, the source nearest that market that yields it, where a drone gets from the source's market (the
+    /// one nearest it that sells fuel) on a full tank and a shuttle flies from there and back; one point per source.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="goods">The goods the sources yield: the ores, or the gases.</param>
+    /// <param name="nearestSource">The source nearest a market that yields a good and passes the check; empty for none.</param>
+    /// <param name="drone">The drone, for its tank.</param>
+    /// <param name="shuttle">The shuttle, for its tank.</param>
+    /// <returns>The points, by market and source.</returns>
+    public static IReadOnlyList<CollectionPoint> Parked(
+        TradeMarketMap map,
+        IReadOnlySet<string> goods,
+        Func<string, string, Func<string, bool>, string> nearestSource,
+        ShipModel drone,
+        ShipModel shuttle)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(goods);
+        ArgumentNullException.ThrowIfNull(nearestSource);
+        ArgumentNullException.ThrowIfNull(drone);
+        ArgumentNullException.ThrowIfNull(shuttle);
+
+        bool Serviceable(string source)
+            => NearestFuelMarket(map, source) is { Length: > 0 } anchor
+                && TradeRoutePlanner.TryPlanFlight(map, anchor, source, drone.FuelCapacity, drone.FuelCapacity, out _)
+                && IsWithinRoundTrip(map, shuttle, anchor, source);
+
+        var points = new Dictionary<string, (List<string> Ores, List<string> Scarce)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
+        {
+            foreach (var good in map.GoodsAt(market)
+                .Where(good => goods.Contains(good.Symbol) && IsDemanded(good) && !IsAbundant(good.Supply))
+                .OrderBy(good => good.Symbol, StringComparer.Ordinal))
+            {
+                var source = nearestSource(good.Symbol, market, Serviceable);
+                if (source.Length == 0)
+                {
+                    continue;
+                }
+
+                if (!points.TryGetValue(source, out var point))
+                {
+                    point = ([], []);
+                    points[source] = point;
+                }
+
+                if (!point.Ores.Contains(good.Symbol, StringComparer.OrdinalIgnoreCase))
+                {
+                    point.Ores.Add(good.Symbol);
+                }
+
+                if (IsLowSupply(good) && !point.Scarce.Contains(good.Symbol, StringComparer.OrdinalIgnoreCase))
+                {
+                    point.Scarce.Add(good.Symbol);
+                }
+            }
+        }
+
+        return [.. points
+            .Select(entry => new CollectionPoint(entry.Key, NearestFuelMarket(map, entry.Key), [.. entry.Value.Ores.Order(StringComparer.Ordinal)], [.. entry.Value.Scarce.Order(StringComparer.Ordinal)]))
+            .OrderBy(point => point.SellWaypointSymbol, StringComparer.Ordinal)
+            .ThenBy(point => point.AsteroidSymbol, StringComparer.Ordinal)];
+    }
+
+    /// <summary>The market nearest a waypoint that sells fuel (D142: a parked point's market); empty for none.</summary>
+    /// <param name="map">The system.</param>
+    /// <param name="waypointSymbol">The waypoint: an asteroid or a gas giant.</param>
+    /// <returns>The market, by distance, then by symbol.</returns>
+    public static string NearestFuelMarket(TradeMarketMap map, string waypointSymbol)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        return map.MarketWaypoints
+            .Where(map.SellsFuel)
+            .Select(market => (Market: market, Found: map.TryGetDistance(waypointSymbol, market, out var distance), Distance: distance))
+            .Where(entry => entry.Found)
+            .OrderBy(entry => entry.Distance)
+            .ThenBy(entry => entry.Market, StringComparer.Ordinal)
+            .Select(entry => entry.Market)
+            .FirstOrDefault() ?? string.Empty;
+    }
+
+    /// <summary>
     /// The jump gate's smelters (PLAN.md slice 6.25, D92): each market that imports an ore and exports a metal made from it, a
     /// good the production chains make from ores alone, that goes into a material the gate still needs
     /// (<see cref="TradeMarketMap.GoesIntoConstruction"/>). In X1-FJ91 on 2026-10-05, H60 made IRON from IRON_ORE, which went
@@ -769,17 +878,37 @@ public static class MiningPlanner
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(drone);
 
-        var wanting = GateSmelters(context.Map).Where(smelter => !HasEnough(smelter.Supply)).ToList();
+        var served = new Lazy<HashSet<string>>(() => MiningTargets(context, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+            .Select(target => target.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase));
+        return GateOresShort(context.Map, smelter => served.Value.Contains(smelter.Key));
+    }
+
+    /// <summary>
+    /// The ores a gate miner would be bought for while drones park (PLAN.md slice 6.53, D142): as
+    /// <see cref="GateOresShort(MiningContext, ShipModel)"/>, but an ore is served when one of the parked points yields it, as
+    /// its shuttle carries it to the smelter.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="points">The parked points (<see cref="ParkedPoints"/>).</param>
+    /// <returns>The ores, by the lowest supply among their smelters, then by symbol.</returns>
+    public static IReadOnlyList<string> GateOresShortAtPoints(TradeMarketMap map, IReadOnlyList<CollectionPoint> points)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(points);
+        return GateOresShort(map, smelter => points.Any(point => point.Ores.Contains(smelter.Ore, StringComparer.OrdinalIgnoreCase)));
+    }
+
+    private static IReadOnlyList<string> GateOresShort(TradeMarketMap map, Func<GateSmelter, bool> served)
+    {
+        var wanting = GateSmelters(map).Where(smelter => !HasEnough(smelter.Supply)).ToList();
         if (wanting.Count == 0)
         {
             return [];
         }
 
-        var served = MiningTargets(context, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
-            .Select(target => target.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return [.. wanting
-            .Where(smelter => served.Contains(smelter.Key))
+            .Where(served)
             .GroupBy(smelter => smelter.Ore, StringComparer.OrdinalIgnoreCase)
             .OrderBy(ore => ore.Min(smelter => SupplyRank(smelter.Supply)))
             .ThenBy(ore => ore.Key, StringComparer.Ordinal)

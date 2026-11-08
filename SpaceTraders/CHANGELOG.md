@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-08, slice 6.53)
+- Drones that never move (D142, `Drones.Parked`, true): every mining and siphon drone parks at an asteroid or gas giant a
+  market's goods come from and hands what it gathers to the light shuttle designated there; the shuttle sells each good
+  where the jump gate's chain needs it, else where it fetches most, market by market. While the gate needs materials only
+  the gate chain's sites get drones and shuttles, at the gate's place in the order. In X1-VP96 a siphon drone's 80-unit tank
+  never got C37's gases to F45, 231 away.
+- Tests: `CollectOreGoalExecutorTests`, `MineForShuttleGoalExecutorTests`, `MiningAutomationServiceTests`,
+  `SiphonAutomationServiceTests`, `SiphonPlannerTests`, `RolePlanServiceTests`, `AutomationSwitchesTests`,
+  `DefaultSettingsSeedTests`.
+
 ### Code – Changed (2026-11-08, slice 6.52)
 - A light hauler for the gate (D140): while the gate needs materials, the cargo ship beyond the list is a light hauler,
   bought when the gate's next load waits only for a free ship, which then lets it go first in the purchase order as long as

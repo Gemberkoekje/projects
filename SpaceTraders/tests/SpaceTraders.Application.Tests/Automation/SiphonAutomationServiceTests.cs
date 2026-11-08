@@ -410,6 +410,49 @@ public sealed class SiphonAutomationServiceTests
     }
 
     [Fact]
+    public async Task WithTheDronesParked_ASiphonDroneParksAtTheGasGiant_AShuttleIsBought_AndCollectsOnceTheDroneIsThere()
+    {
+        // Slice 6.53 (D142), asked on 2026-11-08: "Can we set up that miners and siphoners don't move at all anymore, and they
+        // move stuff to some kind of hauler which does the actual selling?" F48, beyond the drone's tank, makes the EXPLOSIVES of
+        // the gate's chain: the drone parks at C38, a light shuttle is bought at the gate's place in the order and designated
+        // for C38, and once the drone is there the shuttle's round starts.
+        _settings.GetAsync<bool>(MiningAutomationService.ParkedDronesSetting, Arg.Any<CancellationToken>()).Returns(true);
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(FarGateMap(), 250_000, 200));
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new ShipyardWaypointDto
+            {
+                WaypointSymbol = C39,
+                SystemSymbol = SystemSymbol,
+                ShipTypes = ["SHIP_SIPHON_DRONE", "SHIP_LIGHT_SHUTTLE"],
+                Ships =
+                [
+                    new ShipyardShipDto { Type = "SHIP_SIPHON_DRONE", PurchasePrice = 42_000, FuelCapacity = 80, CargoCapacity = 15 },
+                    new ShipyardShipDto { Type = "SHIP_LIGHT_SHUTTLE", PurchasePrice = 101_247, FuelCapacity = 300, CargoCapacity = 40 },
+                ],
+            },
+        ]);
+        _purchases.TryPurchaseAsync("SHIP_LIGHT_SHUTTLE", C39, Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = true, PurchasedShip = Shuttle() });
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-5", FleetRole.Siphon), ("SHIP-9", FleetRole.Collect));
+        Fleet(SiphonDrone());
+
+        await RunAsync();
+
+        var job = _activeGoals["SHIP-5"].Should().BeOfType<MineForShuttleGoal>().Subject;
+        (job.AsteroidWaypointSymbol, job.SellWaypointSymbol, job.Siphon).Should().Be((C38, C39, true));
+        _order.Of(AutomationPlan.Siphon).Should().Be(new PurchaseNeed(PurchaseTier.Construction, "SHIP_LIGHT_SHUTTLE", C39, 101_247));
+        _state!.CollectionPoints.Should().ContainSingle().Which.ShuttleSymbols.Should().Equal("SHIP-9");
+
+        Fleet(SiphonDrone(waypoint: C38, status: "IN_ORBIT"), Shuttle());
+
+        await RunAsync();
+
+        var round = _activeGoals["SHIP-9"].Should().BeOfType<CollectOreGoal>().Subject;
+        (round.AsteroidWaypointSymbol, round.Siphon, round.Selling).Should().Be((C38, true, false));
+    }
+
+    [Fact]
     public async Task WhereOnlyTheExploringCommandShipIs_NoDroneIsBought()
     {
         // Asked on 2026-10-04: while the command ship explores, business stays home. X1-KR90 sells siphon drones, and its

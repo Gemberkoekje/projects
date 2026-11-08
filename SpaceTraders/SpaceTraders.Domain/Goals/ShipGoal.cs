@@ -335,6 +335,13 @@ public sealed record MineForShuttleGoal : ShipGoal
     /// </summary>
     public bool Drifting { get; init; }
 
+    /// <summary>
+    /// Whether the drone siphons at a gas giant rather than mines at an asteroid (PLAN.md slice 6.53, D142): a siphon drone
+    /// parked for a collecting shuttle as a mining drone is, for the siphon plan; <see cref="AsteroidWaypointSymbol"/> is then
+    /// the gas giant and <see cref="TradeSymbol"/> the gas. False unless set.
+    /// </summary>
+    public bool Siphon { get; init; }
+
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.MineForShuttle;
 }
@@ -342,8 +349,9 @@ public sealed record MineForShuttleGoal : ShipGoal
 /// <summary>
 /// One round of a collecting shuttle (PLAN.md slice 6.18, D83): it flies to <see cref="AsteroidWaypointSymbol"/> and waits
 /// in orbit while the parked drones hand it their ore (<see cref="MineForShuttleGoal"/>), until its hold is full; then it
-/// sells everything aboard at <see cref="SellWaypointSymbol"/> (<see cref="Selling"/>), and the goal ends. The mining plan
-/// gives the next round. It also leaves with a part hold when no drone is left there. The round is booked as a trip (D46).
+/// sells what is aboard (<see cref="Selling"/>): since slice 6.53 (D142) each good where the jump gate's chain needs it, else
+/// where it fetches most, market by market, <see cref="SellWaypointSymbol"/> being the next; and the goal ends. The plan gives
+/// the next round. It also leaves with a part hold when no drone is left there. The round is booked as a trip (D46).
 /// </summary>
 public sealed record CollectOreGoal : TripGoal
 {
@@ -355,6 +363,12 @@ public sealed record CollectOreGoal : TripGoal
 
     /// <summary>True once it sells: its hold is full, or no drone is left at the asteroid.</summary>
     public bool Selling { get; init; }
+
+    /// <summary>
+    /// Whether it collects at a gas giant for the siphon plan (PLAN.md slice 6.53, D142): what parked siphon drones hand it.
+    /// False unless set.
+    /// </summary>
+    public bool Siphon { get; init; }
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.CollectOre;

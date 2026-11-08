@@ -883,6 +883,20 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      `MiningStarted`, reason `shared`. A drone is passed over to the trading plan (B63) only when nothing below ABUNDANT is left that it
      can reach and sell, or with a full hold nobody it can reach buys (step 1). The command ship shares nothing: it takes
      what pays it most (D38), and is passed over when every pair has a miner.
+- **Every drone parked** (slice 6.53, D142, asked on 2026-11-08: "Can we set up that miners and siphoners don't move at all
+  anymore, and they move stuff to some kind of hauler which does the actual selling?"; `Drones.Parked`, true): the far
+  asteroids below for every source. A collection point is any asteroid (and, in the siphon plan, any gas giant) that is the
+  nearest source of a good a market buys below ABUNDANT, where a drone gets from the market nearest it that sells fuel, the
+  point's market, and a light shuttle flies there and back (`MiningPlanner.ParkedPoints`, `SiphonPlanner.ParkedPoints`);
+  while the jump gate needs materials, only those whose sources yield a good of its chain, those goods first, their scarce
+  ones wanting a drone each (`MiningAutomationService.GateSitesOnly`). A free mining or siphon drone parks
+  (`MineForShuttleGoal`, a siphon drone's with `Siphon`): where it is when that is a point, a gate miner or siphoner at a
+  point that yields its good, another at the nearest point that wants a drone, else where the fewest are; it never sells,
+  whatever it holds. A drone whose point is gone parks elsewhere on the next pass. Shuttles are bought and collect as
+  below, at the gate's place in the order while the gate needs materials; the gate's miners and siphoners are bought for a
+  good a point yields, the shuttle carrying it to the smelter. Every collecting shuttle sells each good where the gate's
+  chain needs it, the nearest step first, else where it fetches most, market by market (`CollectOreGoalExecutor`). The
+  command ship keeps its trips; abroad there are no points. With the setting false, the rest of this section as before.
 - **Far asteroids with a shuttle** (slice 6.18, D83, asked on 2026-10-05: "We park a light shuttle ... at the asteroid, and
   have the drones drop their ore into the light shuttle. When the light shuttle is full, it sells the ore at the market,
   then comes back."): a collection point (`MiningPlanner.CollectionPoints`) is, for a market that sells fuel and buys an

@@ -101,6 +101,25 @@ public sealed class MineForShuttleGoalExecutorTests
     }
 
     [Fact]
+    public async Task AParkedSiphonDrone_Siphons_InsteadOfMining()
+    {
+        // Slice 6.53 (D142): "miners and siphoners don't move at all anymore": a siphon drone parks at its gas giant as a mining
+        // drone parks at its asteroid, and siphons there for the shuttle.
+        _bus.InvokeAsync<ShipCommandResult>(Arg.Any<SiphonResourcesCommand>(), Arg.Any<CancellationToken>(), Arg.Any<TimeSpan?>())
+            .Returns(new ShipCommandResult("SHIP-3", ShipLocalStatus.InOrbit, SystemSymbol, B13, Accepted: true));
+        Fleet(Drone(waypoint: B13, status: "IN_ORBIT"));
+
+        var result = await StepAsync(Drone(waypoint: B13, status: "IN_ORBIT"), Job with { TradeSymbol = "LIQUID_HYDROGEN", Siphon = true });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _bus.Received(1).InvokeAsync<ShipCommandResult>(
+            Arg.Is<SiphonResourcesCommand>(command => command.TradeSymbol == "LIQUID_HYDROGEN" && command.SourceWaypoint == B13),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<TimeSpan?>());
+        await _bus.DidNotReceive().InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>(), Arg.Any<TimeSpan?>());
+    }
+
+    [Fact]
     public async Task WithOreAboard_AndTheShuttleCollectingThere_ItHandsItOver_OneGoodATransfer()
     {
         var drone = Drone(waypoint: B13, status: "IN_ORBIT", cargo: [new CargoItemModel("IRON_ORE", 5), new CargoItemModel("ICE_WATER", 2)]);

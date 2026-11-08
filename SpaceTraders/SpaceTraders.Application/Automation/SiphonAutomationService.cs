@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Health;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Mining;
 using SpaceTraders.Application.Ports;
@@ -71,6 +72,8 @@ public sealed class SiphonAutomationService(
     internal const int DefaultMaxDrones = 10;
 
     private const string SiphonDroneShipType = "SHIP_SIPHON_DRONE";
+    private const string LightShuttleShipType = "SHIP_LIGHT_SHUTTLE";
+    private const string Collection = "collection";
 
     /// <summary>The minutes between two drones for one gas of the jump gate's chain while the setting holds none (D141).</summary>
     private const int DefaultGateSiphonIntervalMinutes = 30;
@@ -81,6 +84,7 @@ public sealed class SiphonAutomationService(
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
     {
         var board = await FleetRoleBoard.ReadAsync(settings, plans, cancellationToken);
+        var parkedMode = await settings.GetAsync<bool>(MiningAutomationService.ParkedDronesSetting, cancellationToken);
 
         // B71: the goals before the ships, so a trip that ends meanwhile leaves no siphoner free with the gas it sold.
         var read = await FleetGoals.ReadAsync(ships, goals, cancellationToken);
@@ -101,9 +105,13 @@ public sealed class SiphonAutomationService(
         // How many siphoners work on each pair: a drone that shares one takes the pair with the fewest (D77).
         var siphonersOn = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // The siphoners' trips: a free siphoner takes a scarce gas that has none near its market first (D48, D53).
+        // The siphoners' trips: a free siphoner takes a scarce gas that has none near its market first (D48, D53). D142: the
+        // drones parked at a gas giant, and the shuttles' rounds there.
         var covered = new List<CoveringTrip>();
         var free = new List<ShipModel>();
+        var parked = new List<(ShipModel Ship, MineForShuttleGoal Job)>();
+        var rounds = new List<(ShipModel Ship, CollectOreGoal Round)>();
+        var freeCollectors = new List<ShipModel>();
         foreach (var ship in fleet)
         {
             var goal = read.GoalOf(ship.Symbol);
@@ -115,11 +123,57 @@ public sealed class SiphonAutomationService(
                 siphonersOn[key] = siphonersOn.GetValueOrDefault(key) + 1;
                 covered.Add(new CoveringTrip(trip.TradeSymbol, trip.SellWaypointSymbol, ship.FuelCapacity));
             }
+            else if (goal is MineForShuttleGoal { Siphon: true } job && job.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            {
+                var key = MiningPlanner.OpportunityKey(job.SellWaypointSymbol, job.TradeSymbol);
+                heldKeys.Add(key);
+                heldBy[key] = ship.Symbol;
+                siphonersOn[key] = siphonersOn.GetValueOrDefault(key) + 1;
+                parked.Add((ship, job));
+            }
+            else if (goal is CollectOreGoal { Siphon: true } round && round.Status is not GoalStatus.Blocked and not GoalStatus.Completed)
+            {
+                rounds.Add((ship, round));
+            }
             else if (board.IsSiphoner(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
             {
                 free.Add(ship);
             }
+            else if (parkedMode && board.IsCollector(ship) && FleetRoles.IsFree(ship, goal, withAssignment.Contains(ship.Symbol)))
+            {
+                freeCollectors.Add(ship);
+            }
         }
+
+        // D142: the gas giants where siphon drones park, the shuttles designated for each, and the drones bought for the jump
+        // gate's gases (D141), as the last pass left them.
+        var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.SiphonAutomation, cancellationToken);
+        var inFleet = fleet.Select(ship => ship.Symbol).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var designated = (existing?.CollectionPoints ?? [])
+            .GroupBy(point => MiningAutomationService.PointKey(point.SellWaypointSymbol, point.AsteroidWaypointSymbol), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.SelectMany(point => point.ShuttleSymbols).Where(inFleet.Contains).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                StringComparer.OrdinalIgnoreCase);
+        var gateSiphoners = (existing?.GateMiners ?? []).ToList();
+        var shipyardList = await shipyards.GetAllAsync(cancellationToken);
+        var maps = new Dictionary<string, TradeMarketMap>(StringComparer.OrdinalIgnoreCase);
+        var pointsBySystem = new Dictionary<string, IReadOnlyList<CollectionPoint>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var systemSymbol in systems)
+        {
+            var map = (await tradeContexts.ReadAsync(systemSymbol, cancellationToken)).Map;
+            maps[systemSymbol] = map;
+            pointsBySystem[systemSymbol] = parkedMode ? ParkedPointsIn(map, systemSymbol, fleet, shipyardList) : [];
+        }
+
+        if (parkedMode)
+        {
+            await MiningAutomationService.KeepParkedAtPointsAsync(goals, logger, "Siphon", parked, pointsBySystem, designated, existing?.CollectionPoints ?? [], inFleet, cancellationToken);
+        }
+
+        var places = parked
+            .GroupBy(entry => MiningAutomationService.PointKey(entry.Job.SellWaypointSymbol, entry.Job.AsteroidWaypointSymbol), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Select(entry => (entry.Ship.Symbol, entry.Job.TradeSymbol)).ToList(), StringComparer.OrdinalIgnoreCase);
 
         // Before the first drone there is no siphoner: the openings of every system where our ships are show
         // what a drone would be bought for.
@@ -128,15 +182,28 @@ public sealed class SiphonAutomationService(
         var opportunities = new List<MiningAutomationOpportunityState>();
         foreach (var systemSymbol in systems)
         {
-            var map = (await tradeContexts.ReadAsync(systemSymbol, cancellationToken)).Map;
+            var map = maps[systemSymbol];
+            var points = pointsBySystem[systemSymbol];
             var candidates = free.Where(ship => string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)).ToList();
             var withTrip = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var siphoner in candidates)
             {
-                if (await GiveTripAsync(map, siphoner, heldKeys, heldBy, siphonersOn, covered, cancellationToken))
+                // D142: a siphon drone parks at a gas giant, and the point's shuttle sells; the command ship takes trips (D38).
+                if ((parkedMode && FleetRoles.IsSiphoner(siphoner) && points.Count > 0 && await ParkAsync(map, siphoner, points, places, gateSiphoners, heldKeys, heldBy, cancellationToken))
+                    || await GiveTripAsync(map, siphoner, heldKeys, heldBy, siphonersOn, covered, cancellationToken))
                 {
                     withTrip.Add(siphoner.Symbol);
                     gaveTrip.Add(siphoner.Symbol);
+                }
+            }
+
+            // D142: a designated shuttle collects once a drone is parked at its gas giant.
+            foreach (var collector in freeCollectors.Where(ship => string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (points.FirstOrDefault(point => designated.GetValueOrDefault(point.Key, []).Contains(collector.Symbol, StringComparer.OrdinalIgnoreCase)) is { } point
+                    && parked.Any(entry => MiningAutomationService.IsParkedAt(entry.Ship, point)))
+                {
+                    await StartRoundAsync(collector, point, cancellationToken);
                 }
             }
 
@@ -170,11 +237,105 @@ public sealed class SiphonAutomationService(
             fleet.Where(board.IsSiphoner).Select(ship => ship.Symbol),
             free.Where(ship => !gaveTrip.Contains(ship.Symbol)).Select(ship => ship.Symbol));
 
-        // D141: the drones bought for the jump gate's gases, as the last pass left them.
-        var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.SiphonAutomation, cancellationToken);
-        var gateSiphoners = (existing?.GateMiners ?? []).ToList();
-        await BuyDroneAsync(fleet, systems, board, heldKeys, covered, freeAtStart, gateSiphoners, cancellationToken);
-        await SaveStateAsync(existing, opportunities, gateSiphoners, cancellationToken);
+        var collecting = new SiphonCollecting(pointsBySystem, places, designated, parked, rounds, parkedMode, maps);
+        await BuyDroneAsync(fleet, systems, board, heldKeys, covered, freeAtStart, gateSiphoners, collecting, shipyardList, cancellationToken);
+        await SaveStateAsync(existing, opportunities, gateSiphoners, MiningAutomationService.CollectionPointStates(pointsBySystem, places, designated), cancellationToken);
+    }
+
+    /// <summary>
+    /// Parks a siphon drone at a gas giant (D142): where it is, when that is a point; a drone bought for a gas of the jump
+    /// gate's chain (D141) at a point that yields its gas; another at the nearest point that wants a drone, else where the
+    /// fewest are. It
+    /// siphons there for the point's shuttle (<see cref="MineForShuttleGoal.Siphon"/>), logging <c>SiphonStarted</c>, reason
+    /// <c>collection</c>.
+    /// </summary>
+    /// <returns>True: it has its place.</returns>
+    private async Task<bool> ParkAsync(
+        TradeMarketMap map,
+        ShipModel drone,
+        IReadOnlyList<CollectionPoint> points,
+        Dictionary<string, List<(string Ship, string Ore)>> places,
+        IReadOnlyList<GateMinerState> gateSiphoners,
+        HashSet<string> heldKeys,
+        Dictionary<string, string> heldBy,
+        CancellationToken cancellationToken)
+    {
+        var gateGas = gateSiphoners.FirstOrDefault(siphoner => siphoner.ShipSymbol.Equals(drone.Symbol, StringComparison.OrdinalIgnoreCase))?.TradeSymbol ?? string.Empty;
+        int DronesAt(CollectionPoint point) => places.TryGetValue(point.Key, out var there) ? there.Count : 0;
+        bool Yields(CollectionPoint point) => gateGas.Length > 0 && point.Ores.Contains(gateGas, StringComparer.OrdinalIgnoreCase);
+        double Distance(CollectionPoint point) => map.TryGetDistance(MiningPlanner.Position(drone), point.AsteroidSymbol, out var distance) ? distance : double.MaxValue;
+        var point = points.FirstOrDefault(candidate => string.Equals(drone.WaypointSymbol, candidate.AsteroidSymbol, StringComparison.OrdinalIgnoreCase))
+            ?? points.Where(Yields).OrderBy(DronesAt).ThenBy(Distance).ThenBy(candidate => candidate.Key, StringComparer.Ordinal).FirstOrDefault()
+            ?? points.Where(candidate => candidate.DronesWanted > DronesAt(candidate)).OrderBy(Distance).ThenBy(candidate => candidate.Key, StringComparer.Ordinal).FirstOrDefault()
+            ?? points.OrderBy(DronesAt).ThenBy(Distance).ThenBy(candidate => candidate.Key, StringComparer.Ordinal).First();
+
+        if (!places.TryGetValue(point.Key, out var placed))
+        {
+            placed = [];
+            places[point.Key] = placed;
+        }
+
+        placed.RemoveAll(place => place.Ship.Equals(drone.Symbol, StringComparison.OrdinalIgnoreCase));
+        var taken = placed.Select(place => place.Ore).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var gas = Yields(point) ? gateGas
+            : point.ScarceOres.FirstOrDefault(scarce => !taken.Contains(scarce)) ?? point.ScarceOres.FirstOrDefault() ?? point.Ores[0];
+        placed.Add((drone.Symbol, gas));
+        var key = MiningPlanner.OpportunityKey(point.SellWaypointSymbol, gas);
+        heldKeys.Add(key);
+        heldBy[key] = drone.Symbol;
+
+        await goals.SetActiveGoalAsync(
+            drone.Symbol,
+            new MineForShuttleGoal { TradeSymbol = gas, AsteroidWaypointSymbol = point.AsteroidSymbol, SellWaypointSymbol = point.SellWaypointSymbol, Siphon = true },
+            cancellationToken);
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} siphons at {WaypointSymbol} for {TradeSymbol} and sells it at {SellWaypoint} ({Reason}).",
+            JournalEvents.SiphonStarted,
+            drone.Symbol,
+            point.AsteroidSymbol,
+            gas,
+            point.SellWaypointSymbol,
+            Collection);
+        return true;
+    }
+
+    /// <summary>Starts a designated shuttle's round of collecting at its gas giant (D142).</summary>
+    private async Task StartRoundAsync(ShipModel shuttle, CollectionPoint point, CancellationToken cancellationToken)
+    {
+        await goals.SetActiveGoalAsync(
+            shuttle.Symbol,
+            new CollectOreGoal { AsteroidWaypointSymbol = point.AsteroidSymbol, SellWaypointSymbol = point.SellWaypointSymbol, Siphon = true },
+            cancellationToken);
+        logger.LogInformation(
+            "{EventKind:l}: ship {ShipSymbol} collects at {WaypointSymbol} and sells at {SellWaypoint} ({Reason}).",
+            JournalEvents.CollectionStarted,
+            shuttle.Symbol,
+            point.AsteroidSymbol,
+            point.SellWaypointSymbol,
+            Collection);
+    }
+
+    /// <summary>
+    /// The system's gas giants where siphon drones park (D142, <see cref="SiphonPlanner.ParkedPoints"/>), judged with the tanks
+    /// of a siphon drone of the fleet (else as the cheapest shipyard sells one) and a light shuttle as the cheapest shipyard sells
+    /// it; none while either isn't sold there. While the jump gate needs materials, only those whose gases go into them
+    /// (<see cref="MiningAutomationService.GateSitesOnly"/>).
+    /// </summary>
+    private static IReadOnlyList<CollectionPoint> ParkedPointsIn(TradeMarketMap map, string systemSymbol, IReadOnlyList<ShipModel> fleet, IReadOnlyList<ShipyardWaypointDto> shipyardList)
+    {
+        var drone = MiningAutomationService.CheapestListing(shipyardList, systemSymbol, SiphonDroneShipType);
+        var shuttle = MiningAutomationService.CheapestListing(shipyardList, systemSymbol, LightShuttleShipType);
+        if (drone is null || shuttle is null)
+        {
+            return [];
+        }
+
+        var tank = fleet.FirstOrDefault(FleetRoles.IsSiphoner)?.FuelCapacity ?? drone.Value.Ship.FuelCapacity;
+        var points = SiphonPlanner.ParkedPoints(
+            map,
+            new ShipModel("NEW-DRONE", systemSymbol, drone.Value.Shipyard.WaypointSymbol, "DOCKED", "CRUISE", tank, tank, CargoCapacity: drone.Value.Ship.CargoCapacity, ShipType: SiphonDroneShipType),
+            new ShipModel("NEW-SHUTTLE", systemSymbol, shuttle.Value.Shipyard.WaypointSymbol, "DOCKED", "CRUISE", shuttle.Value.Ship.FuelCapacity, shuttle.Value.Ship.FuelCapacity, CargoCapacity: shuttle.Value.Ship.CargoCapacity, ShipType: LightShuttleShipType));
+        return MiningAutomationService.GateSitesOnly(map, points);
     }
 
     /// <summary>
@@ -312,9 +473,18 @@ public sealed class SiphonAutomationService(
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         List<GateMinerState> gateSiphoners,
+        SiphonCollecting collecting,
+        IReadOnlyList<ShipyardWaypointDto> shipyardList,
         CancellationToken cancellationToken)
     {
-        var (need, gateGas) = await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, gateSiphoners, cancellationToken);
+        // D142: the shuttles come first: a drone parked at a gas giant sells nothing without one.
+        var (need, shuttlePoint) = ShuttleNeed(systems, collecting, shipyardList);
+        var gateGas = string.Empty;
+        if (need.Tier == PurchaseTier.None)
+        {
+            (need, gateGas) = await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, gateSiphoners, collecting, cancellationToken);
+        }
+
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Siphon, need, cancellationToken))
         {
             return;
@@ -328,6 +498,21 @@ public sealed class SiphonAutomationService(
                 need.ShipyardWaypointSymbol,
                 purchased.FailureReason ?? "Purchase failed.");
             return;
+        }
+
+        if (shuttlePoint.Length > 0 && purchased.PurchasedShip is { } shuttle)
+        {
+            if (!collecting.Designated.TryGetValue(shuttlePoint, out var shuttles))
+            {
+                shuttles = [];
+                collecting.Designated[shuttlePoint] = shuttles;
+            }
+
+            shuttles.Add(shuttle.Symbol);
+            logger.LogInformation(
+                "Siphon plan: ship {ShipSymbol} was bought to collect what the drones parked at {PointKey} siphon (D142).",
+                shuttle.Symbol,
+                shuttlePoint);
         }
 
         if (gateGas.Length > 0 && purchased.PurchasedShip is { } drone)
@@ -368,6 +553,7 @@ public sealed class SiphonAutomationService(
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
         IReadOnlyList<GateMinerState> gateSiphoners,
+        SiphonCollecting collecting,
         CancellationToken cancellationToken)
     {
         var maxDrones = await settings.ThresholdAsync(MaxDronesSetting, DefaultMaxDrones, cancellationToken);
@@ -415,9 +601,12 @@ public sealed class SiphonAutomationService(
 
             // D130, D141: while the jump gate needs materials, only a drone for a gas its chain is short of, one per gas every
             // interval, at the gate's place in the order.
+            var points = collecting.PointsBySystem.GetValueOrDefault(systemSymbol, []);
             if (map.ConstructionMaterials.Count > 0)
             {
-                var gas = SiphonPlanner.GateGasesShort(map, newDrone)
+                // D142: with the drones parked, a gas is served where a point yields it: its shuttle takes it to the market.
+                var shortGases = collecting.ParkedMode ? SiphonPlanner.GateGasesShortAtPoints(map, points) : SiphonPlanner.GateGasesShort(map, newDrone);
+                var gas = shortGases
                     .FirstOrDefault(shortGas => !gateSiphoners.Any(siphoner => siphoner.TradeSymbol.Equals(shortGas, StringComparison.OrdinalIgnoreCase)
                         && now - siphoner.BoughtAt < interval));
                 if (gas is not null)
@@ -432,7 +621,7 @@ public sealed class SiphonAutomationService(
             }
 
             var siphonDrones = fleet.Count(ship => FleetRoles.IsSiphoner(ship) && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase));
-            if (siphonDrones < SiphonPlanner.ScarceGases(map, newDrone).Count)
+            if (siphonDrones < (collecting.ParkedMode ? points.Sum(point => point.DronesWanted) : SiphonPlanner.ScarceGases(map, newDrone).Count))
             {
                 return (need, string.Empty);
             }
@@ -469,6 +658,46 @@ public sealed class SiphonAutomationService(
     }
 
     /// <summary>
+    /// A light shuttle for a gas giant where siphon drones park (D142, <see cref="MiningAutomationService.ShuttleNeedAt"/>): at
+    /// the gate's place in the order while the jump gate needs materials, as its miners' shuttles; with the drones for scarce
+    /// gases (<see cref="PurchaseTier.Coverage"/>) once it is done.
+    /// </summary>
+    private (PurchaseNeed Need, string PointKey) ShuttleNeed(IReadOnlyList<string> systems, SiphonCollecting collecting, IReadOnlyList<ShipyardWaypointDto> shipyardList)
+    {
+        if (!collecting.ParkedMode)
+        {
+            return (PurchaseNeed.None, string.Empty);
+        }
+
+        foreach (var systemSymbol in systems)
+        {
+            var points = collecting.PointsBySystem.GetValueOrDefault(systemSymbol, []);
+            if (points.Count == 0 || MiningAutomationService.CheapestListing(shipyardList, systemSymbol, LightShuttleShipType) is not { } listing)
+            {
+                continue;
+            }
+
+            var map = collecting.MapsBySystem[systemSymbol];
+            var tier = map.ConstructionMaterials.Count > 0 ? PurchaseTier.Construction : PurchaseTier.Coverage;
+            var (need, pointKey) = MiningAutomationService.ShuttleNeedAt(
+                points,
+                collecting.Designated,
+                collecting.Places,
+                collecting.Parked,
+                collecting.Rounds,
+                new PurchaseNeed(tier, LightShuttleShipType, listing.Shipyard.WaypointSymbol, listing.Ship.PurchasePrice),
+                map);
+            if (need.Tier != PurchaseTier.None)
+            {
+                logger.LogDebug("Siphon plan: a {ShipType} for the drones parked at {PointKey} (D142).", LightShuttleShipType, pointKey);
+                return (need, pointKey);
+            }
+        }
+
+        return (PurchaseNeed.None, string.Empty);
+    }
+
+    /// <summary>
     /// The time between two drones for one gas of the jump gate's chain (D141), as between two gate miners for one ore (D92):
     /// <c>Mining.GateMinerIntervalMinutes</c>, else half an hour.
     /// </summary>
@@ -486,6 +715,7 @@ public sealed class SiphonAutomationService(
         MiningAutomationPlanState? existing,
         IReadOnlyList<MiningAutomationOpportunityState> opportunities,
         IReadOnlyList<GateMinerState> gateSiphoners,
+        IReadOnlyList<CollectionPointState> collectionPoints,
         CancellationToken cancellationToken)
     {
         var now = TimeProvider.System.GetUtcNow();
@@ -507,7 +737,8 @@ public sealed class SiphonAutomationService(
 
         if (existing is not null
             && Same(existing.Opportunities, dated)
-            && JsonSerializer.Serialize(existing.GateMiners, CompareOptions) == JsonSerializer.Serialize(recentGateSiphoners, CompareOptions))
+            && JsonSerializer.Serialize(existing.GateMiners, CompareOptions) == JsonSerializer.Serialize(recentGateSiphoners, CompareOptions)
+            && JsonSerializer.Serialize(existing.CollectionPoints, CompareOptions) == JsonSerializer.Serialize(collectionPoints, CompareOptions))
         {
             return;
         }
@@ -519,6 +750,7 @@ public sealed class SiphonAutomationService(
                 PlanId = existing?.PlanId ?? Guid.NewGuid(),
                 Opportunities = dated,
                 GateMiners = recentGateSiphoners,
+                CollectionPoints = collectionPoints,
                 CreatedAt = existing?.CreatedAt ?? now,
                 UpdatedAt = now,
             },
@@ -531,4 +763,18 @@ public sealed class SiphonAutomationService(
 
     private static MiningAutomationOpportunityState Undated(MiningAutomationOpportunityState opportunity)
         => opportunity with { FirstObservedAt = default, LastObservedAt = default };
+
+    /// <summary>
+    /// What the plan knows of its gas giants where drones park at a pass (D142): the points of each system, the drones with a
+    /// place at each, the shuttles designated for each, the parked drones' and the shuttles' goals, whether drones park, and the
+    /// maps read this pass.
+    /// </summary>
+    private sealed record SiphonCollecting(
+        IReadOnlyDictionary<string, IReadOnlyList<CollectionPoint>> PointsBySystem,
+        IReadOnlyDictionary<string, List<(string Ship, string Ore)>> Places,
+        Dictionary<string, List<string>> Designated,
+        IReadOnlyList<(ShipModel Ship, MineForShuttleGoal Job)> Parked,
+        IReadOnlyList<(ShipModel Ship, CollectOreGoal Round)> Rounds,
+        bool ParkedMode,
+        IReadOnlyDictionary<string, TradeMarketMap> MapsBySystem);
 }

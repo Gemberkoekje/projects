@@ -130,6 +130,42 @@ public sealed class CollectOreGoalExecutorTests
     }
 
     [Fact]
+    public async Task WithAFullHold_ItSetsOffToSell_FirstWhereTheGatesChainWantsWhatItHolds()
+    {
+        // Slice 6.53 (D142), asked on 2026-11-08 with "Gate chain first, per good": B14 makes the IRON of the gate's FAB_MATS
+        // from IRON_ORE; B7 pays more for the ore, and is the only buyer of the ICE_WATER.
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(GateMap(), 129_357, 200));
+
+        await StepAsync(Shuttle(cargo: [new CargoItemModel("IRON_ORE", 30), new CargoItemModel("ICE_WATER", 10)]), Round);
+
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-7", Arg.Is<CollectOreGoal>(goal => goal.Selling && goal.SellWaypointSymbol == B14), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Selling_ItSellsHereWhatSellsBestHere_AndFliesOnWithTheRest_ToWhereTheGatesChainWantsIt()
+    {
+        // D142: at B7 it sells the ICE_WATER, which only B7 buys, and keeps the IRON_ORE for B14's IRON, though B7 pays more.
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(GateMap(), 129_357, 200));
+        _port.GetShipCargoAsync("SHIP-7", Arg.Any<CancellationToken>())
+            .Returns(new CargoModel(40, 40, [new CargoItemModel("IRON_ORE", 30), new CargoItemModel("ICE_WATER", 10)]));
+        _port.SellCargoAsync("SHIP-7", "ICE_WATER", 10, Arg.Any<CancellationToken>())
+            .Returns(new TradeActionResult("AGENT", 129_657, new CargoModel(30, 40, [new CargoItemModel("IRON_ORE", 30)]), 300));
+
+        var result = await StepAsync(
+            Shuttle(waypoint: B7, status: "DOCKED", cargo: [new CargoItemModel("IRON_ORE", 30), new CargoItemModel("ICE_WATER", 10)]),
+            Round with { Selling = true });
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _port.DidNotReceive().SellCargoAsync("SHIP-7", "IRON_ORE", Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync(
+            "SHIP-7",
+            Arg.Is<CollectOreGoal>(goal => goal.Selling && goal.SellWaypointSymbol == B14 && goal.Earned == 300),
+            Arg.Any<CancellationToken>());
+        await _jettison.DidNotReceiveWithAnyArgs().JettisonAsync(default!, default!, default!, default);
+        await _goals.DidNotReceive().ClearActiveGoalAsync("SHIP-7", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Selling_InOrbitAtTheMarket_ItDocksFirst()
     {
         var result = await StepAsync(Shuttle(waypoint: B7, status: "IN_ORBIT", cargo: [new CargoItemModel("IRON_ORE", 40)]), Round with { Selling = true });
@@ -137,6 +173,22 @@ public sealed class CollectOreGoalExecutorTests
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
         await _dock.Received(1).ExecuteAsync("SHIP-7", Arg.Any<CancellationToken>());
     }
+
+    /// <summary>
+    /// For D142: the gate needs FAB_MATS, made from IRON, made from IRON_ORE; B14, 35 from B13, makes IRON from IRON_ORE (pays
+    /// 50); B7 imports IRON_ORE without making anything from it (pays 61) and ICE_WATER (pays 30).
+    /// </summary>
+    private static TradeMarketMap GateMap()
+        => new(
+            Waypoints,
+            [
+                Market(B7, Good("IRON_ORE", "IMPORT", 118, 61, 20, "LIMITED"), Good("ICE_WATER", "IMPORT", 60, 30, 20, "MODERATE"), Good("FUEL", "EXCHANGE", 79, 71, 180, "MODERATE")),
+                Market(B14, Good("IRON_ORE", "IMPORT", 100, 50, 20, "LIMITED"), Good("IRON", "EXPORT", 300, 150, 20, "MODERATE"), Good("FUEL", "EXCHANGE", 80, 72, 180, "MODERATE")),
+            ],
+            new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["IRON"], ["IRON"] = ["IRON_ORE"] })
+        {
+            ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+        };
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
 

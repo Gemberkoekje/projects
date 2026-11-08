@@ -79,6 +79,9 @@ public static class TradeRoutePlanner
     /// <summary>Where a sale that pays nothing stands with <c>supplyFirst</c> (D91): after every sale that pays.</summary>
     private const int UnpaidSaleTier = 3;
 
+    /// <summary>What puts a sale that feeds the jump gate's chain before every other (D142): its step, less this.</summary>
+    private const int GateSaleTierOffset = 1_000;
+
     /// <summary>The key that identifies a route: good, buy market and sell market.</summary>
     /// <param name="tradeSymbol">The good.</param>
     /// <param name="buyWaypointSymbol">The buy market.</param>
@@ -1093,6 +1096,10 @@ public static class TradeRoutePlanner
     /// <param name="units">The units it holds.</param>
     /// <param name="sale">The best place to sell, and what it fetches there.</param>
     /// <param name="supplyFirst">Whether markets that make something from the good come first: miners and siphoners (D91).</param>
+    /// <param name="gateFirst">
+    /// Whether a sale that pays to a market that makes a good of the jump gate's chain from it comes before every other, the
+    /// nearest step first (PLAN.md slice 6.53, D142, <see cref="TradeMarketMap.ConstructionFeedOf"/>): the collecting shuttles.
+    /// </param>
     /// <returns>False when no market it can reach buys the good.</returns>
     public static bool TryFindBestSale(
         TradeMarketMap map,
@@ -1100,7 +1107,8 @@ public static class TradeRoutePlanner
         string tradeSymbol,
         int units,
         out TradeSale sale,
-        bool supplyFirst = false)
+        bool supplyFirst = false,
+        bool gateFirst = false)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(ship);
@@ -1121,6 +1129,11 @@ public static class TradeRoutePlanner
 
             var candidate = new TradeSale(market, good.SellPrice, flight.FuelCost, ((long)good.SellPrice * units) - flight.FuelCost - flight.AntimatterCost);
             var tier = supplyFirst && candidate.NetRevenue > 0 ? SaleTier(map, market, tradeSymbol) : UnpaidSaleTier;
+            if (gateFirst && candidate.NetRevenue > 0 && map.ConstructionFeedOf(market, tradeSymbol) is { Step: > 0 } feed)
+            {
+                tier = feed.Step - GateSaleTierOffset;
+            }
+
             var isHere = market.Equals(here, StringComparison.OrdinalIgnoreCase);
             if (!found
                 || tier < bestTier

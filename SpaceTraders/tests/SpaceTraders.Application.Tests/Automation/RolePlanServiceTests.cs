@@ -297,6 +297,29 @@ public sealed class RolePlanServiceTests
     }
 
     [Fact]
+    public async Task AShuttleTheSiphonPlanDesignated_Collects_OnceItsDroneIsParkedAtTheGasGiant()
+    {
+        // Slice 6.53 (D142): the siphon plan's gas giants have shuttles too, which collect as the mining plan's do (D86).
+        On(AutomationPlan.Survey, AutomationPlan.Mining, AutomationPlan.Siphon, AutomationPlan.Trading);
+        var shuttle = new ShipModel("SHIP-7", SystemSymbol, H52, "DOCKED", "CRUISE", 300, 300, CargoCapacity: 40, ShipType: "SHIP_LIGHT_SHUTTLE", MountSymbols: [], CargoInventory: []);
+        _plans.GetAsync<MiningAutomationPlanState>(PlanTypes.SiphonAutomation, Arg.Any<CancellationToken>()).Returns(new MiningAutomationPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            Opportunities = [],
+            CollectionPoints = [new CollectionPointState { AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Ores = ["LIQUID_HYDROGEN"], ScarceOres = ["LIQUID_HYDROGEN"], ShuttleSymbols = ["SHIP-7"], DroneSymbols = ["SHIP-3"] }],
+            CreatedAt = Now,
+            UpdatedAt = Now,
+        });
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "LIQUID_HYDROGEN", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Siphon = true };
+        Fleet(CommandShip(), Drone("SHIP-3", waypoint: B13, status: "IN_ORBIT"), shuttle);
+
+        await RunAsync();
+
+        _state!.Conditions.Should().EndWith("|collectors SHIP-7");
+        _state.Ships.Single(ship => ship.ShipSymbol == "SHIP-7").Role.Should().Be(FleetRole.Collect);
+    }
+
+    [Fact]
     public async Task AShipOnATradeTripThatEndsAbroad_KeepsTheTradeRole()
     {
         // Slice 6.29 (D96): the command ship, the only ship that can survey, would survey (D38); but its trip sells in X1-CD,

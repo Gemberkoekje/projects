@@ -86,6 +86,12 @@ public sealed class RolePlanService(
         var collectors = roleSettings.Switches.Contains(AutomationPlan.Mining)
             ? Collectors(await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, cancellationToken), fleet)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // D142: and those the siphon plan designated for the gas giants where its drones park.
+        if (roleSettings.Switches.Contains(AutomationPlan.Siphon))
+        {
+            collectors.UnionWith(Collectors(await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.SiphonAutomation, cancellationToken), fleet));
+        }
         var conditions = Conditions(roleSettings.Switches, contractWantsOre, roleSettings.ConstructionSystems, collectors);
 
         var state = await plans.GetAsync<RolePlanState>(PlanTypes.Roles, cancellationToken);

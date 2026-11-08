@@ -120,6 +120,38 @@ internal static class SiphonFixture
         };
 
     /// <summary>
+    /// For D142, as X1-VP96 was on 2026-11-08: F48, 228 from the gas giant C38 and out of a siphon drone's reach, makes the
+    /// EXPLOSIVES of the jump gate's chain from both gases (its nitrogen SCARCE, its hydrogen LIMITED); C39, at C38's spot,
+    /// sells fuel. The gate needs FAB_MATS.
+    /// </summary>
+    public static TradeMarketMap FarGateMap()
+        => new(
+            Waypoints,
+            [
+                Market(C39, Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
+                Market(C40, Good("FUEL", "EXCHANGE", 75, 66, 180, "MODERATE")),
+                Market(
+                    F48,
+                    Good("LIQUID_NITROGEN", "IMPORT", 120, 60, 60, "SCARCE"),
+                    Good("LIQUID_HYDROGEN", "IMPORT", 104, 52, 60, "LIMITED"),
+                    Good("EXPLOSIVES", "EXPORT", 200, 100, 60, "MODERATE"),
+                    Good("FUEL", "EXCHANGE", 79, 70, 180, "MODERATE")),
+            ],
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["FAB_MATS"] = ["QUARTZ_SAND"],
+                ["QUARTZ_SAND"] = ["EXPLOSIVES"],
+                ["EXPLOSIVES"] = ["LIQUID_HYDROGEN", "LIQUID_NITROGEN"],
+            })
+        {
+            ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+        };
+
+    /// <summary>A light shuttle, docked at C39: a 40-unit hold and a 300-unit tank, nothing to siphon with.</summary>
+    public static ShipModel Shuttle(string symbol = "SHIP-9", string waypoint = C39, string status = "DOCKED")
+        => new(symbol, SystemSymbol, waypoint, status, "CRUISE", 300, 300, CargoCapacity: 40, ShipType: "SHIP_LIGHT_SHUTTLE", MountSymbols: [], CargoInventory: []);
+
+    /// <summary>
     /// The system with a second gas giant, D90, 13 from F48: F48, beyond a drone's tank, sells fuel, and D90 is there and
     /// back on one tank, so a drone would drift to F48 to siphon from there (D45).
     /// </summary>

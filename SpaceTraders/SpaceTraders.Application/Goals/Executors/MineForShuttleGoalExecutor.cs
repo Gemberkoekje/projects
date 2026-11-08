@@ -18,7 +18,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// shuttle has room for, one transfer per good; it extracts once per cooldown while its hold has room, with the best survey
 /// for its ore (<see cref="MineResourceVolumeCommand"/>, keeping the ores a market buys within one tank, D71); and with its
 /// hold full and no shuttle with room there, it waits, making no API call. The goal doesn't end on its own: the mining plan
-/// ends it when the asteroid's collection closes.
+/// ends it when the asteroid's collection closes. Since slice 6.53 (D142) a parked siphon drone (<see cref="MineForShuttleGoal.Siphon"/>)
+/// does the same at its gas giant, siphoning (<see cref="SiphonResourcesCommand"/>) instead of mining.
 /// </summary>
 /// <remarks>
 /// The API answers a transfer with the transferring ship's hold only, so the shuttle's cached hold is what it held and what
@@ -91,9 +92,12 @@ public sealed class MineForShuttleGoalExecutor(
             return GoalExecutionResult.WaitingForCooldown("Waiting for extraction cooldown.", ship.CooldownExpiresAt);
         }
 
-        var mined = await bus.InvokeAsync<ShipCommandResult>(
-            new MineResourceVolumeCommand(ship.Symbol, job.TradeSymbol, job.AsteroidWaypointSymbol, Math.Max(1, ship.CargoCapacity)) { KeepOtherOres = true },
-            ct);
+        // D142: a parked siphon drone siphons at its gas giant, keeping every gas a market buys (D33).
+        var mined = job.Siphon
+            ? await bus.InvokeAsync<ShipCommandResult>(new SiphonResourcesCommand(ship.Symbol, job.TradeSymbol, job.AsteroidWaypointSymbol), ct)
+            : await bus.InvokeAsync<ShipCommandResult>(
+                new MineResourceVolumeCommand(ship.Symbol, job.TradeSymbol, job.AsteroidWaypointSymbol, Math.Max(1, ship.CargoCapacity)) { KeepOtherOres = true },
+                ct);
         if (mined is null || !mined.Accepted)
         {
             // The mining plan gives the drone its place again on the next tick; one that keeps failing shows as RepeatingError.
