@@ -301,6 +301,36 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void Rank_PutsTheRoutesOnPricesSeenLately_BeforeThoseOnPredictedPrices_TheGatesChainFirstAllTheSame()
+    {
+        // D131, asked on 2026-11-08 ("Any trader, fresh first"): A1's prices are predicted, nobody having looked there lately.
+        // SHIP_PARTS for A1 earn far more than FOOD for D41, and go after it all the same; once the gate needs FAB_MATS, which
+        // A1 makes from SHIP_PARTS (a stand-in chain), the gate's chain goes first, predicted or not (D128: "gate first at all
+        // times").
+        TradeMarketMap MapWith(params string[] materials)
+            => new(
+                Waypoints,
+                [
+                    Market(K85, Good("SHIP_PARTS", "EXPORT", 3_920, 1_855, 6), Good("FOOD", "EXPORT", 1_000, 450, 40), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                    Market(D41, Good("FOOD", "IMPORT", 2_400, 1_200, 40), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                    Market(A1, Good("SHIP_PARTS", "IMPORT", 15_620, 7_738, 6, "LIMITED"), Good("FAB_MATS", "EXPORT", 1_800, 850, 20), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+                ],
+                new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["SHIP_PARTS"] })
+            {
+                ConstructionMaterials = new HashSet<string>(materials, StringComparer.OrdinalIgnoreCase),
+                PredictedMarkets = new HashSet<string>([A1], StringComparer.OrdinalIgnoreCase),
+            };
+
+        var noGate = TradeRoutePlanner.Rank(MapWith(), CommandShip(), 250_000, 5, NoneHeld);
+        var gate = TradeRoutePlanner.Rank(MapWith("FAB_MATS"), CommandShip(), 250_000, 5, NoneHeld);
+
+        noGate.Select(route => (route.TradeSymbol, route.Predicted)).Should().Equal(("FOOD", false), ("SHIP_PARTS", true));
+        noGate[1].CreditsPerHour.Should().BeGreaterThan(noGate[0].CreditsPerHour, "fresh first, whatever the predicted route earns");
+        TradeRoutePlanner.CompareBestFirst(noGate[0], noGate[1]).Should().BeNegative();
+        gate.Select(route => (route.TradeSymbol, route.Predicted, route.FeedsConstruction)).Should().Equal(("SHIP_PARTS", true, true), ("FOOD", false, false));
+    }
+
+    [Fact]
     public void Rank_PutsARouteToAMarketThatExchangesTheGood_AfterEveryOther_AsAWealthTradeThatFeedsNoProduction()
     {
         // D91, asked on 2026-10-05: "EXCHANGE nodes should be lowest priority and only considered as wealth trades, never as

@@ -21,16 +21,26 @@
 - **Claude: mechanic.** Fixes things that don't work the way they are intended to, and nothing
   else. See "Claude's role" in `CLAUDE.md`.
 
-## Where things stand (2026-10-31)
+## Where things stand (2026-11-08)
 
-- **Running:** projects main `07974c65` (projects#220: B84), deployed by gembernodes#102 on 2026-10-31. Slice 6.44 (D127),
-  deployed the same day, first shows at the reset of 2026-11-01. The server reset on 2026-10-18 and 2026-10-25 at 13:00Z; each
-  time the bot restarted while the universe was being reset (B23: a failed startup stops the host), registered SPECTER
-  again and fulfilled its first contract within 50 minutes. The run to 2026-10-18 ended at 99M credits and 1,004 ships,
-  the run to 2026-10-25 at 89M credits and 801 ships. Read on 2026-10-29 at 07:40Z: 9.2M credits and 176 ships, home
-  system X1-BQ86, whose gate was finished on 2026-10-28 at 10:34Z. The next reset is expected on 2026-11-01 at 13:00Z
+- **Running:** projects main `07974c65` (projects#220: B84), deployed by gembernodes#102 on 2026-10-31. Slices 6.45 and 6.46
+  (D128–D131) are built on branch `claude/spacetraders-gate-first`, to deploy. The server reset on 2026-11-01 at 13:00Z; the
+  bot registered SPECTER again and fulfilled its first contract at 13:50Z. The next reset is expected on 2026-11-08 at 13:00Z
   (`spacetraders_server_next_reset_timestamp_seconds`).
-- **Done:** phases 0–5, phase 2's slices 2.1–2.19 and phase 6's 6.1–6.40, listed under [Phases](#phases).
+- **The goal: the home jump gate done within 24 hours of a reset** (asked on 2026-11-08). The run of 2026-11-01 didn't get
+  close (read on 2026-11-08 at 06:22Z, from Loki, Prometheus and the database): at hour 24 the gate had 260 of 1,600 FAB_MATS
+  and 240 of 400 ADVANCED_CIRCUITRY; FAB_MATS were done at hour 49; at hour 113 it still lacked 60 circuitry, its last at hour
+  95.5. Earlier runs took 39.6, 58.2 and 69.6 hours.
+  - The first load came at hour 19.2: the credits stayed at 110,000 to 145,000 overnight, spent on ten drones and surveyors
+    before the list's first cargo ship, while K88 and E49, the markets that paid, went 18 hours unseen (D96). At 07:20Z on
+    11-02 the command ship found them again, made about 1M in an hour, and the shuttle, both haulers and 26 probes were bought
+    within 40 minutes. The first probe came at hour 18.6, not near hour 8 as slice 6.44 expected.
+  - From 11-02 14:00Z D45, home's only circuitry seller, stood RESTRICTED, its circuitry SCARCE or LIMITED, so the gate's loads
+    never bought there (D66). Meanwhile our traders bought 20 there every 2.5 hours for about 700 a trip at A4 (D15): 520 from
+    11-05 12:30Z while the gate waited for 60 (D128).
+  - The load it couldn't buy held every purchase after it (D64): from 11-04 15:52Z one ship was bought, a siphon drone,
+    while the credits grew from 1M to 7.9M; the run ended with 4 cargo ships, 27 drones and 27 probes (D129).
+- **Done:** phases 0–5, phase 2's slices 2.1–2.19 and phase 6's 6.1–6.41 and 6.44, listed under [Phases](#phases).
 - **Still open:**
   - Phase 6's checks: a loop counts as done after a full reset period with no open anomalies for it. The first full
     period, the run from 2026-10-04 13:00Z to 2026-10-11 13:00Z, is over and wasn't clean (read on 2026-10-11 from
@@ -213,6 +223,10 @@ get the next D-number.
 | D125 | Slice 6.41 (asked on 2026-10-11): "I'd like the POSTS for mining to be below all other API calls. I'd rather have miners wait but have up to date markets and exploring than working miners but needing to wait for the explore." Then: "Mining only gives a tiny amount of the total profits, so by the time there's so many API requests that the miners aren't working, it just means that the miners have earned their fill and need to make way for more lucrative trade requests." The tick runs every step in turn (the plans, the explore plan's one look among them, then each ship's goal step, then one market refresh), so a lane in the rate limit would hold up every ship after a miner in the tick, and wouldn't bring the explore plan's look sooner: that waits for the tick to end. In the run of 2026-10-04 the gathering actions were about 57,600 of 761,569 requests (7.6%), plus their flights, docks and sales; the explore plan's looks about 3,000. | **Gatherers last, and skipped while the requests are busy** (2026-10-11): every request of a mining, siphoning or survey trip counts (the goals of the mining, siphon and survey plans), not the contract's drone. Their goal steps run last in the tick, after the market refresh, and a step is skipped while the rate limit is busy; a skipped ship isn't stuck. |
 | D126 | Slice 6.42 (asked on 2026-10-11, with D125): "I'd also like the explorer GET requests to be higher priority." | **The explore plan's reads and the explorers' go with the writes** (2026-10-11): they no longer give way to writes (D19); a trade trip's requests still go first (D115). |
 | D127 | Slice 6.44 (asked on 2026-10-31, after the gate took 39.6, 58.2 and 69.6 hours on the same code): "Honestly, all home probes should come before building the gates. I thought that was a decision I made earlier, but clearly it wasn't." D64 put the probes behind the gate's loads, and D96 takes a market older than `Trade.MaxPriceAgeMinutes` off every route, at home too, while only a ship there refreshes it: no route, so no ship, so it stays dark. In the run of 2026-10-25 the first probe came at hour 69.6; X1-BQ86-K89 saw no ship for 65.9 hours and D46 for 52.2, 13 of the 26 home markets stayed usable, and trades made 0.36M in hours 12 to 36, against 2.56M in the run of 2026-10-11. D46's circuitry stood at 5,365 for 50 hours, where the bot's own buying left it, so no load looked affordable; the real price was 3,370. | **Every home probe before the gate** (2026-10-31): a new tier, `HomeProbes`, 6, after the cargo ships of `Trade.ShipPurchases` and before the gate's loads; `Construction` and everything after it moved up by one. Read as: the place in the order counts whether or not the gate needs materials, so home's probes also go before the explorers and the cargo ship on the clock (D113, D116), which matters only when the gate is done with home short of probes, as another agent built most of the gate of 2026-10-18; home before every system abroad; within home the shipyards first (D109), an interceptor wherever one is sold (D119); with the shipyards SCARCE it needs nothing and the gate goes on (D97, D121); a probe that waits for one of our ships at its shipyard lets the loads go, leaving its price (D118). Amends D43, D64, D97 and D109. |
+| D128 | Slice 6.45 (asked on 2026-11-08, after the gate of 2026-11-01 waited four days for its last 60 ADVANCED_CIRCUITRY): "The gate should be first priority at all times, so any trade should be for the gate or it's prereqs first. Any complete prereqs (e.g. fab mats that are done) should be removed from that list." D89 put the routes feeding a market that makes a gate material first, one step down the chain, and only while the material was needed; nothing stopped a trader buying the material itself. From 11-05 12:30Z our traders bought 520 circuitry at D45, its only seller, for about 700 a trip at A4, which makes QUANTUM_DRIVES from it (D15), each purchase knocking D45 back to SCARCE, where the gate's loads don't buy (D66). | **Traders leave the gate's materials, and the whole chain feeds first** ("Traders leave gate goods (Recommended)", "Whole prereq chain", 2026-11-08): no trade route buys a material the gate still needs in the gate's system; a route to a market that makes, from its good, something that goes into a material still needed, directly or further down the chain, comes before every route that feeds none, the nearest step to the gate first; a finished material's chain feeds nothing. Read as: D90's "up to its fuel" holds for every step of the chain, as "first" needs the route to count at all. Not chosen: the loads buying at LIMITED (D66 stands) and the loads before the home probes (D127 stands). Amends D89 and D90. |
+| D129 | Slice 6.45 (asked on 2026-11-08): the gate's load that waits for its markets holds every purchase after it (D64); from 11-04 15:52Z the bot bought one ship while the credits grew from 1M to 7.9M. Asked whether the purchases after it should go while it waits. | **Only what serves the gate** (2026-11-08): "Explorers and probes are worthless without the gate. Any extra cargo ships should only be bought if it serves the goal of getting the gate done within 24 hours of a reset." Read as: while the home gate needs materials, a cargo ship beyond `Trade.ShipPurchases` is bought only for a route down the gate's chain (D128) that has waited `Trade.ShipPurchaseWaitMinutes` with every trader busy (D88), whatever it earns (D90), at the gate's place in the order, after a load the markets sell now, as the gate's miners are (D92); the explorers and the probes after the gate still wait for it. Amends D43, D64, D88, D112 and D116. |
+| D130 | Slice 6.45 (asked on 2026-11-08): "Mining and siphoning drones should only be bought in order to keep the market healthy." Every drone purchase already needed a market that makes something from the ore or gas to have it SCARCE or LIMITED, in three places: one per short ore per area before the cargo ships (D48, D53: ten drones and surveyors before the run's first cargo ship), the gate's miners (D92), and in turn with the cargo ships (D28, D32). The run of 2026-11-01 had 19 mining and 8 siphon drones, netting about 2.3M of the week's 16M. | **Gate chain only, until done** (2026-11-08): while the home jump gate needs materials, drones are bought only for the ores its smelters lack (the gate's miners, D92); no drone for a scarce ore, none in turn with the cargo ships, none abroad and no siphon drone until the gate is done, then as before. Read as: the contract's drone (D23) and the collection points' shuttles (D83) stay. Amends D28, D32, D48, D53 and D122. |
+| D131 | Slice 6.46 (asked on 2026-11-08): "We have some data now from the past few weeks how markets progress. Can we make a dead reckoning prediction rule for any markets without active ships or probes so that our command ship goes there to trade eventually? Even if it isn't fully accurate (e.g. due to other players) at least it will solve the problem. But only do this for the home system." D96 takes a market older than `Trade.MaxPriceAgeMinutes` off every route, and only a ship there refreshes it, so one no ship passes stays dark: K88 and E49 for 18 hours in the run of 2026-11-01. Asked who may take a route on predicted prices. | **Predicted home markets, any trader, fresh first** ("Any trader, fresh first", 2026-11-08): a home market older than the age that was seen with prices is predicted for now (`MarketDeadReckoning`: each price drifts back towards the good's resting price at the market as the time since the last look grows, its supply back to its usual level, its trade volume as seen; the constants fitted on the runs' price samples) and takes routes again; a route on a predicted market goes after every route on prices seen lately; a trip is judged on the same prices, and re-reads the real ones where it lands. A market never seen with prices, and one abroad, stay stale. Read as: the gate's chain goes first even on predicted prices (D128, "first priority at all times"). Amends D96. |
 
 ## Phases
 
@@ -311,6 +325,9 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.42 The explorers' reads with the writes (D126), to build (below)
 - 6.43 All first looks in one pass (D124), to build (below)
 - 6.44 Home probes before the gate (D127), deployed (below)
+- 6.45 Gate first: the gate's materials stay the gate's, the whole chain feeds first, drones and extra cargo ships only for
+  the gate (D128–D130), built (below)
+- 6.46 Dead reckoning for the home markets nobody looks at (D131), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -358,3 +375,50 @@ the gates of other systems (D68).
     before a run has shown it.
   - To understand this, start with `PurchaseTier` in `Services/PurchaseOrder.cs`, then `Wants` in
     `Automation/ProbeDeploymentPlanService.cs`.
+- **6.45 Gate first** (D128–D130; asked on 2026-11-08, after the gate of 2026-11-01 missed the goal of 24 hours by days, see
+  "Where things stand"): built on branch `claude/spacetraders-gate-first`.
+  - D128: `TradeMarketMap.ConstructionFeedOf` (was `ConstructionMaterialMadeFrom`) gives the good a delivery feeds of the gate's
+    chain and its step (`ConstructionFeed`; the steps from `StepsInto`, the shortest way down); `TradeRoute.ConstructionStep`
+    orders the chain nearest first, in `Rank` and `CompareBestFirst`; `TradeMarketMap.IsConstructionMaterialAt` makes
+    `TryEvaluateFrom` refuse a material the gate still needs at a market in its system (`TradeRouteCheck.GateMaterial`, new, 7,
+    with its sentence in "Goods not traded"). D90's break-even holds for every step (`IsWorthIt`, the executor's `feedsGate`).
+    A route further down logs "which makes … from it, … steps from the jump gate (D128)".
+  - D129: `TradingAutomationService.BuyCargoShipAsync`: beyond the list, while the gate needs materials, only routes that feed
+    the chain count towards D88's wait, the need stands at `PurchaseTier.Construction`, and a new ship with no such route is
+    not bought. `PurchaseOrder` already lets a non-construction need at the gate's place through while the load waits for its
+    markets (`IsGateLoadBeforeMiners`, `WaitsForMarkets`).
+  - D130: `MiningAutomationService.DroneNeedAsync` skips the coverage and alternating drones while its map names gate
+    materials and says so to `NeedAsync`, which then skips mining abroad; `SiphonAutomationService.DroneNeedAsync` buys
+    nothing then.
+  - Tests: `TradeRoutePlannerTests` `Rank_BuysNoMaterialTheJumpGateStillNeeds_InTheGatesSystem` and
+    `Rank_PutsTheRoutesDownTheJumpGatesChainFirst_TheNearestStepFirst_AndDropsAFinishedMaterialsChain`;
+    `TradingAutomationServiceTests`
+    `WhileTheJumpGateNeedsMaterials_ACargoShipBeyondTheList_IsBoughtOnlyForARouteDownTheGatesChain_AtTheGatesPlace`;
+    `GateMinerTests` `WhileTheGateNeedsMaterials_NoDroneIsBoughtForAScarceMineral_OnlyTheGatesMiners` and
+    `WhileTheGateNeedsMaterials_NoDroneIsBoughtInTurnWithTheCargoShips_NorForAScarceMineral` (they replace
+    `ADroneForAScarceMineral_ComesFirst` and `AGateMiner_CountsOnlyForItsOwnOre_AmongTheDronesForScarceMinerals`, which held
+    D48 before D92); `SiphonAutomationServiceTests` `WhileTheJumpGateNeedsMaterials_NoSiphonDroneIsBought`. Each failed before.
+  - To check on the first run: no `CargoBought` of a gate material on a trade trip at home; `TradeStarted` lines with "steps
+    from the jump gate"; no drone bought but the gate's miners until the gate is done; the gate's hour against 24.
+  - To understand this, start with `ConstructionFeedOf` in `Trading/TradeMarketMap.cs`, then `Rank` in
+    `Trading/TradeRoutePlanner.cs`.
+- **6.46 Dead reckoning for the home markets nobody looks at** (D131; asked on 2026-11-08): built on the same branch.
+  - `MarketDeadReckoning` (new, pure): a good's price drifts back towards its resting price, the median of its samples at the
+    market within `HistoryWindow` of the last look, on a log scale, e^(−t/τ) of the gap left after the time t since the look,
+    τ by EXPORT, IMPORT or EXCHANGE; its supply goes back to the level it showed most after `SupplyBackAfterTimeConstants` of
+    τ; the trade volume stays. With no samples a good stays as seen.
+  - `MarketPredictions` (new, `IMarketPredictions`, scoped) reads a market's samples up to its last look
+    (`IMarketPriceSampleRepository.GetWaypointPricesAsync`) once per look (`MarketHistoryCache`, singleton).
+  - `TradeContextReader.ReadReachAsync` predicts the home system's stale markets that were seen with prices, takes them off
+    `StaleMarkets` and names them in `TradeMarketMap.PredictedMarkets`; `ReadTradeAsync` (new) does the same for one system,
+    for the trade executor, which reads every map through it, so a trip is weighed as it was chosen. `ReadAsync`, which the
+    other plans read, predicts nothing.
+  - `TradeRoute.Predicted` ranks after the routes on prices seen lately, the gate's chain first all the same; the trading
+    plan logs "goes on predicted prices".
+  - Tests: `MarketDeadReckoningTests`; `TradeContextReaderTests`
+    `AHomeMarketNobodyLookedAtLately_IsPredictedForNow_InsteadOfStale_ButOnlyAtHome`; `TradeRoutePlannerTests`
+    `Rank_PutsTheRoutesOnPricesSeenLately_BeforeThoseOnPredictedPrices_TheGatesChainFirstAllTheSame`.
+  - To check on the first run: no home market dark for hours once it has been seen with prices; "goes on predicted prices"
+    lines, and how often such a trip is dropped at its buy market (`not_lucrative`).
+  - To understand this, start with `MarketDeadReckoning` in `Trading/MarketDeadReckoning.cs`, then `PredictHomeAsync` in
+    `Trading/TradeContextReader.cs`.

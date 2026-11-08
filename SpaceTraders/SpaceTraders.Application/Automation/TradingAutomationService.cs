@@ -901,6 +901,17 @@ public sealed class TradingAutomationService(
 
     private void LogRoute(ShipModel ship, TradeRoute route)
     {
+        // D131: a trip on a market's predicted prices says so; the ship re-reads the real prices when it gets there.
+        if (route.Predicted)
+        {
+            logger.LogInformation(
+                "Trading plan: ship {ShipSymbol}'s trip of {TradeSymbol} from {BuyWaypoint} to {SellWaypoint} goes on predicted prices, nobody having looked at a market of it lately (D131).",
+                ship.Symbol,
+                route.TradeSymbol,
+                route.BuyWaypointSymbol,
+                route.SellWaypointSymbol);
+        }
+
         // D95: the journal gives the rate the route was ranked by, and the trip's time it was worked out over.
         var creditsPerHour = (long)Math.Round(route.CreditsPerHour);
         var tripMinutes = TripTime.Minutes(route.Seconds);

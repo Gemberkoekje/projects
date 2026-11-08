@@ -7,6 +7,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-08, slice 6.46)
+- The home system's markets nobody has looked at lately are predicted, not dark (D131), as asked on 2026-11-08: "Can we make a
+  dead reckoning prediction rule for any markets without active ships or probes so that our command ship goes there to trade
+  eventually? ... But only do this for the home system." A home market older than `Trade.MaxPriceAgeMinutes` that was seen with
+  prices gets its goods predicted for now (`MarketDeadReckoning`, new): each price drifts back towards the good's resting price
+  at the market as the time since the last look grows, its supply back to its usual level, its trade volume as seen. It takes
+  routes again (`TradeMarketMap.PredictedMarkets`), after every route on prices seen lately ("Any trader, fresh first"), the
+  gate's chain first all the same; a trip reads the same prices (`ITradeContextReader.ReadTradeAsync`, new) and the real ones
+  where it lands. A market's samples are read once per look (`MarketPredictions`, `MarketHistoryCache`). In the run of
+  2026-11-01, K88 and E49 went 18 hours unseen. Tests: `MarketDeadReckoningTests`, `TradeContextReaderTests`
+  `AHomeMarketNobodyLookedAtLately_IsPredictedForNow_InsteadOfStale_ButOnlyAtHome`, `TradeRoutePlannerTests`
+  `Rank_PutsTheRoutesOnPricesSeenLately_BeforeThoseOnPredictedPrices_TheGatesChainFirstAllTheSame`.
+
+### Code – Changed (2026-11-08, slice 6.45)
+- Gate first (D128–D130), as asked on 2026-11-08 after the gate of 2026-11-01 waited four days for its last 60
+  ADVANCED_CIRCUITRY: "The gate should be first priority at all times, so any trade should be for the gate or it's prereqs
+  first. Any complete prereqs (e.g. fab mats that are done) should be removed from that list."
+  - No trade route buys a material the gate still needs in the gate's system (D128, `TradeRouteCheck.GateMaterial`): from
+    11-05 our traders bought 520 circuitry at its only seller, X1-UK3-D45, for about 700 a trip, keeping it SCARCE, where the
+    gate's loads don't buy (D66).
+  - The routes down the gate's whole production chain come first, the nearest step first (D128,
+    `TradeMarketMap.ConstructionFeedOf`, `TradeRoute.ConstructionStep`), at cost (D90); a finished material's chain feeds
+    nothing.
+  - While the gate needs materials, a cargo ship beyond `Trade.ShipPurchases` is bought only for a route down its chain, at
+    the gate's place in the order (D129: "Any extra cargo ships should only be bought if it serves the goal of getting the gate
+    done within 24 hours of a reset"); the explorers and probes still wait for the gate.
+  - While the gate needs materials, the only drones bought are the gate's miners (D130: "Gate chain only, until done"): no
+    drone for a scarce ore, none in turn with the cargo ships, none abroad, no siphon drone.
+  - Tests: `TradeRoutePlannerTests` (2), `TradingAutomationServiceTests` (1), `GateMinerTests` (2, replacing the two that held
+    D48 before D92), `SiphonAutomationServiceTests` (1); each failed before the change.
+
+### Docs – Changed (2026-11-08, slices 6.45 and 6.46)
+- `PLAN.md`: where things stand after the run of 2026-11-01 and the goal of the gate within 24 hours, D128–D131, slices 6.45
+  and 6.46. `docs/HOW_IT_WORKS.md`: the gate's chain and materials in trading, the drones and cargo ships while the gate needs
+  materials, the predicted home markets.
+
 ### Code – Fixed (2026-10-31, B84)
 - A restart no longer fetches the markets and shipyards the cache already has (B84): `StartupSyncService` fetches only a
   market without prices or a shipyard without listings, and everything else stays as old as it is. On 2026-10-31 at 771

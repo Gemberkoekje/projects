@@ -80,6 +80,7 @@ public sealed class TradeMarketMap
         _constructionSteps = other._constructionSteps;
         ConstructionSystemSymbol = other.ConstructionSystemSymbol;
         StaleMarkets = other.StaleMarkets;
+        PredictedMarkets = other.PredictedMarkets;
     }
 
     /// <summary>The systems' waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
@@ -106,6 +107,18 @@ public sealed class TradeMarketMap
     /// prices still say where fuel is sold, but no route buys or sells there. None unless set.
     /// </summary>
     public IReadOnlySet<string> StaleMarkets { get; init; } = NoMarkets;
+
+    /// <summary>
+    /// The markets of the home system nobody has looked at within <c>Trade.MaxPriceAgeMinutes</c>, whose goods the map holds as
+    /// predicted for now (PLAN.md slice 6.46, D131, <see cref="MarketDeadReckoning"/>) instead of leaving them stale: a route
+    /// may buy or sell there, after every route on prices seen lately. None unless set.
+    /// </summary>
+    public IReadOnlySet<string> PredictedMarkets { get; init; } = NoMarkets;
+
+    /// <summary>Whether the map holds a market's goods as predicted (<see cref="PredictedMarkets"/>, D131).</summary>
+    /// <param name="waypointSymbol">The market's waypoint.</param>
+    /// <returns>True for a predicted market.</returns>
+    public bool IsPredicted(string waypointSymbol) => PredictedMarkets.Contains(waypointSymbol);
 
     /// <summary>
     /// The materials the system's jump gate still needs, while the construction plan buys them (PLAN.md slice 6.22, D89): the

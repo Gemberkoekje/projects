@@ -966,6 +966,11 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
      the drone the mining role (`RoleAdvisor`), which, since a drone gathers first (D58), it does;
   4. with nothing to buy at home, and whether the contract mines or not, a miner abroad (below).
 
+  While the home jump gate needs materials, only step 2 buys (slice 6.45, D130, asked on 2026-11-08: "Mining and siphoning
+  drones should only be bought in order to keep the market healthy", and of the options "Gate chain only, until done"): no
+  drone for a scarce ore, none in turn with the cargo ships, none abroad, and no siphon drone, until the gate is done. The
+  contract's drone (D23) and the shuttles of the collection points (D83) are as before.
+
   A pair a drone would only share buys no drone (D77): the first trip is judged with the pairs under way held, as
   before.
 - **Abroad** (slice 6.40, D122, asked on 2026-10-09: "I'd like mining to be done wherever there's low ore supply, not just in
@@ -1126,7 +1131,11 @@ buy.
   ships wait. The
   mining plan's drones for the gate's smelters stand at the same place (D92: "If the gate can be built, it should be
   built, otherwise extra miners can be built."): they wait while a load can be bought now, the credits aside, and are
-  bought while it waits for its markets.
+  bought while it waits for its markets. So does a cargo ship beyond `Trade.ShipPurchases` (slice 6.45, D129, asked on
+  2026-11-08: "Explorers and probes are worthless without the gate. Any extra cargo ships should only be bought if it serves
+  the goal of getting the gate done within 24 hours of a reset."): while the gate needs materials, the trading plan buys one
+  only for a route down the gate's chain (D128) that has waited `Trade.ShipPurchaseWaitMinutes` with every trader busy (D88),
+  whatever it earns (D90). The explorers and the other probes still wait for the gate.
   A construction trip holds back what its cargo costs from the moment it starts until it buys
   (`SupplyConstructionGoal.ReservedCredits`, as D57): the traders, the other trips and ship purchases leave it. As for
   a ship purchase, nothing holds the traders back while the credits for a load build up.
@@ -1210,7 +1219,18 @@ buy.
   the feeding to the portal construction materials"): while the system's jump gate needs materials and the construction
   plan is on, a lucrative trip that delivers a good to a market making one of those materials from it (the market exports
   the material, imports the good below ABUNDANT, and the production chains make the material from the good;
-  `TradeMarketMap.ConstructionMaterialMadeFrom`) comes before every other, whatever it earns. The trade context reads the
+  `TradeMarketMap.ConstructionFeedOf`) comes before every other, whatever it earns. Since slice 6.45 (D128, asked on
+  2026-11-08: "any trade should be for the gate or it's prereqs first. Any complete prereqs (e.g. fab mats that are done)
+  should be removed from that list", chosen "Whole prereq chain") so does one further down the chain: to a market that
+  makes, from the good, something a material still needed is made from, directly or through further goods
+  (`TradeRoute.ConstructionStep`: 1 for the material, 2 for what goes into it, and so on), the nearest step first. A
+  finished material's chain feeds nothing. Its `TradeStarted` says "which makes … from it, … steps from the jump gate
+  (D128)".
+  - **The gate's own materials** (slice 6.45, D128, "Traders leave gate goods"): no trip buys a material the gate still needs
+    in the gate's system (`TradeMarketMap.IsConstructionMaterialAt`, `TradeRouteCheck.GateMaterial`). In the run of
+    2026-11-01 the gate waited four days for its last 60 ADVANCED_CIRCUITRY while our traders bought 520 at its only seller,
+    X1-UK3-D45, for about 700 a trip at A4, which makes QUANTUM_DRIVES from it; each purchase knocked D45 back to SCARCE,
+    so the gate's loads (D66) never bought. The trade context reads the
   materials still needed from the construction cache (`TradeContextReader`). On 2026-10-05 the FAB_MATS markets D52 and
   F58 made 1 to 4 units a tick while their IRON was SCARCE: IRON for them now goes first. Such a trip's `TradeStarted` says
   "which makes the jump gate's … from it (D89)".
@@ -1220,7 +1240,8 @@ buy.
     costs, and at its sell market sells unless that would fetch less than the cargo cost and another market pays more. H60
     sold IRON for 105 to 157 within an hour on 2026-10-05, while D52 paid 151 to 155 and F58 150. "Goods not traded" shows
     such a route as "feeds the jump gate's …, … units for … after fuel (D89, D90)".
-- **Ranking** (D15, D82, D85, D95): among the lucrative trips (after those that feed the jump gate, D89, and before those to a
+- **Ranking** (D15, D82, D85, D95): among the lucrative trips (after those that feed the jump gate, D89, D128, then those on
+  prices seen lately before those on a market's predicted prices, D131, and before those to a
   market that exchanges the good, which come last and never count as feeding production, D91, `TradeRoute.ToExchange`),
   the one that earns most an hour first, an end product's rate counted at half (`TradeRoutePlanner.RankingRate`): one goes
   first only when it earns more than twice as much an hour.
@@ -1275,6 +1296,16 @@ buy.
     The market watch keeps the markets where our ships are fresh, abroad too, where the probes sit (slice 6.28). Only a ship
     at a market refreshes it, so a market no ship passes stays dark: no route, so no ship. Home's probes come before the jump
     gate's loads for that reason (slice 6.44, D127).
+  - **Predicted at home** (slice 6.46, D131, asked on 2026-11-08: "Can we make a dead reckoning prediction rule for any
+    markets without active ships or probes so that our command ship goes there to trade eventually? ... But only do this for
+    the home system."; chosen "Any trader, fresh first"): a home market older than `Trade.MaxPriceAgeMinutes` that was seen
+    with prices isn't stale: its goods are predicted for now (`MarketDeadReckoning`, `TradeMarketMap.PredictedMarkets`),
+    each price drifted back towards the good's resting price at the market (the median of its samples within a day of its
+    last look) as the time since the look grows, its supply back to its usual level after a while, its trade volume as seen.
+    A route on a predicted market (`TradeRoute.Predicted`) goes after every route on prices seen lately, the gate's chain
+    first all the same; the trading plan logs "goes on predicted prices" for it. A trip reads its system the same way
+    (`ITradeContextReader.ReadTradeAsync`), so it is judged at its buy market as it was chosen, and the market it gets to is
+    fresh then. A market never seen with prices, and one abroad, stay stale.
   - **Who crosses systems**, read from D96 with D58, D65, D83 and D86: a ship whose role is trading (the trade role on the
     board; with the board off, a cargo ship), not a shuttle kept for a collection point. A drone, a builder and the survey
     ship in its spare time trade in their own system between their trips, as their own work is there; so does a shuttle
