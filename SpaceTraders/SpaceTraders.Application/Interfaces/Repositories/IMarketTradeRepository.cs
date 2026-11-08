@@ -15,7 +15,7 @@ public interface IMarketTradeRepository
     /// <returns>How many were new.</returns>
     Task<int> RecordAsync(string systemSymbol, IReadOnlyList<MarketTradeModel> trades, CancellationToken cancellationToken = default);
 
-    /// <summary>How many transactions each market listed since a time, by market.</summary>
+    /// <summary>How many transactions each market listed since a time, and what they came to, by market.</summary>
     /// <param name="since">The start.</param>
     /// <param name="cancellationToken">Stops the read.</param>
     /// <returns>One count per market with any.</returns>
@@ -45,4 +45,7 @@ public sealed record MarketTradeCount
 
     /// <summary>The transactions.</summary>
     public required int Trades { get; init; }
+
+    /// <summary>What they came to, units times price, in credits (PLAN.md slice 6.48, D135); 0 unless set.</summary>
+    public long Credits { get; init; }
 }

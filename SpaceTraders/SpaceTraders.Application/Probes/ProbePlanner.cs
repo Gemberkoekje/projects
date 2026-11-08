@@ -429,9 +429,9 @@ public sealed record ProbeMarket
     public ShipyardKind Shipyard { get; init; }
 
     /// <summary>
-    /// What a probe there would make sure of, in credits an hour (PLAN.md slice 6.47, D134): the best route through the market
-    /// at its predicted prices, times how far those prices aren't trusted (<see cref="Trading.TradeRoutePlanner.BestRateThrough"/>,
-    /// <see cref="Trading.PredictionConfidence"/>). 0 for a market whose prices were seen lately, or with no route; 0 unless set.
+    /// What a probe there would make sure of, in credits an hour (PLAN.md slices 6.47 and 6.48, D134, D135,
+    /// <see cref="ProbePromise.Of"/>): the best route through the market at its predicted prices, times how far those prices
+    /// aren't trusted, plus a share of what the other agents trade there an hour. 0 unless set.
     /// </summary>
     public double Promise { get; init; }
 }
