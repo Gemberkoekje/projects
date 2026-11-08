@@ -141,7 +141,7 @@ public sealed class TradeContextReaderTests
     {
         // D131, asked on 2026-11-08: "Can we make a dead reckoning prediction rule for any markets without active ships or
         // probes so that our command ship goes there to trade eventually? ... But only do this for the home system." K88 was
-        // seen 18 hours ago with CLOTHING at 3,400, which our purchases had raised; it usually stood at 2,950. A1 was never seen
+        // seen 18 hours ago with CLOTHING at 3,400, which our purchases had raised; before, it stood at 2,950. A1 was never seen
         // with prices: it stays stale (a market abroad does too, as TheReach_MapsTheSystemsWithinTwiceItsJumps_... shows). The
         // plain map of the system (ReadAsync) predicts nothing; a trade trip's (ReadTradeAsync) does.
         var now = DateTimeOffset.UtcNow;
@@ -165,6 +165,8 @@ public sealed class TradeContextReaderTests
         ]);
         _samples.GetWaypointPricesAsync("X1-FJ91-K88", Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(
         [
+            new MarketPriceSampleDto(now.AddHours(-22), "X1-FJ91-K88", "CLOTHING", 2_950, 1_400, "MODERATE", "WEAK", 20),
+            new MarketPriceSampleDto(now.AddHours(-21), "X1-FJ91-K88", "CLOTHING", 2_950, 1_400, "MODERATE", "WEAK", 20),
             new MarketPriceSampleDto(now.AddHours(-20), "X1-FJ91-K88", "CLOTHING", 2_950, 1_400, "MODERATE", "WEAK", 20),
             new MarketPriceSampleDto(now.AddHours(-19), "X1-FJ91-K88", "CLOTHING", 2_950, 1_400, "MODERATE", "WEAK", 20),
             new MarketPriceSampleDto(now.AddHours(-18), "X1-FJ91-K88", "CLOTHING", 3_400, 1_600, "LIMITED", "WEAK", 20),
@@ -178,10 +180,13 @@ public sealed class TradeContextReaderTests
         reach.StaleMarkets.Should().BeEquivalentTo(["X1-FJ91-A1"]);
         reach.IsFresh("X1-FJ91-K88").Should().BeTrue("a predicted market takes routes again");
         reach.TryGetGood("X1-FJ91-K88", "CLOTHING", out var predicted).Should().BeTrue();
-        (predicted.PurchasePrice, predicted.Supply).Should().Be((2_950, "MODERATE"), "18 hours have taken it back to where it usually stood");
+        // An export drifts back to the lowest price it showed this run, a gap of e^(-18/16) left after 18 hours.
+        var expected = (int)Math.Round(Math.Exp(Math.Log(2_950) + ((Math.Log(3_400) - Math.Log(2_950)) * Math.Exp(-18.0 / 16))));
+        predicted.PurchasePrice.Should().BeCloseTo(expected, 2);
+        predicted.Supply.Should().Be("HIGH", "nearly back at its resting price, nobody buying");
         trip.PredictedMarkets.Should().BeEquivalentTo(["X1-FJ91-K88"]);
         trip.TryGetGood("X1-FJ91-K88", "CLOTHING", out var forTrip).Should().BeTrue();
-        forTrip.PurchasePrice.Should().Be(2_950);
+        forTrip.PurchasePrice.Should().BeCloseTo(expected, 2);
         plain.PredictedMarkets.Should().BeEmpty();
         plain.TryGetGood("X1-FJ91-K88", "CLOTHING", out var asSeen).Should().BeTrue();
         asSeen.PurchasePrice.Should().Be(3_400);

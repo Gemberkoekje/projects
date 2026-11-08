@@ -11,14 +11,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The home system's markets nobody has looked at lately are predicted, not dark (D131), as asked on 2026-11-08: "Can we make a
   dead reckoning prediction rule for any markets without active ships or probes so that our command ship goes there to trade
   eventually? ... But only do this for the home system." A home market older than `Trade.MaxPriceAgeMinutes` that was seen with
-  prices gets its goods predicted for now (`MarketDeadReckoning`, new): each price drifts back towards the good's resting price
-  at the market as the time since the last look grows, its supply back to its usual level, its trade volume as seen. It takes
-  routes again (`TradeMarketMap.PredictedMarkets`), after every route on prices seen lately ("Any trader, fresh first"), the
+  prices gets its goods predicted for now (`MarketDeadReckoning`, new, fitted on the runs of 2026-10-11 to 2026-11-01): an
+  export's price drifts down to the lowest it showed this run (τ 16 hours), an import's up to the highest of the last day (τ 4
+  hours), the sell price with it, the supply after 4 hours; the trade volume and exchanged goods stay as seen. It takes
+  routes again (`TradeMarketMap.PredictedMarkets`), ranked at half its rate an hour (`TradeRoutePlanner.PredictedRateWeight`:
+  "a predicted 1000 profit should rank lower than a certain 1000 profit. A predicted 1000000 profit should rank higher"), the
   gate's chain first all the same; a trip reads the same prices (`ITradeContextReader.ReadTradeAsync`, new) and the real ones
   where it lands. A market's samples are read once per look (`MarketPredictions`, `MarketHistoryCache`). In the run of
   2026-11-01, K88 and E49 went 18 hours unseen. Tests: `MarketDeadReckoningTests`, `TradeContextReaderTests`
   `AHomeMarketNobodyLookedAtLately_IsPredictedForNow_InsteadOfStale_ButOnlyAtHome`, `TradeRoutePlannerTests`
-  `Rank_PutsTheRoutesOnPricesSeenLately_BeforeThoseOnPredictedPrices_TheGatesChainFirstAllTheSame`.
+  `ARouteOnPredictedPrices_RanksAtAWeightOfItsRate_SoItGoesFirstOnlyWhenItEarnsThatMuchMore_TheGatesChainFirstAllTheSame`.
 
 ### Code – Changed (2026-11-08, slice 6.45)
 - Gate first (D128–D130), as asked on 2026-11-08 after the gate of 2026-11-01 waited four days for its last 60

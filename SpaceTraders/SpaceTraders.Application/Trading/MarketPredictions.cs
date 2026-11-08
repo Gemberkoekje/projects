@@ -47,9 +47,9 @@ public sealed class MarketPredictions(IMarketPriceSampleRepository samples, Mark
             var history = await cache.GetOrReadAsync(
                 market.WaypointSymbol,
                 lastObservedAt,
-                token => samples.GetWaypointPricesAsync(market.WaypointSymbol, lastObservedAt - MarketDeadReckoning.HistoryWindow, lastObservedAt, token),
+                token => samples.GetWaypointPricesAsync(market.WaypointSymbol, lastObservedAt - MarketDeadReckoning.RunHistory, lastObservedAt, token),
                 cancellationToken);
-            predicted.Add(MarketDeadReckoning.Predict(market, history, now - lastObservedAt));
+            predicted.Add(MarketDeadReckoning.Predict(market, history, lastObservedAt, now - lastObservedAt));
         }
 
         return predicted;

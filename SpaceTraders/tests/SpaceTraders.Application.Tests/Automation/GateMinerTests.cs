@@ -173,7 +173,7 @@ public sealed class GateMinerTests
     [Fact]
     public async Task WhileTheGateNeedsMaterials_NoDroneIsBoughtForAScarceMineral_OnlyTheGatesMiners()
     {
-        // D130, asked on 2026-11-08: "Mining and siphoning drones should only be bought in order to keep the market healthy";
+        // D130, asked on 2026-11-08: "Mining and siphoning drones should only be bought in order to keep the market healthy".
         // of the options, "Gate chain only, until done". H52's QUARTZ_SAND is SCARCE and the fleet has no drone yet, only its
         // survey ship: before D130 a drone for the scarce quartz came first (D48). Now the gate's miners alone are bought, for
         // the ore its smelters are shortest of; once the gate is done, the quartz gets its drone again.

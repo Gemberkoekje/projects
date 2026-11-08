@@ -19,10 +19,10 @@ namespace SpaceTraders.Application.Trading;
 ///   <item>a trip is lucrative when it earns at least <c>Trade.MinProfitPerUnit</c> per unit (D14);</item>
 ///   <item>no trip buys a material the jump gate still needs in the gate's system (slice 6.45, D128): those are the gate's;</item>
 ///   <item>among lucrative trips, first those that feed the jump gate's chain (D89; slice 6.45, D128: a material it still needs,
-///   or anything further down its production chain, the nearest step first), then those on prices seen lately before those on a
-///   market's predicted prices (slice 6.46, D131), last those to a market that exchanges the good (D91), and otherwise the one
-///   that earns most an hour over the whole trip from where the ship is (D95, <see cref="TripTime"/>), an end product's (a good
-///   nothing is made from) counted at half (D15, D82, D85).</item>
+///   or anything further down its production chain, the nearest step first), last those to a market that exchanges the good
+///   (D91), and otherwise the one that earns most an hour over the whole trip from where the ship is (D95,
+///   <see cref="TripTime"/>), an end product's (a good nothing is made from) counted at half (D15, D82, D85), and one on a
+///   market's predicted prices at <see cref="PredictedRateWeight"/> (slice 6.46, D131).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -130,7 +130,6 @@ public static class TradeRoutePlanner
         return [.. routes
             .OrderByDescending(route => route.FeedsConstruction)
             .ThenBy(route => route.ConstructionStep)
-            .ThenBy(route => route.Predicted)
             .ThenBy(route => route.ToExchange)
             .ThenByDescending(RankingRate)
             .ThenByDescending(route => route.FeedsProduction)
@@ -195,14 +194,22 @@ public static class TradeRoutePlanner
     {
         ArgumentNullException.ThrowIfNull(route);
 
-        return route.FeedsProduction ? route.CreditsPerHour : route.CreditsPerHour / 2.0;
+        var rate = route.FeedsProduction ? route.CreditsPerHour : route.CreditsPerHour / 2.0;
+        return route.Predicted ? rate * PredictedRateWeight : rate;
     }
 
     /// <summary>
+    /// What a route on a market's predicted prices counts for against one on prices seen lately (slice 6.46, D131): its rate
+    /// times this. Asked on 2026-11-08: "a predicted 1000 profit should rank lower than a certain 1000 profit. A predicted
+    /// 1000000 profit should rank higher than a certain 1000 profit." A prediction can be wrong (other players trade too), and a
+    /// trip that finds it so at its buy market is dropped, its flight lost.
+    /// </summary>
+    public const double PredictedRateWeight = 0.5;
+
+    /// <summary>
     /// Orders two routes as Rank does (D15, D82, D85, D89, D91, D95, D128): one that feeds the jump gate's chain first, the
-    /// nearest step to the gate first, then one on prices seen lately before one on predicted prices (D131), one that sells to a
-    /// market that exchanges the good last, then by <see cref="RankingRate"/>, a good something is made from first on a tie, then
-    /// by key.
+    /// nearest step to the gate first, one that sells to a market that exchanges the good last, then by <see cref="RankingRate"/>
+    /// (a predicted route's weighed down, D131), a good something is made from first on a tie, then by key.
     /// </summary>
     /// <param name="x">One route.</param>
     /// <param name="y">The other route.</param>
@@ -222,12 +229,6 @@ public static class TradeRoutePlanner
         if (step != 0)
         {
             return step;
-        }
-
-        var predicted = x.Predicted.CompareTo(y.Predicted);
-        if (predicted != 0)
-        {
-            return predicted;
         }
 
         var exchange = x.ToExchange.CompareTo(y.ToExchange);
@@ -1332,8 +1333,8 @@ public sealed record TradeRoute
 
     /// <summary>
     /// Whether the buy or the sell market's prices are predicted, nobody having looked at it lately (PLAN.md slice 6.46, D131,
-    /// <see cref="TradeMarketMap.PredictedMarkets"/>): such a route goes after every route on prices seen lately, the jump gate's
-    /// chain first all the same ("Any trader, fresh first"). False unless set.
+    /// <see cref="TradeMarketMap.PredictedMarkets"/>): such a route ranks at <see cref="TradeRoutePlanner.PredictedRateWeight"/> of
+    /// its rate (<see cref="TradeRoutePlanner.RankingRate"/>), the jump gate's chain first all the same. False unless set.
     /// </summary>
     public bool Predicted { get; init; }
 

@@ -357,7 +357,7 @@ public sealed class SiphonAutomationServiceTests
     [Fact]
     public async Task WhileTheJumpGateNeedsMaterials_NoSiphonDroneIsBought()
     {
-        // D130, asked on 2026-11-08: "Mining and siphoning drones should only be bought in order to keep the market healthy";
+        // D130, asked on 2026-11-08: "Mining and siphoning drones should only be bought in order to keep the market healthy".
         // of the options, "Gate chain only, until done". No gas goes into the gate's materials, so while the gate needs them
         // the scarce gases of WithNoSiphoner_ItBuysTheFirstDrone_WhereItSellsForTheLeast get no drone.
         _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(

@@ -1241,7 +1241,7 @@ buy.
     sold IRON for 105 to 157 within an hour on 2026-10-05, while D52 paid 151 to 155 and F58 150. "Goods not traded" shows
     such a route as "feeds the jump gate's …, … units for … after fuel (D89, D90)".
 - **Ranking** (D15, D82, D85, D95): among the lucrative trips (after those that feed the jump gate, D89, D128, then those on
-  prices seen lately before those on a market's predicted prices, D131, and before those to a
+  one on a market's predicted prices at half its rate, D131, and before those to a
   market that exchanges the good, which come last and never count as feeding production, D91, `TradeRoute.ToExchange`),
   the one that earns most an hour first, an end product's rate counted at half (`TradeRoutePlanner.RankingRate`): one goes
   first only when it earns more than twice as much an hour.
@@ -1298,12 +1298,20 @@ buy.
     gate's loads for that reason (slice 6.44, D127).
   - **Predicted at home** (slice 6.46, D131, asked on 2026-11-08: "Can we make a dead reckoning prediction rule for any
     markets without active ships or probes so that our command ship goes there to trade eventually? ... But only do this for
-    the home system."; chosen "Any trader, fresh first"): a home market older than `Trade.MaxPriceAgeMinutes` that was seen
+    the home system."; chosen "Any trader, fresh first", then: "a predicted 1000 profit should rank lower than a certain 1000
+    profit. A predicted 1000000 profit should rank higher than a certain 1000 profit."): a home market older than `Trade.MaxPriceAgeMinutes` that was seen
     with prices isn't stale: its goods are predicted for now (`MarketDeadReckoning`, `TradeMarketMap.PredictedMarkets`),
-    each price drifted back towards the good's resting price at the market (the median of its samples within a day of its
-    last look) as the time since the look grows, its supply back to its usual level after a while, its trade volume as seen.
-    A route on a predicted market (`TradeRoute.Predicted`) goes after every route on prices seen lately, the gate's chain
-    first all the same; the trading plan logs "goes on predicted prices" for it. A trip reads its system the same way
+    each price drifted back towards the good's resting price at the market on a log scale, e^(−t/τ) of the gap left after the
+    time t since the look. Fitted on the runs of 2026-10-11 to 2026-11-01 (gaps where we didn't trade the good): an export's
+    resting price is the lowest it showed this run, τ 16 hours; an import's the highest of the 24 hours up to the look, τ 4
+    hours; with fewer than 5 looks the supply at the look bounds it (`ExportLadder`, `ImportLadder`). The sell price moves with
+    the purchase price; after 4 hours the supply follows the predicted distance from rest, an export's only growing, an
+    import's only shrinking; the trade volume, and a good the market exchanges, stay as seen. On real gaps of 16 to 32 hours
+    the purchase price was off by a mean 11.8% for exports (21.9% as last seen) and 2.5% for imports (7.6%); the export rule
+    errs on the cheap side when someone else buys meanwhile.
+    A route on a predicted market (`TradeRoute.Predicted`) ranks at half its rate an hour
+    (`TradeRoutePlanner.PredictedRateWeight`), as an end product does (D85), so it goes first only when it earns more than
+    twice as much an hour; the gate's chain first all the same; the trading plan logs "goes on predicted prices" for it. A trip reads its system the same way
     (`ITradeContextReader.ReadTradeAsync`), so it is judged at its buy market as it was chosen, and the market it gets to is
     fresh then. A market never seen with prices, and one abroad, stay stale.
   - **Who crosses systems**, read from D96 with D58, D65, D83 and D86: a ship whose role is trading (the trade role on the
