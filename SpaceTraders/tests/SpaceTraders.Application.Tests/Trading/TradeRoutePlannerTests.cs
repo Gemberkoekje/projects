@@ -261,6 +261,60 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void BeforeTheGateCanBeBuilt_ARouteThatFeedsItRanksAndPaysAsAnyOther()
+    {
+        // D136, asked on 2026-11-08: "Gate-first once the gate can be built". The setting of
+        // Rank_PutsTheRoutesThatFeedTheJumpGatesMaterialsFirst_WhileTheGateNeedsThem, with the purchase order not yet at the gate's
+        // loads: SHIP_PARTS, which earn far more, go first, and IRON for D41 counts as an ordinary route.
+        TradeMarketMap MapWith(bool constructionFirst)
+            => new(
+                Waypoints,
+                [
+                    Market(K85, Good("IRON", "EXPORT", 124, 56, 60), Good("SHIP_PARTS", "EXPORT", 3_920, 1_855, 6), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                    Market(D41, Good("IRON", "IMPORT", 310, 154, 60, "SCARCE"), Good("FAB_MATS", "EXPORT", 1_800, 850, 20), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                    Market(A1, Good("SHIP_PARTS", "IMPORT", 15_620, 7_738, 6), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+                ],
+                new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["FAB_MATS"] = ["IRON", "QUARTZ_SAND"],
+                    ["SHIP_LIGHT_HAULER"] = ["SHIP_PARTS", "SHIP_PLATING"],
+                })
+            {
+                ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+                ConstructionFirst = constructionFirst,
+            };
+
+        var saving = TradeRoutePlanner.Rank(MapWith(constructionFirst: false), CommandShip(), 250_000, 5, NoneHeld);
+        var buildable = TradeRoutePlanner.Rank(MapWith(constructionFirst: true), CommandShip(), 250_000, 5, NoneHeld);
+
+        saving.Select(route => route.TradeSymbol).Should().Equal("SHIP_PARTS", "IRON");
+        saving.Should().OnlyContain(route => !route.FeedsConstruction);
+        buildable.Select(route => (route.TradeSymbol, route.FeedsConstruction)).Should().Equal(("IRON", true), ("SHIP_PARTS", false));
+    }
+
+    [Fact]
+    public void BeforeTheGateCanBeBuilt_ARouteThatFeedsItAtCost_IsNoRoute()
+    {
+        // D136 with D90: the IRON of Rank_TakesARouteThatFeedsTheJumpGate_WhileItsGoodsSellForWhatTheyCost, sold at what it cost,
+        // is worth taking for the gate only once the gate can be built; before, it must earn the minimum as any route does.
+        TradeMarketMap MapWith(bool constructionFirst)
+            => new(
+                Waypoints,
+                [
+                    Market(K85, Good("IRON", "EXPORT", 150, 70, 20), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                    Market(D41, Good("IRON", "IMPORT", 300, 150, 20, "SCARCE"), Good("FAB_MATS", "EXPORT", 1_800, 850, 20), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                ],
+                new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["IRON", "QUARTZ_SAND"] })
+            {
+                ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+                ConstructionFirst = constructionFirst,
+            };
+
+        TradeRoutePlanner.Rank(MapWith(constructionFirst: false), CommandShip(), 250_000, 5, NoneHeld).Should().BeEmpty();
+        TradeRoutePlanner.Rank(MapWith(constructionFirst: true), CommandShip(), 250_000, 5, NoneHeld).Should().ContainSingle();
+    }
+
+    [Fact]
     public void Rank_PutsTheRoutesDownTheJumpGatesChainFirst_TheNearestStepFirst_AndDropsAFinishedMaterialsChain()
     {
         // D128, asked on 2026-11-08 ("Whole prereq chain"): "any trade should be for the gate or its prereqs first. Any complete

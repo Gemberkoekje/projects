@@ -80,6 +80,7 @@ public sealed class TradeMarketMap
         _constructionMaterials = other._constructionMaterials;
         _constructionSteps = other._constructionSteps;
         ConstructionSystemSymbol = other.ConstructionSystemSymbol;
+        ConstructionFirst = other.ConstructionFirst;
         StaleMarkets = other.StaleMarkets;
         PredictionWeights = other.PredictionWeights;
     }
@@ -147,6 +148,13 @@ public sealed class TradeMarketMap
             _constructionSteps = StepsInto(value, _madeFrom);
         }
     }
+
+    /// <summary>
+    /// Whether the routes that feed the jump gate's chain go first, at cost (D89, D90, D128): once the gate can be built, the
+    /// order ships are bought in having reached its loads (PLAN.md slice 6.49, D136). Until then <see cref="ConstructionFeedOf"/>
+    /// names no feed, and such a route ranks and pays as any other. True unless set.
+    /// </summary>
+    public bool ConstructionFirst { get; init; } = true;
 
     /// <summary>
     /// The system whose jump gate needs <see cref="ConstructionMaterials"/> (D68: the headquarters'): only its markets feed the
@@ -323,7 +331,8 @@ public sealed class TradeMarketMap
     /// What a good delivered to a market feeds of the jump gate's chain (D89, PLAN.md slice 6.45, D128): the market imports the good,
     /// below ABUNDANT, and exports something made from it (the production chains) that is one of <see cref="ConstructionMaterials"/>
     /// (step 1, D89) or goes into one, further down the chain (step 2 for an input of a material, and so on: "Whole prereq chain").
-    /// Of several, the nearest step to the gate. On 2026-10-05 the two FAB_MATS markets, D52 and F58, made 1 to 4 units a tick
+    /// Of several, the nearest step to the gate. None until the gate can be built (<see cref="ConstructionFirst"/>, D136). On
+    /// 2026-10-05 the two FAB_MATS markets, D52 and F58, made 1 to 4 units a tick
     /// while their IRON was SCARCE, and the gate needed 1,260 more. A finished material, and every step below it that goes
     /// into nothing else the gate still needs, feeds nothing.
     /// </summary>
@@ -332,7 +341,8 @@ public sealed class TradeMarketMap
     /// <returns>The good made there and its step; <see cref="ConstructionFeed.None"/> when delivering the good there feeds none.</returns>
     public ConstructionFeed ConstructionFeedOf(string waypointSymbol, string tradeSymbol)
     {
-        if (_constructionSteps.Count == 0
+        if (!ConstructionFirst
+            || _constructionSteps.Count == 0
             || (ConstructionSystemSymbol.Length > 0 && !SystemOf(waypointSymbol).Equals(ConstructionSystemSymbol, StringComparison.OrdinalIgnoreCase))
             || !TryGetGood(waypointSymbol, tradeSymbol, out var input)
             || !input.Type.Equals(ImportType, StringComparison.OrdinalIgnoreCase)

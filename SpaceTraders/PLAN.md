@@ -23,12 +23,12 @@
 
 ## Where things stand (2026-11-08)
 
-- **Running:** projects main `da7534f7` (projects#227: slice 6.47, D132–D134, with projects#226: slices 6.45 and 6.46,
-  D128–D131), deployed by gembernodes#136 on 2026-11-08 at 08:10:51Z (gembernodes#135 deployed #226 at 07:43Z). In its first
-  minutes every one of 135 market reads listed transactions, none another agent's: nobody else traded at the home markets.
-  Slice 6.48 (D135) is built on branch `claude/spacetraders-busy-markets`. The server reset on 2026-11-01 at 13:00Z; the
-  bot registered SPECTER again and fulfilled its first contract at 13:50Z. The next reset is expected on 2026-11-08 at 13:00Z
-  (`spacetraders_server_next_reset_timestamp_seconds`).
+- **Running:** projects main `1e5137e5` (projects#228: slice 6.48, D135, with 6.45–6.47), deployed by gembernodes#137 on
+  2026-11-08 at 09:36:42Z. The server reset at 13:00Z; the bot looped through six restarts while it answered "The universe is
+  being reset" (B23) and was back at 13:06:42Z as `SPECTER@2026-11-08`, home X1-VP96, its first contract fulfilled at 13:54Z.
+  From 13:54Z every trade fed the gate's chain, then at −400 to +3,000 credits a trip, and the credits stood at about 125,000
+  from 14:20Z, too few for the list's light haulers or home's probes: D136, slice 6.49, built on branch
+  `claude/spacetraders-gate-when-buildable`.
 - **The goal: the home jump gate done within 24 hours of a reset** (asked on 2026-11-08). The run of 2026-11-01 didn't get
   close (read on 2026-11-08 at 06:22Z, from Loki, Prometheus and the database): at hour 24 the gate had 260 of 1,600 FAB_MATS
   and 240 of 400 ADVANCED_CIRCUITRY; FAB_MATS were done at hour 49; at hour 113 it still lacked 60 circuitry, its last at hour
@@ -233,6 +233,7 @@ get the next D-number.
 | D133 | Slice 6.47 (asked on 2026-11-08): "I'd like to check the market history. The more other players are trading there, the lower the prediction accuracy should be. This should count for the entire system, not just the market itself. In fact, I'd like it to ripple out. So the market itself should get the biggest accuracy hit, the system should get a smaller accuracy hit, and the systems 1 jump out should get an even smaller accuracy hit. This all of course only counts for predicted prices, any location with a parked probe just has accurate prices." A market read lists the market's recent transactions with each ship's symbol (the API's spec: "Visible only when a ship is present at the market"); the bot ignored them. Asked how to measure other players' trading, and how strong the ripple is. | **The markets' transaction lists, 1 : ½ : ¼** ("Market transaction lists (Recommended)", "1 : ½ : ¼ (Recommended)", 2026-11-08): the other agents' transactions are stored once each (kept 7 days, shown in Grafana); a predicted market's weight counts those of the last day, the market's own fully, the rest of its system's at half, the systems one jump away at a quarter; 90% with none, halved by every 10 weighed transactions, never below 10%; all five numbers are settings (`Prediction.*`). A route on two predicted markets is trusted at both weights multiplied. A market seen lately counts fully. Replaces D131's fixed half. |
 | D134 | Slice 6.47 (asked on 2026-11-08): "Probe parkings should also prioritize any location that promises bigger profits, so bigger profits are more accurate earlier." The probes roamed to the market whose prices were oldest, less twice the flight (slice 6.3), after the shipyards (D109, D110), home first (D127). Asked where the promise ranks against those rules. | **Within the current tiers** ("Within the current tiers (Recommended)", 2026-11-08): home first and the shipyards first stay; among the other markets a probe goes to one never seen first, then the one that promises most, then by age as before. A market's promise is the most a route through it earns an hour at its predicted prices, reckoned for a light hauler flying from the buy market, times how far those prices aren't trusted (1 − its weight, D133); a market seen lately promises nothing. Read as: a market never seen comes first, as nothing predicts it. Amends slice 6.3's order. |
 | D135 | Slice 6.48 (asked on 2026-11-08): "Probes should also prioritize markets with a lot of players. As the accuracy of predictions is low, but the actual profits could be high." D134's promise, a predicted route times the doubt, already grew with other players' trading through the weight (D133), but a busy market whose predicted prices showed no route promised nothing, and a market seen lately none at all. | **Add their trade flow to the promise** ("Add their trade flow to the promise (Recommended)", 2026-11-08): every market's promise adds `Prediction.ProbeFlowSharePercent` (10) of what the other agents traded there an hour over the last day (units times price); the predicted route's part counts only while its prices are predicted. Amends D134. |
+| D136 | Slice 6.49 (asked on 2026-11-08, hour 1.7 of the run of 2026-11-08): D128 put the gate's chain first at all times and, as read, at cost at every step (D90). After the contract, the command ship's first four gate trades earned 44,527, 32,345, 19,801 and 18,450 (microprocessors and electronics for D41's circuitry); then the margins went, and from 14:01Z its and the shuttle's trips earned −392 to +3,656, every one for the gate's chain, while the credits stood at about 125,000 from 14:20Z, below the light haulers of `Trade.ShipPurchases` (about 257,000 and the reserve) and home's probes, which come before the gate's loads (D43, D127). Asked how the chain's trades should rank. | **Gate-first once the gate can be built** ("Gate-first once the gate can be built (Recommended)", 2026-11-08): until the order ships are bought in reaches the gate's loads (no plan needs anything before them: the contract's drone, the surveyors, the list's cargo ships, home's probes), a route that feeds the gate's chain ranks and pays as any other (no first place, no at cost); from then on, gate-first at all times as D128. Read as: the gate's materials stay off every route all the same (D128), and the drones stay the gate's miners only (D130), as neither held the credits back. Amends D89, D90 and D128. |
 
 ## Phases
 
@@ -335,7 +336,8 @@ stays your call; Claude only fixes deviations from intended behaviour.
   the gate (D128–D130), built (below)
 - 6.46 Dead reckoning for the home markets nobody looks at (D131), merged (below)
 - 6.47 Predictions everywhere, trusted by who else trades, and probes where most is at stake (D132–D134), deployed (below)
-- 6.48 Probes to the busy markets (D135), built (below)
+- 6.48 Probes to the busy markets (D135), deployed (below)
+- 6.49 Gate-first once the gate can be built (D136), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -470,7 +472,8 @@ the gates of other systems (D68).
     agents trade at home. Both show in `spacetraders_market_other_agent_trades` once deployed.
   - To understand this, start with `PredictionConfidence` in `Trading/PredictionConfidence.cs`, then `PredictAsync` in
     `Trading/TradeContextReader.cs` and `PromisesAsync` in `Automation/ProbeDeploymentPlanService.cs`.
-- **6.48 Probes to the busy markets** (D135; asked on 2026-11-08): built on branch `claude/spacetraders-busy-markets`.
+- **6.48 Probes to the busy markets** (D135; asked on 2026-11-08): merged as projects#228, deployed by gembernodes#137 on
+  2026-11-08 at 09:36:42Z.
   - `MarketTradeCount.Credits` (units times price, summed by `MarketTradeRepository.CountSinceAsync`); `ProbePromise.Of` (pure):
     the predicted route times the doubt plus `Prediction.ProbeFlowSharePercent` of the other agents' credits an hour;
     `ProbeDeploymentPlanService.PromisesAsync` now gives every market of the system a promise, read with
@@ -480,3 +483,17 @@ the gates of other systems (D68).
     before), `MarketTradeRepositoryTests` (the credits), `DefaultSettingsSeedTests` (the setting).
   - To understand this, start with `ProbePromise` in `Probes/ProbePromiseCache.cs`, then `PromisesAsync` in
     `Automation/ProbeDeploymentPlanService.cs`.
+- **6.49 Gate-first once the gate can be built** (D136; asked on 2026-11-08): built on branch
+  `claude/spacetraders-gate-when-buildable`.
+  - `PurchaseNeeds.OpenBefore(tier, now)`: whether a plan said lately it needs something before a tier;
+    `TradeContextReader` sets `TradeMarketMap.ConstructionFirst` (new, true unless set) to "nothing open before
+    `PurchaseTier.Construction`" on every map it reads; `ConstructionFeedOf` names no feed while it is false, so a chain route
+    neither ranks first nor runs at cost (`IsWorthIt`, the executor's `feedsGate`, the journal's "steps from the jump gate"),
+    and a cargo ship beyond the list finds no gate route to be bought for (D129).
+  - Tests: `TradeRoutePlannerTests` `BeforeTheGateCanBeBuilt_ARouteThatFeedsItRanksAndPaysAsAnyOther` and
+    `BeforeTheGateCanBeBuilt_ARouteThatFeedsItAtCost_IsNoRoute`, `TradeContextReaderTests`
+    `TheGatesChainGoesFirst_OnlyOnceThePurchaseOrderHasReachedTheGatesLoads`; each failed before.
+  - To check on the run: the credits grow again until the list and home's probes are bought, and "steps from the jump gate"
+    trades start once the construction plan's loads are next.
+  - To understand this, start with `GateCanBeBuilt` in `Trading/TradeContextReader.cs`, then `ConstructionFeedOf` in
+    `Trading/TradeMarketMap.cs`.
