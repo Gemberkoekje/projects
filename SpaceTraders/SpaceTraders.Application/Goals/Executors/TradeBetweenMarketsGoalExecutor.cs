@@ -120,7 +120,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         var bought = Aboard(ship, trade.TradeSymbol);
 
         // D90: a trip that feeds the jump gate's material only has to sell its goods for what they cost.
-        var feedsGate = context.Map.ConstructionMaterialMadeFrom(trade.SellWaypointSymbol, trade.TradeSymbol).Length > 0;
+        var feedsGate = context.Map.ConstructionFeedOf(trade.SellWaypointSymbol, trade.TradeSymbol).Feeds;
         var minimum = feedsGate ? 0 : context.MinProfitPerUnit;
         if (bought == 0)
         {
@@ -258,11 +258,11 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         }
 
         var system = ship.SystemSymbol ?? string.Empty;
-        var context = await tradeContexts.ReadAsync(system, ct);
+        var context = await tradeContexts.ReadTradeAsync(system, ct);
         var sellsHere = context.Map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var here) && here.SellPrice > 0;
 
         // D90: a trip that feeds the jump gate's material only has to sell its goods for what they cost.
-        var feedsGate = context.Map.ConstructionMaterialMadeFrom(trade.SellWaypointSymbol, trade.TradeSymbol).Length > 0;
+        var feedsGate = context.Map.ConstructionFeedOf(trade.SellWaypointSymbol, trade.TradeSymbol).Feeds;
         if (!Pays(here, trade, context.MinProfitPerUnit, feedsGate)
             && TryFindBetterSale(context.Map, ship, trade, units, sellsHere ? here.SellPrice : 0, out var elsewhere))
         {
@@ -298,7 +298,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             left -= batch;
             current = current with { Earned = current.Earned + revenue };
             await goals.SetActiveGoalAsync(ship.Symbol, current, ct);
-            map = (await tradeContexts.ReadAsync(system, ct)).Map;
+            map = (await tradeContexts.ReadTradeAsync(system, ct)).Map;
         }
 
         if (left > 0)
@@ -408,7 +408,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             return await AbroadAsync(ship, trade, destination, ct);
         }
 
-        var context = await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct);
+        var context = await tradeContexts.ReadTradeAsync(ship.SystemSymbol ?? string.Empty, ct);
         return await GoalFlight.TowardsAsync(context.Map, ship, destination, dock, bus, ct);
     }
 
@@ -449,7 +449,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     /// </summary>
     private Task<TradeContext> HaulContextAsync(string system, TradeBetweenMarketsGoal trade, CancellationToken ct)
         => string.Equals(system, WaypointSymbols.SystemOf(trade.SellWaypointSymbol), StringComparison.OrdinalIgnoreCase)
-            ? tradeContexts.ReadAsync(system, ct)
+            ? tradeContexts.ReadTradeAsync(system, ct)
             : tradeContexts.ReadReachAsync(system, ct);
 
     /// <summary>

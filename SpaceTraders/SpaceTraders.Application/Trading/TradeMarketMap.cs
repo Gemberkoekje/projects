@@ -28,7 +28,7 @@ public sealed class TradeMarketMap
     private readonly HashSet<string> _madeInto;
     private readonly long _averageFuelPrice;
     private readonly IReadOnlySet<string> _constructionMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _goingIntoConstruction = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _constructionSteps = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Builds the map of one system, or of several (slice 6.29).</summary>
     /// <param name="waypoints">The systems' waypoints, with their coordinates.</param>
@@ -77,9 +77,10 @@ public sealed class TradeMarketMap
         _madeInto = other._madeInto;
         _averageFuelPrice = other._averageFuelPrice;
         _constructionMaterials = other._constructionMaterials;
-        _goingIntoConstruction = other._goingIntoConstruction;
+        _constructionSteps = other._constructionSteps;
         ConstructionSystemSymbol = other.ConstructionSystemSymbol;
         StaleMarkets = other.StaleMarkets;
+        PredictedMarkets = other.PredictedMarkets;
     }
 
     /// <summary>The systems' waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
@@ -108,6 +109,18 @@ public sealed class TradeMarketMap
     public IReadOnlySet<string> StaleMarkets { get; init; } = NoMarkets;
 
     /// <summary>
+    /// The markets of the home system nobody has looked at within <c>Trade.MaxPriceAgeMinutes</c>, whose goods the map holds as
+    /// predicted for now (PLAN.md slice 6.46, D131, <see cref="MarketDeadReckoning"/>) instead of leaving them stale: a route
+    /// may buy or sell there, after every route on prices seen lately. None unless set.
+    /// </summary>
+    public IReadOnlySet<string> PredictedMarkets { get; init; } = NoMarkets;
+
+    /// <summary>Whether the map holds a market's goods as predicted (<see cref="PredictedMarkets"/>, D131).</summary>
+    /// <param name="waypointSymbol">The market's waypoint.</param>
+    /// <returns>True for a predicted market.</returns>
+    public bool IsPredicted(string waypointSymbol) => PredictedMarkets.Contains(waypointSymbol);
+
+    /// <summary>
     /// The materials the system's jump gate still needs, while the construction plan buys them (PLAN.md slice 6.22, D89): the
     /// routes that feed the markets making them come first. None unless set.
     /// </summary>
@@ -117,7 +130,7 @@ public sealed class TradeMarketMap
         init
         {
             _constructionMaterials = value;
-            _goingIntoConstruction = GoodsGoingInto(value, _madeFrom);
+            _constructionSteps = StepsInto(value, _madeFrom);
         }
     }
 
@@ -250,7 +263,20 @@ public sealed class TradeMarketMap
     /// </summary>
     /// <param name="tradeSymbol">The good.</param>
     /// <returns>True when more of the good makes more of what the gate needs.</returns>
-    public bool GoesIntoConstruction(string tradeSymbol) => _goingIntoConstruction.Contains(tradeSymbol);
+    public bool GoesIntoConstruction(string tradeSymbol) => _constructionSteps.ContainsKey(tradeSymbol);
+
+    /// <summary>
+    /// Whether a market sells one of the materials the jump gate still needs, in the gate's system (PLAN.md slice 6.45, D128):
+    /// no trade route buys it there. Asked on 2026-11-08, after the gate of 2026-11-01 waited four days for its last 60
+    /// ADVANCED_CIRCUITRY while our traders bought 520 at its only seller, X1-UK3-D45, for a 700-credit trade to A4: "Traders leave
+    /// gate goods".
+    /// </summary>
+    /// <param name="waypointSymbol">The market's waypoint.</param>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <returns>True when the good is the gate's material and the market is in its system.</returns>
+    public bool IsConstructionMaterialAt(string waypointSymbol, string tradeSymbol)
+        => ConstructionMaterials.Contains(tradeSymbol)
+            && (ConstructionSystemSymbol.Length == 0 || SystemOf(waypointSymbol).Equals(ConstructionSystemSymbol, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// The pricier good a market makes from <paramref name="tradeSymbol"/>: the market imports the good,
@@ -280,33 +306,36 @@ public sealed class TradeMarketMap
     }
 
     /// <summary>
-    /// The jump gate's material a market makes from a good delivered there (D89): the market imports the good, below ABUNDANT,
-    /// and exports one of <see cref="ConstructionMaterials"/> made from it (the production chains), so more of the good grows
-    /// that production. On 2026-10-05 the two FAB_MATS markets, D52 and F58, made 1 to 4 units a tick while their IRON was
-    /// SCARCE, and the gate needed 1,260 more.
+    /// What a good delivered to a market feeds of the jump gate's chain (D89, PLAN.md slice 6.45, D128): the market imports the good,
+    /// below ABUNDANT, and exports something made from it (the production chains) that is one of <see cref="ConstructionMaterials"/>
+    /// (step 1, D89) or goes into one, further down the chain (step 2 for an input of a material, and so on: "Whole prereq chain").
+    /// Of several, the nearest step to the gate. On 2026-10-05 the two FAB_MATS markets, D52 and F58, made 1 to 4 units a tick
+    /// while their IRON was SCARCE, and the gate needed 1,260 more. A finished material, and every step below it that goes
+    /// into nothing else the gate still needs, feeds nothing.
     /// </summary>
     /// <param name="waypointSymbol">The market's waypoint.</param>
     /// <param name="tradeSymbol">The good delivered.</param>
-    /// <returns>The material, or empty when delivering the good there feeds none.</returns>
-    public string ConstructionMaterialMadeFrom(string waypointSymbol, string tradeSymbol)
+    /// <returns>The good made there and its step; <see cref="ConstructionFeed.None"/> when delivering the good there feeds none.</returns>
+    public ConstructionFeed ConstructionFeedOf(string waypointSymbol, string tradeSymbol)
     {
-        if (ConstructionMaterials.Count == 0
+        if (_constructionSteps.Count == 0
             || (ConstructionSystemSymbol.Length > 0 && !SystemOf(waypointSymbol).Equals(ConstructionSystemSymbol, StringComparison.OrdinalIgnoreCase))
             || !TryGetGood(waypointSymbol, tradeSymbol, out var input)
             || !input.Type.Equals(ImportType, StringComparison.OrdinalIgnoreCase)
             || input.Supply.Equals(AbundantSupply, StringComparison.OrdinalIgnoreCase))
         {
-            return string.Empty;
+            return ConstructionFeed.None;
         }
 
         return GoodsAt(waypointSymbol)
             .Where(export => export.Type.Equals(ExportType, StringComparison.OrdinalIgnoreCase)
-                && ConstructionMaterials.Contains(export.Symbol)
+                && _constructionSteps.ContainsKey(export.Symbol)
                 && _madeFrom.TryGetValue(export.Symbol, out var inputs)
                 && inputs.Contains(tradeSymbol, StringComparer.OrdinalIgnoreCase))
-            .Select(export => export.Symbol)
-            .Order(StringComparer.Ordinal)
-            .FirstOrDefault() ?? string.Empty;
+            .Select(export => new ConstructionFeed(export.Symbol, _constructionSteps[export.Symbol] + 1))
+            .OrderBy(feed => feed.Step)
+            .ThenBy(feed => feed.TradeSymbol, StringComparer.Ordinal)
+            .FirstOrDefault() ?? ConstructionFeed.None;
     }
 
     /// <summary>
@@ -344,22 +373,54 @@ public sealed class TradeMarketMap
     public bool Exchanges(string waypointSymbol, string tradeSymbol)
         => TryGetGood(waypointSymbol, tradeSymbol, out var good) && good.Type.Equals(ExchangeType, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>The materials, and every good they are made from, directly or further down the production chains.</summary>
-    private static HashSet<string> GoodsGoingInto(IEnumerable<string> materials, IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom)
+    /// <summary>
+    /// The materials, and every good they are made from, directly or further down the production chains, each with its step
+    /// from the gate: 0 for a material, 1 for what a material is made from, and so on, the shortest way down.
+    /// </summary>
+    private static Dictionary<string, int> StepsInto(IEnumerable<string> materials, IReadOnlyDictionary<string, IReadOnlyList<string>> madeFrom)
     {
-        var goods = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var next = new Queue<string>(materials);
-        while (next.TryDequeue(out var good))
+        var steps = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var next = new Queue<(string Good, int Step)>(materials.Select(material => (material, 0)));
+        while (next.TryDequeue(out var entry))
         {
-            if (goods.Add(good) && madeFrom.TryGetValue(good, out var inputs))
+            if (steps.TryAdd(entry.Good, entry.Step) && madeFrom.TryGetValue(entry.Good, out var inputs))
             {
                 foreach (var input in inputs)
                 {
-                    next.Enqueue(input);
+                    next.Enqueue((input, entry.Step + 1));
                 }
             }
         }
 
-        return goods;
+        return steps;
     }
+}
+
+/// <summary>
+/// What a delivery feeds of the jump gate's chain (<see cref="TradeMarketMap.ConstructionFeedOf"/>, D89, D128): the good the sell
+/// market makes from it, and how many steps that is from the gate (1: the gate's material itself).
+/// </summary>
+public sealed record ConstructionFeed
+{
+    /// <summary>Creates a feed.</summary>
+    /// <param name="TradeSymbol">The good made from the delivery; empty for none.</param>
+    /// <param name="Step">1 when it is a material the gate needs, 2 when it goes into one, and so on; 0 for none.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ConstructionFeed(string TradeSymbol, int Step)
+    {
+        this.TradeSymbol = TradeSymbol;
+        this.Step = Step;
+    }
+
+    /// <summary>Feeds nothing the gate needs.</summary>
+    public static ConstructionFeed None { get; } = new(string.Empty, 0);
+
+    /// <summary>The good made from the delivery; empty for none.</summary>
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>1 when it is a material the gate needs, 2 when it goes into one, and so on; 0 for none.</summary>
+    public required int Step { get; init; }
+
+    /// <summary>Whether the delivery feeds the gate's chain.</summary>
+    public bool Feeds => Step > 0;
 }

@@ -939,6 +939,55 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task WhileTheJumpGateNeedsMaterials_ACargoShipBeyondTheList_IsBoughtOnlyForARouteDownTheGatesChain_AtTheGatesPlace()
+    {
+        // D129, asked on 2026-11-08: "Explorers and probes are worthless without the gate. Any extra cargo ships should only be
+        // bought if it serves the goal of getting the gate done within 24 hours of a reset." The setting of
+        // BeyondTheList_ACargoShipIsBought_OnlyOnceARouteWorthTheMinimumHasWaitedForOne, with the gate needing FAB_MATS: the
+        // EQUIPMENT for D41 that waits feeds nothing of the gate, so no ship, however long it waits. Once D41 makes FAB_MATS from
+        // EQUIPMENT (a stand-in chain), the route feeds the gate (D128): after its 30 minutes the hauler is bought at the gate's
+        // place in the order, as the gate's miners are (D92), not on the clock before the probes.
+        SurveyPlanOn();
+        _settings.GetAsync<long>(TradingAutomationService.ShipPurchaseMinRouteProfitSetting, Arg.Any<CancellationToken>()).Returns(10_000L);
+        _settings.GetAsync<int>(TradingAutomationService.ShipPurchaseWaitMinutesSetting, Arg.Any<CancellationToken>()).Returns(30);
+        TradeMarketMap GateMap(bool d41MakesFabMats)
+        {
+            var d41 = Market(D41, Good("EQUIPMENT", "IMPORT", 7_032, 3_487, 80, "LIMITED"), Good("MEDICINE", "EXPORT", 4_867, 2_227, 40), Good("FUEL", "EXCHANGE", 76, 69, 180));
+            return new TradeMarketMap(
+                Waypoints,
+                [
+                    Market(K85, Good("EQUIPMENT", "EXPORT", 3_254, 1_456, 80), Good("FOOD", "EXPORT", 2_360, 1_069, 60), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                    d41MakesFabMats ? d41 with { TradeGoods = [.. d41.TradeGoods, Good("FAB_MATS", "EXPORT", 1_800, 850, 20)], Exports = ["FAB_MATS"] } : d41,
+                    A1Market(),
+                ],
+                new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = d41MakesFabMats ? ["EQUIPMENT"] : ["IRON", "QUARTZ_SAND"] })
+            {
+                ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+            };
+        }
+
+        var busy = Shuttle("SHIP-5") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+        Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) }, busy, busy with { Symbol = "SHIP-6" }, busy with { Symbol = "SHIP-7" });
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(GateMap(d41MakesFabMats: false), 1_000_000));
+
+        await RunAsync();
+        _demand.Backdate(TimeSpan.FromMinutes(30));
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(PurchaseNeed.None, "the route that waits feeds nothing of the gate");
+        await NothingBoughtAsync();
+
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(GateMap(d41MakesFabMats: true), 1_000_000));
+
+        await RunAsync();
+        _demand.Backdate(TimeSpan.FromMinutes(30));
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Construction, "SHIP_LIGHT_HAULER", A1, 354_210));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task BeyondTheList_TheLargestHoldWithinTheTradeReach_IsBought_WhereAProbeOfOursAnswersTheCall()
     {
         // Slice 6.33 (D112), asked on 2026-10-07: "when buying a new trade ship (purchasing order 9) it should pick whatever the

@@ -333,6 +333,8 @@ public sealed class SiphonAutomationService(
     ///   way held) would serve a market short of its gas (<see cref="PurchaseTier.Alternating"/>, D22, D28, D32), which,
     ///   with the role board on, the board would have siphon (<see cref="IRoleAdvisor"/>).</item>
     /// </list>
+    /// None while the home jump gate needs materials (slice 6.45, D130: "Gate chain only, until done"): no gas goes into its
+    /// materials, and only the gate's miners are bought (D92).
     /// </summary>
     private async Task<PurchaseNeed> DroneNeedAsync(
         IReadOnlyList<ShipModel> fleet,
@@ -371,6 +373,12 @@ public sealed class SiphonAutomationService(
 
             var (shipyard, forSale) = listing;
             var map = (await tradeContexts.ReadAsync(systemSymbol, cancellationToken)).Map;
+            if (map.ConstructionMaterials.Count > 0)
+            {
+                logger.LogDebug("Siphon plan: no siphon drone bought in {SystemSymbol} while the jump gate needs materials (D130).", systemSymbol);
+                continue;
+            }
+
             var newDrone = new ShipModel(
                 "NEW-DRONE",
                 systemSymbol,

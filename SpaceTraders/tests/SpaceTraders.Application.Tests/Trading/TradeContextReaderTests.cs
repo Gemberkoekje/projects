@@ -29,6 +29,8 @@ public sealed class TradeContextReaderTests
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly IGateNetwork _gates = Substitute.For<IGateNetwork>();
     private readonly ISystemRepository _systems = Substitute.For<ISystemRepository>();
+    private readonly IMarketPriceSampleRepository _samples = Substitute.For<IMarketPriceSampleRepository>();
+    private readonly MarketHistoryCache _history = new();
 
     public TradeContextReaderTests()
     {
@@ -136,6 +138,63 @@ public sealed class TradeContextReaderTests
     }
 
     [Fact]
+    public async Task AHomeMarketNobodyLookedAtLately_IsPredictedForNow_InsteadOfStale_ButOnlyAtHome()
+    {
+        // D131, asked on 2026-11-08: "Can we make a dead reckoning prediction rule for any markets without active ships or
+        // probes so that our command ship goes there to trade eventually? ... But only do this for the home system." K88 was
+        // seen 18 hours ago with CLOTHING at 3,400, which our purchases had raised; before, it stood at 2,950. A1 was never seen
+        // with prices: it stays stale (a market abroad does too, as TheReach_MapsTheSystemsWithinTwiceItsJumps_... shows). The
+        // plain map of the system (ReadAsync) predicts nothing; a trade trip's (ReadTradeAsync) does.
+        var now = DateTimeOffset.UtcNow;
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, "X1-FJ91-A1", 2_000_000, "COBALT", 3));
+        _waypoints.GetBySystemAsync(System, Arg.Any<CancellationToken>()).Returns(
+        [
+            new WaypointCacheModel("X1-FJ91-K88", System, "PLANET", 0, 0, true, false, now),
+            new WaypointCacheModel("X1-FJ91-A1", System, "PLANET", 10, 10, true, false, now),
+        ]);
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Snapshot("X1-FJ91-K88", System, new TradeGoodSnapshot("CLOTHING", "EXPORT", 3_400, 1_600, 20, "LIMITED")),
+            Snapshot("X1-FJ91-A1", System),
+            Snapshot("X1-HN44-A1", "X1-HN44", new TradeGoodSnapshot("EQUIPMENT", "IMPORT", 9_000, 5_000, 20, "MODERATE")),
+        ]);
+        _markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new MarketFreshnessRecord("X1-FJ91-K88", System, now.AddHours(-18)),
+            new MarketFreshnessRecord("X1-FJ91-A1", System, now.AddHours(-1), HasPrices: false),
+            new MarketFreshnessRecord("X1-HN44-A1", "X1-HN44", now.AddMinutes(-40)),
+        ]);
+        _samples.GetWaypointPricesAsync("X1-FJ91-K88", Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(
+        [
+            new MarketPriceSampleDto(now.AddHours(-22), "X1-FJ91-K88", "CLOTHING", 2_950, 1_400, "MODERATE", "WEAK", 20),
+            new MarketPriceSampleDto(now.AddHours(-21), "X1-FJ91-K88", "CLOTHING", 2_950, 1_400, "MODERATE", "WEAK", 20),
+            new MarketPriceSampleDto(now.AddHours(-20), "X1-FJ91-K88", "CLOTHING", 2_950, 1_400, "MODERATE", "WEAK", 20),
+            new MarketPriceSampleDto(now.AddHours(-19), "X1-FJ91-K88", "CLOTHING", 2_950, 1_400, "MODERATE", "WEAK", 20),
+            new MarketPriceSampleDto(now.AddHours(-18), "X1-FJ91-K88", "CLOTHING", 3_400, 1_600, "LIMITED", "WEAK", 20),
+        ]);
+
+        var reach = (await Reader().ReadReachAsync(System, CancellationToken.None)).Map;
+        var trip = (await Reader().ReadTradeAsync(System, CancellationToken.None)).Map;
+        var plain = (await Reader().ReadAsync(System, CancellationToken.None)).Map;
+
+        reach.PredictedMarkets.Should().BeEquivalentTo(["X1-FJ91-K88"]);
+        reach.StaleMarkets.Should().BeEquivalentTo(["X1-FJ91-A1"]);
+        reach.IsFresh("X1-FJ91-K88").Should().BeTrue("a predicted market takes routes again");
+        reach.TryGetGood("X1-FJ91-K88", "CLOTHING", out var predicted).Should().BeTrue();
+        // An export drifts back to the lowest price it showed this run, a gap of e^(-18/16) left after 18 hours.
+        var expected = (int)Math.Round(Math.Exp(Math.Log(2_950) + ((Math.Log(3_400) - Math.Log(2_950)) * Math.Exp(-18.0 / 16))));
+        predicted.PurchasePrice.Should().BeCloseTo(expected, 2);
+        predicted.Supply.Should().Be("HIGH", "nearly back at its resting price, nobody buying");
+        trip.PredictedMarkets.Should().BeEquivalentTo(["X1-FJ91-K88"]);
+        trip.TryGetGood("X1-FJ91-K88", "CLOTHING", out var forTrip).Should().BeTrue();
+        forTrip.PurchasePrice.Should().BeCloseTo(expected, 2);
+        await _samples.Received(1).GetWaypointPricesAsync("X1-FJ91-K88", Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        plain.PredictedMarkets.Should().BeEmpty();
+        plain.TryGetGood("X1-FJ91-K88", "CLOTHING", out var asSeen).Should().BeTrue();
+        asSeen.PurchasePrice.Should().Be(3_400);
+    }
+
+    [Fact]
     public async Task TheFreshMarkets_AreThoseSeenWithPricesWithinTheAge_InEverySystem()
     {
         // Slice 6.40 (D122): mining abroad reads only these, as a trade route does (D96). Trade.MaxPriceAgeMinutes unset: 30.
@@ -168,5 +227,6 @@ public sealed class TradeContextReaderTests
     private void ConstructionPlanOn(bool on)
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), Arg.Any<CancellationToken>()).Returns(on);
 
-    private TradeContextReader Reader() => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems);
+    private TradeContextReader Reader()
+        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history));
 }

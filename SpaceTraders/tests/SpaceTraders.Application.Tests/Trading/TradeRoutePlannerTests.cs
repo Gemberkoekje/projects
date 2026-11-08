@@ -229,6 +229,119 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void Rank_BuysNoMaterialTheJumpGateStillNeeds_InTheGatesSystem()
+    {
+        // D128, asked on 2026-11-08 ("Traders leave gate goods"): the gate of 2026-11-01 waited four days for its last 60
+        // ADVANCED_CIRCUITRY while our traders bought 520 at its only seller, X1-UK3-D45, every ~2.5 hours, for about 700 a trip
+        // at A4, which makes QUANTUM_DRIVES from it (D15); each purchase knocked D45 back to SCARCE, so the gate (D66) never
+        // bought. Here D41 sells the circuitry and A1 makes QUANTUM_DRIVES from it: no route while the gate needs it, the route
+        // back once the gate has all it needs.
+        TradeMarketMap MapWith(params string[] materials)
+            => new(
+                Waypoints,
+                [
+                    Market(D41, Good("ADVANCED_CIRCUITRY", "EXPORT", 6_494, 3_100, 20, "LIMITED"), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                    Market(A1, Good("ADVANCED_CIRCUITRY", "IMPORT", 12_986, 6_540, 20, "LIMITED"), Good("QUANTUM_DRIVES", "EXPORT", 40_000, 20_000, 10), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+                ],
+                new Dictionary<string, IReadOnlyList<string>> { ["QUANTUM_DRIVES"] = ["ADVANCED_CIRCUITRY"] })
+            {
+                ConstructionMaterials = new HashSet<string>(materials, StringComparer.OrdinalIgnoreCase),
+                ConstructionSystemSymbol = SystemSymbol,
+            };
+
+        var needed = MapWith("ADVANCED_CIRCUITRY");
+        var done = MapWith();
+
+        TradeRoutePlanner.Rank(needed, CommandShip(), 250_000, 5, NoneHeld).Should().BeEmpty("the gate still needs ADVANCED_CIRCUITRY");
+        TradeRoutePlanner.Judge(needed, CommandShip(), 250_000, 5, NoneHeld)
+            .Should().ContainSingle(judgement => judgement.Route.TradeSymbol == "ADVANCED_CIRCUITRY")
+            .Which.Check.Should().Be(TradeRouteCheck.GateMaterial);
+        TradeRoutePlanner.Rank(done, CommandShip(), 250_000, 5, NoneHeld)
+            .Should().ContainSingle().Which.TradeSymbol.Should().Be("ADVANCED_CIRCUITRY", "the gate needs none any more");
+    }
+
+    [Fact]
+    public void Rank_PutsTheRoutesDownTheJumpGatesChainFirst_TheNearestStepFirst_AndDropsAFinishedMaterialsChain()
+    {
+        // D128, asked on 2026-11-08 ("Whole prereq chain"): "any trade should be for the gate or its prereqs first. Any complete
+        // prereqs (e.g. fab mats that are done) should be removed from that list." D41 makes MICROPROCESSORS from COPPER, which go
+        // into the gate's ADVANCED_CIRCUITRY (step 2); A1 makes ADVANCED_CIRCUITRY from MICROPROCESSORS (step 1); EQUIPMENT for
+        // I56 earns far more and feeds nothing of the gate. Step 1 goes first, then step 2, then the rest; with the circuitry
+        // done, COPPER feeds nothing any more.
+        TradeMarketMap MapWith(params string[] materials)
+            => new(
+                Waypoints,
+                [
+                    Market(K85, Good("COPPER", "EXPORT", 200, 90, 40), Good("MICROPROCESSORS", "EXPORT", 1_000, 450, 40), Good("EQUIPMENT", "EXPORT", 1_500, 700, 40), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                    Market(D41, Good("COPPER", "IMPORT", 440, 210, 40, "SCARCE"), Good("MICROPROCESSORS", "EXPORT", 1_100, 500, 40), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                    Market(A1, Good("MICROPROCESSORS", "IMPORT", 2_200, 1_020, 40, "LIMITED"), Good("ADVANCED_CIRCUITRY", "EXPORT", 7_000, 3_200, 20), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+                    Market(I56, Good("EQUIPMENT", "IMPORT", 8_000, 4_000, 40), Good("FUEL", "EXCHANGE", 86, 76, 180)),
+                ],
+                new Dictionary<string, IReadOnlyList<string>>
+                {
+                    ["ADVANCED_CIRCUITRY"] = ["ELECTRONICS", "MICROPROCESSORS"],
+                    ["MICROPROCESSORS"] = ["SILICON_CRYSTALS", "COPPER"],
+                    ["MACHINERY"] = ["EQUIPMENT"],
+                })
+            {
+                ConstructionMaterials = new HashSet<string>(materials, StringComparer.OrdinalIgnoreCase),
+                ConstructionSystemSymbol = SystemSymbol,
+            };
+
+        var needed = TradeRoutePlanner.Rank(MapWith("ADVANCED_CIRCUITRY"), CommandShip(), 1_000_000, 5, NoneHeld);
+        var done = TradeRoutePlanner.Rank(MapWith(), CommandShip(), 1_000_000, 5, NoneHeld);
+
+        needed.Take(3).Select(route => (route.TradeSymbol, route.SellWaypointSymbol, route.ConstructionMaterial, route.ConstructionStep))
+            .Should().Equal(("MICROPROCESSORS", A1, "ADVANCED_CIRCUITRY", 1), ("COPPER", D41, "MICROPROCESSORS", 2), ("EQUIPMENT", I56, string.Empty, 0));
+        needed[2].CreditsPerHour.Should().BeGreaterThan(needed[1].CreditsPerHour, "the chain goes first, whatever the rest earns");
+        TradeRoutePlanner.CompareBestFirst(needed[0], needed[1]).Should().BeNegative("the nearest step to the gate goes first");
+        TradeRoutePlanner.CompareBestFirst(needed[1], needed[2]).Should().BeNegative();
+        done.Should().OnlyContain(route => !route.FeedsConstruction, "a finished material's chain feeds nothing");
+        done[0].TradeSymbol.Should().Be("EQUIPMENT");
+    }
+
+    [Fact]
+    public void ARouteOnPredictedPrices_RanksAtAWeightOfItsRate_SoItGoesFirstOnlyWhenItEarnsThatMuchMore_TheGatesChainFirstAllTheSame()
+    {
+        // D131, asked on 2026-11-08: "a predicted 1000 profit should rank lower than a certain 1000 profit. A predicted 1000000
+        // profit should rank higher than a certain 1000 profit." A1's prices are predicted, nobody having looked there lately.
+        // SHIP_PARTS for A1 earn far more than twice what FOOD for D41 does an hour at A1's predicted price, and go first. Once
+        // the gate needs FAB_MATS, which A1 makes from SHIP_PARTS (a stand-in chain), the gate's chain goes first, predicted or
+        // not, here at a price that only just pays (D128, D90).
+        TradeMarketMap MapWith(int shipPartsAtA1, params string[] materials)
+            => new(
+                Waypoints,
+                [
+                    Market(K85, Good("SHIP_PARTS", "EXPORT", 3_920, 1_855, 20), Good("FOOD", "EXPORT", 1_000, 450, 40), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                    Market(D41, Good("FOOD", "IMPORT", 2_400, 1_200, 40), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                    Market(A1, Good("SHIP_PARTS", "IMPORT", 15_620, shipPartsAtA1, 20, "LIMITED"), Good("FAB_MATS", "EXPORT", 1_800, 850, 20), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+                ],
+                new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["SHIP_PARTS"], ["SHIP_LIGHT_HAULER"] = ["SHIP_PARTS", "FOOD"] })
+            {
+                ConstructionMaterials = new HashSet<string>(materials, StringComparer.OrdinalIgnoreCase),
+                PredictedMarkets = new HashSet<string>([A1], StringComparer.OrdinalIgnoreCase),
+            };
+
+        TradeRoute Trip(long profit, bool predicted) => new("EQUIPMENT", K85, D41, 20, 1_000, 2_000, 100, profit, string.Empty)
+        {
+            Seconds = 3_600,
+            FeedsProduction = true,
+            Predicted = predicted,
+        };
+
+        TradeRoutePlanner.CompareBestFirst(Trip(1_000, predicted: false), Trip(1_000, predicted: true)).Should().BeNegative("a predicted 1000 ranks lower than a certain 1000");
+        TradeRoutePlanner.CompareBestFirst(Trip(1_000_000, predicted: true), Trip(1_000, predicted: false)).Should().BeNegative("a predicted 1000000 ranks higher than a certain 1000");
+        TradeRoutePlanner.RankingRate(Trip(1_000, predicted: true)).Should().Be(1_000 * TradeRoutePlanner.PredictedRateWeight);
+
+        var farMore = TradeRoutePlanner.Rank(MapWith(7_738), CommandShip(), 1_000_000, 5, NoneHeld);
+        farMore.Select(route => (route.TradeSymbol, route.Predicted)).Should().Equal(("SHIP_PARTS", true), ("FOOD", false));
+        farMore[0].CreditsPerHour.Should().BeGreaterThan(farMore[1].CreditsPerHour / TradeRoutePlanner.PredictedRateWeight);
+
+        var gate = TradeRoutePlanner.Rank(MapWith(4_000, "FAB_MATS"), CommandShip(), 1_000_000, 5, NoneHeld);
+        gate.Select(route => (route.TradeSymbol, route.Predicted, route.FeedsConstruction)).Should().Equal(("SHIP_PARTS", true, true), ("FOOD", false, false));
+    }
+
+    [Fact]
     public void Rank_PutsARouteToAMarketThatExchangesTheGood_AfterEveryOther_AsAWealthTradeThatFeedsNoProduction()
     {
         // D91, asked on 2026-10-05: "EXCHANGE nodes should be lowest priority and only considered as wealth trades, never as

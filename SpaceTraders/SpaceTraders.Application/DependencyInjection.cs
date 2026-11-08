@@ -137,6 +137,8 @@ public static class DependencyInjection
         // process, shared with the markets dashboard), and the watch that keeps prices fresh where ships are.
         services.AddSingleton<ISupplyChainCache, SupplyChainCache>();
         services.AddScoped<ITradeContextReader, TradeContextReader>();
+        services.AddSingleton<MarketHistoryCache>();
+        services.AddScoped<IMarketPredictions, MarketPredictions>();
         services.AddScoped<IMarketRefresher, MarketRefresher>();
         services.AddScoped<IMarketWatchService, MarketWatchService>();
         services.AddSingleton<MarketWatchAttempts>();

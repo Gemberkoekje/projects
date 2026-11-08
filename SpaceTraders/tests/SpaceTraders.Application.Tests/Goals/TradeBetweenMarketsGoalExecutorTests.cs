@@ -48,6 +48,10 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
 
     public TradeBetweenMarketsGoalExecutorTests()
     {
+        // D131: a trip reads its system as the trading plan chose it, with any predicted markets; these tests set the prices
+        // they read for both.
+        _tradeContexts.ReadTradeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => _tradeContexts.ReadAsync(call.ArgAt<string>(0), call.ArgAt<CancellationToken>(1)));
         PricesAre(Map());
         _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("AGENT", null, A1, Credits, "COSMIC", 3));
     }
