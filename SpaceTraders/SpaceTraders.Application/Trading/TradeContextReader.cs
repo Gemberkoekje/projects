@@ -50,6 +50,13 @@ public sealed record TradeContext
     /// a trip already on its way to buy keeps what it holds. 0 unless set.
     /// </summary>
     public long GateLoadCredits { get; init; }
+
+    /// <summary>
+    /// Whether the jump gate's next load waits only for one of our ships, once the gate can be built, as the construction plan
+    /// last said it (PLAN.md slice 6.52, D140, <see cref="PurchaseNeed.WaitsForShip"/>): the trading plan may then buy a light
+    /// hauler for it. False unless set.
+    /// </summary>
+    public bool GateLoadWaitsForShip { get; init; }
 }
 
 /// <summary>Reads the <see cref="TradeContext"/> for a system from the cache.</summary>
@@ -209,7 +216,11 @@ public sealed class TradeContextReader(
                     await settings.GetAsync<long>(CreditReserve.FloorSetting, cancellationToken)),
         };
 
-        return new TradeContext(map, basics.Credits, basics.MinProfitPerUnit, basics.FuelReserve) { GateLoadCredits = GateLoadCredits(now) };
+        return new TradeContext(map, basics.Credits, basics.MinProfitPerUnit, basics.FuelReserve)
+        {
+            GateLoadCredits = GateLoadCredits(now),
+            GateLoadWaitsForShip = GateLoadWaitsForShip(now),
+        };
     }
 
     /// <inheritdoc />
@@ -315,6 +326,17 @@ public sealed class TradeContextReader(
             && purchaseNeeds.Counts(reported.At, now)
                 ? Math.Max(0, reported.Need.Price)
                 : 0;
+
+    /// <summary>
+    /// D140: whether the gate's next load waits only for one of our ships, as the construction plan last said it, once the gate
+    /// can be built.
+    /// </summary>
+    private bool GateLoadWaitsForShip(DateTimeOffset now)
+        => GateCanBeBuilt(now)
+            && purchaseNeeds.Reported().TryGetValue(AutomationPlan.Construction, out var reported)
+            && reported.Need.Tier == PurchaseTier.Construction
+            && reported.Need.WaitsForShip
+            && purchaseNeeds.Counts(reported.At, now);
 
     /// <summary>Whether a market's prices are recent enough to decide by (D96): seen with prices within the age.</summary>
     private static bool IsFresh(MarketFreshnessRecord market, DateTimeOffset now, TimeSpan maxAge)

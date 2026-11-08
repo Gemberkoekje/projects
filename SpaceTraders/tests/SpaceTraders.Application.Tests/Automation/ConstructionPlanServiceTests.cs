@@ -75,8 +75,8 @@ public sealed class ConstructionPlanServiceTests
         started.EventKind.Should().Be("ConstructionStarted");
         started.Properties["Reason"].Should().Be("purchase");
 
-        // D64: its place in the order ships are bought in, after the cargo ships.
-        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "ADVANCED_CIRCUITRY" && need.ShipyardWaypointSymbol == D42);
+        // D64: its place in the order ships are bought in, after the cargo ships. D140: a free builder takes it, so it waits for no ship.
+        _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "ADVANCED_CIRCUITRY" && need.ShipyardWaypointSymbol == D42 && !need.WaitsForShip);
 
         // D139: the gate still needs 1,600 FAB_MATS and 320 ADVANCED_CIRCUITRY no trip carries, and no builder is left.
         _state!.Blocker.Should().Be(ConstructionBlockers.Ships);
@@ -147,6 +147,7 @@ public sealed class ConstructionPlanServiceTests
         _activeGoals.Should().BeEmpty();
         _state!.Waiting.Should().Be(ConstructionPlanService.WaitingForCredits);
         _state.Blocker.Should().Be(ConstructionBlockers.Credits);
+        _order.Of(AutomationPlan.Construction).WaitsForShip.Should().BeFalse("it waits for the credits, not for a ship (D140)");
         _state.ReadyShipSymbols.Should().BeEmpty();
         _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.Price == 370_800 + 85 + (6 * 90));
     }
@@ -171,6 +172,7 @@ public sealed class ConstructionPlanServiceTests
         await RunAsync();
 
         _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "FAB_MATS" && need.ShipyardWaypointSymbol == F49);
+        _order.Of(AutomationPlan.Construction).WaitsForShip.Should().BeTrue("the markets sell it, the credits pay for it, and its one builder is on its way (D140)");
         _state!.ReadyShipSymbols.Should().Equal("SHIP-6");
         _activeGoals["SHIP-6"].Should().BeOfType<SupplyConstructionGoal>().Which.TradeSymbol.Should().Be("ADVANCED_CIRCUITRY");
         _state.Blocker.Should().Be(ConstructionBlockers.Ships, "its one builder is on its way, and the next load waits for it");

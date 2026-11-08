@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-08, slice 6.52)
+- A light hauler for the gate (D140): while the gate needs materials, the cargo ship beyond the list is a light hauler,
+  bought when the gate's next load waits only for a free ship, which then lets it go first in the purchase order as long as
+  the credits after it still pay for the load; at most one every `Trade.ShipPurchaseIntervalMinutes`. Until now the gate's
+  load always came first, and no extra cargo ship was bought while one could be.
+- Siphon drones for the gate's gases (D141): while the gate needs materials, a siphon drone for a gas that a market making a
+  good of the gate's chain from it has below HIGH, one per gas every `Mining.GateMinerIntervalMinutes`, as the gate's miners;
+  and such a market comes first for every siphoner once the gate can be built. D130 bought none, reading that no gas goes
+  into the gate; in X1-VP96 LIQUID_HYDROGEN and LIQUID_NITROGEN make the EXPLOSIVES the ores are made from.
+- Tests: `PurchaseOrderTests`, `TradingAutomationServiceTests`, `ConstructionPlanServiceTests`, `TradeContextReaderTests`,
+  `SiphonPlannerTests`, `SiphonAutomationServiceTests`.
+
 ### Code – Added (2026-11-08, slice 6.51)
 - What stops the home jump gate, as the construction plan sees it each pass (D139): done, building, ships, credits, low
   supply, market busy, purchase order, no market, or off; `spacetraders_construction_blocker`. Next to it the supply down the

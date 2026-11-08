@@ -358,8 +358,9 @@ public sealed class SiphonAutomationServiceTests
     public async Task WhileTheJumpGateNeedsMaterials_NoSiphonDroneIsBought()
     {
         // D130, asked on 2026-11-08: "Mining and siphoning drones should only be bought in order to keep the market healthy".
-        // of the options, "Gate chain only, until done". No gas goes into the gate's materials, so while the gate needs them
-        // the scarce gases of WithNoSiphoner_ItBuysTheFirstDrone_WhereItSellsForTheLeast get no drone.
+        // of the options, "Gate chain only, until done". Here no gas goes into the gate's materials, so while the gate needs
+        // them the scarce gases of WithNoSiphoner_ItBuysTheFirstDrone_WhereItSellsForTheLeast get no drone (D141: only a gas of
+        // its chain does).
         _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(
             new TradeMarketMap(Waypoints, Markets(), new Dictionary<string, IReadOnlyList<string>>())
             {
@@ -373,6 +374,39 @@ public sealed class SiphonAutomationServiceTests
 
         _order.Of(AutomationPlan.Siphon).Should().Be(PurchaseNeed.None);
         await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
+    public async Task WhileTheJumpGateNeedsMaterials_ADroneIsBoughtForAGasItsChainIsShortOf_OnePerGasEveryHalfHour_AtTheGatesPlace()
+    {
+        // Slice 6.52 (D141), asked on 2026-11-08, with LIQUID_HYDROGEN and LIQUID_NITROGEN SCARCE at X1-VP96-F45, which makes
+        // the EXPLOSIVES of the gate's chain: "Like the gate's miners". E47 makes EXPLOSIVES from both; its nitrogen is SCARCE,
+        // its hydrogen MODERATE: a drone for the nitrogen at the gate's place in the order, then one for the hydrogen, then none
+        // until half an hour has passed since the nitrogen's.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(GateMap(), 250_000, 200));
+        _purchases.TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = true, PurchasedShip = SiphonDrone("SHIP-9") });
+        Fleet(CommandShip(waypoint: "X1-DC53-H51"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Siphon).Should().Be(new PurchaseNeed(PurchaseTier.Construction, "SHIP_SIPHON_DRONE", C39, 42_000));
+        _state!.GateMiners.Select(drone => (drone.ShipSymbol, drone.TradeSymbol)).Should().Equal(("SHIP-9", "LIQUID_NITROGEN"));
+
+        await RunAsync();
+
+        _state!.GateMiners.Select(drone => drone.TradeSymbol).Should().Equal("LIQUID_NITROGEN", "LIQUID_HYDROGEN");
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Siphon).Should().Be(PurchaseNeed.None, "a drone was bought for each gas within the half hour");
+        await _purchases.Received(2).TryPurchaseAsync("SHIP_SIPHON_DRONE", C39, Arg.Any<CancellationToken>());
+
+        _state = _state! with { GateMiners = [.. _state.GateMiners.Select(drone => drone with { BoughtAt = drone.BoughtAt.AddMinutes(-31) })] };
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Siphon).Should().Be(new PurchaseNeed(PurchaseTier.Construction, "SHIP_SIPHON_DRONE", C39, 42_000));
     }
 
     [Fact]

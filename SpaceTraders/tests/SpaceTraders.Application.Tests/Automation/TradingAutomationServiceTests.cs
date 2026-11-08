@@ -988,6 +988,63 @@ public sealed class TradingAutomationServiceTests
     }
 
     [Fact]
+    public async Task WhileTheGatesLoadWaitsForAShip_ALightHaulerIsBought_NotTheLargestHold_AtMostOneEveryHalfHour()
+    {
+        // Slice 6.52 (D140), asked on 2026-11-08: "Allow another light hauler to be bought if there is a haul in the gate chain
+        // that is waiting." Of the options, "One per 30 min". The setting of
+        // WhileTheJumpGateNeedsMaterials_ACargoShipBeyondTheList_IsBoughtOnlyForARouteDownTheGatesChain_AtTheGatesPlace, where no
+        // route down the gate's chain waits, and A1 sells a heavy freighter too: nothing is bought until the gate's own load
+        // waits for a ship; after its 30 minutes a light hauler is, at the gate's place in the order. Then not another for half
+        // an hour.
+        SurveyPlanOn();
+        _settings.GetAsync<int>(TradingAutomationService.ShipPurchaseWaitMinutesSetting, Arg.Any<CancellationToken>()).Returns(30);
+        _settings.GetAsync<int>(TradingAutomationService.ShipPurchaseIntervalMinutesSetting, Arg.Any<CancellationToken>()).Returns(30);
+        Shipyards(HomeShipyard(ForSale("SHIP_HEAVY_FREIGHTER", 360, 1_800_000)));
+        var map = new TradeMarketMap(
+            Waypoints,
+            [
+                Market(K85, Good("EQUIPMENT", "EXPORT", 3_254, 1_456, 80), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                Market(D41, Good("EQUIPMENT", "IMPORT", 7_032, 3_487, 80, "LIMITED"), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                A1Market(),
+            ],
+            new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["IRON", "QUARTZ_SAND"] })
+        {
+            ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+        };
+        var busy = Shuttle("SHIP-5") with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+        Fleet(CommandShip() with { Status = "IN_TRANSIT", ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(5) }, busy, busy with { Symbol = "SHIP-6" }, busy with { Symbol = "SHIP-7" });
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map, 1_000_000));
+
+        await RunAsync();
+        _demand.Backdate(TimeSpan.FromMinutes(30));
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(PurchaseNeed.None, "no haul of the gate's chain waits");
+        await NothingBoughtAsync();
+
+        _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(Context(map, 1_000_000) with { GateLoadWaitsForShip = true });
+
+        await RunAsync();
+        _demand.Backdate(TimeSpan.FromMinutes(30));
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(new PurchaseNeed(PurchaseTier.Construction, "SHIP_LIGHT_HAULER", A1, 354_210));
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+        _purchases.ClearReceivedCalls();
+
+        _demand.Backdate(TimeSpan.FromMinutes(30));
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Trading).Should().Be(PurchaseNeed.None, "the plan bought one less than half an hour ago");
+        await NothingBoughtAsync();
+
+        LastBought(TimeSpan.FromMinutes(31));
+        await RunAsync();
+
+        await _purchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", A1, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task BeyondTheList_TheLargestHoldWithinTheTradeReach_IsBought_WhereAProbeOfOursAnswersTheCall()
     {
         // Slice 6.33 (D112), asked on 2026-10-07: "when buying a new trade ship (purchasing order 9) it should pick whatever the
