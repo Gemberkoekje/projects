@@ -29,6 +29,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-hackerminigames-${{ runner.os }}-${{ hashFiles('HackerMinigames/**/*.csproj', 'HackerMinigames/**/Directory.Packages.props', 'HackerMinigames/**/Directory.Build.props', 'HackerMinigames/**/packages.lock.json') }}
+          restore-keys: |
+            nuget-hackerminigames-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore ./HackerMinigames/HackerMinigames.slnx
 
@@ -63,6 +71,8 @@ jobs:
           context: ./HackerMinigames
           file: ./HackerMinigames/Dockerfile
           push: true
+          cache-from: type=gha,scope=hackerminigames
+          cache-to: type=gha,mode=max,scope=hackerminigames
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/hackerminigames:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/hackerminigames:${{ github.sha }}
