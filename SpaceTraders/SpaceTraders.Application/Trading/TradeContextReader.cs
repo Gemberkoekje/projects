@@ -55,9 +55,9 @@ public interface ITradeContextReader
     Task<TradeContext> ReadAsync(string systemSymbol, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Reads what a trade trip decides by in its system (PLAN.md slice 6.46, D131): as <see cref="ReadAsync"/>, with the home
-    /// system's markets nobody has looked at within <c>Trade.MaxPriceAgeMinutes</c> held as predicted for now
-    /// (<see cref="TradeMarketMap.PredictedMarkets"/>), as the trading plan chose the trip by.
+    /// Reads what a trade trip decides by in its system (PLAN.md slices 6.46 and 6.47, D131, D132): as <see cref="ReadAsync"/>,
+    /// with the system's markets nobody has looked at within <c>Trade.MaxPriceAgeMinutes</c> held as predicted for now
+    /// (<see cref="TradeMarketMap.PredictionWeights"/>), as the trading plan chose the trip by.
     /// </summary>
     /// <param name="systemSymbol">The system the ship is in.</param>
     /// <param name="cancellationToken">Stops the reads.</param>
@@ -99,7 +99,8 @@ public sealed class TradeContextReader(
     ISpaceTradersPort port,
     IGateNetwork gates,
     ISystemRepository systems,
-    IMarketPredictions predictions) : ITradeContextReader
+    IMarketPredictions predictions,
+    IPredictionConfidence confidence) : ITradeContextReader
 {
     /// <summary>The setting that holds the profit per unit, after fuel, a trip must earn (D14).</summary>
     public const string MinProfitPerUnitSetting = "Trade.MinProfitPerUnit";
@@ -172,20 +173,20 @@ public sealed class TradeContextReader(
         var basics = await ReadBasicsAsync(cancellationToken);
         var home = basics.HomeSystemSymbol;
 
-        // D131: the home system's stale markets are predicted for now, and no longer stale.
-        var (reachMarkets, predicted) = await PredictHomeAsync(
+        // D131, D132: the stale markets seen with prices are predicted for now, in every system, and no longer stale.
+        var (reachMarkets, predicted) = await PredictAsync(
             [.. allMarkets.Where(market => inReach.Contains(market.SystemSymbol))],
             staleRecords,
-            home,
+            network,
             now,
             cancellationToken);
-        stale.ExceptWith(predicted);
+        stale.ExceptWith(predicted.Keys);
         var map = new TradeMarketMap(reachWaypoints, reachMarkets, basics.Chains)
         {
             ConstructionMaterials = home.Length > 0 ? await MaterialsAsync(home, cancellationToken) : new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             ConstructionSystemSymbol = home,
             StaleMarkets = stale,
-            PredictedMarkets = predicted,
+            PredictionWeights = predicted,
             Gates = network is null
                 ? TradeGates.None
                 : new TradeGates(
@@ -223,22 +224,25 @@ public sealed class TradeContextReader(
         IReadOnlyList<MarketSnapshot> systemMarkets = [.. (await markets.GetAllSnapshotsAsync(cancellationToken))
             .Where(market => market.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))];
         var basics = await ReadBasicsAsync(cancellationToken);
-        IReadOnlySet<string> predicted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (predict && systemSymbol.Equals(basics.HomeSystemSymbol, StringComparison.OrdinalIgnoreCase))
+        IReadOnlyDictionary<string, double> predicted = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        if (predict)
         {
             var now = TimeProvider.System.GetUtcNow();
             var maxAge = await MaxPriceAgeAsync(cancellationToken);
             var staleRecords = (await markets.GetAllFreshnessAsync(cancellationToken))
                 .Where(market => market.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase) && !IsFresh(market, now, maxAge))
                 .ToList();
-            (systemMarkets, predicted) = await PredictHomeAsync(systemMarkets, staleRecords, basics.HomeSystemSymbol, now, cancellationToken);
+            if (staleRecords.Count > 0)
+            {
+                (systemMarkets, predicted) = await PredictAsync(systemMarkets, staleRecords, await gates.ReadAsync(cancellationToken), now, cancellationToken);
+            }
         }
 
         return new TradeContext(
             new TradeMarketMap(systemWaypoints, systemMarkets, basics.Chains)
             {
                 ConstructionMaterials = await MaterialsAsync(systemSymbol, cancellationToken),
-                PredictedMarkets = predicted,
+                PredictionWeights = predicted,
             },
             basics.Credits,
             basics.MinProfitPerUnit,
@@ -246,19 +250,20 @@ public sealed class TradeContextReader(
     }
 
     /// <summary>
-    /// D131: the markets, with each home market nobody has looked at within the age, but that was seen with prices, as predicted
-    /// for now (<see cref="IMarketPredictions"/>); asked on 2026-11-08: "only do this for the home system". A market never seen
-    /// with prices has nothing to predict from, and one abroad stays as it was.
+    /// D131, D132: the markets, with each one nobody has looked at within the age, but that was seen with prices, as predicted for
+    /// now (<see cref="IMarketPredictions"/>), and how far each is trusted (<see cref="IPredictionConfidence"/>, D133). Asked on
+    /// 2026-11-08: "I'd like to expand the prediction logic to all systems." A market never seen with prices has nothing to
+    /// predict from.
     /// </summary>
-    private async Task<(IReadOnlyList<MarketSnapshot> Markets, IReadOnlySet<string> Predicted)> PredictHomeAsync(
+    private async Task<(IReadOnlyList<MarketSnapshot> Markets, IReadOnlyDictionary<string, double> Predicted)> PredictAsync(
         IReadOnlyList<MarketSnapshot> candidates,
         IReadOnlyList<MarketFreshnessRecord> staleRecords,
-        string home,
+        ExplorePlanState? network,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         var lastLooks = staleRecords
-            .Where(record => record.HasPrices && record.SystemSymbol.Equals(home, StringComparison.OrdinalIgnoreCase))
+            .Where(record => record.HasPrices)
             .GroupBy(record => record.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.Max(record => record.LastObservedAt), StringComparer.OrdinalIgnoreCase);
         var toPredict = candidates
@@ -267,14 +272,17 @@ public sealed class TradeContextReader(
             .ToList();
         if (toPredict.Count == 0)
         {
-            return (candidates, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            return (candidates, new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase));
         }
 
         var predictedMarkets = (await predictions.PredictAsync(toPredict, now, cancellationToken))
             .ToDictionary(market => market.WaypointSymbol, StringComparer.OrdinalIgnoreCase);
-        return (
-            [.. candidates.Select(market => predictedMarkets.GetValueOrDefault(market.WaypointSymbol, market))],
-            predictedMarkets.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase));
+        var weights = await confidence.WeightsAsync(
+            predictedMarkets.Values.ToDictionary(market => market.WaypointSymbol, market => market.SystemSymbol, StringComparer.OrdinalIgnoreCase),
+            network,
+            now,
+            cancellationToken);
+        return ([.. candidates.Select(market => predictedMarkets.GetValueOrDefault(market.WaypointSymbol, market))], weights);
     }
 
     /// <summary>Whether a market's prices are recent enough to decide by (D96): seen with prices within the age.</summary>

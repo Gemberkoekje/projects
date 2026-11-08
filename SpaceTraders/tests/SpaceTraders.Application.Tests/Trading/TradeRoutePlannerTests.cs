@@ -301,10 +301,10 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
-    public void ARouteOnPredictedPrices_RanksAtAWeightOfItsRate_SoItGoesFirstOnlyWhenItEarnsThatMuchMore_TheGatesChainFirstAllTheSame()
+    public void ARouteOnPredictedPrices_RanksAtItsMarketsWeightOfItsRate_SoItGoesFirstOnlyWhenItEarnsThatMuchMore_TheGatesChainFirstAllTheSame()
     {
         // D131, asked on 2026-11-08: "a predicted 1000 profit should rank lower than a certain 1000 profit. A predicted 1000000
-        // profit should rank higher than a certain 1000 profit." A1's prices are predicted, nobody having looked there lately.
+        // profit should rank higher than a certain 1000 profit." A1's prices are predicted, trusted at half (D133's weight).
         // SHIP_PARTS for A1 earn far more than twice what FOOD for D41 does an hour at A1's predicted price, and go first. Once
         // the gate needs FAB_MATS, which A1 makes from SHIP_PARTS (a stand-in chain), the gate's chain goes first, predicted or
         // not, here at a price that only just pays (D128, D90).
@@ -319,26 +319,72 @@ public sealed class TradeRoutePlannerTests
                 new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["SHIP_PARTS"], ["SHIP_LIGHT_HAULER"] = ["SHIP_PARTS", "FOOD"] })
             {
                 ConstructionMaterials = new HashSet<string>(materials, StringComparer.OrdinalIgnoreCase),
-                PredictedMarkets = new HashSet<string>([A1], StringComparer.OrdinalIgnoreCase),
+                PredictionWeights = new Dictionary<string, double> { [A1] = 0.5 },
             };
 
         TradeRoute Trip(long profit, bool predicted) => new("EQUIPMENT", K85, D41, 20, 1_000, 2_000, 100, profit, string.Empty)
         {
             Seconds = 3_600,
             FeedsProduction = true,
-            Predicted = predicted,
+            PredictionWeight = predicted ? 0.5 : 1.0,
         };
 
         TradeRoutePlanner.CompareBestFirst(Trip(1_000, predicted: false), Trip(1_000, predicted: true)).Should().BeNegative("a predicted 1000 ranks lower than a certain 1000");
         TradeRoutePlanner.CompareBestFirst(Trip(1_000_000, predicted: true), Trip(1_000, predicted: false)).Should().BeNegative("a predicted 1000000 ranks higher than a certain 1000");
-        TradeRoutePlanner.RankingRate(Trip(1_000, predicted: true)).Should().Be(1_000 * TradeRoutePlanner.PredictedRateWeight);
+        TradeRoutePlanner.RankingRate(Trip(1_000, predicted: true)).Should().Be(500);
 
         var farMore = TradeRoutePlanner.Rank(MapWith(7_738), CommandShip(), 1_000_000, 5, NoneHeld);
         farMore.Select(route => (route.TradeSymbol, route.Predicted)).Should().Equal(("SHIP_PARTS", true), ("FOOD", false));
-        farMore[0].CreditsPerHour.Should().BeGreaterThan(farMore[1].CreditsPerHour / TradeRoutePlanner.PredictedRateWeight);
+        farMore[0].PredictionWeight.Should().Be(0.5);
+        farMore[0].CreditsPerHour.Should().BeGreaterThan(farMore[1].CreditsPerHour / 0.5);
 
         var gate = TradeRoutePlanner.Rank(MapWith(4_000, "FAB_MATS"), CommandShip(), 1_000_000, 5, NoneHeld);
         gate.Select(route => (route.TradeSymbol, route.Predicted, route.FeedsConstruction)).Should().Equal(("SHIP_PARTS", true, true), ("FOOD", false, false));
+    }
+
+    [Fact]
+    public void TheBestRateThroughAMarket_IsTheMostAnHourOfTheRoutesThatBuyOrSellThere()
+    {
+        // Slice 6.47 (D134): what a probe at a market could make sure of. A1 buys FOOD (from K85, or D41 for less) and sells
+        // MEDICINE to nobody that pays more; the best route through A1 is FOOD from D41, flown from D41.
+        var map = new TradeMarketMap(
+            Waypoints,
+            [
+                Market(K85, Good("FOOD", "EXPORT", 2_000, 900, 40), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                Market(D41, Good("FOOD", "EXPORT", 1_000, 450, 40), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+                Market(A1, Good("FOOD", "IMPORT", 4_000, 2_400, 40), Good("MEDICINE", "EXPORT", 5_000, 2_000, 40), Good("FUEL", "EXCHANGE", 90, 76, 180)),
+            ],
+            new Dictionary<string, IReadOnlyList<string>>());
+        var ship = CommandShip();
+
+        var best = TradeRoutePlanner.BestRateThrough(map, A1, ship);
+
+        TradeRoutePlanner.TryEvaluate(map, ship with { WaypointSymbol = D41 }, "FOOD", D41, A1, long.MaxValue / 4, 0, out var fromD41).Should().BeTrue();
+        TradeRoutePlanner.TryEvaluate(map, ship with { WaypointSymbol = K85 }, "FOOD", K85, A1, long.MaxValue / 4, 0, out var fromK85).Should().BeTrue();
+        best.Should().Be(Math.Max(fromD41.CreditsPerHour, fromK85.CreditsPerHour));
+        best.Should().BePositive();
+        TradeRoutePlanner.BestRateThrough(map, "X1-AB-NOWHERE", ship).Should().Be(0);
+    }
+
+    [Fact]
+    public void ARouteBetweenTwoPredictedMarkets_RanksAtBothWeights()
+    {
+        // D133: each market's prices are trusted for themselves, so a route on two predicted markets is trusted at both.
+        var map = new TradeMarketMap(
+            Waypoints,
+            [
+                Market(K85, Good("FOOD", "EXPORT", 1_000, 450, 40), Good("FUEL", "EXCHANGE", 93, 79, 180)),
+                Market(D41, Good("FOOD", "IMPORT", 2_400, 1_200, 40), Good("FUEL", "EXCHANGE", 76, 69, 180)),
+            ],
+            new Dictionary<string, IReadOnlyList<string>> { ["SHIP_LIGHT_HAULER"] = ["FOOD"] })
+        {
+            PredictionWeights = new Dictionary<string, double> { [K85] = 0.8, [D41] = 0.5 },
+        };
+
+        var route = TradeRoutePlanner.Rank(map, CommandShip(), 1_000_000, 5, NoneHeld).Should().ContainSingle().Subject;
+
+        route.PredictionWeight.Should().BeApproximately(0.4, 1e-9);
+        TradeRoutePlanner.RankingRate(route).Should().BeApproximately(route.CreditsPerHour * 0.4, 1e-6);
     }
 
     [Fact]

@@ -56,6 +56,7 @@ public static class DependencyInjection
 
         services.AddScoped<IAgentCreditsSampleRepository, AgentCreditsSampleRepository>();
         services.AddScoped<IMarketPriceSampleRepository, MarketPriceSampleRepository>();
+        services.AddScoped<IMarketTradeRepository, MarketTradeRepository>();
         services.AddScoped<ILedgerRepository, LedgerRepository>();
         services.AddScoped<IShipTaskRecordRepository, ShipTaskRecordRepository>();
         services.AddScoped<IRunRepository, RunRepository>();

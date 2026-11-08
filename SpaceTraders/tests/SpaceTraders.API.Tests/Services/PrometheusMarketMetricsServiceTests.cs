@@ -270,6 +270,7 @@ public sealed class PrometheusMarketMetricsServiceTests
         services.AddScoped<IAgentRepository, AgentRepository>();
         services.AddScoped<IShipRepository, ShipRepository>();
         services.AddScoped<IShipAssignmentRepository, ShipAssignmentRepository>();
+        services.AddScoped<IMarketTradeRepository, MarketTradeRepository>();
         services.AddScoped(_ => _port);
         services.AddSingleton<ISupplyChainCache>(_ => new SupplyChainCache(NullLogger<SupplyChainCache>.Instance));
         return services.BuildServiceProvider();

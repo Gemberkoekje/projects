@@ -31,6 +31,7 @@ public sealed class TradeContextReaderTests
     private readonly ISystemRepository _systems = Substitute.For<ISystemRepository>();
     private readonly IMarketPriceSampleRepository _samples = Substitute.For<IMarketPriceSampleRepository>();
     private readonly MarketHistoryCache _history = new();
+    private readonly IMarketTradeRepository _trades = Substitute.For<IMarketTradeRepository>();
 
     public TradeContextReaderTests()
     {
@@ -71,8 +72,8 @@ public sealed class TradeContextReaderTests
     public async Task TheReach_MapsTheSystemsWithinTwiceItsJumps_WithTheirGates_AndTheMarketsWhosePricesAreTooOld()
     {
         // Slice 6.29 (D96): with a reach of 1, a route buys one jump from home and sells one jump from there: X1-HN44 and
-        // X1-NF46 are on the map, X1-AD37, three jumps away, isn't. HN44's market was seen 40 minutes ago, NF46's never with
-        // prices: neither chooses a route. The home gate's materials count, and only home's markets feed them (D68, D89).
+        // X1-NF46 are on the map, X1-AD37, three jumps away, isn't. HN44's market was seen 40 minutes ago: its prices are
+        // predicted (D132); NF46's was never seen with prices, so it stays stale. The home gate's materials count, and only home's markets feed them (D68, D89).
         ConstructionPlanOn(true);
         var now = DateTimeOffset.UtcNow;
         _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, "X1-FJ91-A1", 2_000_000, "COBALT", 3));
@@ -125,7 +126,8 @@ public sealed class TradeContextReaderTests
 
         map.Waypoints.Select(waypoint => waypoint.SystemSymbol).Distinct().Should().BeEquivalentTo([System, "X1-HN44", "X1-NF46"]);
         map.MarketWaypoints.Should().BeEquivalentTo(["X1-FJ91-I64", "X1-FJ91-A1", "X1-HN44-A1"]);
-        map.StaleMarkets.Should().BeEquivalentTo(["X1-HN44-A1", "X1-NF46-A1"]);
+        map.StaleMarkets.Should().BeEquivalentTo(["X1-NF46-A1"]);
+        map.PredictedMarkets.Should().BeEquivalentTo(["X1-HN44-A1"]);
         map.Gates.MaxJumps.Should().Be(1);
         map.Gates.CreditFloor.Should().Be(60_000);
         map.Gates.TryFindWay(System, "X1-HN44", out var jumps).Should().BeTrue();
@@ -138,13 +140,13 @@ public sealed class TradeContextReaderTests
     }
 
     [Fact]
-    public async Task AHomeMarketNobodyLookedAtLately_IsPredictedForNow_InsteadOfStale_ButOnlyAtHome()
+    public async Task AMarketNobodyLookedAtLately_IsPredictedForNow_InsteadOfStale_UnlessItWasNeverSeenWithPrices()
     {
         // D131, asked on 2026-11-08: "Can we make a dead reckoning prediction rule for any markets without active ships or
-        // probes so that our command ship goes there to trade eventually? ... But only do this for the home system." K88 was
+        // probes so that our command ship goes there to trade eventually?", and since D132 in every system. K88 was
         // seen 18 hours ago with CLOTHING at 3,400, which our purchases had raised; before, it stood at 2,950. A1 was never seen
-        // with prices: it stays stale (a market abroad does too, as TheReach_MapsTheSystemsWithinTwiceItsJumps_... shows). The
-        // plain map of the system (ReadAsync) predicts nothing; a trade trip's (ReadTradeAsync) does.
+        // with prices: it stays stale. The plain map of the system (ReadAsync) predicts nothing; a trade trip's (ReadTradeAsync)
+        // does.
         var now = DateTimeOffset.UtcNow;
         _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, "X1-FJ91-A1", 2_000_000, "COBALT", 3));
         _waypoints.GetBySystemAsync(System, Arg.Any<CancellationToken>()).Returns(
@@ -195,6 +197,58 @@ public sealed class TradeContextReaderTests
     }
 
     [Fact]
+    public async Task APredictedMarketsWeight_FallsWithTheOtherAgentsTrades_AtItMostThenInItsSystemThenOneJumpOut()
+    {
+        // D133, asked on 2026-11-08: "the market itself should get the biggest accuracy hit, the system should get a smaller
+        // accuracy hit, and the systems 1 jump out should get an even smaller accuracy hit"; chosen "1 : ½ : ¼". Three stale
+        // markets: K88, where other agents traded 10 times in the last day; A2, in the same system; and HN44-A1, one jump away.
+        // With none of the settings set: 90% with nobody trading, halved by every 10 weighed transactions.
+        var now = DateTimeOffset.UtcNow;
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, "X1-FJ91-A1", 2_000_000, "COBALT", 3));
+        _settings.GetAsync<int>(TradeContextReader.MaxHaulDistanceSetting, Arg.Any<CancellationToken>()).Returns(1);
+        _gates.ReadAsync(Arg.Any<CancellationToken>()).Returns(new ExplorePlanState
+        {
+            ShipSymbol = "SPECTER-1",
+            HomeSystemSymbol = System,
+            Status = ExploreStatus.Exploring,
+            UpdatedAt = now,
+            Systems = [Known(System, "X1-FJ91-I64", now, "X1-HN44-BF9D"), Known("X1-HN44", "X1-HN44-BF9D", now, "X1-FJ91-I64")],
+        });
+        foreach (var (system, gate) in new[] { (System, "X1-FJ91-I64"), ("X1-HN44", "X1-HN44-BF9D") })
+        {
+            _waypoints.GetBySystemAsync(system, Arg.Any<CancellationToken>()).Returns(
+            [
+                new WaypointCacheModel(gate, system, "JUMP_GATE", 0, 0, true, false, now),
+                new WaypointCacheModel(system + "-K88", system, "PLANET", 10, 10, true, false, now),
+                new WaypointCacheModel(system + "-A2", system, "PLANET", 20, 20, true, false, now),
+                new WaypointCacheModel(system + "-A1", system, "PLANET", 30, 30, true, false, now),
+            ]);
+        }
+
+        var clothing = new TradeGoodSnapshot("CLOTHING", "EXPORT", 3_000, 1_500, 20, "MODERATE");
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            Snapshot("X1-FJ91-K88", System, clothing),
+            Snapshot("X1-FJ91-A2", System, clothing),
+            Snapshot("X1-HN44-A1", "X1-HN44", clothing),
+        ]);
+        _markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns(
+        [
+            new MarketFreshnessRecord("X1-FJ91-K88", System, now.AddHours(-2)),
+            new MarketFreshnessRecord("X1-FJ91-A2", System, now.AddHours(-2)),
+            new MarketFreshnessRecord("X1-HN44-A1", "X1-HN44", now.AddHours(-2)),
+        ]);
+        _trades.CountSinceAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([new MarketTradeCount(System, "X1-FJ91-K88", 10)]);
+
+        var map = (await Reader().ReadReachAsync(System, CancellationToken.None)).Map;
+
+        map.PredictionWeightOf("X1-FJ91-K88").Should().BeApproximately(0.9 * 0.5, 1e-9, "its own 10 transactions halve it");
+        map.PredictionWeightOf("X1-FJ91-A2").Should().BeApproximately(0.9 * Math.Pow(0.5, 0.5), 1e-9, "its system's count at half");
+        map.PredictionWeightOf("X1-HN44-A1").Should().BeApproximately(0.9 * Math.Pow(0.5, 0.25), 1e-9, "one jump out at a quarter");
+        await _trades.Received(1).CountSinceAsync(Arg.Is<DateTimeOffset>(since => since <= now.AddHours(-23.9)), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task TheFreshMarkets_AreThoseSeenWithPricesWithinTheAge_InEverySystem()
     {
         // Slice 6.40 (D122): mining abroad reads only these, as a trade route does (D96). Trade.MaxPriceAgeMinutes unset: 30.
@@ -228,5 +282,5 @@ public sealed class TradeContextReaderTests
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), Arg.Any<CancellationToken>()).Returns(on);
 
     private TradeContextReader Reader()
-        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history));
+        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()));
 }

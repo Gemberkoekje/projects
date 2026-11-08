@@ -12,7 +12,7 @@ public interface IMarketRefresher
 {
     /// <summary>
     /// Fetches the market at a waypoint, stores it and publishes <see cref="MarketDataRefreshedEvent"/>, so
-    /// the price history records it. The API shows a market's prices only while one of our ships is there:
+    /// the price history records it, and <see cref="MarketTradesListedEvent"/> for the transactions it lists (slice 6.47). The API shows a market's prices only while one of our ships is there:
     /// an answer without prices isn't stored, because it would wipe the prices the cache has.
     /// </summary>
     /// <param name="systemSymbol">The market's system.</param>
@@ -52,6 +52,13 @@ public sealed class MarketRefresher(
 
         await markets.UpsertAsync(market, cancellationToken);
         await bus.PublishAsync(new MarketDataRefreshedEvent(new WaypointSymbol(waypointSymbol), market.TradeGoodsJson));
+
+        // Slice 6.47 (D133): who else trades here, for how far its predicted prices are trusted.
+        if (market.Transactions.Count > 0)
+        {
+            await bus.PublishAsync(new MarketTradesListedEvent(systemSymbol, market.Transactions));
+        }
+
         return true;
     }
 

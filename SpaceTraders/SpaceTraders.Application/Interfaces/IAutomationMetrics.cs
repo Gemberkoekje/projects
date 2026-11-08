@@ -218,6 +218,14 @@ public interface IAutomationMetrics
     void Exploring(int systemsLeft, int explorersWanted);
 
     /// <summary>
+    /// Records the other agents' transactions each market listed in the last day (PLAN.md slice 6.47, D133,
+    /// <c>spacetraders_market_other_agent_trades</c>): what lowers the trust in a market's predicted prices. A market with none
+    /// isn't published.
+    /// </summary>
+    /// <param name="counts">The counts, by market.</param>
+    void OtherAgentTrades(IReadOnlyCollection<Repositories.MarketTradeCount> counts);
+
+    /// <summary>
     /// Records the agent's settings, one series per setting, always 1
     /// (<c>spacetraders_setting_info{setting,current,next_run,description}</c>): its value now, the value the next run
     /// starts with (D69) and what it does, for the dashboard's settings table (slice 2.9). A setting whose values or

@@ -36,6 +36,7 @@ public sealed class DataRetention(SpaceTradersDbContext db) : IDataRetention
         Pruned("run_credit_highlights", $"{RunDays} days", (db, now, ct) => db.RunCreditHighlights.IgnoreQueryFilters().Where(h => h.OccurredAt < now.AddDays(-RunDays)).ExecuteDeleteAsync(ct)),
         Pruned("agent_credits_samples", $"every sample for {RawSampleDays} days, then the first per hour up to {HourlySampleDays} days", PruneAgentCreditsSamplesAsync),
         Pruned("market_price_samples", $"every sample for {RawSampleDays} days, then the first per waypoint, good and hour up to {HourlySampleDays} days", PruneMarketPriceSamplesAsync),
+        Pruned("market_trades", $"{RawSampleDays} days", (db, now, ct) => db.MarketTrades.IgnoreQueryFilters().Where(t => t.Timestamp < now.AddDays(-RawSampleDays)).ExecuteDeleteAsync(ct)),
 
         Bounded("stored_credentials", "the active agent's token"),
         Bounded("cached_agents", "one row for the active agent"),

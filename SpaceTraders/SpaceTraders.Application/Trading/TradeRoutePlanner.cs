@@ -22,7 +22,8 @@ namespace SpaceTraders.Application.Trading;
 ///   or anything further down its production chain, the nearest step first), last those to a market that exchanges the good
 ///   (D91), and otherwise the one that earns most an hour over the whole trip from where the ship is (D95,
 ///   <see cref="TripTime"/>), an end product's (a good nothing is made from) counted at half (D15, D82, D85), and one on a
-///   market's predicted prices at <see cref="PredictedRateWeight"/> (slice 6.46, D131).</item>
+///   market's predicted prices at that market's weight (<see cref="TradeRoute.PredictionWeight"/>, slices 6.46 and 6.47, D131,
+///   D133).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -181,6 +182,45 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
+    /// The most a route through a market earns an hour (PLAN.md slice 6.47, D134): of the routes that buy or sell there, each
+    /// flown by <paramref name="ship"/> from its buy market with credits enough, at the prices the map holds, predicted or not.
+    /// What a probe there could make sure of.
+    /// </summary>
+    /// <param name="map">The market's system.</param>
+    /// <param name="waypointSymbol">The market.</param>
+    /// <param name="ship">The ship that would fly the routes: only its hold, tank and engine count.</param>
+    /// <returns>The credits an hour; 0 when no route through it earns anything.</returns>
+    public static double BestRateThrough(TradeMarketMap map, string waypointSymbol, ShipModel ship)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(ship);
+
+        var best = 0.0;
+        foreach (var good in map.GoodsAt(waypointSymbol).Where(good => good.TradeVolume > 0))
+        {
+            foreach (var other in map.MarketWaypoints.Where(other => !other.Equals(waypointSymbol, StringComparison.OrdinalIgnoreCase) && map.IsFresh(other)))
+            {
+                if (!map.TryGetGood(other, good.Symbol, out var there) || there.TradeVolume <= 0)
+                {
+                    continue;
+                }
+
+                // Bought here and sold there, or bought there and sold here.
+                foreach (var (buy, sell) in new[] { (waypointSymbol, other), (other, waypointSymbol) })
+                {
+                    if (TryEvaluate(map, ship with { WaypointSymbol = buy, CargoCurrent = 0 }, good.Symbol, buy, sell, long.MaxValue / 4, 0, out var route)
+                        && route.Profit > 0)
+                    {
+                        best = Math.Max(best, route.CreditsPerHour);
+                    }
+                }
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
     /// What a route counts for when routes are ranked (D82, D85, D95): what it earns an hour over the whole trip
     /// (<see cref="TradeRoute.CreditsPerHour"/>), or half of that for an end product, a good nothing is made from
     /// (<see cref="TradeRoute.FeedsProduction"/>). So a short route that earns less a trip goes before a long one that earns
@@ -195,16 +235,8 @@ public static class TradeRoutePlanner
         ArgumentNullException.ThrowIfNull(route);
 
         var rate = route.FeedsProduction ? route.CreditsPerHour : route.CreditsPerHour / 2.0;
-        return route.Predicted ? rate * PredictedRateWeight : rate;
+        return rate * route.PredictionWeight;
     }
-
-    /// <summary>
-    /// What a route on a market's predicted prices counts for against one on prices seen lately (slice 6.46, D131): its rate
-    /// times this. Asked on 2026-11-08: "a predicted 1000 profit should rank lower than a certain 1000 profit. A predicted
-    /// 1000000 profit should rank higher than a certain 1000 profit." A prediction can be wrong (other players trade too), and a
-    /// trip that finds it so at its buy market is dropped, its flight lost.
-    /// </summary>
-    public const double PredictedRateWeight = 0.5;
 
     /// <summary>
     /// Orders two routes as Rank does (D15, D82, D85, D89, D91, D95, D128): one that feeds the jump gate's chain first, the
@@ -1009,7 +1041,7 @@ public static class TradeRoutePlanner
             FeedsProduction = !map.IsEndProduct(tradeSymbol) && !toExchange,
             ConstructionMaterial = material,
             ConstructionStep = feed.Step,
-            Predicted = map.IsPredicted(buyWaypointSymbol) || map.IsPredicted(sellWaypointSymbol),
+            PredictionWeight = map.PredictionWeightOf(buyWaypointSymbol) * map.PredictionWeightOf(sellWaypointSymbol),
             ToExchange = toExchange,
             Seconds = TripTime.TradeSeconds(map, ship.WaypointSymbol ?? string.Empty, approach.Stops, buyWaypointSymbol, haul.Stops, speed, CooldownLeft(map, ship)),
         };
@@ -1332,11 +1364,16 @@ public sealed record TradeRoute
     public int ConstructionStep { get; init; }
 
     /// <summary>
-    /// Whether the buy or the sell market's prices are predicted, nobody having looked at it lately (PLAN.md slice 6.46, D131,
-    /// <see cref="TradeMarketMap.PredictedMarkets"/>): such a route ranks at <see cref="TradeRoutePlanner.PredictedRateWeight"/> of
-    /// its rate (<see cref="TradeRoutePlanner.RankingRate"/>), the jump gate's chain first all the same. False unless set.
+    /// How far the route's prices are trusted (PLAN.md slices 6.46 and 6.47, D131, D133): 1 on prices seen lately, else the
+    /// predicted markets' weights multiplied (<see cref="TradeMarketMap.PredictionWeightOf"/>). It ranks at that much of its rate
+    /// (<see cref="TradeRoutePlanner.RankingRate"/>), the jump gate's chain first all the same: asked on 2026-11-08, "a predicted
+    /// 1000 profit should rank lower than a certain 1000 profit. A predicted 1000000 profit should rank higher than a certain
+    /// 1000 profit." 1 unless set.
     /// </summary>
-    public bool Predicted { get; init; }
+    public double PredictionWeight { get; init; } = 1.0;
+
+    /// <summary>Whether the buy or the sell market's prices are predicted (<see cref="PredictionWeight"/> below 1).</summary>
+    public bool Predicted => PredictionWeight < 1.0;
 
     /// <summary>Whether the route feeds the jump gate's chain (<see cref="ConstructionMaterial"/>, D89, D128).</summary>
     public bool FeedsConstruction => ConstructionMaterial.Length > 0;

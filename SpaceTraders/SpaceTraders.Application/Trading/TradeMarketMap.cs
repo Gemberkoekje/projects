@@ -29,6 +29,7 @@ public sealed class TradeMarketMap
     private readonly long _averageFuelPrice;
     private readonly IReadOnlySet<string> _constructionMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _constructionSteps = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, double> _predictionWeights = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Builds the map of one system, or of several (slice 6.29).</summary>
     /// <param name="waypoints">The systems' waypoints, with their coordinates.</param>
@@ -80,7 +81,7 @@ public sealed class TradeMarketMap
         _constructionSteps = other._constructionSteps;
         ConstructionSystemSymbol = other.ConstructionSystemSymbol;
         StaleMarkets = other.StaleMarkets;
-        PredictedMarkets = other.PredictedMarkets;
+        PredictionWeights = other.PredictionWeights;
     }
 
     /// <summary>The systems' waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
@@ -109,16 +110,29 @@ public sealed class TradeMarketMap
     public IReadOnlySet<string> StaleMarkets { get; init; } = NoMarkets;
 
     /// <summary>
-    /// The markets of the home system nobody has looked at within <c>Trade.MaxPriceAgeMinutes</c>, whose goods the map holds as
-    /// predicted for now (PLAN.md slice 6.46, D131, <see cref="MarketDeadReckoning"/>) instead of leaving them stale: a route
-    /// may buy or sell there, after every route on prices seen lately. None unless set.
+    /// The markets nobody has looked at within <c>Trade.MaxPriceAgeMinutes</c> whose goods the map holds as predicted for now
+    /// (PLAN.md slice 6.46, D131, <see cref="MarketDeadReckoning"/>; every system's since slice 6.47, D132) instead of leaving
+    /// them stale, each with how far its prices are trusted (<see cref="PredictionConfidence"/>, D133): a route there ranks at
+    /// that weight of its rate. None unless set.
     /// </summary>
-    public IReadOnlySet<string> PredictedMarkets { get; init; } = NoMarkets;
+    public IReadOnlyDictionary<string, double> PredictionWeights
+    {
+        get => _predictionWeights;
+        init => _predictionWeights = new Dictionary<string, double>(value, StringComparer.OrdinalIgnoreCase);
+    }
 
-    /// <summary>Whether the map holds a market's goods as predicted (<see cref="PredictedMarkets"/>, D131).</summary>
+    /// <summary>The markets whose goods the map holds as predicted (<see cref="PredictionWeights"/>).</summary>
+    public IReadOnlyCollection<string> PredictedMarkets => _predictionWeights.Keys;
+
+    /// <summary>Whether the map holds a market's goods as predicted (<see cref="PredictionWeights"/>, D131).</summary>
     /// <param name="waypointSymbol">The market's waypoint.</param>
     /// <returns>True for a predicted market.</returns>
-    public bool IsPredicted(string waypointSymbol) => PredictedMarkets.Contains(waypointSymbol);
+    public bool IsPredicted(string waypointSymbol) => _predictionWeights.ContainsKey(waypointSymbol);
+
+    /// <summary>How far a market's prices are trusted (D133): its <see cref="PredictionWeights"/> weight, else 1.</summary>
+    /// <param name="waypointSymbol">The market's waypoint.</param>
+    /// <returns>The weight.</returns>
+    public double PredictionWeightOf(string waypointSymbol) => _predictionWeights.GetValueOrDefault(waypointSymbol, 1.0);
 
     /// <summary>
     /// The materials the system's jump gate still needs, while the construction plan buys them (PLAN.md slice 6.22, D89): the

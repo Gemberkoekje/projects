@@ -7,6 +7,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-08, slice 6.47)
+- Predicted prices in every system (D132: "I'd like to expand the prediction logic to all systems"), not only at home.
+- How far a market's predicted prices are trusted depends on how much other players trade there (D133): every market read
+  lists the market's recent transactions, and the other agents' are stored (`market_trades`, 7 days,
+  `spacetraders_market_other_agent_trades`). Those of the last day lower the weight a route on the market ranks at: the
+  market's own fully, the rest of its system's at half, the systems one jump away at a quarter; 90% with none, halved by
+  every 10, never below 10% (settings `Prediction.*`). Replaces slice 6.46's fixed half.
+- Roaming probes go to a market never seen first, then to the one whose predicted prices put most at stake (the best route
+  through it an hour times how little it is trusted), then by age as before (D134: "Probe parkings should also prioritize any
+  location that promises bigger profits, so bigger profits are more accurate earlier").
+- Tests: `MarketTradeHandlerTests`, `MarketTradeRepositoryTests`, `DatabaseInitializerTests` (the new table on an existing
+  database), `TradeContextReaderTests` (the ripple), `TradeRoutePlannerTests` (two weights, the best rate through a market),
+  `ProbePlannerTests` (the promise).
+
+### Docs – Changed (2026-11-08, slice 6.47)
+- `PLAN.md`: D132–D134, slice 6.47, where things stand. `docs/HOW_IT_WORKS.md`: predicted prices everywhere, how far they are
+  trusted, the probes' order, the new settings.
+
 ### Code – Changed (2026-11-08, slice 6.46)
 - The home system's markets nobody has looked at lately are predicted, not dark (D131), as asked on 2026-11-08: "Can we make a
   dead reckoning prediction rule for any markets without active ships or probes so that our command ship goes there to trade

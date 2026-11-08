@@ -69,6 +69,14 @@ public sealed class DefaultSettingsSeedTests
         "Trade.MaxHaulDistance",
         "Trade.MaxPriceAgeMinutes",
 
+        // How far predicted prices are trusted (slice 6.47, D133): PredictionConfidence, by the other agents' transactions at the
+        // market, in its system and one jump out.
+        "Prediction.MaxWeightPercent",
+        "Prediction.MinWeightPercent",
+        "Prediction.HalvingTrades",
+        "Prediction.SystemSharePercent",
+        "Prediction.NeighbourSharePercent",
+
         // The explorers (slice 6.30, D102): ExplorePlanService wants one for every Explore.SystemsPerExplorer systems left to
         // explore, at most Explore.MaxExplorers.
         "Explore.SystemsPerExplorer",
