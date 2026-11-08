@@ -1147,12 +1147,17 @@ buy.
   offered that material again for 10 minutes (`ConstructionRetries`, in memory).
 - **The state** (`plan_states`, `Construction`): the sites with each material's required, fulfilled and on-the-way
   units, the builders, the builders a load waits for (`ReadyShipSymbols`, for the `ShipLeftIdle` rule) and
-  `Waiting`. It is written only when it changes.
+  `Waiting`; since slice 6.51 (D139) also `Blocker`, what stops the gate this pass (`ConstructionBlockers`, the first that
+  holds: done, no market, low supply or market busy, purchase order, credits, ships, building), and each site's `Chain`,
+  every good of its production chain down to the ores with the best supply where it is sold and where the next step is made
+  from it (`ConstructionChain`). It is written only when it changes.
 - **Visibility:** the journal says `ConstructionStarted`, `CargoBought`, `ConstructionSupplied` and
   `ConstructionDropped`, and each trip ends with `TripEnded` (`Activity` `construction`, always a loss). The ledger
   books the purchases as `ConstructionBuy`. The fleet view says `buying FAB_MATS at X1-DC53-F49 for X1-DC53-I55` or
   `supplying FAB_MATS to X1-DC53-I55`. `spacetraders_construction_units_required` and `_fulfilled` feed the
-  dashboard's jump gate panels (gembernodes).
+  dashboard's jump gate panels (gembernodes), and since slice 6.51 `spacetraders_construction_blocker` (the state's
+  `Blocker` as a code, 8 while the plan or the automation is off) and `spacetraders_construction_chain_supply` (its `Chain`)
+  the panels under them: what stops the gate over time, the share of the time each reason held, and the chain's supply.
 - **In X1-DC53** (2026-10-04) the home gate, X1-DC53-I55, was complete before our ships came (FAB_MATS 1600/1600,
   ADVANCED_CIRCUITRY 400/400, QUANTUM_STABILIZERS 1/1), so the plan finds nothing to build there. Its neighbours
   X1-HZ59-I59 and X1-BG54-I54 were under construction, needing the same.

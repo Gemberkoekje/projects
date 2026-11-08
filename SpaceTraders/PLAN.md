@@ -32,7 +32,9 @@
   home's 26 probes were bought by 17:45Z. Then no load was bought: 815,440 credits against a reserve of 796,935 while FAB_MATS
   and ADVANCED_CIRCUITRY were ABUNDANT: D137 and D138, slice 6.50, built on branch `claude/spacetraders-gate-money`.
   Asked the same hour, not yet worked out: "A ship should never stand still. Gate and gate prereqs are first priority. Goal is
-  to build the gate within 24 hours." and "Any ship purchases should be to make the gate building quicker."
+  to build the gate within 24 hours." and "Any ship purchases should be to make the gate building quicker." Asked next: a
+  dashboard of what stops the gate over time, down its chain to the ores: D139, slice 6.51, built on branch
+  `claude/spacetraders-gate-blocker` (on top of 6.50) with gembernodes branch `claude/spacetraders-gate-blocker-dashboard`.
 - **The goal: the home jump gate done within 24 hours of a reset** (asked on 2026-11-08). The run of 2026-11-01 didn't get
   close (read on 2026-11-08 at 06:22Z, from Loki, Prometheus and the database): at hour 24 the gate had 260 of 1,600 FAB_MATS
   and 240 of 400 ADVANCED_CIRCUITRY; FAB_MATS were done at hour 49; at hour 113 it still lacked 60 circuitry, its last at hour
@@ -240,6 +242,7 @@ get the next D-number.
 | D136 | Slice 6.49 (asked on 2026-11-08, hour 1.7 of the run of 2026-11-08): D128 put the gate's chain first at all times and, as read, at cost at every step (D90). After the contract, the command ship's first four gate trades earned 44,527, 32,345, 19,801 and 18,450 (microprocessors and electronics for D41's circuitry); then the margins went, and from 14:01Z its and the shuttle's trips earned −392 to +3,656, every one for the gate's chain, while the credits stood at about 125,000 from 14:20Z, below the light haulers of `Trade.ShipPurchases` (about 257,000 and the reserve) and home's probes, which come before the gate's loads (D43, D127). Asked how the chain's trades should rank. | **Gate-first once the gate can be built** ("Gate-first once the gate can be built (Recommended)", 2026-11-08): until the order ships are bought in reaches the gate's loads (no plan needs anything before them: the contract's drone, the surveyors, the list's cargo ships, home's probes), a route that feeds the gate's chain ranks and pays as any other (no first place, no at cost); from then on, gate-first at all times as D128. Read as: the gate's materials stay off every route all the same (D128), and the drones stay the gate's miners only (D130), as neither held the credits back. Amends D89, D90 and D128. |
 | D137 | Slice 6.50 (asked on 2026-11-08, hour 4.7): home's probes bought, the gate could be built, but its 334,107 load waited: a load keeps the credit reserve (D64), 796,935 against 815,440 credits, about 260,000 of it the floor and the trading holds (D51), the rest what trips on their way to buy hold back (D57) and a trader's saving for a full hold (D56). FAB_MATS at F46 and ADVANCED_CIRCUITRY at D41 were ABUNDANT. Asked what a load may use. | **Before savings and new trips** ("Before savings and new trips (Recommended)", 2026-11-08): a load leaves only the floor (`FleetExpansion.MinCreditReserve`), the fuel reserve (`Trade.FuelReserveCredits`) and what the trips already on their way to buy hold back, trade and construction (D57); the trading holds (D51) and the savings (D56) don't count against it. Once the gate can be built (D136), a new trade trip leaves what the next load costs, as the construction plan last said it; a trip already on its way keeps what it holds. Ship purchases keep the whole reserve as before. Amends D51, D56, D57 and D64. |
 | D138 | Slice 6.50 (asked on 2026-11-08): the mining plan bought a light shuttle (96,564) for a collection point at the far asteroid X1-VP96-B36 (D83) and sent the contract's drone drifting there for ALUMINUM_ORE; D130's reading had left these shuttles alone. Asked whether they should wait for the gate too. | **"Only if the far-asteroid has materials we need for the gate."** (2026-11-08): while the gate needs materials, a collection point gets its shuttle only when its asteroid yields an ore that goes into one of them (`TradeMarketMap.GoesIntoConstruction`); afterwards as before. B36 yields COPPER_ORE, which goes into ADVANCED_CIRCUITRY, so its shuttle would still have been bought. Amends D83 and D130. |
+| D139 | Slice 6.51 (asked on 2026-11-08, hour 5): "I want to know what stops the gate from being built. Is it a lack of credits, is it scarce/limited prereqs, is it not enough ships available to do it? Should show over time, so if at one point ships is the problem and at another point credits, I want to be able to see that." Then: "Not just the gate mats themselves, also the materials needed to build the gate mats. And the materials that they need, down to the ores." | **One reason a pass, and the chain's supply** (read as): the construction plan names on every pass what stops the home gate, the first that holds of: done; no market a builder reaches sells what it needs; low supply (SCARCE or LIMITED wherever it is sold, D66) or market busy (another of our trips buys it there, D80); a purchase before its loads in the order (D64, D136); credits (D137); ships (a load is ready, no builder is free with an empty hold, or none is at home); building (every unit it needs is on its way). A load that waits for its markets keeps that reason while the order holds it back too, as the gate's miners may be bought meanwhile (D92). Next to it, every good of the gate's chain, step 1 a material it still needs, 2 what that is made from, and so on to the ores, with the best supply where the good is sold and where the next step is made from it, in the gate's system. `spacetraders_construction_blocker` and `spacetraders_construction_chain_supply`, on the SpaceTraders dashboard under the jump gate (gembernodes). Changes no decision the bot takes. |
 
 ## Phases
 
@@ -345,6 +348,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.48 Probes to the busy markets (D135), deployed (below)
 - 6.49 Gate-first once the gate can be built (D136), deployed (below)
 - 6.50 The gate's money before the traders' savings, and shuttles only for the gate's ores (D137, D138), built (below)
+- 6.51 What stops the gate, over time and down its chain (D139), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -519,3 +523,24 @@ the gates of other systems (D68).
     LIMITED.
   - To understand this, start with `EvaluateConstructionAsync` in `Orchestration/BudgetPolicy.cs`, then `GateLoadCredits` in
     `Trading/TradeContextReader.cs`.
+- **6.51 What stops the gate, over time and down its chain** (D139; asked on 2026-11-08): built on branch
+  `claude/spacetraders-gate-blocker` (on top of 6.50), dashboard on gembernodes branch
+  `claude/spacetraders-gate-blocker-dashboard`.
+  - `ConstructionBlockers` (new, `Construction/`): the reasons and their codes, 0 done to 8 off.
+    `ConstructionPlanService.BuyLoadsAsync` picks the pass's reason from its next load (`NextLoad`), the order's answer,
+    the builders it gave no load and what still remains; `ConstructionPlanState.Blocker` keeps it.
+  - `ConstructionChain.Of` (new, `Construction/`): the gate's chain down the production chains from the materials it still
+    needs, each good with the best export/exchange supply and the best import supply at a market that makes a chain good
+    from it, in the gate's system; `ConstructionSiteState.Chain` keeps it.
+  - `PrometheusMetricsService.GateSamples` reads the plan's state (off while the plan or the automation is) into
+    `IAutomationMetrics.ConstructionBlocker` (`spacetraders_construction_blocker`, a code) and `ConstructionChain`
+    (`spacetraders_construction_chain_supply{site,good,step,kind}`, 1 SCARCE to 5 ABUNDANT, one series per good and side).
+  - Dashboard (gembernodes `infrastructure/monitoring/dashboards/spacetraders-dashboard.json`): "What stops the jump gate"
+    (a state timeline), "What stopped the jump gate, share of the time" (over the range shown), and the chain's supply where
+    each good is sold and where it is made into the next step (two state timelines, a row per "step · good").
+  - Tests: `ConstructionPlanServiceTests` (the reason on the plan's existing cases and three new, the chain in the
+    state), `ConstructionChainTests` (three), `PrometheusMetricsServiceTests`
+    `SampleAsync_ExportsWhatStopsTheGate_FromTheConstructionPlansState`, `PrometheusAutomationMetricsTests`
+    `WhatStopsTheGate_IsOneSeries_AndTheChainsSupplyOnePerGoodAndSide`.
+  - To understand this, start with `ConstructionBlockers` in `Construction/ConstructionBlockers.cs`, then the end of
+    `BuyLoadsAsync` in `Automation/ConstructionPlanService.cs`, then `ConstructionChain.Of`.
