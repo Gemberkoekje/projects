@@ -28,6 +28,8 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: RayTracer/**/packages.lock.json
 
       # RestoreLockedMode is relaxed so a lock file that lags a project change
       # (it self-heals on the next local restore) can't spuriously fail CI.

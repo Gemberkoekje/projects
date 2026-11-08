@@ -41,6 +41,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-adventureengine-${{ runner.os }}-${{ hashFiles('AdventureEngine/**/*.csproj', 'AdventureEngine/**/Directory.Packages.props', 'AdventureEngine/**/Directory.Build.props', 'AdventureEngine/**/packages.lock.json') }}
+          restore-keys: |
+            nuget-adventureengine-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore ./AdventureEngine/AdventureEngine.slnx
 
@@ -78,6 +86,8 @@ jobs:
           context: .
           file: ./AdventureEngine/src/AdventureEngine.Web/Dockerfile
           push: true
+          cache-from: type=gha,scope=adventureengine
+          cache-to: type=gha,mode=max,scope=adventureengine
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/adventureengine:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/adventureengine:${{ github.sha }}

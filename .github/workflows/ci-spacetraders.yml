@@ -28,6 +28,8 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: SpaceTraders/**/packages.lock.json
 
       - name: Restore
         run: |
@@ -93,6 +95,8 @@ jobs:
           context: .
           file: ./SpaceTraders/Dockerfile.api
           push: true
+          cache-from: type=gha,scope=spacetraders-api
+          cache-to: type=gha,mode=max,scope=spacetraders-api
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/spacetraders-api:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/spacetraders-api:${{ github.sha }}
@@ -103,6 +107,8 @@ jobs:
           context: .
           file: ./SpaceTraders/Dockerfile.webui
           push: true
+          cache-from: type=gha,scope=spacetraders-webui
+          cache-to: type=gha,mode=max,scope=spacetraders-webui
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/spacetraders-webui:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/spacetraders-webui:${{ github.sha }}

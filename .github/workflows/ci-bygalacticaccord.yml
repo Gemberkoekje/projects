@@ -28,6 +28,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-bygalacticaccord-${{ runner.os }}-${{ hashFiles('ByGalacticAccord/**/*.csproj', 'ByGalacticAccord/**/Directory.Packages.props', 'ByGalacticAccord/**/Directory.Build.props', 'ByGalacticAccord/**/packages.lock.json') }}
+          restore-keys: |
+            nuget-bygalacticaccord-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore ./ByGalacticAccord/ByGalacticAccord.slnx
 
@@ -47,6 +55,16 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ByGalacticAccord/tools/client-check/package-lock.json
+
+      # `playwright install` skips a browser that is already there, so a hit skips the download.
+      # The lock file pins the Playwright version, and with it the browser build.
+      - name: Cache the Playwright browser
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-bygalacticaccord-${{ runner.os }}-${{ hashFiles('ByGalacticAccord/tools/client-check/package-lock.json') }}
 
       - name: Install the browser check
         working-directory: ./ByGalacticAccord/tools/client-check
@@ -99,6 +117,8 @@ jobs:
           context: ./ByGalacticAccord
           file: ./ByGalacticAccord/Dockerfile
           push: true
+          cache-from: type=gha,scope=bygalacticaccord
+          cache-to: type=gha,mode=max,scope=bygalacticaccord
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/bygalacticaccord:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/bygalacticaccord:${{ github.sha }}

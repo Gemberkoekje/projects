@@ -39,6 +39,8 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
         with:
           global-json-file: CharacterCreator/global.json
+          cache: true
+          cache-dependency-path: CharacterCreator/**/packages.lock.json
 
       - name: Restore
         run: dotnet restore CharacterCreator.slnx
@@ -69,6 +71,8 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
         with:
           global-json-file: CharacterCreator/global.json
+          cache: true
+          cache-dependency-path: CharacterCreator/**/packages.lock.json
 
       # The Dockerfile is runtime-only: it copies what this step publishes.
       - name: Publish
@@ -94,6 +98,8 @@ jobs:
           context: ./CharacterCreator
           file: ./CharacterCreator/Dockerfile
           push: true
+          cache-from: type=gha,scope=charactercreator
+          cache-to: type=gha,mode=max,scope=charactercreator
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/charactercreator:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/charactercreator:${{ github.sha }}

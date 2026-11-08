@@ -27,6 +27,14 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-sts2viewer-${{ runner.os }}-${{ hashFiles('sts2_decompiled/sts2_Viewer/**/*.csproj', 'sts2_decompiled/sts2_Viewer/**/Directory.Packages.props', 'sts2_decompiled/sts2_Viewer/**/Directory.Build.props', 'sts2_decompiled/sts2_Viewer/**/packages.lock.json') }}
+          restore-keys: |
+            nuget-sts2viewer-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore ./sts2_decompiled/sts2_Viewer/sts2_Viewer.csproj
 
@@ -59,6 +67,8 @@ jobs:
         with:
           context: ./sts2_decompiled/sts2_Viewer
           push: true
+          cache-from: type=gha,scope=sts2viewer
+          cache-to: type=gha,mode=max,scope=sts2viewer
           tags: |
             ghcr.io/${{ env.REPOSITORY_OWNER_LC }}/sts2viewer:latest
             ghcr.io/${{ env.REPOSITORY_OWNER_LC }}/sts2viewer:${{ github.sha }}

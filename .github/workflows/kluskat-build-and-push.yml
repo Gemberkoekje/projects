@@ -28,6 +28,8 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: Kluskat/**/packages.lock.json
 
       - name: Restore
         run: dotnet restore ./Kluskat/Kluskat.slnx
@@ -50,6 +52,8 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: Kluskat/**/packages.lock.json
 
       # The Dockerfile is runtime-only: it copies what this step publishes.
       - name: Publish
@@ -75,6 +79,8 @@ jobs:
           context: ./Kluskat
           file: ./Kluskat/Dockerfile
           push: true
+          cache-from: type=gha,scope=kluskat
+          cache-to: type=gha,mode=max,scope=kluskat
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/kluskat:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/kluskat:${{ github.sha }}
