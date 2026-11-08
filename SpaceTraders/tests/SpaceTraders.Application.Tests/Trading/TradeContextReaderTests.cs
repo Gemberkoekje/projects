@@ -30,6 +30,7 @@ public sealed class TradeContextReaderTests
     private readonly IGateNetwork _gates = Substitute.For<IGateNetwork>();
     private readonly ISystemRepository _systems = Substitute.For<ISystemRepository>();
     private readonly IMarketPriceSampleRepository _samples = Substitute.For<IMarketPriceSampleRepository>();
+    private readonly MarketHistoryCache _history = new();
 
     public TradeContextReaderTests()
     {
@@ -187,6 +188,7 @@ public sealed class TradeContextReaderTests
         trip.PredictedMarkets.Should().BeEquivalentTo(["X1-FJ91-K88"]);
         trip.TryGetGood("X1-FJ91-K88", "CLOTHING", out var forTrip).Should().BeTrue();
         forTrip.PurchasePrice.Should().BeCloseTo(expected, 2);
+        await _samples.Received(1).GetWaypointPricesAsync("X1-FJ91-K88", Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
         plain.PredictedMarkets.Should().BeEmpty();
         plain.TryGetGood("X1-FJ91-K88", "CLOTHING", out var asSeen).Should().BeTrue();
         asSeen.PurchasePrice.Should().Be(3_400);
@@ -226,5 +228,5 @@ public sealed class TradeContextReaderTests
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), Arg.Any<CancellationToken>()).Returns(on);
 
     private TradeContextReader Reader()
-        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, new MarketHistoryCache()));
+        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history));
 }

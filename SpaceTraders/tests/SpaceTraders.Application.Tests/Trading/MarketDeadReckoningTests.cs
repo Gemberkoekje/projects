@@ -95,7 +95,7 @@ public sealed class MarketDeadReckoningTests
             .Concat(Samples("FUEL", (-50, 90), (0, 72)))
             .ToList();
 
-        var predicted = MarketDeadReckoning.Predict(market, history, LastLook, TimeSpan.FromDays(10));
+        var predicted = MarketDeadReckoning.Predict(market, MarketDeadReckoning.Summarize(history, LastLook), TimeSpan.FromDays(10));
 
         predicted.TradeGoods.Select(good => (good.Symbol, good.PurchasePrice)).Should().Equal(("CLOTHING", 2_950), ("FUEL", 72));
         predicted.Exports.Should().Equal("CLOTHING");

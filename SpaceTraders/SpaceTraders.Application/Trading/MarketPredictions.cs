@@ -47,9 +47,11 @@ public sealed class MarketPredictions(IMarketPriceSampleRepository samples, Mark
             var history = await cache.GetOrReadAsync(
                 market.WaypointSymbol,
                 lastObservedAt,
-                token => samples.GetWaypointPricesAsync(market.WaypointSymbol, lastObservedAt - MarketDeadReckoning.RunHistory, lastObservedAt, token),
+                async token => MarketDeadReckoning.Summarize(
+                    await samples.GetWaypointPricesAsync(market.WaypointSymbol, lastObservedAt - MarketDeadReckoning.RunHistory, lastObservedAt, token),
+                    lastObservedAt),
                 cancellationToken);
-            predicted.Add(MarketDeadReckoning.Predict(market, history, lastObservedAt, now - lastObservedAt));
+            predicted.Add(MarketDeadReckoning.Predict(market, history, now - lastObservedAt));
         }
 
         return predicted;
@@ -57,34 +59,35 @@ public sealed class MarketPredictions(IMarketPriceSampleRepository samples, Mark
 }
 
 /// <summary>
-/// The price samples of each market up to its last look (D131), kept until it is looked at again: a market that is predicted
-/// stays unseen, so the same samples serve every pass meanwhile. One entry per market.
+/// What each market's samples up to its last look say about its goods (D131, <see cref="MarketDeadReckoning.Summarize"/>), kept
+/// until it is looked at again: a market that is predicted stays unseen, so the same summary serves every pass meanwhile. One
+/// entry per market.
 /// </summary>
 /// <remarks>Thread-safe; registered once for the process.</remarks>
 public sealed class MarketHistoryCache
 {
-    private readonly ConcurrentDictionary<string, (DateTimeOffset LastObservedAt, IReadOnlyList<MarketPriceSampleDto> Samples)> _entries
+    private readonly ConcurrentDictionary<string, (DateTimeOffset LastObservedAt, IReadOnlyDictionary<string, GoodHistory> History)> _entries
         = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The market's samples up to its last look, read with <paramref name="read"/> once per look.</summary>
+    /// <summary>What the market's samples up to its last look say, read with <paramref name="read"/> once per look.</summary>
     /// <param name="waypointSymbol">The market.</param>
     /// <param name="lastObservedAt">Its last look.</param>
-    /// <param name="read">Reads the samples.</param>
+    /// <param name="read">Reads the samples and sums them up.</param>
     /// <param name="cancellationToken">Stops the read.</param>
-    /// <returns>The samples, the oldest first.</returns>
-    public async Task<IReadOnlyList<MarketPriceSampleDto>> GetOrReadAsync(
+    /// <returns>Each good's history.</returns>
+    public async Task<IReadOnlyDictionary<string, GoodHistory>> GetOrReadAsync(
         string waypointSymbol,
         DateTimeOffset lastObservedAt,
-        Func<CancellationToken, Task<IReadOnlyList<MarketPriceSampleDto>>> read,
+        Func<CancellationToken, Task<IReadOnlyDictionary<string, GoodHistory>>> read,
         CancellationToken cancellationToken)
     {
         if (_entries.TryGetValue(waypointSymbol, out var entry) && entry.LastObservedAt == lastObservedAt)
         {
-            return entry.Samples;
+            return entry.History;
         }
 
-        var samples = await read(cancellationToken);
-        _entries[waypointSymbol] = (lastObservedAt, samples);
-        return samples;
+        var history = await read(cancellationToken);
+        _entries[waypointSymbol] = (lastObservedAt, history);
+        return history;
     }
 }
