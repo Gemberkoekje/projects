@@ -267,6 +267,11 @@ public sealed class TradeContextReaderTests
         saving.ConstructionMaterials.Should().BeEquivalentTo(["FAB_MATS"], "the gate still needs them; only the order of trades waits");
         saving.ConstructionFirst.Should().BeFalse();
         buildable.ConstructionFirst.Should().BeTrue();
+
+        // D137: once the gate can be built, a new trade trip leaves what its next load costs.
+        (await Reader().ReadReachAsync(System, CancellationToken.None)).GateLoadCredits.Should().Be(80_000);
+        _purchaseNeeds.Report(AutomationPlan.Trading, new PurchaseNeed(PurchaseTier.CargoShips, "SHIP_LIGHT_HAULER", "X1-FJ91-A2", 257_486), DateTimeOffset.UtcNow);
+        (await Reader().ReadReachAsync(System, CancellationToken.None)).GateLoadCredits.Should().Be(0, "the gate can't be built yet");
     }
 
     [Fact]

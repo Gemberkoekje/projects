@@ -95,8 +95,9 @@ public sealed class SupplyConstructionGoalExecutor(
                 : await DropAsync(ship, trip, TripBook.NotNeeded, ct);
         }
 
-        // D64: a load keeps the credit reserve, as a ship purchase does; what this trip holds back is its own to spend.
-        var decision = await budget.EvaluateAsync(0, ct);
+        // D64, D137: a load keeps the floor, the fuel reserve and what the other trips on their way to buy hold back; what this
+        // trip holds back is its own to spend.
+        var decision = await budget.EvaluateConstructionAsync(ct);
         var spendable = Math.Max(0, decision.AvailableCredits - Math.Max(0, decision.ReservedCredits - TripReservations.HeldBack(trip)));
 
         // D81: batches of the market's trade volume, each at the price quoted then, with the prices the arrival or the last

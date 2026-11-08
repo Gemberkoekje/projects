@@ -19,6 +19,17 @@ namespace SpaceTraders.Application.Orchestration;
 public interface IBudgetPolicy
 {
     Task<BudgetDecision> EvaluateAsync(long proposedCost, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// What a load of materials for the jump gate may spend (PLAN.md slice 6.50, D137): the credits less the floor
+    /// (<c>FleetExpansion.MinCreditReserve</c>), the fuel reserve (<c>Trade.FuelReserveCredits</c>) and what the trade and
+    /// construction trips on their way to buy hold back (D57, D64). Asked on 2026-11-08, with 815,440 credits against a reserve
+    /// of 796,935 while FAB_MATS and ADVANCED_CIRCUITRY were ABUNDANT: "Before savings and new trips". The trading holds (D51)
+    /// and a trader's saving for a full hold (D56) no longer count against a load.
+    /// </summary>
+    /// <param name="cancellationToken">Stops the reads.</param>
+    /// <returns>The decision; its <see cref="BudgetDecision.SpendableCredits"/> is what a load may spend.</returns>
+    Task<BudgetDecision> EvaluateConstructionAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class BudgetPolicy(
@@ -29,6 +40,9 @@ public sealed class BudgetPolicy(
     FullHoldSavings savings,
     IShipGoalRepository goals) : IBudgetPolicy
 {
+    /// <summary>The credits cargo leaves for fuel (D24): <c>Trade.FuelReserveCredits</c>.</summary>
+    private const string FuelReserveSetting = "Trade.FuelReserveCredits";
+
     private const string FabMatsBuyThresholdSetting = "Construction.FabMatsBuyThreshold";
     private const string FabMatsTransactionSizeSetting = "Construction.FabMatsTransactionSize";
     private const string ConstructionHourlyBudgetCapEnabledSetting = "Construction.HourlyBudgetCapEnabled";
@@ -83,6 +97,18 @@ public sealed class BudgetPolicy(
             FabMatsBuyThreshold: fabMatsBuyThreshold,
             FabMatsTransactionSize: fabMatsTransactionSize,
             HourlyConstructionBudgetCapEnabled: hourlyConstructionBudgetCapEnabled);
+    }
+
+    /// <inheritdoc />
+    public async Task<BudgetDecision> EvaluateConstructionAsync(CancellationToken cancellationToken = default)
+    {
+        var agent = await agents.GetAsync(cancellationToken);
+        var available = agent?.Credits ?? 0;
+        var reserved = Math.Max(0, await settings.GetAsync<long>(CreditReserve.FloorSetting, cancellationToken))
+            + Math.Max(0, await settings.GetAsync<long>(FuelReserveSetting, cancellationToken))
+            + TripReservations.HeldBack(await goals.GetActiveTradeGoalsAsync(cancellationToken))
+            + TripReservations.HeldBack(await goals.GetActiveConstructionGoalsAsync(cancellationToken));
+        return new BudgetDecision(true, available, reserved, Math.Max(0, available - reserved));
     }
 
     /// <summary>

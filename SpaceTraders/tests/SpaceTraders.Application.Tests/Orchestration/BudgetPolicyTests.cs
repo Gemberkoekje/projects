@@ -41,6 +41,30 @@ public sealed class BudgetPolicyTests
     }
 
     [Fact]
+    public async Task AGateLoad_LeavesTheFloorTheFuelReserveAndTheTripsOnTheirWayToBuy_NotTheTradersHoldsOrSavings()
+    {
+        // D137, asked on 2026-11-08 with 815,440 credits against a reserve of 796,935: "Before savings and new trips". A trader
+        // saves up for a 300,000 hold (D56) and another trip on its way to buy holds back 100,000 (D57): a ship purchase keeps
+        // both, a load only the trip's, with the 60,000 floor and the 5,000 for fuel.
+        var settings = MakeSettings(60_000);
+        settings.GetAsync<long>("Trade.FuelReserveCredits", Arg.Any<CancellationToken>()).Returns(5_000L);
+        _savings.SaveFor("SPECTER-8", "X1-VP96-D40|X1-VP96-A2|SHIP_PARTS", 300_000);
+        _goals.GetActiveTradeGoalsAsync(Arg.Any<CancellationToken>()).Returns(new Dictionary<string, TradeBetweenMarketsGoal>
+        {
+            ["SPECTER-1"] = new() { TradeSymbol = "SHIP_PARTS", BuyWaypointSymbol = "X1-VP96-D40", SellWaypointSymbol = "X1-VP96-A2", ReservedCredits = 100_000 },
+        });
+        _goals.GetActiveConstructionGoalsAsync(Arg.Any<CancellationToken>()).Returns(new Dictionary<string, SupplyConstructionGoal>());
+        var policy = Policy(MakeAgent(815_440), settings);
+
+        var load = await policy.EvaluateConstructionAsync(CancellationToken.None);
+        var ship = await policy.EvaluateAsync(0, CancellationToken.None);
+
+        load.ReservedCredits.Should().Be(60_000 + 5_000 + 100_000);
+        load.SpendableCredits.Should().Be(815_440 - 165_000);
+        ship.ReservedCredits.Should().BeGreaterThanOrEqualTo(60_000 + 300_000 + 100_000, "a ship purchase still keeps the saving and the trip's hold");
+    }
+
+    [Fact]
     public async Task EvaluateAsync_AllowsSpendBelowSpendable()
     {
         var policy = Policy(MakeAgent(500_000), MakeSettings(100_000));

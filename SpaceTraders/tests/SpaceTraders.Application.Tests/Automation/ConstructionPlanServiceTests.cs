@@ -386,7 +386,10 @@ public sealed class ConstructionPlanServiceTests
     private void PricesAre(TradeMarketMap map) => _tradeContexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(map, 1_000_000, 200, 5_000));
 
     private void Spendable(long credits)
-        => _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(new BudgetDecision(true, credits + 100_000, 100_000, credits));
+    {
+        _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns(new BudgetDecision(true, credits + 100_000, 100_000, credits));
+        _budget.EvaluateConstructionAsync(Arg.Any<CancellationToken>()).Returns(new BudgetDecision(true, credits + 100_000, 100_000, credits));
+    }
 
     private Task RunAsync()
         => new ConstructionPlanService(

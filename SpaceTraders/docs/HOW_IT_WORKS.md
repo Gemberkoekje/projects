@@ -1123,7 +1123,10 @@ buy.
   comes first, then by name; of the markets, the one where the load costs least with its fuel, to the market and on
   to the gate, in CRUISE through refuelling stops (`TradeRoutePlanner.TryPlanFlight`). In X1-DC53, F49 exports
   FAB_MATS and D42 ADVANCED_CIRCUITRY.
-- **Money** (D64): supplying pays nothing, so a load is judged like a ship purchase. It leaves the credit reserve
+- **Money** (D64; since slice 6.50, D137: "Before savings and new trips", a load leaves only the floor, the fuel reserve and
+  what trips on their way to buy hold back, `IBudgetPolicy.EvaluateConstructionAsync`, and once the gate can be built a new
+  trade trip leaves what the next load costs, `TradeContext.GateLoadCredits`; what follows is the reserve ship purchases keep):
+  supplying pays nothing, so a load is judged like a ship purchase. It leaves the credit reserve
   (`BudgetPolicy`: the floor and the trading holds, D51; the dearest full hold a trader saves up for, D56; and what the
   trips on their way to buy hold back, D57), and waits for every purchase before it in the order ships are bought in:
   the contract's drone, the surveyors, a drone per scarce mineral and area, the cargo ships of `Trade.ShipPurchases`, and

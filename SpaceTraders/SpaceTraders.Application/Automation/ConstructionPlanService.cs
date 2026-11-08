@@ -198,7 +198,9 @@ public sealed class ConstructionPlanService(
     /// </summary>
     private async Task BuyLoadsAsync(Pass pass, CancellationToken cancellationToken)
     {
-        var spendable = (await budget.EvaluateAsync(0, cancellationToken)).SpendableCredits;
+        // D137: a load leaves the floor, the fuel reserve and what trips on their way to buy hold back; not the traders' holds
+        // or savings.
+        var spendable = (await budget.EvaluateConstructionAsync(cancellationToken)).SpendableCredits;
 
         // D80: one buyer of a material at a market at a time, a trade trip or a construction trip, those this pass starts too.
         var tradeTrips = (await goals.GetActiveTradeGoalsAsync(cancellationToken)).Values.ToList();
