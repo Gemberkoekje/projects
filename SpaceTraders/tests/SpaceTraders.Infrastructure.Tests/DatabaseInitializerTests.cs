@@ -165,6 +165,28 @@ public sealed class DatabaseInitializerTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task InitializeAsync_AddsTheMarketTradesTable_ToADatabaseFromBeforeIt_AsTheModelWouldCreateIt()
+    {
+        // Slice 6.47 (D133): the cluster's database was created without market_trades, and the model's tables exist, so only
+        // AddedSchema creates it.
+        await using (var first = CreateContext())
+        {
+            await SpaceTradersDatabaseInitializer.InitializeAsync(first);
+        }
+
+        var asTheModelCreatesThem = await ColumnsAsync("market_trades");
+        var indexes = await IndexesAsync("market_trades");
+        await ExecuteAsync("DROP TABLE market_trades;");
+
+        await using var db = CreateContext();
+        await SpaceTradersDatabaseInitializer.InitializeAsync(db);
+
+        asTheModelCreatesThem.Should().NotBeEmpty();
+        (await ColumnsAsync("market_trades")).Should().Equal(asTheModelCreatesThem);
+        (await IndexesAsync("market_trades")).Should().Equal(indexes);
+    }
+
+    [SkippableFact]
     public async Task InitializeAsync_D69_KeepsWhatWasSetBeforeIt_AndSwitchesOnThePlansThatWereOff()
     {
         // The agent the reset of 2026-10-04 13:00Z registered has most plans off (D9's defaults). Before the deploy you
@@ -299,6 +321,24 @@ public sealed class DatabaseInitializerTests : IAsyncLifetime
         }
 
         return modelTables.Where(table => !existing.Contains(table)).ToList();
+    }
+
+    private async Task<IReadOnlyList<string>> IndexesAsync(string table)
+    {
+        await using var connection = new NpgsqlConnection(_pg.GetConnectionString());
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "select indexdef from pg_indexes where schemaname = 'public' and tablename = @table order by indexname",
+            connection);
+        command.Parameters.AddWithValue("table", table);
+        await using var reader = await command.ExecuteReaderAsync();
+        var indexes = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            indexes.Add(reader.GetString(0));
+        }
+
+        return indexes;
     }
 
     private async Task ExecuteAsync(string sql)

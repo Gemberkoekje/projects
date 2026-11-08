@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet;
 
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Markets;
 
@@ -18,6 +19,10 @@ public sealed class Market
 
     [JsonPropertyName("tradeGoods")]
     public IReadOnlyList<TradeGood>? TradeGoods { get; init; }
+
+    /// <summary>The market's recent transactions, every agent's; visible only while one of our ships is there (slice 6.47, D133).</summary>
+    [JsonPropertyName("transactions")]
+    public IReadOnlyList<MarketTransaction>? Transactions { get; init; }
 }
 
 public sealed class TradeGoodSymbol

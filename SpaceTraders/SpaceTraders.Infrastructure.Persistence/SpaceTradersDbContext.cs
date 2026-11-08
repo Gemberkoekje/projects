@@ -61,6 +61,8 @@ public sealed class SpaceTradersDbContext(
 
     public DbSet<MarketPriceSample> MarketPriceSamples => Set<MarketPriceSample>();
 
+    public DbSet<MarketTrade> MarketTrades => Set<MarketTrade>();
+
     public DbSet<ShipTaskRecord> ShipTaskRecords => Set<ShipTaskRecord>();
 
     public DbSet<FleetGoalRecord> FleetGoals => Set<FleetGoalRecord>();
@@ -378,6 +380,26 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.Activity).HasMaxLength(50);
             entity.HasIndex(x => new { x.AgentId, x.GoodSymbol, x.ObservedAt });
             entity.HasIndex(x => new { x.AgentId, x.WaypointSymbol, x.GoodSymbol, x.ObservedAt });
+            entity.HasQueryFilter(x => x.AgentId == AgentId);
+        });
+
+        // Slice 6.47 (D133): the other agents' transactions the markets list; SpaceTradersDatabaseInitializer.AddedSchema
+        // creates the same table and indexes on a database from before.
+        modelBuilder.Entity<MarketTrade>(entity =>
+        {
+            entity.ToTable("market_trades");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.AgentId).HasMaxLength(AgentIdentity.MaxLength).IsRequired();
+            entity.Property(x => x.SystemSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.WaypointSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.ShipSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.TradeSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Type).HasMaxLength(20).IsRequired();
+            entity.HasIndex(x => new { x.AgentId, x.WaypointSymbol, x.ShipSymbol, x.TradeSymbol, x.Type, x.Timestamp })
+                .IsUnique()
+                .HasDatabaseName("IX_market_trades_unique");
+            entity.HasIndex(x => new { x.AgentId, x.Timestamp }).HasDatabaseName("IX_market_trades_AgentId_Timestamp");
             entity.HasQueryFilter(x => x.AgentId == AgentId);
         });
 

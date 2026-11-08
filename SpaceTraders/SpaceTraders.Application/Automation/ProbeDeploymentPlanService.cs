@@ -70,8 +70,16 @@ public sealed class ProbeDeploymentPlanService(
     ISettingsRepository settings,
     IPurchaseOrder purchaseOrder,
     IGateNetwork gates,
-    ILogger<ProbeDeploymentPlanService> logger) : IProbeDeploymentPlanService
+    ILogger<ProbeDeploymentPlanService> logger,
+    ITradeContextReader tradeContexts,
+    ProbePromiseCache promiseCache) : IProbeDeploymentPlanService
 {
+    /// <summary>
+    /// The ship a market's promise is reckoned for (slice 6.47, D134): a light hauler's hold and tank, so the markets compare
+    /// alike whatever is in the fleet.
+    /// </summary>
+    private static readonly ShipModel PromiseShip = new("PROMISE", null, null, "DOCKED", "CRUISE", 400, 400, CargoCapacity: 80);
+
     /// <summary>The ship the plan buys (D29).</summary>
     public const string ProbeShipType = "SHIP_PROBE";
 
@@ -165,7 +173,10 @@ public sealed class ProbeDeploymentPlanService(
         var moves = new List<(ServedSystem System, ProbeMove Move)>();
         foreach (var system in pass.Systems)
         {
-            foreach (var move in ProbePlanner.Plan(Snapshot(pass, system)))
+            var promises = system.Probes.Any(probe => probe.IsFree)
+                ? await promiseCache.GetOrReadAsync(system.Symbol, pass.Now, token => PromisesAsync(system.Symbol, token), cancellationToken)
+                : NoPromises;
+            foreach (var move in ProbePlanner.Plan(Snapshot(pass, system, promises)))
             {
                 await SendAsync(move, cancellationToken);
                 moves.Add((system, move));
@@ -300,10 +311,29 @@ public sealed class ProbeDeploymentPlanService(
         }
     }
 
-    private static ProbeSnapshot Snapshot(Pass pass, ServedSystem system) => new()
+    private static readonly IReadOnlyDictionary<string, double> NoPromises = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Slice 6.47 (D134): what a probe at each predicted market of the system would make sure of, in credits an hour: the best
+    /// route through it at its predicted prices (<see cref="TradeRoutePlanner.BestRateThrough"/>) times how far they aren't
+    /// trusted (<see cref="TradeMarketMap.PredictionWeightOf"/>). Asked on 2026-11-08: "Probe parkings should also prioritize any
+    /// location that promises bigger profits, so bigger profits are more accurate earlier"; chosen "Within the current tiers".
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, double>> PromisesAsync(string systemSymbol, CancellationToken cancellationToken)
+    {
+        var map = (await tradeContexts.ReadTradeAsync(systemSymbol, cancellationToken)).Map;
+        return map.PredictedMarkets.ToDictionary(
+            market => market,
+            market => TradeRoutePlanner.BestRateThrough(map, market, PromiseShip with { SystemSymbol = systemSymbol }) * (1 - map.PredictionWeightOf(market)),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static ProbeSnapshot Snapshot(Pass pass, ServedSystem system) => Snapshot(pass, system, NoPromises);
+
+    private static ProbeSnapshot Snapshot(Pass pass, ServedSystem system, IReadOnlyDictionary<string, double> promises) => new()
     {
         Positions = system.Positions,
-        Markets = system.Markets,
+        Markets = [.. system.Markets.Select(market => market with { Promise = promises.GetValueOrDefault(market.WaypointSymbol) })],
         Probes = system.Probes,
         ShipsAt = pass.ShipsAt,
         Calls = pass.Calls,

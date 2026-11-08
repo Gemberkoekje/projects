@@ -313,7 +313,7 @@ it and the other ships can do and what each role would earn: see
 | Explore | Jump through active gates to every system not explored yet, scout each one's markets and shipyards once, and come home (slice 6.11, D59–D63) | The command ship, once its trip ends | What it knows of each system and gate; the command ship Waiting, Exploring, Returning or Done | `SHIP_EXPLORER` (slice 6.30, D98, D102), which the command ship fetches unless a probe of ours answers the purchase's call (slice 6.32, D108); each jump buys one ANTIMATTER |
 | Roles | Give every ship the role that earns the fleet most per hour: surveys first, the contract next, a drone per scarce mineral and area, the rest by an assignment (slice 6.9, D38–D42, D48, D53) | Every ship but the probes; it gives no goals: the plans below read the roles | Each ship's role, why, and what each role it could take would earn it | Nothing; the drones the mining and siphon plans buy beyond one per scarce mineral and area must be worth their role |
 | Contract | Fulfil one mineral contract | Every free miner (D23) | PendingBudget, Active, DeferredUnsupported, Completed | One `SHIP_ORE_HOUND` where a shipyard at home sells one, else a `SHIP_MINING_DRONE` (slice 6.39, D120), never at SCARCE (D121), first in the order (D43) |
-| ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, the stalest nearby first (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30); a probe parks at each shipyard first, those that sell explorers first of all (slice 6.32, D109, D110) | Probes, and the interceptors bought in their place (slice 6.38, D119) | Markets with their probe, the next probe's ship, price and shipyard, open calls | `SHIP_INTERCEPTOR` wherever a shipyard it buys from sells one, else `SHIP_PROBE` (D119), never at SCARCE (D121), while there are fewer probes than markets, after the cargo ships of the list (D43) and the cargo ship on the clock (D116) |
+| ProbeDeployment | A probe at every market of the HQ system; until then the probes roam between markets, a market never seen first, then the one whose predicted prices put most at stake (slice 6.47, D134), then the stalest nearby (slice 6.3, D29); a purchase where none of our ships is fetches a probe (D30); a probe parks at each shipyard first, those that sell explorers first of all (slice 6.32, D109, D110) | Probes, and the interceptors bought in their place (slice 6.38, D119) | Markets with their probe, the next probe's ship, price and shipyard, open calls | `SHIP_INTERCEPTOR` wherever a shipyard it buys from sells one, else `SHIP_PROBE` (D119), never at SCARCE (D121), while there are fewer probes than markets, after the cargo ships of the list (D43) and the cargo ship on the clock (D116) |
 | Survey | Survey the contract's ore, else ores the markets buy (slice 6.4) | Ships that can survey (D20), but the ore hounds, which survey only for their own trips (D120) | Targets, best first | A `SHIP_SURVEYOR` for each system with mining drones that need surveys (no ore hound with a surveyor), with the role board on (D47); then one more for each further area with such drones, after the drones per scarce mineral (D55) |
 | Mining | Mine surveyed ores, else ores in low supply, and sell them (slice 6.4), never for a market that has the ore ABUNDANT; a drone shares a pair rather than trade, until every ore is ABUNDANT (D77); a drone bought for the jump gate's smelters mines only its ore for them while the gate needs a material made from it (D92) | Free miners | Low-supply openings (Pending/Assigned), the gate's miners | `SHIP_ORE_HOUND` where a shipyard of the system sells one, else `SHIP_MINING_DRONE` (slice 6.39, D120), never at SCARCE (D121): one per scarce ore and area (D48, D53); while the gate needs materials, one per ore its smelters have below HIGH every `Mining.GateMinerIntervalMinutes` (D92); then in turn with the cargo ships (D43); up to `Mining.MaxDrones` at home; abroad, last of all, one per ore a system's fresh markets are short of, with no cap (slice 6.40, D122) |
 | Siphon | Siphon gases in low supply at gas giants, keep every gas, and sell them (slice 6.7), never for a market that has the gas ABUNDANT; a drone shares a pair rather than trade, until every gas is ABUNDANT (D77) | Free siphoners: a gas siphon, a hold and a tank, nothing to mine or survey with | Low-supply openings (Pending/Assigned) | `SHIP_SIPHON_DRONE`: one per scarce gas and area (D48, D53), then in turn with the cargo ships (D43); up to `Siphon.MaxDrones` (D32) |
@@ -1296,10 +1296,11 @@ buy.
     The market watch keeps the markets where our ships are fresh, abroad too, where the probes sit (slice 6.28). Only a ship
     at a market refreshes it, so a market no ship passes stays dark: no route, so no ship. Home's probes come before the jump
     gate's loads for that reason (slice 6.44, D127).
-  - **Predicted at home** (slice 6.46, D131, asked on 2026-11-08: "Can we make a dead reckoning prediction rule for any
+  - **Predicted prices** (slice 6.46, D131, asked on 2026-11-08: "Can we make a dead reckoning prediction rule for any
     markets without active ships or probes so that our command ship goes there to trade eventually? ... But only do this for
     the home system."; chosen "Any trader, fresh first", then: "a predicted 1000 profit should rank lower than a certain 1000
-    profit. A predicted 1000000 profit should rank higher than a certain 1000 profit."): a home market older than `Trade.MaxPriceAgeMinutes` that was seen
+    profit. A predicted 1000000 profit should rank higher than a certain 1000 profit."; since slice 6.47, D132, every system's:
+    "I'd like to expand the prediction logic to all systems"): a market older than `Trade.MaxPriceAgeMinutes` that was seen
     with prices isn't stale: its goods are predicted for now (`MarketDeadReckoning`, `TradeMarketMap.PredictedMarkets`),
     each price drifted back towards the good's resting price at the market on a log scale, e^(−t/τ) of the gap left after the
     time t since the look. Fitted on the runs of 2026-10-11 to 2026-11-01 (gaps where we didn't trade the good): an export's
@@ -1309,11 +1310,20 @@ buy.
     import's only shrinking; the trade volume, and a good the market exchanges, stay as seen. On real gaps of 16 to 32 hours
     the purchase price was off by a mean 11.8% for exports (21.9% as last seen) and 2.5% for imports (7.6%); the export rule
     errs on the cheap side when someone else buys meanwhile.
-    A route on a predicted market (`TradeRoute.Predicted`) ranks at half its rate an hour
-    (`TradeRoutePlanner.PredictedRateWeight`), as an end product does (D85), so it goes first only when it earns more than
-    twice as much an hour; the gate's chain first all the same; the trading plan logs "goes on predicted prices" for it. A trip reads its system the same way
-    (`ITradeContextReader.ReadTradeAsync`), so it is judged at its buy market as it was chosen, and the market it gets to is
-    fresh then. A market never seen with prices, and one abroad, stay stale.
+    A route on a predicted market ranks at that market's weight of its rate an hour (`TradeRoute.PredictionWeight`, both
+    markets' weights multiplied when both are predicted), the gate's chain first all the same; the trading plan logs "goes on
+    predicted prices" for it. A trip reads its system the same way (`ITradeContextReader.ReadTradeAsync`), so it is judged at
+    its buy market as it was chosen, and the market it gets to is fresh then. A market never seen with prices stays stale.
+  - **How far predictions are trusted** (slice 6.47, D133, asked on 2026-11-08: "The more other players are trading there,
+    the lower the prediction accuracy should be. This should count for the entire system, not just the market itself. In fact,
+    I'd like it to ripple out."; chosen "Market transaction lists" and "1 : ½ : ¼"): every market read lists the market's
+    recent transactions (`MarketDataModel.Transactions`), and the other agents' (a ship whose symbol isn't ours and a dash) are
+    stored once each (`MarketTradeHandler`, `market_trades`, kept 7 days). A predicted market's weight
+    (`PredictionConfidence`) counts those of the last day: the market's own fully, the rest of its system's at
+    `Prediction.SystemSharePercent` (50), those of the systems one jump away through built gates at
+    `Prediction.NeighbourSharePercent` (25); with none it is `Prediction.MaxWeightPercent` (90), every
+    `Prediction.HalvingTrades` (10) of them halve it, and it never falls below `Prediction.MinWeightPercent` (10). The counts
+    are read at most once a minute. `spacetraders_market_other_agent_trades{system,waypoint}` shows them.
   - **Who crosses systems**, read from D96 with D58, D65, D83 and D86: a ship whose role is trading (the trade role on the
     board; with the board off, a cargo ship), not a shuttle kept for a collection point. A drone, a builder and the survey
     ship in its spare time trade in their own system between their trips, as their own work is there; so does a shuttle
@@ -2127,7 +2137,12 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Trade.MinProfitPerUnit` (200) | Credits per unit, after the fuel for the whole trip, a trade trip must earn to be started, and to be carried on when prices change (D14); 0 means any profit, but see D15 |
 | `Trade.FuelReserveCredits` (5000) | Credits a cargo purchase must leave, so ships can always buy fuel: below them only fuel is bought (D24) |
 | `Trade.MaxHaulDistance` (5) | The trade reach, in jumps (D96): a trade route buys within that many jumps of the trader's system and sells within that many of the buy market's, through built gates (slice 6.29); the probes of the explored systems within it of home are bought at the probe tier, those of the systems beyond it after the drones and cargo ships that take turns (slice 6.28, D97); 0 or less means 5. The market views' queries over the never-written `trade_opportunities` read it too |
-| `Trade.MaxPriceAgeMinutes` (30) | How old, in minutes, a market's prices may be for a trade route to buy or sell there, at home too (slice 6.29, D96); 0 or less means 30. Older prices still say where fuel is sold |
+| `Trade.MaxPriceAgeMinutes` (30) | How old, in minutes, a market's prices may be for a trade route to buy or sell there at the prices seen, at home too (slice 6.29, D96); 0 or less means 30. Older prices still say where fuel is sold, and since slices 6.46 and 6.47 a market seen with prices is predicted after that (D131, D132) |
+| `Prediction.MaxWeightPercent` (90) | How far a route trusts a market's predicted prices where no other agent trades: it ranks at that much of its rate (slice 6.47, D133) |
+| `Prediction.MinWeightPercent` (10) | The least a route trusts a market's predicted prices, however much other agents trade around it (D133) |
+| `Prediction.HalvingTrades` (10) | Other agents' transactions in a day, weighed by where they were, that halve the trust in a market's predicted prices (D133) |
+| `Prediction.SystemSharePercent` (50) | What the other agents' transactions at the other markets of a market's system count for, in percent of those at the market itself (D133) |
+| `Prediction.NeighbourSharePercent` (25) | What those in the systems one jump away count for, in percent of those at the market itself (D133) |
 | `Explore.SystemsPerExplorer` (10) | The explore plan wants one explorer for every this many systems it knows, hasn't explored and reaches through built gates, or part of that (slice 6.30, D102); 0 buys none |
 | `Explore.MaxExplorers` (5) | The most explorers the explore plan buys (D102); 0 for no cap |
 | `Explore.RingWidth` (5) | The width, in jumps from home, of each ring the exploring ships take in turn (D114, slice 6.35, D117): 1 to 5 jumps first, then 6 to 10, and so on, the nearest to each ship first within a ring; 0 or less means 5. The trade reach's width until slice 6.35 |

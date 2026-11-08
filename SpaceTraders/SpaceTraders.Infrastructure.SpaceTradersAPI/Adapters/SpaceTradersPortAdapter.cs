@@ -247,7 +247,17 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             market.TradeGoods is not null ? JsonSerializer.Serialize(market.TradeGoods) : null,
             market.Imports is not null ? JsonSerializer.Serialize(market.Imports) : null,
             market.Exports is not null ? JsonSerializer.Serialize(market.Exports) : null,
-            market.Exchange is not null ? JsonSerializer.Serialize(market.Exchange) : null);
+            market.Exchange is not null ? JsonSerializer.Serialize(market.Exchange) : null)
+        {
+            Transactions = [.. (market.Transactions ?? []).Select(trade => new MarketTradeModel(
+                trade.WaypointSymbol,
+                trade.ShipSymbol,
+                trade.TradeSymbol,
+                trade.Type,
+                trade.Units,
+                trade.PricePerUnit,
+                trade.Timestamp))],
+        };
     }
 
     public async Task<ShipyardDataModel> GetShipyardAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)

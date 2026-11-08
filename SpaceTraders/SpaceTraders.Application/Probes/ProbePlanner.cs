@@ -16,9 +16,11 @@ namespace SpaceTraders.Application.Probes;
 ///   called: first those that sell SHIP_EXPLORER, then the others, each the nearest free probe that isn't parked at a
 ///   shipyard already; one parked at a shipyard that sells no explorer gives way to one that does;</item>
 ///   <item>every other free probe flies to a market that is due (prices older than the interval, the
-///   market watch's <c>Market.RefreshMinutes</c>) and that no probe is at or flying to. Each pair of free
-///   probe and due market is scored by the market's age minus <see cref="FlightWeight"/> times the flight
-///   there, and the best pair goes first, so a market goes to the probe nearest it.</item>
+///   market watch's <c>Market.RefreshMinutes</c>) and that no probe is at or flying to: one never seen first, then the one
+///   that promises most (<see cref="ProbeMarket.Promise"/>, slice 6.47, D134: "Probe parkings should also prioritize any location
+///   that promises bigger profits, so bigger profits are more accurate earlier"), then each pair of free probe and due market
+///   scored by the market's age minus <see cref="FlightWeight"/> times the flight there, and the best pair goes first, so a
+///   market goes to the probe nearest it.</item>
 /// </list>
 /// Once there is a probe for every market (B69), each market keeps one probe, and only the spares fly: those at a
 /// waypoint that is no market, or at a market that has another, go to the markets without a probe, due or not, the
@@ -256,8 +258,12 @@ public static class ProbePlanner
                 return;
             }
 
+            // Slice 6.47 (D134): a market never seen first, then the one that promises most, then the oldest less the flight; of
+            // the probes, the nearest.
             var (probe, market, _) = pairs
-                .OrderByDescending(pair => pair.Score)
+                .OrderByDescending(pair => pair.Market.LastSeenAt == DateTimeOffset.MinValue)
+                .ThenByDescending(pair => pair.Market.Promise)
+                .ThenByDescending(pair => pair.Score)
                 .ThenBy(pair => pair.Market.WaypointSymbol, StringComparer.Ordinal)
                 .ThenBy(pair => pair.Probe.Symbol, StringComparer.Ordinal)
                 .First();
@@ -421,6 +427,13 @@ public sealed record ProbeMarket
     /// parks at a shipyard, those that sell explorers first.
     /// </summary>
     public ShipyardKind Shipyard { get; init; }
+
+    /// <summary>
+    /// What a probe there would make sure of, in credits an hour (PLAN.md slice 6.47, D134): the best route through the market
+    /// at its predicted prices, times how far those prices aren't trusted (<see cref="Trading.TradeRoutePlanner.BestRateThrough"/>,
+    /// <see cref="Trading.PredictionConfidence"/>). 0 for a market whose prices were seen lately, or with no route; 0 unless set.
+    /// </summary>
+    public double Promise { get; init; }
 }
 
 /// <summary>What a market has of a shipyard, which decides where the probes park first (PLAN.md slice 6.32, D109, D110).</summary>

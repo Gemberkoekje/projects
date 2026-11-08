@@ -24,7 +24,8 @@
 ## Where things stand (2026-11-08)
 
 - **Running:** projects main `07974c65` (projects#220: B84), deployed by gembernodes#102 on 2026-10-31. Slices 6.45 and 6.46
-  (D128–D131) are built on branch `claude/spacetraders-gate-first`, to deploy. The server reset on 2026-11-01 at 13:00Z; the
+  (D128–D131) are merged as projects#226 (main `db60371f`); their deploy, gembernodes#135, is open, to merge before the reset
+  of 2026-11-08 13:00Z. Slice 6.47 (D132–D134) is built on branch `claude/spacetraders-predict-everywhere`. The server reset on 2026-11-01 at 13:00Z; the
   bot registered SPECTER again and fulfilled its first contract at 13:50Z. The next reset is expected on 2026-11-08 at 13:00Z
   (`spacetraders_server_next_reset_timestamp_seconds`).
 - **The goal: the home jump gate done within 24 hours of a reset** (asked on 2026-11-08). The run of 2026-11-01 didn't get
@@ -227,6 +228,9 @@ get the next D-number.
 | D129 | Slice 6.45 (asked on 2026-11-08): the gate's load that waits for its markets holds every purchase after it (D64); from 11-04 15:52Z the bot bought one ship while the credits grew from 1M to 7.9M. Asked whether the purchases after it should go while it waits. | **Only what serves the gate** (2026-11-08): "Explorers and probes are worthless without the gate. Any extra cargo ships should only be bought if it serves the goal of getting the gate done within 24 hours of a reset." Read as: while the home gate needs materials, a cargo ship beyond `Trade.ShipPurchases` is bought only for a route down the gate's chain (D128) that has waited `Trade.ShipPurchaseWaitMinutes` with every trader busy (D88), whatever it earns (D90), at the gate's place in the order, after a load the markets sell now, as the gate's miners are (D92); the explorers and the probes after the gate still wait for it. Amends D43, D64, D88, D112 and D116. |
 | D130 | Slice 6.45 (asked on 2026-11-08): "Mining and siphoning drones should only be bought in order to keep the market healthy." Every drone purchase already needed a market that makes something from the ore or gas to have it SCARCE or LIMITED, in three places: one per short ore per area before the cargo ships (D48, D53: ten drones and surveyors before the run's first cargo ship), the gate's miners (D92), and in turn with the cargo ships (D28, D32). The run of 2026-11-01 had 19 mining and 8 siphon drones, netting about 2.3M of the week's 16M. | **Gate chain only, until done** (2026-11-08): while the home jump gate needs materials, drones are bought only for the ores its smelters lack (the gate's miners, D92); no drone for a scarce ore, none in turn with the cargo ships, none abroad and no siphon drone until the gate is done, then as before. Read as: the contract's drone (D23) and the collection points' shuttles (D83) stay. Amends D28, D32, D48, D53 and D122. |
 | D131 | Slice 6.46 (asked on 2026-11-08): "We have some data now from the past few weeks how markets progress. Can we make a dead reckoning prediction rule for any markets without active ships or probes so that our command ship goes there to trade eventually? Even if it isn't fully accurate (e.g. due to other players) at least it will solve the problem. But only do this for the home system." D96 takes a market older than `Trade.MaxPriceAgeMinutes` off every route, and only a ship there refreshes it, so one no ship passes stays dark: K88 and E49 for 18 hours in the run of 2026-11-01. Asked who may take a route on predicted prices. | **Predicted home markets, any trader, weighed down** ("Any trader, fresh first", 2026-11-08): a home market older than the age that was seen with prices is predicted for now (`MarketDeadReckoning`: each price drifts back towards the good's resting price at the market as the time since the last look grows, its supply back to its usual level, its trade volume as seen; the constants fitted on the runs' price samples) and takes routes again; a trip is judged on the same prices, and re-reads the real ones where it lands. A market never seen with prices, and one abroad, stay stale. Then, on how "fresh first" ranks: "a predicted 1000 profit should rank lower than a certain 1000 profit. A predicted 1000000 profit should rank higher than a certain 1000 profit." So a route on a predicted market ranks at a weight of its rate an hour (`TradeRoutePlanner.PredictedRateWeight`, 0.5 to start, as an end product's half, D85). Read as: the gate's chain goes first even on predicted prices (D128, "first priority at all times"). Amends D96. |
+| D132 | Slice 6.47 (asked on 2026-11-08, after D131): "I'd like to expand the prediction logic to all systems." D131 predicted the home system's stale markets only ("only do this for the home system"). | **Every system** (2026-11-08): a market older than `Trade.MaxPriceAgeMinutes` that was seen with prices is predicted in every system on the trading plan's map (the trade reach), and in a trip's own system. Replaces D131's home-only rule. |
+| D133 | Slice 6.47 (asked on 2026-11-08): "I'd like to check the market history. The more other players are trading there, the lower the prediction accuracy should be. This should count for the entire system, not just the market itself. In fact, I'd like it to ripple out. So the market itself should get the biggest accuracy hit, the system should get a smaller accuracy hit, and the systems 1 jump out should get an even smaller accuracy hit. This all of course only counts for predicted prices, any location with a parked probe just has accurate prices." A market read lists the market's recent transactions with each ship's symbol (the API's spec: "Visible only when a ship is present at the market"); the bot ignored them. Asked how to measure other players' trading, and how strong the ripple is. | **The markets' transaction lists, 1 : ½ : ¼** ("Market transaction lists (Recommended)", "1 : ½ : ¼ (Recommended)", 2026-11-08): the other agents' transactions are stored once each (kept 7 days, shown in Grafana); a predicted market's weight counts those of the last day, the market's own fully, the rest of its system's at half, the systems one jump away at a quarter; 90% with none, halved by every 10 weighed transactions, never below 10%; all five numbers are settings (`Prediction.*`). A route on two predicted markets is trusted at both weights multiplied. A market seen lately counts fully. Replaces D131's fixed half. |
+| D134 | Slice 6.47 (asked on 2026-11-08): "Probe parkings should also prioritize any location that promises bigger profits, so bigger profits are more accurate earlier." The probes roamed to the market whose prices were oldest, less twice the flight (slice 6.3), after the shipyards (D109, D110), home first (D127). Asked where the promise ranks against those rules. | **Within the current tiers** ("Within the current tiers (Recommended)", 2026-11-08): home first and the shipyards first stay; among the other markets a probe goes to one never seen first, then the one that promises most, then by age as before. A market's promise is the most a route through it earns an hour at its predicted prices, reckoned for a light hauler flying from the buy market, times how far those prices aren't trusted (1 − its weight, D133); a market seen lately promises nothing. Read as: a market never seen comes first, as nothing predicts it. Amends slice 6.3's order. |
 
 ## Phases
 
@@ -327,7 +331,8 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.44 Home probes before the gate (D127), deployed (below)
 - 6.45 Gate first: the gate's materials stay the gate's, the whole chain feeds first, drones and extra cargo ships only for
   the gate (D128–D130), built (below)
-- 6.46 Dead reckoning for the home markets nobody looks at (D131), built (below)
+- 6.46 Dead reckoning for the home markets nobody looks at (D131), merged (below)
+- 6.47 Predictions everywhere, trusted by who else trades, and probes where most is at stake (D132–D134), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -432,3 +437,33 @@ the gates of other systems (D68).
     lines, and how often such a trip is dropped at its buy market (`not_lucrative`).
   - To understand this, start with `MarketDeadReckoning` in `Trading/MarketDeadReckoning.cs`, then `PredictHomeAsync` in
     `Trading/TradeContextReader.cs`.
+- **6.47 Predictions everywhere, trusted by who else trades, and probes where most is at stake** (D132–D134; asked on
+  2026-11-08): built on branch `claude/spacetraders-predict-everywhere`.
+  - D133, the data: the API's market model reads `transactions` (`Market.Transactions`, the existing `MarketTransaction`),
+    the port carries them (`MarketDataModel.Transactions`, `MarketTradeModel`), `MarketRefresher` publishes
+    `MarketTradesListedEvent` when a read lists any, and `MarketTradeHandler` stores the other agents' (a ship symbol not our
+    agent's and a dash) through `IMarketTradeRepository` (`MarketTradeRepository`, table `market_trades`, unique on market,
+    ship, good, type and time, so a transaction listed again is stored once; `AddedSchema` creates it on the cluster's
+    database; `DataRetention` keeps 7 days; `AgentDataCleanup` takes it with the agent).
+  - D133, the weight: `PredictionConfidence.Weight` (pure) and `WeightsAsync` (counts of the last day, at most once a minute
+    through `MarketTradeCountCache`; the systems one jump away by `ExploreAtlas.Reachable`); `TradeMarketMap.PredictionWeights`
+    replaces `PredictedMarkets` as the source (that is now its keys), `PredictionWeightOf`; `TradeRoute.PredictionWeight`
+    replaces 6.46's `PredictedRateWeight` constant in `RankingRate`. Settings `Prediction.MaxWeightPercent` (90),
+    `Prediction.MinWeightPercent` (10), `Prediction.HalvingTrades` (10), `Prediction.SystemSharePercent` (50),
+    `Prediction.NeighbourSharePercent` (25). Metric `spacetraders_market_other_agent_trades{system,waypoint}`.
+  - D132: `TradeContextReader.PredictAsync` (was `PredictHomeAsync`) predicts every stale market seen with prices, in
+    `ReadReachAsync` and `ReadTradeAsync`.
+  - D134: `ProbeMarket.Promise`; `ProbePlanner.SendToMarkets` orders by never seen, then promise, then the old score;
+    `ProbeDeploymentPlanService.PromisesAsync` reckons each predicted market's promise with
+    `TradeRoutePlanner.BestRateThrough` (new) for a light hauler (80 hold, 400 tank) times 1 − its weight, at most once in five
+    minutes per system (`ProbePromiseCache`), and only for a system with a free probe.
+  - Tests: `MarketTradeHandlerTests` (only the other agents' stored; a read that lists transactions says so),
+    `MarketTradeRepositoryTests` and `DatabaseInitializerTests` `InitializeAsync_AddsTheMarketTradesTable_...` (integration),
+    `TradeContextReaderTests` `APredictedMarketsWeight_FallsWithTheOtherAgentsTrades_AtItMostThenInItsSystemThenOneJumpOut`
+    and the reach test (a stale market abroad is predicted now), `TradeRoutePlannerTests`
+    `ARouteBetweenTwoPredictedMarkets_RanksAtBothWeights` and `TheBestRateThroughAMarket_...`, `ProbePlannerTests`
+    `AMarketThatPromisesMore_GoesFirst_WhateverItsAge_ButAMarketNeverSeenStillComesBeforeIt`.
+  - Not measured yet: how many transactions a market lists and how far back (the spec says only "recent"); how much other
+    agents trade at home. Both show in `spacetraders_market_other_agent_trades` once deployed.
+  - To understand this, start with `PredictionConfidence` in `Trading/PredictionConfidence.cs`, then `PredictAsync` in
+    `Trading/TradeContextReader.cs` and `PromisesAsync` in `Automation/ProbeDeploymentPlanService.cs`.

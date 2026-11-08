@@ -54,6 +54,7 @@ public sealed class ProbeDeploymentPlanServiceTests
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly OpenPurchaseOrder _order = new();
     private readonly IGateNetwork _gates = Substitute.For<IGateNetwork>();
+    private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private readonly DateTimeOffset _now = TimeProvider.System.GetUtcNow();
@@ -61,6 +62,9 @@ public sealed class ProbeDeploymentPlanServiceTests
 
     public ProbeDeploymentPlanServiceTests()
     {
+        // Slice 6.47 (D134): no market is predicted here, so none promises anything and the probes go by age as before.
+        _tradeContexts.ReadTradeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => new TradeContext(new TradeMarketMap([], [], new Dictionary<string, IReadOnlyList<string>>()), 0, 0));
         _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("SPECTER", null, A1, 151_214, "COBALT", 3));
         _waypoints.GetBySystemAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(DefaultWaypoints());
         LastSeen((A1, 60), (A2, 2), (H51, 30), (H52, 1), (XB5C, 1), (J58, 90));
@@ -758,6 +762,8 @@ public sealed class ProbeDeploymentPlanServiceTests
                 _settings,
                 _order,
                 _gates,
-                _log.For<ProbeDeploymentPlanService>())
+                _log.For<ProbeDeploymentPlanService>(),
+                _tradeContexts,
+                new ProbePromiseCache())
             .EnsureBootstrappedAsync();
 }

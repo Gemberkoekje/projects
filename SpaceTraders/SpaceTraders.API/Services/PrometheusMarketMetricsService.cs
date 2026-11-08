@@ -104,6 +104,10 @@ public sealed class PrometheusMarketMetricsService(
                 .Select(system => system with { Probes = probes.GetValueOrDefault(system.System) }),
         ]);
 
+        // Slice 6.47 (D133): the other agents' transactions each market listed in the last day.
+        metrics.OtherAgentTrades(await scope.ServiceProvider.GetRequiredService<IMarketTradeRepository>()
+            .CountSinceAsync(now - Application.Trading.PredictionConfidence.Window, cancellationToken));
+
         // Slice 6.30 (D102): the systems left to explore and the explorers wanted for them, as the explore plan counted them.
         if (explore is not null)
         {

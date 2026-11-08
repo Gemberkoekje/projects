@@ -139,6 +139,9 @@ public static class DependencyInjection
         services.AddScoped<ITradeContextReader, TradeContextReader>();
         services.AddSingleton<MarketHistoryCache>();
         services.AddScoped<IMarketPredictions, MarketPredictions>();
+        services.AddScoped<IPredictionConfidence, PredictionConfidence>();
+        services.AddSingleton<MarketTradeCountCache>();
+        services.AddSingleton<Probes.ProbePromiseCache>();
         services.AddScoped<IMarketRefresher, MarketRefresher>();
         services.AddScoped<IMarketWatchService, MarketWatchService>();
         services.AddSingleton<MarketWatchAttempts>();

@@ -74,6 +74,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly RunGauge _purchaseNeed;
     private readonly RunGauge _creditReserve;
     private readonly RunGauge _exploreSystemsLeft;
+    private readonly RunGauge _otherAgentTrades;
     private readonly RunGauge _exploreExplorersWanted;
 
     private readonly Lock _lock = new();
@@ -107,6 +108,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly Dictionary<(string System, string Waypoint, string ShipType), (string Can, string Equipment)> _shipyardShipInfoLabels = [];
     private readonly HashSet<(string Good, string MadeFrom, string UsedFor)> _supplyChainLabels = [];
     private readonly HashSet<(string Waypoint, string Used)> _surveyLabels = [];
+    private readonly HashSet<(string System, string Waypoint)> _otherAgentTradeLabels = [];
     private readonly Dictionary<string, (string Value, string NextRun, string Description)> _settingLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (string Role, string Reason)> _roleLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string[]> _purchaseNeedLabels = new(StringComparer.Ordinal);
@@ -460,6 +462,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "position",
             "ship_type",
             "shipyard");
+        _otherAgentTrades = Labelled(
+            "spacetraders_market_other_agent_trades",
+            "The other agents' transactions a market listed in the last day (slice 6.47, D133): the more, the less its predicted prices are trusted, and its system's and the neighbouring systems' less so.",
+            "system",
+            "waypoint");
         _exploreSystemsLeft = UntilSet(
             "spacetraders_explore_systems_left",
             "The systems the explore plan knows, hasn't explored and reaches from home through built gates (slice 6.30, D102).");
@@ -590,6 +597,29 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     {
         _exploreSystemsLeft.Set(systemsLeft);
         _exploreExplorersWanted.Set(explorersWanted);
+    }
+
+    /// <inheritdoc />
+    public void OtherAgentTrades(IReadOnlyCollection<Application.Interfaces.Repositories.MarketTradeCount> counts)
+    {
+        var current = counts
+            .GroupBy(count => (System: count.SystemSymbol, Waypoint: count.WaypointSymbol))
+            .ToDictionary(group => group.Key, group => group.Sum(count => count.Trades));
+
+        lock (_lock)
+        {
+            foreach (var gone in _otherAgentTradeLabels.Where(series => !current.ContainsKey(series)).ToList())
+            {
+                _otherAgentTrades.RemoveLabelled(gone.System, gone.Waypoint);
+                _otherAgentTradeLabels.Remove(gone);
+            }
+
+            foreach (var (series, trades) in current)
+            {
+                _otherAgentTrades.WithLabels(series.System, series.Waypoint).Set(trades);
+                _otherAgentTradeLabels.Add(series);
+            }
+        }
     }
 
     /// <inheritdoc />

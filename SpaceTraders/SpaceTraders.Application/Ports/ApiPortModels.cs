@@ -807,6 +807,12 @@ public sealed record MarketDataModel
 
     public string? ExchangeJson { get; init; }
 
+    /// <summary>
+    /// The market's recent transactions, every agent's, as the API lists them while one of our ships is there (PLAN.md slice
+    /// 6.47, D133); none unless set.
+    /// </summary>
+    public IReadOnlyList<MarketTradeModel> Transactions { get; init; } = [];
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public MarketDataModel(
         string WaypointSymbol,
@@ -823,6 +829,51 @@ public sealed record MarketDataModel
         this.ExportsJson = ExportsJson;
         this.ExchangeJson = ExchangeJson;
     }
+}
+
+/// <summary>One transaction a market lists (PLAN.md slice 6.47, D133): any agent's ship buying or selling there.</summary>
+public sealed record MarketTradeModel
+{
+    /// <summary>Creates a transaction.</summary>
+    /// <param name="WaypointSymbol">The market.</param>
+    /// <param name="ShipSymbol">The ship that traded; its agent's symbol, a dash, and a number.</param>
+    /// <param name="TradeSymbol">The good.</param>
+    /// <param name="Type">PURCHASE or SELL.</param>
+    /// <param name="Units">The units.</param>
+    /// <param name="PricePerUnit">The price of a unit.</param>
+    /// <param name="Timestamp">When.</param>
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MarketTradeModel(string WaypointSymbol, string ShipSymbol, string TradeSymbol, string Type, int Units, long PricePerUnit, DateTimeOffset Timestamp)
+    {
+        this.WaypointSymbol = WaypointSymbol;
+        this.ShipSymbol = ShipSymbol;
+        this.TradeSymbol = TradeSymbol;
+        this.Type = Type;
+        this.Units = Units;
+        this.PricePerUnit = PricePerUnit;
+        this.Timestamp = Timestamp;
+    }
+
+    /// <summary>The market.</summary>
+    public required string WaypointSymbol { get; init; }
+
+    /// <summary>The ship that traded; its agent's symbol, a dash, and a number.</summary>
+    public required string ShipSymbol { get; init; }
+
+    /// <summary>The good.</summary>
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>PURCHASE or SELL.</summary>
+    public required string Type { get; init; }
+
+    /// <summary>The units.</summary>
+    public required int Units { get; init; }
+
+    /// <summary>The price of a unit.</summary>
+    public required long PricePerUnit { get; init; }
+
+    /// <summary>When.</summary>
+    public required DateTimeOffset Timestamp { get; init; }
 }
 
 public sealed record ShipyardDataModel

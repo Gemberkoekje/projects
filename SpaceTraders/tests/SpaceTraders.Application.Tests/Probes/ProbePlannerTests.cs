@@ -77,6 +77,23 @@ public sealed class ProbePlannerTests
     }
 
     [Fact]
+    public void AMarketThatPromisesMore_GoesFirst_WhateverItsAge_ButAMarketNeverSeenStillComesBeforeIt()
+    {
+        // Slice 6.47 (D134), asked on 2026-11-08: "Probe parkings should also prioritize any location that promises bigger profits,
+        // so bigger profits are more accurate earlier." J58, 35 minutes away and seen 40 minutes ago, has a predicted route worth
+        // 200,000 an hour at stake; A1, next door and seen 90 minutes ago, promises nothing (by age alone A1 went first). A
+        // market never seen comes first all the same: there is nothing to predict it from.
+        var promising = Market(J58, minutesAgo: 40) with { Promise = 200_000 };
+
+        ProbePlanner.Plan(Snapshot([Probe("PROBE-1", H52)], Market(A1, minutesAgo: 90), promising))
+            .Single().WaypointSymbol.Should().Be(J58);
+        ProbePlanner.Plan(Snapshot([Probe("PROBE-1", H52)], Market(A1, minutesAgo: 90), promising, Market(H51, minutesAgo: 40) with { Promise = 300_000 }))
+            .Single().WaypointSymbol.Should().Be(H51, "it promises more");
+        ProbePlanner.Plan(Snapshot([Probe("PROBE-1", H52)], promising, new ProbeMarket(XB5C, DateTimeOffset.MinValue)))
+            .Single().WaypointSymbol.Should().Be(XB5C);
+    }
+
+    [Fact]
     public void MarketsSeenWithinTheInterval_AreNotDue_SoTheProbeStays()
     {
         ProbePlanner.Plan(Snapshot([Probe("PROBE-1", H52)], Market(H51, minutesAgo: 4), Market(A1, minutesAgo: 2)))
