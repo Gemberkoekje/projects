@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Exploring;
+using SpaceTraders.Application.Health;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
@@ -72,7 +73,8 @@ public sealed class ProbeDeploymentPlanService(
     IGateNetwork gates,
     ILogger<ProbeDeploymentPlanService> logger,
     ITradeContextReader tradeContexts,
-    ProbePromiseCache promiseCache) : IProbeDeploymentPlanService
+    ProbePromiseCache promiseCache,
+    IMarketTradeRepository marketTrades) : IProbeDeploymentPlanService
 {
     /// <summary>
     /// The ship a market's promise is reckoned for (slice 6.47, D134): a light hauler's hold and tank, so the markets compare
@@ -313,19 +315,37 @@ public sealed class ProbeDeploymentPlanService(
 
     private static readonly IReadOnlyDictionary<string, double> NoPromises = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The setting that holds the share of the other agents' trade at a market that counts towards its promise (D135).</summary>
+    public const string ProbeFlowShareSetting = "Prediction.ProbeFlowSharePercent";
+
     /// <summary>
-    /// Slice 6.47 (D134): what a probe at each predicted market of the system would make sure of, in credits an hour: the best
-    /// route through it at its predicted prices (<see cref="TradeRoutePlanner.BestRateThrough"/>) times how far they aren't
-    /// trusted (<see cref="TradeMarketMap.PredictionWeightOf"/>). Asked on 2026-11-08: "Probe parkings should also prioritize any
-    /// location that promises bigger profits, so bigger profits are more accurate earlier"; chosen "Within the current tiers".
+    /// Slice 6.47 (D134): what a probe at each market of the system would make sure of, in credits an hour
+    /// (<see cref="ProbePromise.Of"/>): the best route through a predicted market (<see cref="TradeRoutePlanner.BestRateThrough"/>)
+    /// times how far its prices aren't trusted (<see cref="TradeMarketMap.PredictionWeightOf"/>); slice 6.48 (D135) adds, for every
+    /// market, <c>Prediction.ProbeFlowSharePercent</c> of what the other agents traded there an hour over the last day. Asked on
+    /// 2026-11-08: "Probe parkings should also prioritize any location that promises bigger profits, so bigger profits are more
+    /// accurate earlier"; chosen "Within the current tiers". And: "Probes should also prioritize markets with a lot of players."
     /// </summary>
     private async Task<IReadOnlyDictionary<string, double>> PromisesAsync(string systemSymbol, CancellationToken cancellationToken)
     {
         var map = (await tradeContexts.ReadTradeAsync(systemSymbol, cancellationToken)).Map;
-        return map.PredictedMarkets.ToDictionary(
-            market => market,
-            market => TradeRoutePlanner.BestRateThrough(map, market, PromiseShip with { SystemSymbol = systemSymbol }) * (1 - map.PredictionWeightOf(market)),
-            StringComparer.OrdinalIgnoreCase);
+        var share = await settings.ThresholdAsync(ProbeFlowShareSetting, 10, cancellationToken) / 100.0;
+        var hours = PredictionConfidence.Window.TotalHours;
+        var flow = (await marketTrades.CountSinceAsync(TimeProvider.System.GetUtcNow() - PredictionConfidence.Window, cancellationToken))
+            .Where(count => count.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(count => count.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Sum(count => count.Credits) / hours, StringComparer.OrdinalIgnoreCase);
+        var ship = PromiseShip with { SystemSymbol = systemSymbol };
+        return map.MarketWaypoints
+            .Where(market => map.SystemOf(market).Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(
+                market => market,
+                market => ProbePromise.Of(
+                    map.IsPredicted(market) ? TradeRoutePlanner.BestRateThrough(map, market, ship) : 0,
+                    map.PredictionWeightOf(market),
+                    flow.GetValueOrDefault(market),
+                    share),
+                StringComparer.OrdinalIgnoreCase);
     }
 
     private static ProbeSnapshot Snapshot(Pass pass, ServedSystem system) => Snapshot(pass, system, NoPromises);

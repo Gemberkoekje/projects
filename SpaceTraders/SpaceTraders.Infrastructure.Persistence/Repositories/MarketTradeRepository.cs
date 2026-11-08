@@ -66,9 +66,15 @@ public sealed class MarketTradeRepository(SpaceTradersDbContext db) : IMarketTra
                 .AsNoTracking()
                 .Where(trade => trade.Timestamp >= since)
                 .GroupBy(trade => new { trade.SystemSymbol, trade.WaypointSymbol })
-                .Select(group => new { group.Key.SystemSymbol, group.Key.WaypointSymbol, Trades = group.Count() })
+                .Select(group => new
+                {
+                    group.Key.SystemSymbol,
+                    group.Key.WaypointSymbol,
+                    Trades = group.Count(),
+                    Credits = group.Sum(trade => (long)trade.Units * trade.PricePerUnit),
+                })
                 .ToListAsync(cancellationToken))
-            .Select(count => new MarketTradeCount(count.SystemSymbol, count.WaypointSymbol, count.Trades))
+            .Select(count => new MarketTradeCount(count.SystemSymbol, count.WaypointSymbol, count.Trades) { Credits = count.Credits })
             .ToList();
 
     private static string Key(string waypoint, string ship, string good, string type, DateTimeOffset timestamp)

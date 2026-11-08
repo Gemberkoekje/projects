@@ -55,6 +55,7 @@ public sealed class ProbeDeploymentPlanServiceTests
     private readonly OpenPurchaseOrder _order = new();
     private readonly IGateNetwork _gates = Substitute.For<IGateNetwork>();
     private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
+    private readonly IMarketTradeRepository _marketTrades = Substitute.For<IMarketTradeRepository>();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private readonly DateTimeOffset _now = TimeProvider.System.GetUtcNow();
@@ -98,6 +99,28 @@ public sealed class ProbeDeploymentPlanServiceTests
         flight.TargetWaypointSymbol.Should().Be(A1);
         flight.ForPurchase.Should().BeFalse();
         _activeGoals.Should().NotContainKeys("SPECTER-1", "SPECTER-3");
+    }
+
+    [Fact]
+    public async Task AMarketWhereOtherAgentsTradeALot_GetsTheProbeFirst_ThoughItsPricesAreYounger()
+    {
+        // Slice 6.48 (D135), asked on 2026-11-08: "Probes should also prioritize markets with a lot of players. As the accuracy
+        // of predictions is low, but the actual profits could be high." By age the starting probe goes to A1 (an hour old; see
+        // TheStartingProbe_IsAProbe_AndFliesToTheMarketWhosePricesNeedItMost). Other agents traded 2.4M at H51 in the last day,
+        // 100,000 an hour, of which 10% counts: H51 goes first, though nothing of it is predicted.
+        _tradeContexts.ReadTradeAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(
+            new TradeMarketMap(
+                DefaultWaypoints(),
+                [.. new[] { A1, A2, H51, H52, XB5C, J58 }.Select(market => new MarketSnapshot(market, SystemSymbol, [new TradeGoodSnapshot("FUEL", "EXCHANGE", 72, 68, 180, "MODERATE")], [], [], ["FUEL"]))],
+                new Dictionary<string, IReadOnlyList<string>>()),
+            0,
+            0));
+        _marketTrades.CountSinceAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([new MarketTradeCount(SystemSymbol, H51, 40) { Credits = 2_400_000 }]);
+
+        await RunAsync();
+
+        _activeGoals["SPECTER-2"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(H51);
     }
 
     [Fact]
@@ -764,6 +787,7 @@ public sealed class ProbeDeploymentPlanServiceTests
                 _gates,
                 _log.For<ProbeDeploymentPlanService>(),
                 _tradeContexts,
-                new ProbePromiseCache())
+                new ProbePromiseCache(),
+                _marketTrades)
             .EnsureBootstrappedAsync();
 }

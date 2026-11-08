@@ -94,6 +94,17 @@ public sealed class ProbePlannerTests
     }
 
     [Fact]
+    public void AMarketsPromise_IsItsPredictedRouteTimesTheDoubt_PlusAShareOfWhatOtherAgentsTradeThere()
+    {
+        // Slices 6.47 and 6.48 (D134, D135): a route worth 200,000 an hour at prices trusted at 60% puts 80,000 at stake; other
+        // agents trading 100,000 an hour there add 10% of it. A market seen lately has no doubt about its route, but its traffic
+        // still counts; a quiet market with no route promises nothing.
+        ProbePromise.Of(200_000, 0.6, 100_000, 0.10).Should().BeApproximately(80_000 + 10_000, 1e-6);
+        ProbePromise.Of(200_000, 1.0, 100_000, 0.10).Should().BeApproximately(10_000, 1e-6);
+        ProbePromise.Of(0, 0.9, 0, 0.10).Should().Be(0);
+    }
+
+    [Fact]
     public void MarketsSeenWithinTheInterval_AreNotDue_SoTheProbeStays()
     {
         ProbePlanner.Plan(Snapshot([Probe("PROBE-1", H52)], Market(H51, minutesAgo: 4), Market(A1, minutesAgo: 2)))

@@ -77,6 +77,10 @@ public sealed class DefaultSettingsSeedTests
         "Prediction.SystemSharePercent",
         "Prediction.NeighbourSharePercent",
 
+        // Where roaming probes go first (slice 6.48, D135): ProbeDeploymentPlanService adds this share of the other agents'
+        // trade at a market an hour to its promise.
+        "Prediction.ProbeFlowSharePercent",
+
         // The explorers (slice 6.30, D102): ExplorePlanService wants one for every Explore.SystemsPerExplorer systems left to
         // explore, at most Explore.MaxExplorers.
         "Explore.SystemsPerExplorer",

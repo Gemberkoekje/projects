@@ -34,7 +34,7 @@ public sealed class MarketTradeRepositoryTests : IntegrationTestBase
         await using var db = CreateFreshContext();
         var counts = await new MarketTradeRepository(db).CountSinceAsync(At.AddHours(-24));
 
-        counts.Should().ContainSingle().Which.Should().Be(new Application.Interfaces.Repositories.MarketTradeCount("X1-UK3", "X1-UK3-D45", 3));
+        counts.Should().ContainSingle().Which.Should().Be(new Application.Interfaces.Repositories.MarketTradeCount("X1-UK3", "X1-UK3-D45", 3) { Credits = 3 * 20 * 6_494L });
     }
 
     private async Task<int> RecordAsync(IReadOnlyList<MarketTradeModel> trades)

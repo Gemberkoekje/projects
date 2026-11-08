@@ -23,9 +23,10 @@
 
 ## Where things stand (2026-11-08)
 
-- **Running:** projects main `07974c65` (projects#220: B84), deployed by gembernodes#102 on 2026-10-31. Slices 6.45 and 6.46
-  (D128–D131) are merged as projects#226 (main `db60371f`); their deploy, gembernodes#135, is open, to merge before the reset
-  of 2026-11-08 13:00Z. Slice 6.47 (D132–D134) is built on branch `claude/spacetraders-predict-everywhere`. The server reset on 2026-11-01 at 13:00Z; the
+- **Running:** projects main `da7534f7` (projects#227: slice 6.47, D132–D134, with projects#226: slices 6.45 and 6.46,
+  D128–D131), deployed by gembernodes#136 on 2026-11-08 at 08:10:51Z (gembernodes#135 deployed #226 at 07:43Z). In its first
+  minutes every one of 135 market reads listed transactions, none another agent's: nobody else traded at the home markets.
+  Slice 6.48 (D135) is built on branch `claude/spacetraders-busy-markets`. The server reset on 2026-11-01 at 13:00Z; the
   bot registered SPECTER again and fulfilled its first contract at 13:50Z. The next reset is expected on 2026-11-08 at 13:00Z
   (`spacetraders_server_next_reset_timestamp_seconds`).
 - **The goal: the home jump gate done within 24 hours of a reset** (asked on 2026-11-08). The run of 2026-11-01 didn't get
@@ -231,6 +232,7 @@ get the next D-number.
 | D132 | Slice 6.47 (asked on 2026-11-08, after D131): "I'd like to expand the prediction logic to all systems." D131 predicted the home system's stale markets only ("only do this for the home system"). | **Every system** (2026-11-08): a market older than `Trade.MaxPriceAgeMinutes` that was seen with prices is predicted in every system on the trading plan's map (the trade reach), and in a trip's own system. Replaces D131's home-only rule. |
 | D133 | Slice 6.47 (asked on 2026-11-08): "I'd like to check the market history. The more other players are trading there, the lower the prediction accuracy should be. This should count for the entire system, not just the market itself. In fact, I'd like it to ripple out. So the market itself should get the biggest accuracy hit, the system should get a smaller accuracy hit, and the systems 1 jump out should get an even smaller accuracy hit. This all of course only counts for predicted prices, any location with a parked probe just has accurate prices." A market read lists the market's recent transactions with each ship's symbol (the API's spec: "Visible only when a ship is present at the market"); the bot ignored them. Asked how to measure other players' trading, and how strong the ripple is. | **The markets' transaction lists, 1 : ½ : ¼** ("Market transaction lists (Recommended)", "1 : ½ : ¼ (Recommended)", 2026-11-08): the other agents' transactions are stored once each (kept 7 days, shown in Grafana); a predicted market's weight counts those of the last day, the market's own fully, the rest of its system's at half, the systems one jump away at a quarter; 90% with none, halved by every 10 weighed transactions, never below 10%; all five numbers are settings (`Prediction.*`). A route on two predicted markets is trusted at both weights multiplied. A market seen lately counts fully. Replaces D131's fixed half. |
 | D134 | Slice 6.47 (asked on 2026-11-08): "Probe parkings should also prioritize any location that promises bigger profits, so bigger profits are more accurate earlier." The probes roamed to the market whose prices were oldest, less twice the flight (slice 6.3), after the shipyards (D109, D110), home first (D127). Asked where the promise ranks against those rules. | **Within the current tiers** ("Within the current tiers (Recommended)", 2026-11-08): home first and the shipyards first stay; among the other markets a probe goes to one never seen first, then the one that promises most, then by age as before. A market's promise is the most a route through it earns an hour at its predicted prices, reckoned for a light hauler flying from the buy market, times how far those prices aren't trusted (1 − its weight, D133); a market seen lately promises nothing. Read as: a market never seen comes first, as nothing predicts it. Amends slice 6.3's order. |
+| D135 | Slice 6.48 (asked on 2026-11-08): "Probes should also prioritize markets with a lot of players. As the accuracy of predictions is low, but the actual profits could be high." D134's promise, a predicted route times the doubt, already grew with other players' trading through the weight (D133), but a busy market whose predicted prices showed no route promised nothing, and a market seen lately none at all. | **Add their trade flow to the promise** ("Add their trade flow to the promise (Recommended)", 2026-11-08): every market's promise adds `Prediction.ProbeFlowSharePercent` (10) of what the other agents traded there an hour over the last day (units times price); the predicted route's part counts only while its prices are predicted. Amends D134. |
 
 ## Phases
 
@@ -332,7 +334,8 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.45 Gate first: the gate's materials stay the gate's, the whole chain feeds first, drones and extra cargo ships only for
   the gate (D128–D130), built (below)
 - 6.46 Dead reckoning for the home markets nobody looks at (D131), merged (below)
-- 6.47 Predictions everywhere, trusted by who else trades, and probes where most is at stake (D132–D134), built (below)
+- 6.47 Predictions everywhere, trusted by who else trades, and probes where most is at stake (D132–D134), deployed (below)
+- 6.48 Probes to the busy markets (D135), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -438,7 +441,7 @@ the gates of other systems (D68).
   - To understand this, start with `MarketDeadReckoning` in `Trading/MarketDeadReckoning.cs`, then `PredictHomeAsync` in
     `Trading/TradeContextReader.cs`.
 - **6.47 Predictions everywhere, trusted by who else trades, and probes where most is at stake** (D132–D134; asked on
-  2026-11-08): built on branch `claude/spacetraders-predict-everywhere`.
+  2026-11-08): merged as projects#227, deployed by gembernodes#136 on 2026-11-08 at 08:10:51Z.
   - D133, the data: the API's market model reads `transactions` (`Market.Transactions`, the existing `MarketTransaction`),
     the port carries them (`MarketDataModel.Transactions`, `MarketTradeModel`), `MarketRefresher` publishes
     `MarketTradesListedEvent` when a read lists any, and `MarketTradeHandler` stores the other agents' (a ship symbol not our
@@ -467,3 +470,13 @@ the gates of other systems (D68).
     agents trade at home. Both show in `spacetraders_market_other_agent_trades` once deployed.
   - To understand this, start with `PredictionConfidence` in `Trading/PredictionConfidence.cs`, then `PredictAsync` in
     `Trading/TradeContextReader.cs` and `PromisesAsync` in `Automation/ProbeDeploymentPlanService.cs`.
+- **6.48 Probes to the busy markets** (D135; asked on 2026-11-08): built on branch `claude/spacetraders-busy-markets`.
+  - `MarketTradeCount.Credits` (units times price, summed by `MarketTradeRepository.CountSinceAsync`); `ProbePromise.Of` (pure):
+    the predicted route times the doubt plus `Prediction.ProbeFlowSharePercent` of the other agents' credits an hour;
+    `ProbeDeploymentPlanService.PromisesAsync` now gives every market of the system a promise, read with
+    `IMarketTradeRepository` (new dependency), still at most once in five minutes per system (`ProbePromiseCache`).
+  - Tests: `ProbePlannerTests` `AMarketsPromise_IsItsPredictedRouteTimesTheDoubt_PlusAShareOfWhatOtherAgentsTradeThere`,
+    `ProbeDeploymentPlanServiceTests` `AMarketWhereOtherAgentsTradeALot_GetsTheProbeFirst_ThoughItsPricesAreYounger` (failed
+    before), `MarketTradeRepositoryTests` (the credits), `DefaultSettingsSeedTests` (the setting).
+  - To understand this, start with `ProbePromise` in `Probes/ProbePromiseCache.cs`, then `PromisesAsync` in
+    `Automation/ProbeDeploymentPlanService.cs`.

@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-08, slice 6.48)
+- Roaming probes favour busy markets (D135: "Probes should also prioritize markets with a lot of players. As the accuracy of
+  predictions is low, but the actual profits could be high."): every market's promise adds `Prediction.ProbeFlowSharePercent`
+  (10) of what the other agents traded there an hour over the last day, so a busy market draws a probe even when its predicted
+  prices show no route. Tests: `ProbePlannerTests` (the promise), `ProbeDeploymentPlanServiceTests` (a busy market first),
+  `MarketTradeRepositoryTests` (the credits).
+
+### Docs – Changed (2026-11-08, slice 6.48)
+- `PLAN.md`: D135, slice 6.48, where things stand after deploying 6.47. `docs/HOW_IT_WORKS.md`: the probes' order, the setting.
+
 ### Code – Changed (2026-11-08, slice 6.47)
 - Predicted prices in every system (D132: "I'd like to expand the prediction logic to all systems"), not only at home.
 - How far a market's predicted prices are trusted depends on how much other players trade there (D133): every market read
