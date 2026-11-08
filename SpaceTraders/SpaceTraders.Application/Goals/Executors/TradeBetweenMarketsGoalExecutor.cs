@@ -120,7 +120,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         var bought = Aboard(ship, trade.TradeSymbol);
 
         // D90: a trip that feeds the jump gate's material only has to sell its goods for what they cost.
-        var feedsGate = context.Map.ConstructionMaterialMadeFrom(trade.SellWaypointSymbol, trade.TradeSymbol).Length > 0;
+        var feedsGate = context.Map.ConstructionFeedOf(trade.SellWaypointSymbol, trade.TradeSymbol).Feeds;
         var minimum = feedsGate ? 0 : context.MinProfitPerUnit;
         if (bought == 0)
         {
@@ -262,7 +262,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         var sellsHere = context.Map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var here) && here.SellPrice > 0;
 
         // D90: a trip that feeds the jump gate's material only has to sell its goods for what they cost.
-        var feedsGate = context.Map.ConstructionMaterialMadeFrom(trade.SellWaypointSymbol, trade.TradeSymbol).Length > 0;
+        var feedsGate = context.Map.ConstructionFeedOf(trade.SellWaypointSymbol, trade.TradeSymbol).Feeds;
         if (!Pays(here, trade, context.MinProfitPerUnit, feedsGate)
             && TryFindBetterSale(context.Map, ship, trade, units, sellsHere ? here.SellPrice : 0, out var elsewhere))
         {

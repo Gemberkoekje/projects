@@ -355,6 +355,27 @@ public sealed class SiphonAutomationServiceTests
     }
 
     [Fact]
+    public async Task WhileTheJumpGateNeedsMaterials_NoSiphonDroneIsBought()
+    {
+        // D130, asked on 2026-11-08: "Mining and siphoning drones should only be bought in order to keep the market healthy";
+        // of the options, "Gate chain only, until done". No gas goes into the gate's materials, so while the gate needs them
+        // the scarce gases of WithNoSiphoner_ItBuysTheFirstDrone_WhereItSellsForTheLeast get no drone.
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(
+            new TradeMarketMap(Waypoints, Markets(), new Dictionary<string, IReadOnlyList<string>>())
+            {
+                ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+            },
+            250_000,
+            200));
+        Fleet(CommandShip(waypoint: "X1-DC53-H51"));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Siphon).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+    }
+
+    [Fact]
     public async Task WhereOnlyTheExploringCommandShipIs_NoDroneIsBought()
     {
         // Asked on 2026-10-04: while the command ship explores, business stays home. X1-KR90 sells siphon drones, and its

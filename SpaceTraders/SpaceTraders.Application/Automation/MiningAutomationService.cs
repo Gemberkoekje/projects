@@ -734,6 +734,9 @@ public sealed class MiningAutomationService(
     ///   <item>with nothing to buy at home, a miner for a system abroad (<see cref="AbroadNeedAsync"/>, slice 6.40, D122), whether
     ///   the contract mines or not: it takes no miner abroad.</item>
     /// </list>
+    /// While the home jump gate needs materials, only the gate's miners (D92) are bought (slice 6.45, D130), asked on 2026-11-08:
+    /// "Mining and siphoning drones should only be bought in order to keep the market healthy", and of the options "Gate chain
+    /// only, until done": no drone for a scarce ore, none in turn with the cargo ships, none abroad, until the gate is done.
     /// </summary>
     private async Task<Purchase> NeedAsync(
         IReadOnlyList<ShipModel> fleet,
@@ -759,9 +762,16 @@ public sealed class MiningAutomationService(
                 }
             }
 
-            if (await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, gateMiners, shipyardList, cancellationToken) is { Need.Tier: not PurchaseTier.None } drone)
+            var (drone, gateBuilding) = await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, collecting, gateMiners, shipyardList, cancellationToken);
+            if (drone is { Need.Tier: not PurchaseTier.None })
             {
                 return drone;
+            }
+
+            // D130: while the home jump gate needs materials, no miner for a system abroad either.
+            if (gateBuilding)
+            {
+                return Purchase.Nothing;
             }
         }
 
@@ -816,7 +826,8 @@ public sealed class MiningAutomationService(
         return Purchase.Nothing;
     }
 
-    private async Task<Purchase> DroneNeedAsync(
+    /// <returns>The drone to buy, and whether the home jump gate needs materials (D130).</returns>
+    private async Task<(Purchase Purchase, bool GateBuilding)> DroneNeedAsync(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyList<string> systems,
         FleetRoleBoard board,
@@ -840,7 +851,7 @@ public sealed class MiningAutomationService(
         if (drones >= maxDrones)
         {
             logger.LogDebug("Mining plan: mining drone cap reached ({Current}/{Max}); purchase skipped.", drones, maxDrones);
-            return Purchase.Nothing;
+            return (Purchase.Nothing, false);
         }
 
         var forSystems = new List<(string System, MiningContext Context, ShipModel NewDrone, PurchaseNeed Need)>();
@@ -870,9 +881,21 @@ public sealed class MiningAutomationService(
             var pointDrones = collecting.PointsBySystem.GetValueOrDefault(systemSymbol, []).Sum(point => point.DronesWanted);
             if (miningDrones < scarceOres + pointDrones)
             {
-                return new Purchase(need);
+                // D130: while the jump gate needs materials, only its miners are bought.
+                if (context.Map.ConstructionMaterials.Count > 0)
+                {
+                    logger.LogDebug(
+                        "Mining plan: no drone for a scarce ore in {SystemSymbol} while the jump gate needs materials; only the gate's miners are bought (D130).",
+                        systemSymbol);
+                }
+                else
+                {
+                    return (new Purchase(need), false);
+                }
             }
         }
+
+        var gateBuilding = forSystems.Any(entry => entry.Context.Map.ConstructionMaterials.Count > 0);
 
         // D92: while the jump gate needs materials, a drone for an ore its smelters are short of, one per ore every
         // Mining.GateMinerIntervalMinutes, at the gate's place in the order.
@@ -885,13 +908,14 @@ public sealed class MiningAutomationService(
                     && now - miner.BoughtAt < interval));
             if (ore is not null)
             {
-                return new Purchase(need with { Tier = PurchaseTier.Construction }, GateOre: ore);
+                return (new Purchase(need with { Tier = PurchaseTier.Construction }, GateOre: ore), gateBuilding);
             }
         }
 
-        if (freeAtStart)
+        // D130: while the jump gate needs materials, no drone in turn with the cargo ships either.
+        if (freeAtStart || gateBuilding)
         {
-            return Purchase.Nothing;
+            return (Purchase.Nothing, gateBuilding);
         }
 
         foreach (var (systemSymbol, context, newDrone, need) in forSystems)
@@ -916,10 +940,10 @@ public sealed class MiningAutomationService(
                 continue;
             }
 
-            return new Purchase(need with { Tier = PurchaseTier.Alternating });
+            return (new Purchase(need with { Tier = PurchaseTier.Alternating }), false);
         }
 
-        return Purchase.Nothing;
+        return (Purchase.Nothing, false);
     }
 
     /// <summary>The minutes between two gate miners for one ore (D92): <c>Mining.GateMinerIntervalMinutes</c>, else half an hour.</summary>

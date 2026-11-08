@@ -33,6 +33,12 @@ public enum TradeRouteCheck
 
     /// <summary>The trip passes every check: it is one of the ship's routes.</summary>
     Lucrative = 6,
+
+    /// <summary>
+    /// The good is a material the jump gate still needs, and the buy market is in the gate's system: it is the gate's, and no
+    /// trip buys it there (PLAN.md slice 6.45, D128).
+    /// </summary>
+    GateMaterial = 7,
 }
 
 /// <summary>
@@ -122,6 +128,7 @@ public sealed record TradeRouteJudgement
                 CultureInfo.InvariantCulture,
                 $"{ship}: can't fly on from {buy} to {sell} with {FuelAtBuyMarket(map):N0} fuel aboard, refuelling at markets on the way ({Ship.FuelCapacity:N0}-unit tank)."),
             TradeRouteCheck.NoRoom => NoRoom(),
+            TradeRouteCheck.GateMaterial => $"{ship}: the jump gate still needs {Route.TradeSymbol}, so no trader buys it at {buy} (D128).",
             TradeRouteCheck.TooFewCredits => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{ship}: a unit at {Route.BuyPrice:N0} and {Route.FuelCost:N0} for the trip's fuel cost {Route.BuyPrice + Route.FuelCost:N0}; {Credits:N0} credits are free for cargo."),
@@ -131,6 +138,9 @@ public sealed record TradeRouteJudgement
             TradeRouteCheck.NotLucrative => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{ship}: {Route.Units:N0} units earn {Route.Profit:N0} after {Route.FuelCost:N0} for fuel, {Route.Profit / Route.Units:N0} a unit; a trip must earn {MinProfitPerUnit:N0} a unit (D14)."),
+            _ when Route.FeedsConstruction && Route.ConstructionStep > 1 => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{ship}: feeds the jump gate's chain, {Route.ConstructionMaterial} {Route.ConstructionStep} steps from the gate, {Route.Units:N0} units for {Route.Profit:N0} after fuel (D90, D128)."),
             _ when Route.FeedsConstruction => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{ship}: feeds the jump gate's {Route.ConstructionMaterial}, {Route.Units:N0} units for {Route.Profit:N0} after fuel (D89, D90)."),

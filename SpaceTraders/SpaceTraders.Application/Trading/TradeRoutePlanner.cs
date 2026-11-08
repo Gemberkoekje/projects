@@ -17,10 +17,11 @@ namespace SpaceTraders.Application.Trading;
 ///   is reached through the gates, within <c>Trade.MaxHaulDistance</c> jumps, and the antimatter of the jumps is a cost
 ///   too;</item>
 ///   <item>a trip is lucrative when it earns at least <c>Trade.MinProfitPerUnit</c> per unit (D14);</item>
-///   <item>among lucrative trips, first those that feed a market making a material the jump gate still needs (D89), last those
-///   to a market that exchanges the good (D91), and otherwise the one that earns most an hour over the whole trip from where
-///   the ship is (D95, <see cref="TripTime"/>), an end product's (a good nothing is made from) counted at half (D15, D82,
-///   D85).</item>
+///   <item>no trip buys a material the jump gate still needs in the gate's system (slice 6.45, D128): those are the gate's;</item>
+///   <item>among lucrative trips, first those that feed the jump gate's chain (D89; slice 6.45, D128: a material it still needs,
+///   or anything further down its production chain, the nearest step first), last those to a market that exchanges the good
+///   (D91), and otherwise the one that earns most an hour over the whole trip from where the ship is (D95,
+///   <see cref="TripTime"/>), an end product's (a good nothing is made from) counted at half (D15, D82, D85).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -127,6 +128,7 @@ public static class TradeRoutePlanner
         CheckRoutes(map, ship, credits, minProfitPerUnit, heldRouteKeys, heldBuys, routes, judgements: null);
         return [.. routes
             .OrderByDescending(route => route.FeedsConstruction)
+            .ThenBy(route => route.ConstructionStep)
             .ThenBy(route => route.ToExchange)
             .ThenByDescending(RankingRate)
             .ThenByDescending(route => route.FeedsProduction)
@@ -195,9 +197,9 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
-    /// Orders two routes as Rank does (D15, D82, D85, D89, D91, D95): one that feeds the jump gate's materials first, one that
-    /// sells to a market that exchanges the good last, then by <see cref="RankingRate"/>, a good something is made from first
-    /// on a tie, then by key.
+    /// Orders two routes as Rank does (D15, D82, D85, D89, D91, D95, D128): one that feeds the jump gate's chain first, the
+    /// nearest step to the gate first, one that sells to a market that exchanges the good last, then by
+    /// <see cref="RankingRate"/>, a good something is made from first on a tie, then by key.
     /// </summary>
     /// <param name="x">One route.</param>
     /// <param name="y">The other route.</param>
@@ -211,6 +213,12 @@ public static class TradeRoutePlanner
         if (gate != 0)
         {
             return gate;
+        }
+
+        var step = x.ConstructionStep.CompareTo(y.ConstructionStep);
+        if (step != 0)
+        {
+            return step;
         }
 
         var exchange = x.ToExchange.CompareTo(y.ToExchange);
@@ -833,7 +841,7 @@ public static class TradeRoutePlanner
                         || !map.IsFresh(sell)
                         || !map.TryGetGood(sell, good.Symbol, out var atSell)
                         || atSell.SellPrice < good.PurchasePrice
-                        || (atSell.SellPrice == good.PurchasePrice && map.ConstructionMaterialMadeFrom(sell, good.Symbol).Length == 0)
+                        || (atSell.SellPrice == good.PurchasePrice && !map.ConstructionFeedOf(sell, good.Symbol).Feeds)
                         || heldRouteKeys.Contains(RouteKey(good.Symbol, buy, sell))
                         || heldBuys.Holds(good.Symbol, buy))
                     {
@@ -907,10 +915,18 @@ public static class TradeRoutePlanner
             return false;
         }
 
-        // D89, D90: the material the delivery feeds, when the jump gate still needs it; such a unit only has to sell for what it
-        // cost.
-        var material = map.ConstructionMaterialMadeFrom(sellWaypointSymbol, tradeSymbol);
-        route = route with { BuyPrice = atBuy.PurchasePrice, SellPrice = atSell.SellPrice, ConstructionMaterial = material };
+        // D89, D90, D128: what the delivery feeds of the jump gate's chain, while the gate still needs it; such a unit only has to
+        // sell for what it cost.
+        var feed = map.ConstructionFeedOf(sellWaypointSymbol, tradeSymbol);
+        var material = feed.TradeSymbol;
+        route = route with { BuyPrice = atBuy.PurchasePrice, SellPrice = atSell.SellPrice, ConstructionMaterial = material, ConstructionStep = feed.Step };
+
+        // D128: a material the gate still needs is the gate's: no trip buys it in the gate's system.
+        if (map.IsConstructionMaterialAt(buyWaypointSymbol, tradeSymbol))
+        {
+            failed = TradeRouteCheck.GateMaterial;
+            return false;
+        }
 
         // D91: a sale to a market that exchanges the good is a wealth trade: it never feeds production, and ranks last.
         var toExchange = map.Exchanges(sellWaypointSymbol, tradeSymbol);
@@ -982,6 +998,7 @@ public static class TradeRoutePlanner
             Jumps = jumps,
             FeedsProduction = !map.IsEndProduct(tradeSymbol) && !toExchange,
             ConstructionMaterial = material,
+            ConstructionStep = feed.Step,
             ToExchange = toExchange,
             Seconds = TripTime.TradeSeconds(map, ship.WaypointSymbol ?? string.Empty, approach.Stops, buyWaypointSymbol, haul.Stops, speed, CooldownLeft(map, ship)),
         };
@@ -1291,13 +1308,19 @@ public sealed record TradeRoute
     public bool FeedsProduction { get; init; }
 
     /// <summary>
-    /// The jump gate's material the sell market makes from the good, while the gate needs it (D89,
-    /// <see cref="TradeMarketMap.ConstructionMaterialMadeFrom"/>): such a route comes before every other. Empty for none, and
-    /// unless set.
+    /// What the sell market makes from the good for the jump gate's chain, while the gate needs it (D89, D128,
+    /// <see cref="TradeMarketMap.ConstructionFeedOf"/>): the gate's material itself at step 1, something that goes into it further
+    /// down. Such a route comes before every other. Empty for none, and unless set.
     /// </summary>
     public string ConstructionMaterial { get; init; } = string.Empty;
 
-    /// <summary>Whether the route feeds a material the jump gate still needs (<see cref="ConstructionMaterial"/>, D89).</summary>
+    /// <summary>
+    /// How many steps from the gate <see cref="ConstructionMaterial"/> is (D128): 1 for the gate's material, 2 for what goes into
+    /// it, and so on; the nearest step goes first. 0 for none, and unless set.
+    /// </summary>
+    public int ConstructionStep { get; init; }
+
+    /// <summary>Whether the route feeds the jump gate's chain (<see cref="ConstructionMaterial"/>, D89, D128).</summary>
     public bool FeedsConstruction => ConstructionMaterial.Length > 0;
 
     /// <summary>
@@ -1316,7 +1339,7 @@ public sealed record TradeRoute
         => Profit > 0 && Profit >= (long)Math.Max(0, minProfitPerUnit) * Units;
 
     /// <summary>
-    /// Whether the trip is worth taking: lucrative (D14), or, when it feeds a material the jump gate still needs (D89), its
+    /// Whether the trip is worth taking: lucrative (D14), or, when it feeds the jump gate's chain (D89, D128: every step), its
     /// goods sell for at least what they cost, its fuel being the price of feeding the gate (D90, asked on 2026-10-05: "Up to
     /// its fuel"; IRON from H60 at 150 to D52 and F58 at 150 to 155 earned less than the minimum).
     /// </summary>

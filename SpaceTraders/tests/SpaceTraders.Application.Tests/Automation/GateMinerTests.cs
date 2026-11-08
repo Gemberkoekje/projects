@@ -171,23 +171,34 @@ public sealed class GateMinerTests
     }
 
     [Fact]
-    public async Task ADroneForAScarceMineral_ComesFirst()
+    public async Task WhileTheGateNeedsMaterials_NoDroneIsBoughtForAScarceMineral_OnlyTheGatesMiners()
     {
-        // D48 comes earlier in the order: H52's QUARTZ_SAND is SCARCE, and the fleet has no drone yet, only its survey ship.
+        // D130, asked on 2026-11-08: "Mining and siphoning drones should only be bought in order to keep the market healthy";
+        // of the options, "Gate chain only, until done". H52's QUARTZ_SAND is SCARCE and the fleet has no drone yet, only its
+        // survey ship: before D130 a drone for the scarce quartz came first (D48). Now the gate's miners alone are bought, for
+        // the ore its smelters are shortest of; once the gate is done, the quartz gets its drone again.
         MarketsAre(GateFixture.Map(markets: GateFixture.Markets(quartz: "SCARCE")));
         Fleet(SurveyShip(H51));
 
         await RunAsync();
 
-        _order.Of(AutomationPlan.Mining).Tier.Should().Be(PurchaseTier.Coverage);
-        _state!.GateMiners.Should().BeEmpty("a drone for a scarce mineral isn't the gate's");
+        _order.Of(AutomationPlan.Mining).Tier.Should().Be(PurchaseTier.Construction);
+        _state!.GateMiners.Should().ContainSingle().Which.TradeSymbol.Should().BeOneOf("IRON_ORE", "COPPER_ORE");
+
+        _state = null;
+        MarketsAre(GateFixture.Map(materials: [], markets: GateFixture.Markets(quartz: "SCARCE")));
+
+        await RunAsync();
+
+        _order.Of(AutomationPlan.Mining).Tier.Should().Be(PurchaseTier.Coverage, "the gate needs nothing any more");
     }
 
     [Fact]
-    public async Task AGateMiner_CountsOnlyForItsOwnOre_AmongTheDronesForScarceMinerals()
+    public async Task WhileTheGateNeedsMaterials_NoDroneIsBoughtInTurnWithTheCargoShips_NorForAScarceMineral()
     {
-        // H52's QUARTZ_SAND is SCARCE and nobody mines it. SHIP-20 mines only IRON_ORE, so it doesn't count as its drone (D48),
-        // and a drone is bought for the quartz. Bought five minutes ago, it holds back the next IRON_ORE drone meanwhile.
+        // D130: H52's QUARTZ_SAND is SCARCE and nobody mines it, F49's COPPER_ORE is HIGH, and the IRON_ORE drone SHIP-20 was
+        // bought five minutes ago, so the gate's next miner waits its half hour (D92). Before D130 the quartz got a drone for
+        // a scarce mineral (D48); now nothing is bought until the half hour has passed.
         MarketsAre(GateFixture.Map(markets: GateFixture.Markets(copper: "HIGH", quartz: "SCARCE")));
         _activeGoals["SHIP-20"] = new MineAndSellGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = XB5C, SellWaypointSymbol = H51 };
         Fleet(Drone("SHIP-20", H51, "IN_ORBIT"));
@@ -195,8 +206,8 @@ public sealed class GateMinerTests
 
         await RunAsync();
 
-        _order.Of(AutomationPlan.Mining).Tier.Should().Be(PurchaseTier.Coverage);
-        _state.GateMiners.Should().ContainSingle(miner => miner.ShipSymbol == "SHIP-20", "the drone for the quartz isn't the gate's");
+        _order.Of(AutomationPlan.Mining).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
     }
 
     [Fact]

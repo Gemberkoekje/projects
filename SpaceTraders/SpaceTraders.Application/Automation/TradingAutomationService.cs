@@ -378,7 +378,11 @@ public sealed class TradingAutomationService(
     /// of the list is saved up for, whatever the routes, after the contract's drone, a surveyor and a drone for each scarce
     /// mineral; a ship beyond the list needs nothing until a route has waited so, and then goes before the probes once
     /// <c>Trade.ShipPurchaseIntervalMinutes</c> have passed since the plan last bought one (slice 6.34, D116,
-    /// <see cref="BeyondTheListTierAsync"/>), and till then takes turns with the drones after them.
+    /// <see cref="BeyondTheListTierAsync"/>), and till then takes turns with the drones after them. While the home jump gate needs
+    /// materials (slice 6.45, D129), asked on 2026-11-08: "Any extra cargo ships should only be bought if it serves the goal of
+    /// getting the gate done within 24 hours of a reset": a ship beyond the list is bought only for a route down the gate's chain
+    /// (D128) that has waited so, at the gate's place in the order, after a load the markets sell now, as the gate's miners are
+    /// (D92); explorers and probes still wait for the gate ("Explorers and probes are worthless without the gate").
     /// </summary>
     /// <param name="lastBoughtAt">When the plan last bought a cargo ship, as its state keeps it; null for none on record.</param>
     /// <returns>When this pass bought one; null when it bought none.</returns>
@@ -421,21 +425,23 @@ public sealed class TradingAutomationService(
 
         // D88: beyond the list a cargo ship adds value only when the traders can't keep up: a route worth
         // Trade.ShipPurchaseMinRouteProfit from the shipyard, that no trader holds, has waited Trade.ShipPurchaseWaitMinutes with
-        // every trader busy. A stable market never gets there; till then the drones' turn comes (D43).
+        // every trader busy. A stable market never gets there; till then the drones' turn comes (D43). D129: while the home
+        // jump gate needs materials, only a route down the gate's chain counts (D128), whatever it earns (D90), and the ship
+        // stands at the gate's place in the order, as its miners do (D92).
+        var forGate = !inList && context.Map.ConstructionMaterials.Count > 0;
         var minRouteProfit = await settings.GetAsync<long>(ShipPurchaseMinRouteProfitSetting, cancellationToken);
         var waited = demand.Note(
             TradeRoutePlanner.Rank(context.Map, newShip, AnyCredits, context.MinProfitPerUnit, heldKeys, heldBuys)
-                .Where(route => route.Profit >= minRouteProfit)
+                .Where(route => forGate ? route.FeedsConstruction : route.Profit >= minRouteProfit)
                 .Select(route => route.Key),
             TimeProvider.System.GetUtcNow());
         var hasWork = idle == 0
             && waited >= TimeSpan.FromMinutes(await settings.GetAsync<int>(ShipPurchaseWaitMinutesSetting, cancellationToken));
+        var tier = inList ? PurchaseTier.CargoShips
+            : forGate ? PurchaseTier.Construction
+            : await BeyondTheListTierAsync(lastBoughtAt, cancellationToken);
         var need = inList || hasWork
-            ? new PurchaseNeed(
-                inList ? PurchaseTier.CargoShips : await BeyondTheListTierAsync(lastBoughtAt, cancellationToken),
-                shipType,
-                shipyard.WaypointSymbol,
-                forSale.PurchasePrice)
+            ? new PurchaseNeed(tier, shipType, shipyard.WaypointSymbol, forSale.PurchasePrice)
             : PurchaseNeed.None;
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Trading, need, cancellationToken) || idle > 0)
         {
@@ -444,6 +450,15 @@ public sealed class TradingAutomationService(
 
         var creditsForCargo = Math.Max(0, context.Credits - forSale.PurchasePrice - context.FuelReserveCredits);
         var routes = TradeRoutePlanner.Rank(context.Map, newShip, creditsForCargo, context.MinProfitPerUnit, heldKeys, heldBuys);
+        if (forGate && !routes.Any(route => route.FeedsConstruction))
+        {
+            logger.LogDebug(
+                "Trading plan: a new {ShipType} from {Shipyard} would have no route down the jump gate's chain; no purchase while the gate needs materials (D129).",
+                shipType,
+                shipyard.WaypointSymbol);
+            return null;
+        }
+
         if (routes.Count == 0)
         {
             logger.LogDebug(
@@ -906,6 +921,26 @@ public sealed class TradingAutomationService(
                 route.Profit,
                 route.FuelCost,
                 route.AntimatterCost,
+                creditsPerHour,
+                tripMinutes);
+        }
+        else if (route.FeedsConstruction && route.ConstructionStep > 1)
+        {
+            // D128: a route further down the jump gate's chain comes before every route that feeds none; the journal says so.
+            logger.LogInformation(
+                "{EventKind:l}: ship {ShipSymbol} trades {Units} {TradeSymbol} from {BuyWaypoint} ({BuyPrice} each) to {SellWaypoint} ({SellPrice} each), which makes {ConstructionMaterial} from it, {ConstructionStep} steps from the jump gate (D128); about {ExpectedProfit} credits after {FuelCost} for fuel, the flight to the buy market included: {CreditsPerHour} an hour over about {TripMinutes} minutes.",
+                JournalEvents.TradeStarted,
+                ship.Symbol,
+                route.Units,
+                route.TradeSymbol,
+                route.BuyWaypointSymbol,
+                route.BuyPrice,
+                route.SellWaypointSymbol,
+                route.SellPrice,
+                route.ConstructionMaterial,
+                route.ConstructionStep,
+                route.Profit,
+                route.FuelCost,
                 creditsPerHour,
                 tripMinutes);
         }
