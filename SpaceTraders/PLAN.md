@@ -33,8 +33,11 @@
   and ADVANCED_CIRCUITRY were ABUNDANT: D137 and D138, slice 6.50, built on branch `claude/spacetraders-gate-money`.
   Asked the same hour, not yet worked out: "A ship should never stand still. Gate and gate prereqs are first priority. Goal is
   to build the gate within 24 hours." and "Any ship purchases should be to make the gate building quicker." Asked next: a
-  dashboard of what stops the gate over time, down its chain to the ores: D139, slice 6.51, built on branch
-  `claude/spacetraders-gate-blocker` (on top of 6.50) with gembernodes branch `claude/spacetraders-gate-blocker-dashboard`.
+  dashboard of what stops the gate over time, down its chain to the ores: D139, slice 6.51; 6.50 and 6.51 merged as
+  projects#231 and #232 (main `984c347e`) and deployed with the dashboard by gembernodes#141 at 18:35Z. Its first reading,
+  18:36Z: ships (a load ready and paid for, no builder free), with LIQUID_HYDROGEN and LIQUID_NITROGEN SCARCE at F45, which
+  makes the EXPLOSIVES of the asteroid base's ores: D140 and D141, slice 6.52, built on branch
+  `claude/spacetraders-gate-hauler-siphon`.
 - **The goal: the home jump gate done within 24 hours of a reset** (asked on 2026-11-08). The run of 2026-11-01 didn't get
   close (read on 2026-11-08 at 06:22Z, from Loki, Prometheus and the database): at hour 24 the gate had 260 of 1,600 FAB_MATS
   and 240 of 400 ADVANCED_CIRCUITRY; FAB_MATS were done at hour 49; at hour 113 it still lacked 60 circuitry, its last at hour
@@ -243,6 +246,8 @@ get the next D-number.
 | D137 | Slice 6.50 (asked on 2026-11-08, hour 4.7): home's probes bought, the gate could be built, but its 334,107 load waited: a load keeps the credit reserve (D64), 796,935 against 815,440 credits, about 260,000 of it the floor and the trading holds (D51), the rest what trips on their way to buy hold back (D57) and a trader's saving for a full hold (D56). FAB_MATS at F46 and ADVANCED_CIRCUITRY at D41 were ABUNDANT. Asked what a load may use. | **Before savings and new trips** ("Before savings and new trips (Recommended)", 2026-11-08): a load leaves only the floor (`FleetExpansion.MinCreditReserve`), the fuel reserve (`Trade.FuelReserveCredits`) and what the trips already on their way to buy hold back, trade and construction (D57); the trading holds (D51) and the savings (D56) don't count against it. Once the gate can be built (D136), a new trade trip leaves what the next load costs, as the construction plan last said it; a trip already on its way keeps what it holds. Ship purchases keep the whole reserve as before. Amends D51, D56, D57 and D64. |
 | D138 | Slice 6.50 (asked on 2026-11-08): the mining plan bought a light shuttle (96,564) for a collection point at the far asteroid X1-VP96-B36 (D83) and sent the contract's drone drifting there for ALUMINUM_ORE; D130's reading had left these shuttles alone. Asked whether they should wait for the gate too. | **"Only if the far-asteroid has materials we need for the gate."** (2026-11-08): while the gate needs materials, a collection point gets its shuttle only when its asteroid yields an ore that goes into one of them (`TradeMarketMap.GoesIntoConstruction`); afterwards as before. B36 yields COPPER_ORE, which goes into ADVANCED_CIRCUITRY, so its shuttle would still have been bought. Amends D83 and D130. |
 | D139 | Slice 6.51 (asked on 2026-11-08, hour 5): "I want to know what stops the gate from being built. Is it a lack of credits, is it scarce/limited prereqs, is it not enough ships available to do it? Should show over time, so if at one point ships is the problem and at another point credits, I want to be able to see that." Then: "Not just the gate mats themselves, also the materials needed to build the gate mats. And the materials that they need, down to the ores." | **One reason a pass, and the chain's supply** (read as): the construction plan names on every pass what stops the home gate, the first that holds of: done; no market a builder reaches sells what it needs; low supply (SCARCE or LIMITED wherever it is sold, D66) or market busy (another of our trips buys it there, D80); a purchase before its loads in the order (D64, D136); credits (D137); ships (a load is ready, no builder is free with an empty hold, or none is at home); building (every unit it needs is on its way). A load that waits for its markets keeps that reason while the order holds it back too, as the gate's miners may be bought meanwhile (D92). Next to it, every good of the gate's chain, step 1 a material it still needs, 2 what that is made from, and so on to the ores, with the best supply where the good is sold and where the next step is made from it, in the gate's system. `spacetraders_construction_blocker` and `spacetraders_construction_chain_supply`, on the SpaceTraders dashboard under the jump gate (gembernodes). Changes no decision the bot takes. |
+| D140 | Slice 6.52 (asked on 2026-11-08, hour 5.7): the gate's blocker read "ships" (D139): its next load, the markets selling it and the credits paying for it, waited for a free builder. D129 lets the trading plan buy a cargo ship beyond the list for the gate's chain at the gate's place in the order, but the gate's own load comes first there unless it waits for its markets (D92), so none was ever bought while a load could be. Asked: "Allow another light hauler to be bought if there is a haul in the gate chain that is waiting." | **One per 30 min** ("One per 30 min (Recommended)", 2026-11-08): while the home gate needs materials, the ship beyond the list is a light hauler where one is sold (else the largest hold, D112); the gate's own load that waits only for a free ship counts as a haul down the chain that waits (D88, D129), and lets the hauler go first in the order as long as the credits after it still pay for the load and the reserve (as D118 does); at most one every `Trade.ShipPurchaseIntervalMinutes` since the plan last bought a cargo ship. The gate's miners still wait for the load. Amends D92, D112 and D129. |
+| D141 | Slice 6.52 (asked on 2026-11-08, hour 5.7): "why isn't liquid hydrogen and nitrogen rising?" At X1-VP96-F45 both were SCARCE (WEAK), as at E43 and G47. F45 makes EXPLOSIVES from them, and the asteroid base J55 its IRON_ORE, COPPER_ORE and the other ores from EXPLOSIVES (the game's production chains), so they go into FAB_MATS and ADVANCED_CIRCUITRY. No ship had carried either in the home system that run: D130 read that no gas goes into the gate's materials and bought no siphon drone, and the only seller, the exchange at C38, sold them 4–6 below what the importers paid, a step-3 feed the traders, nearest step first (D128), never reached. Asked whether siphon drones should be bought for the gases of the gate's chain. | **Like the gate's miners** ("Like the gate's miners (Recommended)", 2026-11-08): while the home gate needs materials, a siphon drone for a gas that a market making a good of the gate's chain from it has below HIGH (`SiphonPlanner.GateGasesShort`), one per gas every `Mining.GateMinerIntervalMinutes`, at the gate's place in the order, after a load the markets sell now, as the gate's miners (D92); and once the gate can be built (D136), a siphoner takes such a market first (`SiphonTarget.FeedsGate`), as the trades that feed the gate do (D128). No other siphon drone until the gate is done, as before. Amends D28, D48 and D130. |
 
 ## Phases
 
@@ -348,7 +353,8 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.48 Probes to the busy markets (D135), deployed (below)
 - 6.49 Gate-first once the gate can be built (D136), deployed (below)
 - 6.50 The gate's money before the traders' savings, and shuttles only for the gate's ores (D137, D138), built (below)
-- 6.51 What stops the gate, over time and down its chain (D139), built (below)
+- 6.51 What stops the gate, over time and down its chain (D139), deployed (below)
+- 6.52 A light hauler for a gate load that waits for a ship, and siphon drones for the gate's gases (D140, D141), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -523,9 +529,8 @@ the gates of other systems (D68).
     LIMITED.
   - To understand this, start with `EvaluateConstructionAsync` in `Orchestration/BudgetPolicy.cs`, then `GateLoadCredits` in
     `Trading/TradeContextReader.cs`.
-- **6.51 What stops the gate, over time and down its chain** (D139; asked on 2026-11-08): built on branch
-  `claude/spacetraders-gate-blocker` (on top of 6.50), dashboard on gembernodes branch
-  `claude/spacetraders-gate-blocker-dashboard`.
+- **6.51 What stops the gate, over time and down its chain** (D139; asked on 2026-11-08): merged as projects#232 (with
+  #231, main `984c347e`), deployed with the dashboard by gembernodes#141 on 2026-11-08 at 18:35Z.
   - `ConstructionBlockers` (new, `Construction/`): the reasons and their codes, 0 done to 8 off.
     `ConstructionPlanService.BuyLoadsAsync` picks the pass's reason from its next load (`NextLoad`), the order's answer,
     the builders it gave no load and what still remains; `ConstructionPlanState.Blocker` keeps it.
@@ -544,3 +549,24 @@ the gates of other systems (D68).
     `WhatStopsTheGate_IsOneSeries_AndTheChainsSupplyOnePerGoodAndSide`.
   - To understand this, start with `ConstructionBlockers` in `Construction/ConstructionBlockers.cs`, then the end of
     `BuyLoadsAsync` in `Automation/ConstructionPlanService.cs`, then `ConstructionChain.Of`.
+- **6.52 A light hauler for a gate load that waits for a ship, and siphon drones for the gate's gases** (D140, D141; asked
+  on 2026-11-08): built on branch `claude/spacetraders-gate-hauler-siphon`.
+  - D140: `PurchaseNeed.WaitsForShip` (new): the construction plan's next load waits only for a free builder.
+    `PurchaseOrder.GateLoadWaitsForAShip` (new) lets the trading plan's need at the gate's place go before such a load,
+    keeping its price as D118 keeps a waiting purchase's (`PurchaseNeeds.Hold`). `TradeContext.GateLoadWaitsForShip` (new,
+    `TradeContextReader`); `TradingAutomationService.BuyCargoShipAsync` buys a light hauler while the gate needs materials,
+    counts the waiting load among the routes that wait (`GateLoadKey`), and buys at most one every
+    `Trade.ShipPurchaseIntervalMinutes` (`ShipPurchaseIntervalAsync`).
+  - D141: `SiphonTarget.FeedsGate` (new, from `TradeMarketMap.ConstructionFeedOf`) ranks first in `SiphonTargets`,
+    `SharedTargets` and `UncoveredFirst`. `SiphonPlanner.GateGasesShort` (new); `SiphonAutomationService.DroneNeedAsync`
+    buys for it at `PurchaseTier.Construction`, one per gas every `Mining.GateMinerIntervalMinutes`, and the plan's state
+    keeps the drones bought for the gate's gases (`MiningAutomationPlanState.GateMiners`, a day of them).
+  - Tests: `PurchaseOrderTests` `ALightHaulerForTheGate_GoesBeforeTheGatesLoad_WhileTheLoadWaitsForAShip_AndTheCreditsLeaveItsPrice`,
+    `TradingAutomationServiceTests` `WhileTheGatesLoadWaitsForAShip_ALightHaulerIsBought_NotTheLargestHold_AtMostOneEveryHalfHour`,
+    `ConstructionPlanServiceTests` (`WaitsForShip` on three cases), `TradeContextReaderTests` (`GateLoadWaitsForShip`),
+    `SiphonPlannerTests` (two), `SiphonAutomationServiceTests`
+    `WhileTheJumpGateNeedsMaterials_ADroneIsBoughtForAGasItsChainIsShortOf_OnePerGasEveryHalfHour_AtTheGatesPlace`.
+  - To check on the run: a `ShipPurchased` light hauler within half an hour of the gate's blocker reading "ships", and siphon
+    drones for LIQUID_NITROGEN and LIQUID_HYDROGEN selling at F45, whose supply of both rises above SCARCE.
+  - To understand this, start with `GateLoadWaitsForAShip` in `Services/PurchaseOrder.cs`, then `BuyCargoShipAsync` in
+    `Automation/TradingAutomationService.cs`, then `GateGasesShort` in `Siphoning/SiphonPlanner.cs`.

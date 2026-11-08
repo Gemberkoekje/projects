@@ -72,6 +72,9 @@ public sealed class SiphonAutomationService(
 
     private const string SiphonDroneShipType = "SHIP_SIPHON_DRONE";
 
+    /// <summary>The minutes between two drones for one gas of the jump gate's chain while the setting holds none (D141).</summary>
+    private const int DefaultGateSiphonIntervalMinutes = 30;
+
     private static readonly JsonSerializerOptions CompareOptions = new();
 
     /// <inheritdoc />
@@ -167,8 +170,11 @@ public sealed class SiphonAutomationService(
             fleet.Where(board.IsSiphoner).Select(ship => ship.Symbol),
             free.Where(ship => !gaveTrip.Contains(ship.Symbol)).Select(ship => ship.Symbol));
 
-        await BuyDroneAsync(fleet, systems, board, heldKeys, covered, freeAtStart, cancellationToken);
-        await SaveStateAsync(opportunities, cancellationToken);
+        // D141: the drones bought for the jump gate's gases, as the last pass left them.
+        var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.SiphonAutomation, cancellationToken);
+        var gateSiphoners = (existing?.GateMiners ?? []).ToList();
+        await BuyDroneAsync(fleet, systems, board, heldKeys, covered, freeAtStart, gateSiphoners, cancellationToken);
+        await SaveStateAsync(existing, opportunities, gateSiphoners, cancellationToken);
     }
 
     /// <summary>
@@ -294,7 +300,9 @@ public sealed class SiphonAutomationService(
 
     /// <summary>
     /// Says what the plan would buy (<see cref="DroneNeedAsync"/>), and buys it when the order ships are bought in lets it
-    /// (D43, <see cref="IPurchaseOrder"/>), within the credit reserve. One a pass: the next pass counts the new drone.
+    /// (D43, <see cref="IPurchaseOrder"/>), within the credit reserve. One a pass: the next pass counts the new drone. A drone
+    /// bought for the jump gate's gases is noted with its gas (D141): the next for the gas waits
+    /// <c>Mining.GateMinerIntervalMinutes</c>, as the gate's miners do.
     /// </summary>
     private async Task BuyDroneAsync(
         IReadOnlyList<ShipModel> fleet,
@@ -303,9 +311,10 @@ public sealed class SiphonAutomationService(
         IReadOnlySet<string> heldKeys,
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
+        List<GateMinerState> gateSiphoners,
         CancellationToken cancellationToken)
     {
-        var need = await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, cancellationToken);
+        var (need, gateGas) = await DroneNeedAsync(fleet, systems, board, heldKeys, covered, freeAtStart, gateSiphoners, cancellationToken);
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Siphon, need, cancellationToken))
         {
             return;
@@ -318,6 +327,16 @@ public sealed class SiphonAutomationService(
                 "Siphon plan: siphon drone purchase denied at {Shipyard} — {Reason}.",
                 need.ShipyardWaypointSymbol,
                 purchased.FailureReason ?? "Purchase failed.");
+            return;
+        }
+
+        if (gateGas.Length > 0 && purchased.PurchasedShip is { } drone)
+        {
+            gateSiphoners.Add(new GateMinerState { ShipSymbol = drone.Symbol, TradeSymbol = gateGas, BoughtAt = TimeProvider.System.GetUtcNow() });
+            logger.LogInformation(
+                "Siphon plan: ship {ShipSymbol} was bought for {TradeSymbol}, which the jump gate's chain is short of (D141).",
+                drone.Symbol,
+                gateGas);
         }
     }
 
@@ -333,16 +352,22 @@ public sealed class SiphonAutomationService(
     ///   way held) would serve a market short of its gas (<see cref="PurchaseTier.Alternating"/>, D22, D28, D32), which,
     ///   with the role board on, the board would have siphon (<see cref="IRoleAdvisor"/>).</item>
     /// </list>
-    /// None while the home jump gate needs materials (slice 6.45, D130: "Gate chain only, until done"): no gas goes into its
-    /// materials, and only the gate's miners are bought (D92).
+    /// While the home jump gate needs materials (slice 6.45, D130: "Gate chain only, until done"), only a drone for a gas its
+    /// chain is short of (slice 6.52, D141, "Like the gate's miners"): a gas a market making a good of the chain from it has
+    /// below HIGH (<see cref="SiphonPlanner.GateGasesShort"/>), one per gas every <c>Mining.GateMinerIntervalMinutes</c>, at the
+    /// gate's place in the order (<see cref="PurchaseTier.Construction"/>), after a load the markets sell now, as the gate's
+    /// miners (D92). D130 read that no gas goes into the gate's materials; in X1-VP96 on 2026-11-08 LIQUID_HYDROGEN and
+    /// LIQUID_NITROGEN made the EXPLOSIVES the asteroid base's ores are made from.
     /// </summary>
-    private async Task<PurchaseNeed> DroneNeedAsync(
+    /// <returns>The need, and the gas of the gate's chain it is for; empty for any other.</returns>
+    private async Task<(PurchaseNeed Need, string GateGas)> DroneNeedAsync(
         IReadOnlyList<ShipModel> fleet,
         IReadOnlyList<string> systems,
         FleetRoleBoard board,
         IReadOnlySet<string> heldKeys,
         IReadOnlyCollection<CoveringTrip> covered,
         bool freeAtStart,
+        IReadOnlyList<GateMinerState> gateSiphoners,
         CancellationToken cancellationToken)
     {
         var maxDrones = await settings.ThresholdAsync(MaxDronesSetting, DefaultMaxDrones, cancellationToken);
@@ -350,8 +375,11 @@ public sealed class SiphonAutomationService(
         if (drones >= maxDrones)
         {
             logger.LogDebug("Siphon plan: siphon drone cap reached ({Current}/{Max}); purchase skipped.", drones, maxDrones);
-            return PurchaseNeed.None;
+            return (PurchaseNeed.None, string.Empty);
         }
+
+        var interval = await GateSiphonIntervalAsync(cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
 
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
         foreach (var systemSymbol in systems)
@@ -373,12 +401,6 @@ public sealed class SiphonAutomationService(
 
             var (shipyard, forSale) = listing;
             var map = (await tradeContexts.ReadAsync(systemSymbol, cancellationToken)).Map;
-            if (map.ConstructionMaterials.Count > 0)
-            {
-                logger.LogDebug("Siphon plan: no siphon drone bought in {SystemSymbol} while the jump gate needs materials (D130).", systemSymbol);
-                continue;
-            }
-
             var newDrone = new ShipModel(
                 "NEW-DRONE",
                 systemSymbol,
@@ -391,10 +413,28 @@ public sealed class SiphonAutomationService(
                 ShipType: SiphonDroneShipType);
             var need = new PurchaseNeed(PurchaseTier.Coverage, SiphonDroneShipType, shipyard.WaypointSymbol, forSale.PurchasePrice);
 
+            // D130, D141: while the jump gate needs materials, only a drone for a gas its chain is short of, one per gas every
+            // interval, at the gate's place in the order.
+            if (map.ConstructionMaterials.Count > 0)
+            {
+                var gas = SiphonPlanner.GateGasesShort(map, newDrone)
+                    .FirstOrDefault(shortGas => !gateSiphoners.Any(siphoner => siphoner.TradeSymbol.Equals(shortGas, StringComparison.OrdinalIgnoreCase)
+                        && now - siphoner.BoughtAt < interval));
+                if (gas is not null)
+                {
+                    return (need with { Tier = PurchaseTier.Construction }, gas);
+                }
+
+                logger.LogDebug(
+                    "Siphon plan: no siphon drone bought in {SystemSymbol} while the jump gate needs materials: no gas of its chain is short there, or one was bought for it lately (D130, D141).",
+                    systemSymbol);
+                continue;
+            }
+
             var siphonDrones = fleet.Count(ship => FleetRoles.IsSiphoner(ship) && string.Equals(ship.SystemSymbol, systemSymbol, StringComparison.OrdinalIgnoreCase));
             if (siphonDrones < SiphonPlanner.ScarceGases(map, newDrone).Count)
             {
-                return need;
+                return (need, string.Empty);
             }
 
             if (freeAtStart)
@@ -422,17 +462,34 @@ public sealed class SiphonAutomationService(
                 continue;
             }
 
-            return need with { Tier = PurchaseTier.Alternating };
+            return (need with { Tier = PurchaseTier.Alternating }, string.Empty);
         }
 
-        return PurchaseNeed.None;
+        return (PurchaseNeed.None, string.Empty);
     }
 
-    /// <summary>Records the openings. Only a change is written: the tick runs every 5 seconds.</summary>
-    private async Task SaveStateAsync(IReadOnlyList<MiningAutomationOpportunityState> opportunities, CancellationToken cancellationToken)
+    /// <summary>
+    /// The time between two drones for one gas of the jump gate's chain (D141), as between two gate miners for one ore (D92):
+    /// <c>Mining.GateMinerIntervalMinutes</c>, else half an hour.
+    /// </summary>
+    private async Task<TimeSpan> GateSiphonIntervalAsync(CancellationToken cancellationToken)
+    {
+        var minutes = await settings.GetAsync<int>(MiningAutomationService.GateMinerIntervalSetting, cancellationToken);
+        return TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultGateSiphonIntervalMinutes);
+    }
+
+    /// <summary>
+    /// Records the openings, and the drones bought for the jump gate's gases (D141), those of the last day. Only a change is
+    /// written: the tick runs every 5 seconds.
+    /// </summary>
+    private async Task SaveStateAsync(
+        MiningAutomationPlanState? existing,
+        IReadOnlyList<MiningAutomationOpportunityState> opportunities,
+        IReadOnlyList<GateMinerState> gateSiphoners,
+        CancellationToken cancellationToken)
     {
         var now = TimeProvider.System.GetUtcNow();
-        var existing = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.SiphonAutomation, cancellationToken);
+        List<GateMinerState> recentGateSiphoners = [.. gateSiphoners.Where(siphoner => now - siphoner.BoughtAt < TimeSpan.FromDays(1))];
         var firstSeen = (existing?.Opportunities ?? [])
             .GroupBy(opportunity => opportunity.OpportunityKey, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First().FirstObservedAt, StringComparer.OrdinalIgnoreCase);
@@ -448,7 +505,9 @@ public sealed class SiphonAutomationService(
                 }),
         ];
 
-        if (existing is not null && Same(existing.Opportunities, dated))
+        if (existing is not null
+            && Same(existing.Opportunities, dated)
+            && JsonSerializer.Serialize(existing.GateMiners, CompareOptions) == JsonSerializer.Serialize(recentGateSiphoners, CompareOptions))
         {
             return;
         }
@@ -459,6 +518,7 @@ public sealed class SiphonAutomationService(
             {
                 PlanId = existing?.PlanId ?? Guid.NewGuid(),
                 Opportunities = dated,
+                GateMiners = recentGateSiphoners,
                 CreatedAt = existing?.CreatedAt ?? now,
                 UpdatedAt = now,
             },

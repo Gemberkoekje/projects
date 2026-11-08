@@ -282,6 +282,31 @@ public sealed class PurchaseOrderTests
     }
 
     [Fact]
+    public async Task ALightHaulerForTheGate_GoesBeforeTheGatesLoad_WhileTheLoadWaitsForAShip_AndTheCreditsLeaveItsPrice()
+    {
+        // Slice 6.52 (D140), asked on 2026-11-08: "Allow another light hauler to be bought if there is a haul in the gate chain
+        // that is waiting." That hour the load of ADVANCED_CIRCUITRY, 332,879, waited for a free builder; the light hauler,
+        // 307,789, goes first while the credits after it still pay for the load and the reserve. The gate's miners still wait.
+        Credits(800_000, reserve: 100_000);
+        EveryoneSays(PurchaseNeed.None);
+        var load = new PurchaseNeed(PurchaseTier.Construction, "ADVANCED_CIRCUITRY", "X1-VP96-D41", 332_879);
+        var hauler = new PurchaseNeed(PurchaseTier.Construction, "SHIP_LIGHT_HAULER", "X1-VP96-A2", 307_789);
+        _needs.Report(AutomationPlan.Construction, load, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Trading, hauler)).Should().BeFalse("a load that waits only for the credits comes first");
+
+        _needs.Report(AutomationPlan.Construction, load with { WaitsForShip = true }, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.Trading, hauler)).Should().BeTrue();
+        _needs.HeldFor("SHIP_LIGHT_HAULER", "X1-VP96-A2", DateTimeOffset.UtcNow).Should().Be(332_879, "the hauler's purchase keeps the load's price");
+        (await MayBuyAsync(AutomationPlan.Mining, Need(PurchaseTier.Construction, "SHIP_MINING_DRONE"))).Should().BeFalse("the gate's miners still wait for the load (D92)");
+
+        Credits(700_000, reserve: 100_000);
+
+        (await MayBuyAsync(AutomationPlan.Trading, hauler)).Should().BeFalse("700,000 less the hauler leaves less than the load and the reserve");
+    }
+
+    [Fact]
     public async Task TheGatesMiners_NeverHoldTheGatesLoadBack()
     {
         EveryoneSays(PurchaseNeed.None);

@@ -270,8 +270,15 @@ public sealed class TradeContextReaderTests
 
         // D137: once the gate can be built, a new trade trip leaves what its next load costs.
         (await Reader().ReadReachAsync(System, CancellationToken.None)).GateLoadCredits.Should().Be(80_000);
+
+        // D140: and says whether that load waits for a ship.
+        (await Reader().ReadReachAsync(System, CancellationToken.None)).GateLoadWaitsForShip.Should().BeFalse();
+        _purchaseNeeds.Report(AutomationPlan.Construction, new PurchaseNeed(PurchaseTier.Construction, "FAB_MATS", "X1-FJ91-A1", 80_000) { WaitsForShip = true }, DateTimeOffset.UtcNow);
+        (await Reader().ReadReachAsync(System, CancellationToken.None)).GateLoadWaitsForShip.Should().BeTrue();
+
         _purchaseNeeds.Report(AutomationPlan.Trading, new PurchaseNeed(PurchaseTier.CargoShips, "SHIP_LIGHT_HAULER", "X1-FJ91-A2", 257_486), DateTimeOffset.UtcNow);
         (await Reader().ReadReachAsync(System, CancellationToken.None)).GateLoadCredits.Should().Be(0, "the gate can't be built yet");
+        (await Reader().ReadReachAsync(System, CancellationToken.None)).GateLoadWaitsForShip.Should().BeFalse("the gate can't be built yet");
     }
 
     [Fact]

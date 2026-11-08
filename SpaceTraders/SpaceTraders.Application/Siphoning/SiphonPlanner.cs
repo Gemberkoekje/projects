@@ -76,24 +76,27 @@ public static class SiphonPlanner
             var driftsThere = gases.Count > 0 && MiningPlanner.CanDriftTo(map, siphoner, market);
             foreach (var good in gases)
             {
-                // D91: whether the market makes something from the gas, or only pays for it.
+                // D91: whether the market makes something from the gas, or only pays for it. D141: whether that feeds the jump gate's
+                // chain, once the gate can be built.
                 var feeds = map.MakesSomethingFrom(market, good.Symbol);
+                var feedsGate = map.ConstructionFeedOf(market, good.Symbol).Step > 0;
                 if (TryFindNearestGasGiant(map, good.Symbol, market, gasGiant => Gathers(gasGiant, market), out var nearest))
                 {
-                    targets.Add(new SiphonTarget(good.Symbol, nearest, market, good.SellPrice, Share(map, nearest), good.Supply) { FeedsProduction = feeds });
+                    targets.Add(new SiphonTarget(good.Symbol, nearest, market, good.SellPrice, Share(map, nearest), good.Supply) { FeedsProduction = feeds, FeedsGate = feedsGate });
                 }
                 else if (driftsThere
                     && TryFindNearestGasGiant(map, good.Symbol, market, gasGiant => MiningPlanner.IsWithinRoundTrip(map, siphoner, market, gasGiant), out var far))
                 {
                     // Out of CRUISE reach (D45): the siphoner drifts to the market, which sells fuel, and siphons from there.
-                    targets.Add(new SiphonTarget(good.Symbol, far, market, good.SellPrice, Share(map, far), good.Supply, Far: true) { FeedsProduction = feeds });
+                    targets.Add(new SiphonTarget(good.Symbol, far, market, good.SellPrice, Share(map, far), good.Supply, Far: true) { FeedsProduction = feeds, FeedsGate = feedsGate });
                 }
             }
         }
 
         var position = MiningPlanner.Position(siphoner);
         return [.. targets
-            .OrderByDescending(target => target.FeedsProduction)
+            .OrderByDescending(target => target.FeedsGate)
+            .ThenByDescending(target => target.FeedsProduction)
             .ThenBy(target => MiningPlanner.SupplyRank(target.Supply))
             .ThenBy(target => target.Far)
             .ThenByDescending(target => target.ExpectedValue)
@@ -131,7 +134,8 @@ public static class SiphonPlanner
         ArgumentNullException.ThrowIfNull(siphonersPerPair);
         return [.. SiphonTargets(map, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
             .Select((target, rank) => (Target: target, Rank: rank))
-            .OrderByDescending(entry => entry.Target.FeedsProduction)
+            .OrderByDescending(entry => entry.Target.FeedsGate)
+            .ThenByDescending(entry => entry.Target.FeedsProduction)
             .ThenBy(entry => MiningPlanner.SupplyRank(entry.Target.Supply))
             .ThenBy(entry => entry.Target.Far)
             .ThenBy(entry => siphonersPerPair.GetValueOrDefault(entry.Target.Key))
@@ -162,7 +166,8 @@ public static class SiphonPlanner
                 Target: target,
                 Rank: rank,
                 Uncovered: target.FeedsProduction && target.LowSupply && !covering.Any(trip => trip.Covers(map, target.Gas, target.SellWaypointSymbol))))
-            .OrderByDescending(entry => entry.Uncovered)
+            .OrderByDescending(entry => entry.Target.FeedsGate)
+            .ThenByDescending(entry => entry.Uncovered)
             .ThenBy(entry => entry.Uncovered && entry.Target.Far)
             .ThenBy(entry => !entry.Uncovered ? 0 : map.TryGetDistance(position, entry.Target.GasGiantSymbol, out var distance) ? distance : double.MaxValue)
             .ThenBy(entry => entry.Rank)
@@ -188,6 +193,55 @@ public static class SiphonPlanner
             SiphonTargets(map, ship, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
                 .Where(target => target.FeedsProduction && target.LowSupply)
                 .Select(target => new MineralArea(target.Gas, [target.SellWaypointSymbol])));
+    }
+
+    /// <summary>
+    /// The gases a gate siphoner would be bought for now (PLAN.md slice 6.52, D141, as the gate's miners, D92): each gas that a
+    /// market making a good of the jump gate's chain from it (it imports the gas and exports what goes into the gate's
+    /// materials, <see cref="TradeMarketMap.GoesIntoConstruction"/>) has below HIGH, and that the drone can siphon and sell
+    /// there; the gas whose market has the lowest supply first. Asked on 2026-11-08, with LIQUID_HYDROGEN and LIQUID_NITROGEN
+    /// SCARCE at X1-VP96-F45, which makes the EXPLOSIVES the asteroid base's ores are made from: "Like the gate's miners".
+    /// None while the gate needs nothing.
+    /// </summary>
+    /// <param name="map">The system, with the gate's materials.</param>
+    /// <param name="drone">A drone as it would be bought: at the shipyard, with a full tank.</param>
+    /// <returns>The gases, by the lowest supply among their markets, then by symbol.</returns>
+    public static IReadOnlyList<string> GateGasesShort(TradeMarketMap map, ShipModel drone)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(drone);
+
+        var wanting = new List<(string Market, string Gas, string Supply)>();
+        foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
+        {
+            var goods = map.GoodsAt(market).ToList();
+            foreach (var gas in goods.Where(good => GasGiants.Gases.Contains(good.Symbol)
+                && good.Type.Equals("IMPORT", StringComparison.OrdinalIgnoreCase)
+                && !MiningPlanner.HasEnough(good.Supply)))
+            {
+                if (goods.Any(export => export.Type.Equals("EXPORT", StringComparison.OrdinalIgnoreCase)
+                    && map.GoesIntoConstruction(export.Symbol)
+                    && map.InputsOf(export.Symbol).Contains(gas.Symbol, StringComparer.OrdinalIgnoreCase)))
+                {
+                    wanting.Add((market, gas.Symbol, gas.Supply));
+                }
+            }
+        }
+
+        if (wanting.Count == 0)
+        {
+            return [];
+        }
+
+        var served = SiphonTargets(map, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+            .Select(target => target.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return [.. wanting
+            .Where(entry => served.Contains(MiningPlanner.OpportunityKey(entry.Market, entry.Gas)))
+            .GroupBy(entry => entry.Gas, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(gas => gas.Min(entry => MiningPlanner.SupplyRank(entry.Supply)))
+            .ThenBy(gas => gas.Key, StringComparer.Ordinal)
+            .Select(gas => gas.Key)];
     }
 
     /// <summary>
@@ -293,6 +347,13 @@ public sealed record SiphonTarget
     /// trade, ranks after every other and never counts as a market short of its gas. True unless set.
     /// </summary>
     public bool FeedsProduction { get; init; } = true;
+
+    /// <summary>
+    /// Whether the sell market makes a good of the jump gate's chain from the gas, once the gate can be built (PLAN.md slice
+    /// 6.52, D141, <see cref="TradeMarketMap.ConstructionFeedOf"/>): such a target comes before every other, as the routes that
+    /// feed the gate do (D128). False unless set.
+    /// </summary>
+    public bool FeedsGate { get; init; }
 
     /// <summary>Whether the sell market has the gas in low supply (D22): SCARCE or LIMITED.</summary>
     public bool LowSupply => MiningPlanner.IsLowSupply(Supply);

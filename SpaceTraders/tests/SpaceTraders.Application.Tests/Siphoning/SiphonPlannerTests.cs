@@ -329,4 +329,31 @@ public sealed class SiphonPlannerTests
                 Good("LIQUID_NITROGEN", "IMPORT", 34, 30, 60, "MODERATE"),
                 Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
         ];
+
+    [Fact]
+    public void OnceTheGateCanBeBuilt_AMarketThatMakesAGoodOfItsChainFromTheGas_ComesFirst()
+    {
+        // Slice 6.52 (D141), asked on 2026-11-08: "Like the gate's miners". G50's hydrogen and E47's nitrogen are both SCARCE;
+        // G50 pays more, but E47 makes the EXPLOSIVES of the gate's chain, so its gases come first once the gate can be built
+        // (D136), as the routes that feed the gate do (D128).
+        var empty = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var buildable = SiphonPlanner.SiphonTargets(GateMap(), SiphonDrone(), empty);
+        var before = SiphonPlanner.SiphonTargets(GateMap(constructionFirst: false), SiphonDrone(), empty);
+
+        buildable.TakeWhile(target => target.FeedsGate).Select(target => (target.Gas, target.SellWaypointSymbol))
+            .Should().Equal(("LIQUID_NITROGEN", E47), ("LIQUID_HYDROGEN", E47));
+        (before[0].Gas, before[0].SellWaypointSymbol).Should().Be(("LIQUID_HYDROGEN", G50));
+        before.Should().OnlyContain(target => !target.FeedsGate);
+    }
+
+    [Fact]
+    public void TheGatesGasesShort_AreThoseAMarketMakingAGoodOfItsChainHasBelowHigh_TheLowestSupplyFirst()
+    {
+        // D141: E47's nitrogen (SCARCE) and hydrogen (MODERATE) go into the gate's chain, whether or not the gate can be built
+        // yet (the order decides when, D92); G50's SCARCE hydrogen makes PLASTICS, which feeds nothing of it.
+        SiphonPlanner.GateGasesShort(GateMap(), SiphonDrone()).Should().Equal("LIQUID_NITROGEN", "LIQUID_HYDROGEN");
+        SiphonPlanner.GateGasesShort(GateMap(constructionFirst: false), SiphonDrone()).Should().Equal("LIQUID_NITROGEN", "LIQUID_HYDROGEN");
+        SiphonPlanner.GateGasesShort(Map(), SiphonDrone()).Should().BeEmpty("with no gate to build, no gas goes into one");
+    }
 }

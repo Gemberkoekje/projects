@@ -969,7 +969,8 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
   While the home jump gate needs materials, only step 2 buys (slice 6.45, D130, asked on 2026-11-08: "Mining and siphoning
   drones should only be bought in order to keep the market healthy", and of the options "Gate chain only, until done"): no
   drone for a scarce ore, none in turn with the cargo ships, none abroad, and no siphon drone, until the gate is done. The
-  contract's drone (D23) and the shuttles of the collection points (D83) are as before.
+  contract's drone (D23) and the shuttles of the collection points (D83) are as before. Since slice 6.52 (D141, "Like the
+  gate's miners") the siphon plan buys a drone for a gas of the gate's chain the same way: see the siphon plan.
 
   A pair a drone would only share buys no drone (D77): the first trip is judged with the pairs under way held, as
   before.
@@ -1006,6 +1007,13 @@ ASTEROID_FIELD and ENGINEERED_ASTEROID waypoints can be mined. A survey shows wh
 The mining plan for gases, by the same rules, without surveys: the API's siphon call takes none
 (`POST my/ships/{ship}/siphon` has no body, and a surveyor's deposits are ores only).
 
+- **The jump gate's gases** (slice 6.52, D141, asked on 2026-11-08: "Like the gate's miners"): while the home gate needs
+  materials, the only siphon drone bought is one for a gas that a market making a good of the gate's chain from it has
+  below HIGH (`SiphonPlanner.GateGasesShort`; in X1-VP96, F45 makes the EXPLOSIVES the asteroid base's ores are made from,
+  out of LIQUID_HYDROGEN and LIQUID_NITROGEN), one per gas every `Mining.GateMinerIntervalMinutes`, at the gate's place in
+  the order (`PurchaseTier.Construction`), after a load the markets sell now; the state keeps those drones (`GateMiners`).
+  Once the gate can be built (D136), such a market comes first for every siphoner (`SiphonTarget.FeedsGate`), before the
+  orders below.
 - **A siphoner** is a ship with a gas siphon, a hold and a tank, and nothing to mine or survey with
   (`FleetRoles.IsSiphoner`), whichever plans are on: a siphon drone. The command ship has a siphon too,
   but it mines, or surveys (D20). With the role board on (slice 6.9), a siphoner is a ship with the siphon
@@ -1138,7 +1146,12 @@ buy.
   2026-11-08: "Explorers and probes are worthless without the gate. Any extra cargo ships should only be bought if it serves
   the goal of getting the gate done within 24 hours of a reset."): while the gate needs materials, the trading plan buys one
   only for a route down the gate's chain (D128) that has waited `Trade.ShipPurchaseWaitMinutes` with every trader busy (D88),
-  whatever it earns (D90). The explorers and the other probes still wait for the gate.
+  whatever it earns (D90). The explorers and the other probes still wait for the gate. Since slice 6.52 (D140, asked on
+  2026-11-08: "Allow another light hauler to be bought if there is a haul in the gate chain that is waiting") that ship is a
+  light hauler where one is sold, at most one every `Trade.ShipPurchaseIntervalMinutes`; the gate's own load that waits only
+  for a free ship (`PurchaseNeed.WaitsForShip`: its markets sell it, the credits pay for it, no builder is free and empty)
+  counts as a route that waits, and lets the hauler go first in the order as long as the credits after it still pay for the
+  load and the reserve (`PurchaseOrder.GateLoadWaitsForAShip`, as D118).
   A construction trip holds back what its cargo costs from the moment it starts until it buys
   (`SupplyConstructionGoal.ReservedCredits`, as D57): the traders, the other trips and ship purchases leave it. As for
   a ship purchase, nothing holds the traders back while the credits for a load build up.

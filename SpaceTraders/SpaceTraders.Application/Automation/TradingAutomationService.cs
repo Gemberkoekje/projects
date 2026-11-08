@@ -123,6 +123,12 @@ public sealed class TradingAutomationService(
     /// <summary>Half an hour, as asked, while <c>Trade.ShipPurchaseIntervalMinutes</c> isn't set above 0 (D116).</summary>
     private const int DefaultShipPurchaseIntervalMinutes = 30;
 
+    /// <summary>The cargo ship bought beyond the list while the jump gate needs materials (PLAN.md slice 6.52, D140).</summary>
+    private const string LightHaulerShipType = "SHIP_LIGHT_HAULER";
+
+    /// <summary>The key a gate load that waits for a ship counts under among the routes that wait for one (D140).</summary>
+    private const string GateLoadKey = "construction:gate-load";
+
     /// <summary>Credits that buy a full hold of anything: whether a new cargo ship would have work, whatever the credits now.</summary>
     private const long AnyCredits = long.MaxValue / 4;
 
@@ -382,7 +388,11 @@ public sealed class TradingAutomationService(
     /// materials (slice 6.45, D129), asked on 2026-11-08: "Any extra cargo ships should only be bought if it serves the goal of
     /// getting the gate done within 24 hours of a reset": a ship beyond the list is bought only for a route down the gate's chain
     /// (D128) that has waited so, at the gate's place in the order, after a load the markets sell now, as the gate's miners are
-    /// (D92); explorers and probes still wait for the gate ("Explorers and probes are worthless without the gate").
+    /// (D92); explorers and probes still wait for the gate ("Explorers and probes are worthless without the gate"). Since slice
+    /// 6.52 (D140), asked on 2026-11-08: "Allow another light hauler to be bought if there is a haul in the gate chain that is
+    /// waiting": that ship is a light hauler where one is sold, at most one every <c>Trade.ShipPurchaseIntervalMinutes</c>, and
+    /// the gate's own load that waits only for a free ship counts as such a route and lets it go first in the order, as long
+    /// as the credits after it still pay for the load (<see cref="PurchaseNeed.WaitsForShip"/>).
     /// </summary>
     /// <param name="lastBoughtAt">When the plan last bought a cargo ship, as its state keeps it; null for none on record.</param>
     /// <returns>When this pass bought one; null when it bought none.</returns>
@@ -419,23 +429,48 @@ public sealed class TradingAutomationService(
 
         // Slice 6.29 (D96): a cargo ship trades across the systems in reach, so the routes that wait for one count there too.
         var (shipyard, forSale) = found;
-        var shipType = forSale.Type;
         var context = await tradeContexts.ReadReachAsync(shipyard.SystemSymbol, cancellationToken);
+
+        // Slice 6.52 (D140), asked on 2026-11-08: "Allow another light hauler to be bought if there is a haul in the gate chain
+        // that is waiting." While the home jump gate needs materials, the ship beyond the list is a light hauler where one is
+        // sold, else the largest hold as before.
+        var forGate = !inList && context.Map.ConstructionMaterials.Count > 0;
+        if (forGate
+            && !forSale.Type.Equals(LightHaulerShipType, StringComparison.OrdinalIgnoreCase)
+            && await ListedAsync(LightHaulerShipType, businessSystems, cancellationToken) is { } hauler)
+        {
+            if (!hauler.Shipyard.SystemSymbol.Equals(shipyard.SystemSymbol, StringComparison.OrdinalIgnoreCase))
+            {
+                context = await tradeContexts.ReadReachAsync(hauler.Shipyard.SystemSymbol, cancellationToken);
+            }
+
+            (shipyard, forSale) = hauler;
+        }
+
+        var shipType = forSale.Type;
         var newShip = AsBought(shipyard, forSale);
 
         // D88: beyond the list a cargo ship adds value only when the traders can't keep up: a route worth
         // Trade.ShipPurchaseMinRouteProfit from the shipyard, that no trader holds, has waited Trade.ShipPurchaseWaitMinutes with
         // every trader busy. A stable market never gets there; till then the drones' turn comes (D43). D129: while the home
         // jump gate needs materials, only a route down the gate's chain counts (D128), whatever it earns (D90), and the ship
-        // stands at the gate's place in the order, as its miners do (D92).
-        var forGate = !inList && context.Map.ConstructionMaterials.Count > 0;
+        // stands at the gate's place in the order, as its miners do (D92). D140: the gate's own load that waits for a ship is a
+        // haul down its chain that waits too.
+        var gateLoadWaits = forGate && context.GateLoadWaitsForShip;
         var minRouteProfit = await settings.GetAsync<long>(ShipPurchaseMinRouteProfitSetting, cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
         var waited = demand.Note(
             TradeRoutePlanner.Rank(context.Map, newShip, AnyCredits, context.MinProfitPerUnit, heldKeys, heldBuys)
                 .Where(route => forGate ? route.FeedsConstruction : route.Profit >= minRouteProfit)
-                .Select(route => route.Key),
-            TimeProvider.System.GetUtcNow());
+                .Select(route => route.Key)
+                .Concat(gateLoadWaits ? [GateLoadKey] : []),
+            now);
+
+        // D140: "One per 30 min": while the gate needs materials, a cargo ship beyond the list at most once every
+        // Trade.ShipPurchaseIntervalMinutes since the plan last bought one.
+        var recentlyBought = forGate && lastBoughtAt is { } boughtAt && now - boughtAt < await ShipPurchaseIntervalAsync(cancellationToken);
         var hasWork = idle == 0
+            && !recentlyBought
             && waited >= TimeSpan.FromMinutes(await settings.GetAsync<int>(ShipPurchaseWaitMinutesSetting, cancellationToken));
         var tier = inList ? PurchaseTier.CargoShips
             : forGate ? PurchaseTier.Construction
@@ -450,7 +485,7 @@ public sealed class TradingAutomationService(
 
         var creditsForCargo = Math.Max(0, context.Credits - forSale.PurchasePrice - context.FuelReserveCredits);
         var routes = TradeRoutePlanner.Rank(context.Map, newShip, creditsForCargo, context.MinProfitPerUnit, heldKeys, heldBuys);
-        if (forGate && !routes.Any(route => route.FeedsConstruction))
+        if (forGate && !gateLoadWaits && !routes.Any(route => route.FeedsConstruction))
         {
             logger.LogDebug(
                 "Trading plan: a new {ShipType} from {Shipyard} would have no route down the jump gate's chain; no purchase while the gate needs materials (D129).",
@@ -459,7 +494,7 @@ public sealed class TradingAutomationService(
             return null;
         }
 
-        if (routes.Count == 0)
+        if (routes.Count == 0 && !gateLoadWaits)
         {
             logger.LogDebug(
                 "Trading plan: a new {ShipType} from {Shipyard} would have no lucrative route; no purchase.",
@@ -502,9 +537,15 @@ public sealed class TradingAutomationService(
             return PurchaseTier.TimedCargoShip;
         }
 
-        var minutes = await settings.GetAsync<int>(ShipPurchaseIntervalMinutesSetting, cancellationToken);
-        var interval = TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultShipPurchaseIntervalMinutes);
+        var interval = await ShipPurchaseIntervalAsync(cancellationToken);
         return TimeProvider.System.GetUtcNow() - boughtAt >= interval ? PurchaseTier.TimedCargoShip : PurchaseTier.Alternating;
+    }
+
+    /// <summary>The time between two cargo ships beyond the list (D116, D140): <c>Trade.ShipPurchaseIntervalMinutes</c>, else half an hour.</summary>
+    private async Task<TimeSpan> ShipPurchaseIntervalAsync(CancellationToken cancellationToken)
+    {
+        var minutes = await settings.GetAsync<int>(ShipPurchaseIntervalMinutesSetting, cancellationToken);
+        return TimeSpan.FromMinutes(minutes > 0 ? minutes : DefaultShipPurchaseIntervalMinutes);
     }
 
     /// <summary>

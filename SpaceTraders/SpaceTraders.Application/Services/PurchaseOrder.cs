@@ -200,6 +200,33 @@ public sealed class PurchaseOrder(
     }
 
     /// <summary>
+    /// Whether the gate's load waits only for a free ship of ours before the trading plan's cargo ship for the gate (PLAN.md
+    /// slice 6.52, D140): the construction plan said lately its next load waits for a ship (<see cref="PurchaseNeed.WaitsForShip"/>),
+    /// and the trading plan would buy at the gate's place in the order.
+    /// </summary>
+    /// <param name="plan">The plan that would buy.</param>
+    /// <param name="need">What it would buy.</param>
+    /// <param name="reported">What each plan said it needs, as it last said it.</param>
+    /// <param name="counts">Whether what a plan said at a time still counts (<see cref="PurchaseNeeds.Counts"/>).</param>
+    /// <returns>True when the gate's load lets the cargo ship go first.</returns>
+    internal static bool GateLoadWaitsForAShip(
+        AutomationPlan plan,
+        PurchaseNeed need,
+        IReadOnlyDictionary<AutomationPlan, ReportedNeed> reported,
+        Func<DateTimeOffset, bool> counts)
+    {
+        ArgumentNullException.ThrowIfNull(need);
+        ArgumentNullException.ThrowIfNull(reported);
+        ArgumentNullException.ThrowIfNull(counts);
+        return plan == AutomationPlan.Trading
+            && need.Tier == PurchaseTier.Construction
+            && reported.TryGetValue(AutomationPlan.Construction, out var gate)
+            && counts(gate.At)
+            && gate.Need.Tier == PurchaseTier.Construction
+            && gate.Need.WaitsForShip;
+    }
+
+    /// <summary>
     /// Whose turn it is between drones and cargo ships (D43): the kind not bought last, so after the list's last cargo ship a
     /// drone comes first, then a cargo ship, and so on; the drones' when neither was ever bought. Any drone counts, the
     /// contract's and a scarce mineral's too; probes, surveyors and explorers don't take turns, and every other ship is a cargo
@@ -284,7 +311,16 @@ public sealed class PurchaseOrder(
         // Slice 6.36 (D118), asked on 2026-10-07: "Yes please, as long as the total doesn't dip below the total needed for the
         // freighter." A purchase that waits only for one of our ships to reach its shipyard lets this one go first, as long as
         // the credits after it leave the waiting ones' prices and the credit reserve; its purchase keeps them too.
-        var waiting = WaitingForAShip(reported, calls.Open(now), Counts);
+        var waiting = new HashSet<AutomationPlan>(WaitingForAShip(reported, calls.Open(now), Counts));
+
+        // Slice 6.52 (D140), asked on 2026-11-08: "Allow another light hauler to be bought if there is a haul in the gate chain
+        // that is waiting." The gate's load that waits only for a free ship lets the trading plan's cargo ship for the gate go
+        // first, on the same terms: the credits after it leave the load's price and the credit reserve.
+        if (GateLoadWaitsForAShip(plan, need, reported, Counts))
+        {
+            waiting.Add(AutomationPlan.Construction);
+        }
+
         if (ahead.All(before => before.Need.Tier != PurchaseTier.None && waiting.Contains(before.Plan)))
         {
             var held = ahead.Sum(before => before.Need.Price);
@@ -292,7 +328,7 @@ public sealed class PurchaseOrder(
             {
                 needs.Hold(plan, held);
                 logger.LogDebug(
-                    "Purchase order: the {Plan} plan's {ShipType} ({Tier}) goes before {Ahead}, which wait for one of our ships at their shipyards, and leaves {Held} for them (D118).",
+                    "Purchase order: the {Plan} plan's {ShipType} ({Tier}) goes before {Ahead}, which wait for one of our ships, and leaves {Held} for them (D118, D140).",
                     plan,
                     need.ShipType,
                     need.Tier,
@@ -658,6 +694,13 @@ public sealed record PurchaseNeed
     /// the gate's place in the order (slice 6.25, D92). False unless set.
     /// </summary>
     public bool WaitsForMarkets { get; init; }
+
+    /// <summary>
+    /// Whether the jump gate's next load waits only for one of our ships (PLAN.md slice 6.52, D140): its markets sell it and the
+    /// credits pay for it, but no builder is free with an empty hold to take it. The trading plan's cargo ship for the gate may
+    /// then go before it in the order, as long as the credits after it still pay for the load. False unless set.
+    /// </summary>
+    public bool WaitsForShip { get; init; }
 }
 
 /// <summary>A need as a plan last said it.</summary>

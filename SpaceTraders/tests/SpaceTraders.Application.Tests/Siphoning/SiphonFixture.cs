@@ -88,6 +88,38 @@ internal static class SiphonFixture
             new Dictionary<string, IReadOnlyList<string>> { ["FUEL"] = ["HYDROCARBON"] });
 
     /// <summary>
+    /// For D141: E47 makes EXPLOSIVES from both gases (its nitrogen SCARCE, pays 50; its hydrogen MODERATE), which go into the
+    /// jump gate's FAB_MATS through QUARTZ_SAND, as in X1-VP96 on 2026-11-08; G50 makes PLASTICS from its SCARCE hydrogen, which
+    /// pays 55 and feeds nothing of the gate. The gate needs FAB_MATS; it can be built unless <paramref name="constructionFirst"/>
+    /// is false.
+    /// </summary>
+    public static TradeMarketMap GateMap(bool constructionFirst = true)
+        => new(
+            Waypoints,
+            [
+                Market(C39, Good("FUEL", "EXCHANGE", 80, 70, 180, "MODERATE")),
+                Market(C40, Good("FUEL", "EXCHANGE", 75, 66, 180, "MODERATE")),
+                Market(G50, Good("LIQUID_HYDROGEN", "IMPORT", 110, 55, 60, "SCARCE"), Good("PLASTICS", "EXPORT", 300, 150, 60, "MODERATE"), Good("FUEL", "EXCHANGE", 82, 72, 180, "MODERATE")),
+                Market(
+                    E47,
+                    Good("LIQUID_NITROGEN", "IMPORT", 100, 50, 60, "SCARCE"),
+                    Good("LIQUID_HYDROGEN", "IMPORT", 96, 48, 60, "MODERATE"),
+                    Good("EXPLOSIVES", "EXPORT", 200, 100, 60, "MODERATE"),
+                    Good("FUEL", "EXCHANGE", 81, 71, 180, "MODERATE")),
+            ],
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["FAB_MATS"] = ["QUARTZ_SAND"],
+                ["QUARTZ_SAND"] = ["EXPLOSIVES"],
+                ["EXPLOSIVES"] = ["LIQUID_HYDROGEN", "LIQUID_NITROGEN"],
+                ["PLASTICS"] = ["LIQUID_HYDROGEN"],
+            })
+        {
+            ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+            ConstructionFirst = constructionFirst,
+        };
+
+    /// <summary>
     /// The system with a second gas giant, D90, 13 from F48: F48, beyond a drone's tank, sells fuel, and D90 is there and
     /// back on one tank, so a drone would drift to F48 to siphon from there (D45).
     /// </summary>

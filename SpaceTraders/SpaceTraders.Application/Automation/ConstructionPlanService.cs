@@ -224,9 +224,14 @@ public sealed class ConstructionPlanService(
             if (NextLoad(map, first, site, needs, spendable, HeldBuysNow()) is { } next)
             {
                 // D92: a load that waits for its markets lets the gate's miners be bought meanwhile.
+                // D140: a load the markets sell and the credits pay for, with no builder free and empty to take it, waits for a ship:
+                // the trading plan may buy one for it first.
                 need = new PurchaseNeed(PurchaseTier.Construction, next.Load.TradeSymbol, next.Load.BuyWaypointSymbol, next.Load.Cost)
                 {
                     WaitsForMarkets = next.WaitsForMarkets,
+                    WaitsForShip = !next.WaitsForMarkets
+                        && next.Load.Cost <= spendable
+                        && !pass.FreeBuilders().Any(builder => builder.CargoCurrent == 0 && string.Equals(builder.SystemSymbol, system, StringComparison.OrdinalIgnoreCase)),
                 };
                 blocker = next.WaitsForMarkets
                     ? ConstructionPlanner.WhyNoLoad(map, AsIfEmptyWhereItGoes(first), site.WaypointSymbol, needs, HeldBuysNow())
