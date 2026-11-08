@@ -77,6 +77,9 @@ public sealed class ConstructionPlanServiceTests
 
         // D64: its place in the order ships are bought in, after the cargo ships.
         _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "ADVANCED_CIRCUITRY" && need.ShipyardWaypointSymbol == D42);
+
+        // D139: the gate still needs 1,600 FAB_MATS and 320 ADVANCED_CIRCUITRY no trip carries, and no builder is left.
+        _state!.Blocker.Should().Be(ConstructionBlockers.Ships);
     }
 
     [Fact]
@@ -125,6 +128,7 @@ public sealed class ConstructionPlanServiceTests
 
         _activeGoals.Should().BeEmpty();
         _state!.Waiting.Should().Be(ConstructionPlanService.WaitingForPurchaseOrder);
+        _state.Blocker.Should().Be(ConstructionBlockers.PurchaseOrder);
         _order.Of(AutomationPlan.Construction).Tier.Should().Be(PurchaseTier.Construction);
     }
 
@@ -142,6 +146,7 @@ public sealed class ConstructionPlanServiceTests
 
         _activeGoals.Should().BeEmpty();
         _state!.Waiting.Should().Be(ConstructionPlanService.WaitingForCredits);
+        _state.Blocker.Should().Be(ConstructionBlockers.Credits);
         _state.ReadyShipSymbols.Should().BeEmpty();
         _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.Price == 370_800 + 85 + (6 * 90));
     }
@@ -168,6 +173,7 @@ public sealed class ConstructionPlanServiceTests
         _order.Of(AutomationPlan.Construction).Should().Match<PurchaseNeed>(need => need.Tier == PurchaseTier.Construction && need.ShipType == "FAB_MATS" && need.ShipyardWaypointSymbol == F49);
         _state!.ReadyShipSymbols.Should().Equal("SHIP-6");
         _activeGoals["SHIP-6"].Should().BeOfType<SupplyConstructionGoal>().Which.TradeSymbol.Should().Be("ADVANCED_CIRCUITRY");
+        _state.Blocker.Should().Be(ConstructionBlockers.Ships, "its one builder is on its way, and the next load waits for it");
     }
 
     [Fact]
@@ -182,6 +188,7 @@ public sealed class ConstructionPlanServiceTests
 
         _activeGoals.Should().BeEmpty();
         _state!.Waiting.Should().Be(ConstructionPlanner.LowSupply);
+        _state.Blocker.Should().Be(ConstructionBlockers.LowSupply);
         _order.Of(AutomationPlan.Construction).Tier.Should().Be(PurchaseTier.Construction);
     }
 
@@ -296,6 +303,9 @@ public sealed class ConstructionPlanServiceTests
         var others = new[] { "SHIP-6", "SHIP-7", "SHIP-8" }.Where(ship => !_activeGoals.ContainsKey(ship)).ToList();
         others.Should().HaveCount(2).And.OnlyContain(ship => _passedOver.MayTrade(ship, new[] { AutomationPlan.Construction }), "the pass had no load for them (B63)");
         _state!.Sites.Single().Materials.Single(material => material.TradeSymbol == "FAB_MATS").OnTheWay.Should().Be(40);
+
+        // D139: what the gate still needs is all on its way: nothing waits.
+        _state.Blocker.Should().Be(ConstructionBlockers.Building);
     }
 
     [Fact]
@@ -363,6 +373,7 @@ public sealed class ConstructionPlanServiceTests
 
         _activeGoals.Should().BeEmpty();
         _order.Needs.Should().ContainKey(AutomationPlan.Construction).WhoseValue.Should().Be(PurchaseNeed.None);
+        _state!.Blocker.Should().Be(ConstructionBlockers.Done);
     }
 
     [Fact]
@@ -379,6 +390,70 @@ public sealed class ConstructionPlanServiceTests
         _activeGoals.Should().BeEmpty();
         await _sites.DidNotReceive().NeedingMaterialsAsync(Arg.Any<CancellationToken>());
         _order.Of(AutomationPlan.Construction).Should().Be(PurchaseNeed.None);
+        _state!.Blocker.Should().Be(ConstructionBlockers.Ships, "none of our ships is at home to build its gate");
+    }
+
+    /// <summary>
+    /// Slice 6.51 (D139), asked on 2026-11-08: "I want to know what stops the gate from being built. Is it a lack of credits,
+    /// is it scarce/limited prereqs, is it not enough ships available to do it?" With no builder in the gate's system, the
+    /// ships; with no market that sells what it needs, no market.
+    /// </summary>
+    [Fact]
+    public async Task WithNoBuilder_TheShipsStopTheGate_AndWithNoSellerTheMarkets()
+    {
+        Fleet(Hauler());
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Trade));
+
+        await RunAsync();
+
+        _state!.Blocker.Should().Be(ConstructionBlockers.Ships);
+
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
+        PricesAre(Map(GateMarket(), I56Market(), H51Market()));
+
+        await RunAsync();
+
+        _state!.Blocker.Should().Be(ConstructionBlockers.NoMarket);
+    }
+
+    /// <summary>
+    /// D139: a load that waits for its markets says so, though a purchase before it in the order holds it back too: the
+    /// gate's miners may be bought meanwhile (D92), so the markets are what stops it.
+    /// </summary>
+    [Fact]
+    public async Task ALoadThatWaitsForItsMarkets_SaysSo_EvenWhileTheOrderHoldsItBack()
+    {
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
+        Fleet(Hauler());
+        PricesAre(Map(GateMarket(), F49Market(supply: "LIMITED"), D42Market(supply: "SCARCE"), H51Market(), I56Market()));
+        _order.Allows = false;
+
+        await RunAsync();
+
+        _state!.Blocker.Should().Be(ConstructionBlockers.LowSupply);
+    }
+
+    /// <summary>
+    /// D139, asked on 2026-11-08: "Not just the gate mats themselves, also the materials needed to build the gate mats. And
+    /// the materials that they need, down to the ores." The state lists the gate's chain with the supply in its system.
+    /// </summary>
+    [Fact]
+    public async Task TheState_ListsTheGatesChain_DownToTheOres()
+    {
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-6", FleetRole.Construct));
+        Fleet(Hauler());
+        PricesAre(new TradeMarketMap(
+            Waypoints,
+            [GateMarket(), F49Market(), D42Market(), H51Market(), I56Market(), Market(A1, Good("IRON", "EXPORT", 150, 120, 60, "LIMITED"), Good("IRON_ORE", "IMPORT", 40, 35, 60, "SCARCE"))],
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal) { ["FAB_MATS"] = ["IRON"], ["IRON"] = ["IRON_ORE"] }));
+
+        await RunAsync();
+
+        _state!.Sites.Single().Chain.Select(good => (good.TradeSymbol, good.Step, good.ExportSupply, good.ImportSupply)).Should().Equal(
+            ("ADVANCED_CIRCUITRY", 1, "MODERATE", string.Empty),
+            ("FAB_MATS", 1, "MODERATE", string.Empty),
+            ("IRON", 2, "LIMITED", string.Empty),
+            ("IRON_ORE", 3, string.Empty, "SCARCE"));
     }
 
     private void Fleet(params ShipModel[] fleet) => _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);

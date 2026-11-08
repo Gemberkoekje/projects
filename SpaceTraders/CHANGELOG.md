@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-08, slice 6.51)
+- What stops the home jump gate, as the construction plan sees it each pass (D139): done, building, ships, credits, low
+  supply, market busy, purchase order, no market, or off; `spacetraders_construction_blocker`. Next to it the supply down the
+  gate's chain to the ores, where each good is sold and where the next step is made from it;
+  `spacetraders_construction_chain_supply{site,good,step,kind}`. Both in the construction plan's state. Changes no decision.
+- Tests: `ConstructionPlanServiceTests`, `ConstructionChainTests`, `PrometheusMetricsServiceTests`,
+  `PrometheusAutomationMetricsTests`.
+
 ### Code – Changed (2026-11-08, slice 6.50)
 - A gate load leaves only the floor, the fuel reserve and what trips on their way to buy hold back (D137), not the traders'
   holds and savings; once the gate can be built a new trade trip leaves what the next load costs. At hour 4.7 of the run of

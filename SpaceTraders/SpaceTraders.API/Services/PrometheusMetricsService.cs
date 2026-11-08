@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Naming;
@@ -138,6 +139,20 @@ public sealed class PrometheusMetricsService(
         var roleSamples = RoleSamples(roles);
         metrics.Roles(roleSamples);
 
+        // Slice 6.51 (D139): what stops the home jump gate, and the supply down its chain, as the construction plan's last pass
+        // saw them; off while the plan or the automation is.
+        var constructionOn = IsOn(settings.Find(setting => setting.Key == AutomationSwitches.EnabledSetting)?.Value)
+            && IsOn(settings.Find(setting => setting.Key == AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction))?.Value);
+        var constructionState = constructionOn
+            ? await db.PlanStates.AsNoTracking()
+                .Where(plan => plan.PlanType == PlanTypes.Construction)
+                .Select(plan => plan.StateJson)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+        var (blockerCode, chain) = GateSamples(constructionOn, constructionState);
+        metrics.ConstructionBlocker(blockerCode);
+        metrics.ConstructionChain(chain);
+
         // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits; the dearest full
         // hold a trader saves up for (D56); and what the trade and construction trips on their way to buy hold back (D57, D64).
         var roleOf = roleSamples.ToDictionary(
@@ -161,6 +176,57 @@ public sealed class PrometheusMetricsService(
             open.Need.ShipyardWaypointSymbol,
             open.Need.Price))]);
     }
+
+    /// <summary>
+    /// What stops the home jump gate and the supply down its chain (slice 6.51, D139), from the construction plan's state's
+    /// JSON: <see cref="ConstructionBlockers.Off"/> and no chain while the plan is off; code -1 and no chain without a readable
+    /// state or a blocker in it (a state written before).
+    /// </summary>
+    internal static (int Code, IReadOnlyCollection<ConstructionChainMetricsSample> Chain) GateSamples(bool on, string? stateJson)
+    {
+        if (!on)
+        {
+            return (ConstructionBlockers.CodeOf(ConstructionBlockers.Off), []);
+        }
+
+        ConstructionPlanState? state;
+        try
+        {
+            state = string.IsNullOrWhiteSpace(stateJson) ? null : JsonSerializer.Deserialize<ConstructionPlanState>(stateJson);
+        }
+        catch (JsonException)
+        {
+            state = null;
+        }
+
+        if (state is null)
+        {
+            return (-1, []);
+        }
+
+        ConstructionChainMetricsSample[] chain =
+        [
+            .. state.Sites.SelectMany(site => site.Chain.SelectMany(good => new[]
+            {
+                (Kind: "EXPORT", Supply: good.ExportSupply),
+                (Kind: "IMPORT", Supply: good.ImportSupply),
+            }
+            .Where(side => SupplyLevel(side.Supply) > 0)
+            .Select(side => new ConstructionChainMetricsSample(site.WaypointSymbol, good.TradeSymbol, good.Step, side.Kind, SupplyLevel(side.Supply))))),
+        ];
+        return (ConstructionBlockers.CodeOf(state.Blocker), chain);
+    }
+
+    /// <summary>A supply level as a number: 1 SCARCE to 5 ABUNDANT; 0 when unknown or empty.</summary>
+    private static int SupplyLevel(string supply) => supply.ToUpperInvariant() switch
+    {
+        "SCARCE" => 1,
+        "LIMITED" => 2,
+        "MODERATE" => 3,
+        "HIGH" => 4,
+        "ABUNDANT" => 5,
+        _ => 0,
+    };
 
     /// <summary>The role board's ships, from its state's JSON; none without a readable state.</summary>
     internal static IReadOnlyCollection<RoleMetricsSample> RoleSamples(string? stateJson)
