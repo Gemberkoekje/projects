@@ -31,6 +31,7 @@ public sealed class TradeContextReaderTests
     private readonly ISystemRepository _systems = Substitute.For<ISystemRepository>();
     private readonly IMarketPriceSampleRepository _samples = Substitute.For<IMarketPriceSampleRepository>();
     private readonly MarketHistoryCache _history = new();
+    private readonly PurchaseNeeds _purchaseNeeds = new();
     private readonly IMarketTradeRepository _trades = Substitute.For<IMarketTradeRepository>();
 
     public TradeContextReaderTests()
@@ -249,6 +250,26 @@ public sealed class TradeContextReaderTests
     }
 
     [Fact]
+    public async Task TheGatesChainGoesFirst_OnlyOnceThePurchaseOrderHasReachedTheGatesLoads()
+    {
+        // D136, asked on 2026-11-08: "Gate-first once the gate can be built". While the trading plan still saves up for a cargo
+        // ship of Trade.ShipPurchases, the gate's chain doesn't go first; once nothing before the gate's loads is needed, it does.
+        ConstructionPlanOn(true);
+        _purchaseNeeds.Report(AutomationPlan.Trading, new PurchaseNeed(PurchaseTier.CargoShips, "SHIP_LIGHT_HAULER", "X1-FJ91-A2", 257_486), DateTimeOffset.UtcNow);
+
+        var saving = (await Reader().ReadAsync(System, CancellationToken.None)).Map;
+
+        _purchaseNeeds.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+        _purchaseNeeds.Report(AutomationPlan.Construction, new PurchaseNeed(PurchaseTier.Construction, "FAB_MATS", "X1-FJ91-A1", 80_000), DateTimeOffset.UtcNow);
+
+        var buildable = (await Reader().ReadAsync(System, CancellationToken.None)).Map;
+
+        saving.ConstructionMaterials.Should().BeEquivalentTo(["FAB_MATS"], "the gate still needs them; only the order of trades waits");
+        saving.ConstructionFirst.Should().BeFalse();
+        buildable.ConstructionFirst.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task TheFreshMarkets_AreThoseSeenWithPricesWithinTheAge_InEverySystem()
     {
         // Slice 6.40 (D122): mining abroad reads only these, as a trade route does (D96). Trade.MaxPriceAgeMinutes unset: 30.
@@ -282,5 +303,5 @@ public sealed class TradeContextReaderTests
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), Arg.Any<CancellationToken>()).Returns(on);
 
     private TradeContextReader Reader()
-        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()));
+        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()), _purchaseNeeds);
 }

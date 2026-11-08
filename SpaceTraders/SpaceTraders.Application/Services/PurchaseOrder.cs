@@ -411,6 +411,23 @@ public sealed class PurchaseNeeds
     }
 
     /// <summary>
+    /// Whether a plan said lately that it needs something that comes before <paramref name="tier"/> in the order ships are
+    /// bought in (PLAN.md slice 6.49, D136): while one does, the purchase order hasn't reached that tier.
+    /// </summary>
+    /// <param name="tier">The tier.</param>
+    /// <param name="now">The time to judge by (<see cref="Counts"/>).</param>
+    /// <returns>True while an earlier need is open.</returns>
+    public bool OpenBefore(PurchaseTier tier, DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            return _needs.Values.Any(reported => reported.Need.Tier != PurchaseTier.None
+                && reported.Need.Tier < tier
+                && Counts(reported.At, now));
+        }
+    }
+
+    /// <summary>
     /// Records that the order let a plan's need go before needs whose purchase waits for one of our ships (slice 6.36, D118),
     /// and what its purchase keeps for them: their prices.
     /// </summary>

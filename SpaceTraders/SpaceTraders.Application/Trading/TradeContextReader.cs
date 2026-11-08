@@ -100,7 +100,8 @@ public sealed class TradeContextReader(
     IGateNetwork gates,
     ISystemRepository systems,
     IMarketPredictions predictions,
-    IPredictionConfidence confidence) : ITradeContextReader
+    IPredictionConfidence confidence,
+    PurchaseNeeds purchaseNeeds) : ITradeContextReader
 {
     /// <summary>The setting that holds the profit per unit, after fuel, a trip must earn (D14).</summary>
     public const string MinProfitPerUnitSetting = "Trade.MinProfitPerUnit";
@@ -185,6 +186,7 @@ public sealed class TradeContextReader(
         {
             ConstructionMaterials = home.Length > 0 ? await MaterialsAsync(home, cancellationToken) : new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             ConstructionSystemSymbol = home,
+            ConstructionFirst = GateCanBeBuilt(now),
             StaleMarkets = stale,
             PredictionWeights = predicted,
             Gates = network is null
@@ -242,6 +244,7 @@ public sealed class TradeContextReader(
             new TradeMarketMap(systemWaypoints, systemMarkets, basics.Chains)
             {
                 ConstructionMaterials = await MaterialsAsync(systemSymbol, cancellationToken),
+                ConstructionFirst = GateCanBeBuilt(TimeProvider.System.GetUtcNow()),
                 PredictionWeights = predicted,
             },
             basics.Credits,
@@ -284,6 +287,15 @@ public sealed class TradeContextReader(
             cancellationToken);
         return ([.. candidates.Select(market => predictedMarkets.GetValueOrDefault(market.WaypointSymbol, market))], weights);
     }
+
+    /// <summary>
+    /// Whether the jump gate can be built (PLAN.md slice 6.49, D136): no plan needs anything that comes before the gate's loads in
+    /// the order ships are bought in (the contract's drone, the surveyors, the cargo ships of <c>Trade.ShipPurchases</c>, home's
+    /// probes). Asked on 2026-11-08, after the first hours of the run of 2026-11-08 went to gate trades worth −400 to +3,000
+    /// credits while the credits stood still: "Gate-first once the gate can be built". Until then the routes that feed the gate
+    /// rank and pay as any other (<see cref="TradeMarketMap.ConstructionFirst"/>).
+    /// </summary>
+    private bool GateCanBeBuilt(DateTimeOffset now) => !purchaseNeeds.OpenBefore(PurchaseTier.Construction, now);
 
     /// <summary>Whether a market's prices are recent enough to decide by (D96): seen with prices within the age.</summary>
     private static bool IsFresh(MarketFreshnessRecord market, DateTimeOffset now, TimeSpan maxAge)

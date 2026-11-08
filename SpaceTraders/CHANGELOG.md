@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-08, slice 6.49)
+- The gate's chain goes first only once the gate can be built (D136): until the order ships are bought in reaches the gate's
+  loads (the list's cargo ships and home's probes bought), a route that feeds the gate ranks and pays as any other. In the
+  run of 2026-11-08 every trade from 13:54Z fed the gate, from 14:01Z at −392 to +3,656 a trip, and the credits stood at
+  about 125,000 from 14:20Z, below the light haulers and home's probes. Tests: `TradeRoutePlannerTests` (two),
+  `TradeContextReaderTests` (one); each failed before.
+
+### Docs – Changed (2026-11-08, slice 6.49)
+- `PLAN.md`: D136, slice 6.49, where things stand after the reset. `docs/HOW_IT_WORKS.md`: when the gate's chain goes first.
+
 ### Code – Changed (2026-11-08, slice 6.48)
 - Roaming probes favour busy markets (D135: "Probes should also prioritize markets with a lot of players. As the accuracy of
   predictions is low, but the actual profits could be high."): every market's promise adds `Prediction.ProbeFlowSharePercent`

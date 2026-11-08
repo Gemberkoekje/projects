@@ -1216,8 +1216,9 @@ buy.
   - it is lucrative when it earns at least `Trade.MinProfitPerUnit` per unit after fuel (D14); a trip that feeds the jump
     gate's material is worth taking while its goods sell for at least what they cost (D90, below).
 - **Feeding the jump gate first** (slice 6.22, D89, asked on 2026-10-05: "Please make sure the trade routes prioritize
-  the feeding to the portal construction materials"): while the system's jump gate needs materials and the construction
-  plan is on, a lucrative trip that delivers a good to a market making one of those materials from it (the market exports
+  the feeding to the portal construction materials"; since slice 6.49, D136, only once the gate can be built: the order ships
+  are bought in has reached its loads, `TradeMarketMap.ConstructionFirst`, before which such a route ranks and pays as any
+  other): while the system's jump gate needs materials and the construction plan is on, a lucrative trip that delivers a good to a market making one of those materials from it (the market exports
   the material, imports the good below ABUNDANT, and the production chains make the material from the good;
   `TradeMarketMap.ConstructionFeedOf`) comes before every other, whatever it earns. Since slice 6.45 (D128, asked on
   2026-11-08: "any trade should be for the gate or it's prereqs first. Any complete prereqs (e.g. fab mats that are done)
