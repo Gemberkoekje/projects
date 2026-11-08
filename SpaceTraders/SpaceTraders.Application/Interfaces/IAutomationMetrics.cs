@@ -163,6 +163,22 @@ public interface IAutomationMetrics
     void Construction(IReadOnlyCollection<ConstructionMetricsSample> materials);
 
     /// <summary>
+    /// Records what stops the home jump gate from being built (PLAN.md slice 6.51, D139: <c>spacetraders_construction_blocker</c>),
+    /// as the construction plan's last pass saw it: the code of one of <see cref="SpaceTraders.Application.Construction.ConstructionBlockers"/>; not
+    /// set for a negative code.
+    /// </summary>
+    /// <param name="code">The reason's code (<see cref="SpaceTraders.Application.Construction.ConstructionBlockers.CodeOf"/>).</param>
+    void ConstructionBlocker(int code);
+
+    /// <summary>
+    /// Records the supply down the jump gate's production chain (PLAN.md slice 6.51, D139:
+    /// <c>spacetraders_construction_chain_supply{site,good,step,kind}</c>, 1 SCARCE to 5 ABUNDANT), as the construction
+    /// plan's last pass saw it. A good that is no longer in <paramref name="chain"/> loses its series.
+    /// </summary>
+    /// <param name="chain">The chain's goods, a sample for each side that has a supply.</param>
+    void ConstructionChain(IReadOnlyCollection<ConstructionChainMetricsSample> chain);
+
+    /// <summary>
     /// Records the cached markets: when each was observed
     /// (<c>spacetraders_market_observed_timestamp_seconds{system,waypoint,waypoint_type}</c>) and, once a
     /// ship has been there, each good's prices, trade volume, supply and activity
@@ -551,6 +567,34 @@ public sealed record ConstructionMetricsSample
     public required int UnitsRequired { get; init; }
 
     public required int UnitsFulfilled { get; init; }
+}
+
+/// <summary>One good of the jump gate's production chain, on one side (PLAN.md slice 6.51, D139).</summary>
+public sealed record ConstructionChainMetricsSample
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ConstructionChainMetricsSample(string Site, string TradeSymbol, int Step, string Kind, int Supply)
+    {
+        this.Site = Site;
+        this.TradeSymbol = TradeSymbol;
+        this.Step = Step;
+        this.Kind = Kind;
+        this.Supply = Supply;
+    }
+
+    /// <summary>The construction site: the jump gate's waypoint.</summary>
+    public required string Site { get; init; }
+
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>The steps from the gate: 1 for a material, 2 for what it is made from, and so on.</summary>
+    public required int Step { get; init; }
+
+    /// <summary><c>EXPORT</c>: where it is sold; <c>IMPORT</c>: where a good of the chain is made from it.</summary>
+    public required string Kind { get; init; }
+
+    /// <summary>The best supply on that side: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT.</summary>
+    public required int Supply { get; init; }
 }
 
 /// <summary>One deliverable of an accepted contract.</summary>

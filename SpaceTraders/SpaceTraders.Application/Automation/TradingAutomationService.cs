@@ -746,9 +746,9 @@ public sealed class TradingAutomationService(
         long constructionHolds,
         CancellationToken cancellationToken)
     {
-        // Cargo leaves Trade.FuelReserveCredits for fuel (D24), and what the trade and construction trips on their way to buy
-        // hold back (D57, D64).
-        var credits = Math.Max(0, context.CreditsForCargo - held.Sum(route => TripReservations.HeldBack(route.Goal)) - constructionHolds);
+        // Cargo leaves Trade.FuelReserveCredits for fuel (D24), what the trade and construction trips on their way to buy hold
+        // back (D57, D64), and once the gate can be built, what its next load costs (D137).
+        var credits = Math.Max(0, context.CreditsForCargo - held.Sum(route => TripReservations.HeldBack(route.Goal)) - constructionHolds - context.GateLoadCredits);
 
         // What each trader could do before anything is handed out: the routes the ShipLeftIdle rule
         // counts as work waiting for it (D13); and the trip it saves up for, when it does (D56). Its lucrative routes

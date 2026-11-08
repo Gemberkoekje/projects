@@ -9,6 +9,7 @@ using NSubstitute;
 using Prometheus;
 using SpaceTraders.API.Services;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Naming;
@@ -661,6 +662,67 @@ public sealed class PrometheusMetricsServiceTests
         await service.SampleAsync(CancellationToken.None);
 
         roles.Should().NotBeNull().And.HaveCount(ships);
+    }
+
+    /// <summary>
+    /// Slice 6.51 (D139): what stops the gate, and the supply down its chain, from the construction plan's state while the
+    /// plan is on; switched off, the gauge says so and the chain shows nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("true", 3, 3)]
+    [InlineData("false", 8, 0)]
+    public async Task SampleAsync_ExportsWhatStopsTheGate_FromTheConstructionPlansState(string planSwitch, int code, int chainSeries)
+    {
+        var state = new ConstructionPlanState
+        {
+            Sites =
+            [
+                new ConstructionSiteState
+                {
+                    WaypointSymbol = "X1-DC53-I55",
+                    Materials = [],
+                    Chain =
+                    [
+                        new ConstructionChainGoodState { TradeSymbol = "FAB_MATS", Step = 1, ExportSupply = "ABUNDANT" },
+                        new ConstructionChainGoodState { TradeSymbol = "IRON", Step = 2, ExportSupply = "LIMITED", ImportSupply = "SCARCE" },
+                        new ConstructionChainGoodState { TradeSymbol = "IRON_ORE", Step = 3 },
+                    ],
+                },
+            ],
+            Blocker = ConstructionBlockers.Credits,
+            UpdatedAt = TimeProvider.System.GetUtcNow(),
+        };
+        using var provider = BuildProvider();
+        await using (var seedScope = provider.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+            db.Settings.Add(Setting(AgentId, AutomationSwitches.EnabledSetting, "true", "Run the automation"));
+            db.Settings.Add(Setting(AgentId, AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), planSwitch, "Run the construction plan"));
+            db.PlanStates.Add(new PlanStateRecord { AgentId = AgentId, PlanType = PlanTypes.Construction, StateJson = JsonSerializer.Serialize(state) });
+            await db.SaveChangesAsync();
+        }
+
+        var blocker = -1;
+        IReadOnlyCollection<ConstructionChainMetricsSample>? chain = null;
+        _metrics.When(m => m.ConstructionBlocker(Arg.Any<int>())).Do(call => blocker = call.Arg<int>());
+        _metrics.When(m => m.ConstructionChain(Arg.Any<IReadOnlyCollection<ConstructionChainMetricsSample>>()))
+            .Do(call => chain = call.Arg<IReadOnlyCollection<ConstructionChainMetricsSample>>());
+
+        using var service = new PrometheusMetricsService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            _metrics,
+            new ShipStateJournal(NullLogger<ShipStateJournal>.Instance),
+            new PurchaseNeeds(),
+            new FullHoldSavings(),
+            _names,
+            NullLogger<PrometheusMetricsService>.Instance);
+        await service.SampleAsync(CancellationToken.None);
+
+        blocker.Should().Be(code);
+        (string Good, int Step, string Kind, int Supply)[] expected = [("FAB_MATS", 1, "EXPORT", 5), ("IRON", 2, "EXPORT", 2), ("IRON", 2, "IMPORT", 1)];
+        chain.Should().NotBeNull();
+        chain!.Select(sample => (sample.TradeSymbol, sample.Step, sample.Kind, sample.Supply)).Should().BeEquivalentTo(expected.Take(chainSeries));
+        chain.Should().OnlyContain(sample => sample.Site == "X1-DC53-I55");
     }
 
     /// <summary>
@@ -1444,6 +1506,36 @@ public sealed class PrometheusAutomationMetricsTests
         text = await ExportAsync();
         text.Should().Contain("spacetraders_construction_units_fulfilled{reset_date=\"2026-09-27\",site=\"X1-DC53-I55\",trade_symbol=\"FAB_MATS\"} 1600\n");
         text.Should().NotContain("trade_symbol=\"ADVANCED_CIRCUITRY\"");
+    }
+
+    /// <summary>
+    /// Slice 6.51 (D139): what stops the gate is one series, the code of its reason; the chain's supply is one series per
+    /// good and side, and a good that leaves the chain loses its series.
+    /// </summary>
+    [Fact]
+    public async Task WhatStopsTheGate_IsOneSeries_AndTheChainsSupplyOnePerGoodAndSide()
+    {
+        _metrics.ConstructionBlocker(-1);
+        var text = await ExportAsync();
+        text.Should().NotContain("spacetraders_construction_blocker{");
+
+        _metrics.ConstructionBlocker(ConstructionBlockers.CodeOf(ConstructionBlockers.LowSupply));
+        _metrics.ConstructionChain(
+        [
+            new ConstructionChainMetricsSample("X1-DC53-I55", "FAB_MATS", 1, "EXPORT", 2),
+            new ConstructionChainMetricsSample("X1-DC53-I55", "IRON", 2, "IMPORT", 1),
+        ]);
+
+        text = await ExportAsync();
+        text.Should().Contain("spacetraders_construction_blocker{reset_date=\"2026-09-27\"} 4\n");
+        text.Should().Contain("spacetraders_construction_chain_supply{reset_date=\"2026-09-27\",site=\"X1-DC53-I55\",good=\"FAB_MATS\",step=\"1\",kind=\"EXPORT\"} 2\n");
+        text.Should().Contain("spacetraders_construction_chain_supply{reset_date=\"2026-09-27\",site=\"X1-DC53-I55\",good=\"IRON\",step=\"2\",kind=\"IMPORT\"} 1\n");
+
+        _metrics.ConstructionChain([new ConstructionChainMetricsSample("X1-DC53-I55", "FAB_MATS", 1, "EXPORT", 5)]);
+
+        text = await ExportAsync();
+        text.Should().Contain("good=\"FAB_MATS\",step=\"1\",kind=\"EXPORT\"} 5\n");
+        text.Should().NotContain("good=\"IRON\"");
     }
 
     /// <summary>

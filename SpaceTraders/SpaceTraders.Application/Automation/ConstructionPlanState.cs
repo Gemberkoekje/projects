@@ -33,6 +33,12 @@ public sealed record ConstructionPlanState
     /// </summary>
     public string Waiting { get; init; } = string.Empty;
 
+    /// <summary>
+    /// What stops the home jump gate from being built, as this pass saw it (PLAN.md slice 6.51, D139): one of
+    /// <see cref="SpaceTraders.Application.Construction.ConstructionBlockers"/>, the first that holds; empty in a state written before.
+    /// </summary>
+    public string Blocker { get; init; } = string.Empty;
+
     /// <summary>When the state was written.</summary>
     public required DateTimeOffset UpdatedAt { get; init; }
 }
@@ -45,6 +51,12 @@ public sealed record ConstructionSiteState
 
     /// <summary>Its materials.</summary>
     public required IReadOnlyList<ConstructionMaterialState> Materials { get; init; }
+
+    /// <summary>
+    /// The goods of its production chain, down to the ores, with their supply in its system (PLAN.md slice 6.51, D139,
+    /// <see cref="SpaceTraders.Application.Construction.ConstructionChain"/>).
+    /// </summary>
+    public IReadOnlyList<ConstructionChainGoodState> Chain { get; init; } = [];
 }
 
 /// <summary>One material of a construction site.</summary>
@@ -60,4 +72,28 @@ public sealed record ConstructionMaterialState
 
     /// <summary>The units our construction trips carry or go to buy.</summary>
     public required int OnTheWay { get; init; }
+}
+
+/// <summary>
+/// One good of a jump gate's production chain (PLAN.md slice 6.51, D139): a material the gate still needs, or a good one is
+/// made from, directly or further down the chains.
+/// </summary>
+public sealed record ConstructionChainGoodState
+{
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>The steps from the gate: 1 for a material, 2 for what it is made from, and so on.</summary>
+    public required int Step { get; init; }
+
+    /// <summary>
+    /// The best supply among the markets of the gate's system that sell it (export or exchange it), SCARCE to ABUNDANT;
+    /// empty where none does.
+    /// </summary>
+    public string ExportSupply { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The best supply among the markets of the gate's system that make a good of the chain from it (import it and export
+    /// what it goes into); empty where none does.
+    /// </summary>
+    public string ImportSupply { get; init; } = string.Empty;
 }

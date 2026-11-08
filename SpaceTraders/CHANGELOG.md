@@ -7,6 +7,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-08, slice 6.51)
+- What stops the home jump gate, as the construction plan sees it each pass (D139): done, building, ships, credits, low
+  supply, market busy, purchase order, no market, or off; `spacetraders_construction_blocker`. Next to it the supply down the
+  gate's chain to the ores, where each good is sold and where the next step is made from it;
+  `spacetraders_construction_chain_supply{site,good,step,kind}`. Both in the construction plan's state. Changes no decision.
+- Tests: `ConstructionPlanServiceTests`, `ConstructionChainTests`, `PrometheusMetricsServiceTests`,
+  `PrometheusAutomationMetricsTests`.
+
+### Code – Changed (2026-11-08, slice 6.50)
+- A gate load leaves only the floor, the fuel reserve and what trips on their way to buy hold back (D137), not the traders'
+  holds and savings; once the gate can be built a new trade trip leaves what the next load costs. At hour 4.7 of the run of
+  2026-11-08 the 334,107 load waited behind a reserve of 796,935 against 815,440 credits, the materials ABUNDANT.
+- While the gate needs materials, a collection point gets its shuttle only when its asteroid yields an ore that goes into
+  one of them (D138).
+- Tests: `BudgetPolicyTests`, `TradeContextReaderTests`, `MiningAutomationServiceTests` (one each).
+
 ### Code – Changed (2026-11-08, slice 6.49)
 - The gate's chain goes first only once the gate can be built (D136): until the order ships are bought in reaches the gate's
   loads (the list's cargo ships and home's probes bought), a route that feeds the gate ranks and pays as any other. In the

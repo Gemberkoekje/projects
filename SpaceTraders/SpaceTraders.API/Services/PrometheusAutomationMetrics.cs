@@ -73,6 +73,8 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly RunGauge _roleCreditsPerHour;
     private readonly RunGauge _purchaseNeed;
     private readonly RunGauge _creditReserve;
+    private readonly RunGauge _constructionBlocker;
+    private readonly SampledGauge _constructionChainSupply;
     private readonly RunGauge _exploreSystemsLeft;
     private readonly RunGauge _otherAgentTrades;
     private readonly RunGauge _exploreExplorersWanted;
@@ -236,6 +238,16 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "Units supplied to a construction site (the home system's jump gate), per material, by anyone.",
             "site",
             "trade_symbol");
+        _constructionBlocker = UntilSet(
+            "spacetraders_construction_blocker",
+            "What stops the home jump gate from being built, as the construction plan's last pass saw it (slice 6.51, D139): 0 done, 1 building (every unit it needs is on its way), 2 ships (a load is ready, no builder is free to take it), 3 credits, 4 low_supply (SCARCE or LIMITED wherever it is sold), 5 market_busy (another of our trips is on its way to buy it there), 6 purchase_order (a purchase comes before its loads), 7 no_market, 8 off (the construction plan or the automation is off).");
+        _constructionChainSupply = new SampledGauge(Labelled(
+            "spacetraders_construction_chain_supply",
+            "The supply down the home jump gate's production chain (slice 6.51, D139), as the construction plan's last pass saw it: 1 SCARCE, 2 LIMITED, 3 MODERATE, 4 HIGH, 5 ABUNDANT. step 1 is a material the gate still needs, 2 what it is made from, and so on down to the ores. kind EXPORT: the best supply among the gate's system's markets that sell the good; IMPORT: the best among those that make a good of the chain from it.",
+            "site",
+            "good",
+            "step",
+            "kind"));
         _extractedUnits = ZeroFirst(
             "spacetraders_extracted_units_total",
             "Units ships extracted, by ship and good: each extraction's or siphon's yield, before what isn't wanted is jettisoned.",
@@ -704,6 +716,35 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             }
 
             _contracts.UnionWith(currentContracts);
+        }
+    }
+
+    /// <inheritdoc />
+    public void ConstructionBlocker(int code)
+    {
+        if (code >= 0)
+        {
+            _constructionBlocker.Set(code);
+        }
+    }
+
+    /// <inheritdoc />
+    public void ConstructionChain(IReadOnlyCollection<ConstructionChainMetricsSample> chain)
+    {
+        lock (_lock)
+        {
+            _constructionChainSupply.Begin();
+            foreach (var good in chain)
+            {
+                _constructionChainSupply.Set(
+                    good.Supply,
+                    good.Site,
+                    good.TradeSymbol,
+                    good.Step.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    good.Kind);
+            }
+
+            _constructionChainSupply.End();
         }
     }
 

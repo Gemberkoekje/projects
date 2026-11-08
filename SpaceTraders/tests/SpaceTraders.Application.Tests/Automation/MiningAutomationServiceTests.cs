@@ -1131,6 +1131,54 @@ public sealed class MiningAutomationServiceTests
         point.DroneSymbols.Should().Equal("SHIP-3");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WhileTheGateNeedsMaterials_AFarAsteroidGetsAShuttle_OnlyWhenItYieldsAnOreThatGoesIntoThem(bool ironGoesIntoTheGate)
+    {
+        // D138, asked on 2026-11-08: "Only if the far-asteroid has materials we need for the gate." B13 (COMMON_METAL_DEPOSITS)
+        // yields IRON_ORE among others. The gate needs FAB_MATS: made from IRON, made from IRON_ORE, the point gets its shuttle;
+        // made from nothing B13 yields, it doesn't, though a drone has its place there.
+        CollectingAtB13();
+        var chains = ironGoesIntoTheGate
+            ? new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["IRON", "QUARTZ_SAND"], ["IRON"] = ["IRON_ORE"] }
+            : new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["QUARTZ_SAND"] };
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(
+            new TradeMarketMap(
+                Waypoints,
+                [
+                    .. Markets().Where(market => market.WaypointSymbol != B7),
+                    Market(
+                        B7,
+                        Good("GOLD_ORE", "IMPORT", 230, 114, 60, "SCARCE"),
+                        Good("COPPER_ORE", "IMPORT", 68, 58, 180, "SCARCE"),
+                        Good("IRON_ORE", "IMPORT", 118, 61, 60, "LIMITED"),
+                        Good("FUEL", "EXCHANGE", 79, 71, 180, "MODERATE")),
+                ],
+                chains)
+            {
+                ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+            },
+            [],
+            129_357,
+            Now));
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "IRON_ORE", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7, Drifting = true };
+        _purchases.TryPurchaseAsync("SHIP_LIGHT_SHUTTLE", H52, Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult { IsSuccess = true, PurchasedShip = Shuttle("SHIP-20", H52) });
+        Fleet(Drone("SHIP-3", H51, "IN_TRANSIT"));
+
+        await RunAsync();
+
+        if (ironGoesIntoTheGate)
+        {
+            _order.Of(AutomationPlan.Mining).Should().Match<PurchaseNeed>(need => need.ShipType == "SHIP_LIGHT_SHUTTLE");
+        }
+        else
+        {
+            await _purchases.DidNotReceive().TryPurchaseAsync("SHIP_LIGHT_SHUTTLE", Arg.Any<string>(), Arg.Any<CancellationToken>());
+        }
+    }
+
     [Fact]
     public async Task AFarAsteroidsScarceOres_CountADroneEach_WithTheOtherScarceMinerals()
     {

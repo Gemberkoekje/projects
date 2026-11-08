@@ -681,7 +681,7 @@ public sealed class MiningAutomationService(
     /// parked at the asteroid waits with its hold full while its shuttle is away selling. None while no shipyard of the
     /// system sells one with a known price.
     /// </summary>
-    private static Purchase ShuttleNeed(string systemSymbol, Collecting collecting, IReadOnlyList<ShipyardWaypointDto> shipyardList)
+    private static Purchase ShuttleNeed(string systemSymbol, Collecting collecting, IReadOnlyList<ShipyardWaypointDto> shipyardList, TradeMarketMap map)
     {
         if (!collecting.PointsBySystem.TryGetValue(systemSymbol, out var points)
             || points.Count == 0
@@ -693,6 +693,12 @@ public sealed class MiningAutomationService(
         var need = new PurchaseNeed(PurchaseTier.Coverage, LightShuttleShipType, listing.Shipyard.WaypointSymbol, listing.Ship.PurchasePrice);
         foreach (var point in points)
         {
+            // D138, asked on 2026-11-08: "Only if the far-asteroid has materials we need for the gate."
+            if (map.ConstructionMaterials.Count > 0 && !point.Ores.Any(map.GoesIntoConstruction))
+            {
+                continue;
+            }
+
             var shuttles = collecting.Designated.GetValueOrDefault(point.Key, []);
             var hasDrones = collecting.Places.TryGetValue(point.Key, out var there) && there.Count > 0;
             if (hasDrones && shuttles.Count == 0)
@@ -753,10 +759,12 @@ public sealed class MiningAutomationService(
     {
         if (!await ContractTakesMinersAsync(cancellationToken))
         {
-            // D83: the shuttles come first: a drone parked at a far asteroid sells nothing without one.
-            foreach (var systemSymbol in systems)
+            // D83: the shuttles come first: a drone parked at a far asteroid sells nothing without one. D138: while the jump gate
+            // needs materials, only for a point whose asteroid yields an ore that goes into one of them.
+            foreach (var systemSymbol in systems.Where(system => collecting.PointsBySystem.TryGetValue(system, out var points) && points.Count > 0))
             {
-                if (ShuttleNeed(systemSymbol, collecting, shipyardList) is { Need.Tier: not PurchaseTier.None } shuttle)
+                var map = (await miningContexts.ReadAsync(systemSymbol, cancellationToken)).Map;
+                if (ShuttleNeed(systemSymbol, collecting, shipyardList, map) is { Need.Tier: not PurchaseTier.None } shuttle)
                 {
                     return shuttle;
                 }

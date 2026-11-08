@@ -112,6 +112,7 @@ public sealed class ConstructionPlanService(
         if (home.Length > 0 && fleet.Any(ship => !FleetRoles.IsProbe(ship) && string.Equals(ship.SystemSymbol, home, StringComparison.OrdinalIgnoreCase)))
         {
             var homeSites = await sites.NeedingMaterialsAsync(cancellationToken);
+            pass.GateDone = homeSites.Count == 0;
             if (homeSites.Count > 0)
             {
                 var map = (await tradeContexts.ReadAsync(home, cancellationToken)).Map;
@@ -198,25 +199,42 @@ public sealed class ConstructionPlanService(
     /// </summary>
     private async Task BuyLoadsAsync(Pass pass, CancellationToken cancellationToken)
     {
-        var spendable = (await budget.EvaluateAsync(0, cancellationToken)).SpendableCredits;
+        // D137: a load leaves the floor, the fuel reserve and what trips on their way to buy hold back; not the traders' holds
+        // or savings.
+        var spendable = (await budget.EvaluateConstructionAsync(cancellationToken)).SpendableCredits;
 
         // D80: one buyer of a material at a market at a time, a trade trip or a construction trip, those this pass starts too.
         var tradeTrips = (await goals.GetActiveTradeGoalsAsync(cancellationToken)).Values.ToList();
         HeldBuys HeldBuysNow() => HeldBuys.Of(tradeTrips, pass.Trips);
 
+        // Slice 6.51 (D139): what stops the gate, the first reason that holds (ConstructionBlockers); empty while none does yet.
+        var blocker = pass.Sites.Count == 0
+            ? (pass.GateDone ? ConstructionBlockers.Done : ConstructionBlockers.Ships)
+            : string.Empty;
         var need = PurchaseNeed.None;
         foreach (var (site, map, system) in pass.Sites)
         {
-            if (pass.Builders.FirstOrDefault(builder => string.Equals(builder.SystemSymbol, system, StringComparison.OrdinalIgnoreCase)) is { } first
-                && NextLoad(map, first, site, ConstructionPlanner.Needs(site, pass.Trips), spendable, HeldBuysNow()) is { } next)
+            var needs = ConstructionPlanner.Needs(site, pass.Trips);
+            if (pass.Builders.FirstOrDefault(builder => string.Equals(builder.SystemSymbol, system, StringComparison.OrdinalIgnoreCase)) is not { } first)
+            {
+                blocker = needs.Any(material => material.Remaining > 0) ? ConstructionBlockers.Ships : ConstructionBlockers.Building;
+                continue;
+            }
+
+            if (NextLoad(map, first, site, needs, spendable, HeldBuysNow()) is { } next)
             {
                 // D92: a load that waits for its markets lets the gate's miners be bought meanwhile.
                 need = new PurchaseNeed(PurchaseTier.Construction, next.Load.TradeSymbol, next.Load.BuyWaypointSymbol, next.Load.Cost)
                 {
                     WaitsForMarkets = next.WaitsForMarkets,
                 };
+                blocker = next.WaitsForMarkets
+                    ? ConstructionPlanner.WhyNoLoad(map, AsIfEmptyWhereItGoes(first), site.WaypointSymbol, needs, HeldBuysNow())
+                    : next.Load.Cost > spendable ? ConstructionBlockers.Credits : string.Empty;
                 break;
             }
+
+            blocker = needs.Any(material => material.Remaining > 0) ? ConstructionBlockers.NoMarket : ConstructionBlockers.Building;
         }
 
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Construction, need, cancellationToken))
@@ -226,6 +244,10 @@ public sealed class ConstructionPlanService(
                 pass.Waiting = WaitingForPurchaseOrder;
             }
 
+            // D139: a load that waits for its markets says so; one the credits would pay for, or not, waits for the order.
+            pass.Blocker = need.Tier != PurchaseTier.None && (blocker.Length == 0 || blocker == ConstructionBlockers.Credits)
+                ? ConstructionBlockers.PurchaseOrder
+                : blocker;
             return;
         }
 
@@ -242,6 +264,7 @@ public sealed class ConstructionPlanService(
                 .Select(builder => builder.Symbol));
         }
 
+        var waitedFor = string.Empty;
         foreach (var (site, map, system) in pass.Sites)
         {
             foreach (var builder in pass.FreeBuilders()
@@ -254,7 +277,7 @@ public sealed class ConstructionPlanService(
                 var load = loads.FirstOrDefault(candidate => candidate.Cost <= spendable);
                 if (load is null)
                 {
-                    pass.Waiting = loads.Count > 0 ? WaitingForCredits : ConstructionPlanner.WhyNoLoad(map, builder, site.WaypointSymbol, needs, heldBuys);
+                    waitedFor = pass.Waiting = loads.Count > 0 ? WaitingForCredits : ConstructionPlanner.WhyNoLoad(map, builder, site.WaypointSymbol, needs, heldBuys);
                     continue;
                 }
 
@@ -283,6 +306,15 @@ public sealed class ConstructionPlanService(
                     Purchase);
             }
         }
+
+        // D139: with every unit the gate needs on its way, nothing waits; else a free builder left without a load says why, and
+        // with none left free, the ships are what it waits for.
+        var remains = pass.Sites.Any(entry => ConstructionPlanner.Needs(entry.Site, pass.Trips).Any(material => material.Remaining > 0));
+        pass.Blocker = blocker.Length > 0 ? blocker
+            : !remains ? ConstructionBlockers.Building
+            : waitedFor == WaitingForCredits ? ConstructionBlockers.Credits
+            : waitedFor.Length > 0 ? waitedFor
+            : ConstructionBlockers.Ships;
     }
 
     /// <summary>
@@ -339,10 +371,12 @@ public sealed class ConstructionPlanService(
                     Fulfilled = need.Fulfilled,
                     OnTheWay = need.OnTheWay,
                 })],
+                Chain = ConstructionChain.Of(entry.Map, entry.Site, entry.System),
             })],
             BuilderShipSymbols = [.. pass.Builders.Select(builder => builder.Symbol)],
             ReadyShipSymbols = [.. pass.Ready.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal)],
             Waiting = pass.Waiting,
+            Blocker = pass.Blocker,
             UpdatedAt = now,
         };
 
@@ -370,6 +404,12 @@ public sealed class ConstructionPlanService(
         public List<string> Ready { get; } = [];
 
         public string Waiting { get; set; } = string.Empty;
+
+        /// <summary>The home system's gate needs no materials (D139: <see cref="ConstructionBlockers.Done"/>).</summary>
+        public bool GateDone { get; set; }
+
+        /// <summary>What stops the gate, as this pass saw it (D139).</summary>
+        public string Blocker { get; set; } = string.Empty;
 
         /// <summary>The builders that are free now.</summary>
         public IEnumerable<ShipModel> FreeBuilders()

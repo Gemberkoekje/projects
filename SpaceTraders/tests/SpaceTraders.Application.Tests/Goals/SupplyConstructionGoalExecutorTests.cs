@@ -345,8 +345,12 @@ public sealed class SupplyConstructionGoalExecutorTests
     }
 
     private void Budget(long available, long reserved)
-        => _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+    {
+        _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
             .Returns(new BudgetDecision(true, available, reserved, Math.Max(0, available - reserved)));
+        _budget.EvaluateConstructionAsync(Arg.Any<CancellationToken>())
+            .Returns(new BudgetDecision(true, available, reserved, Math.Max(0, available - reserved)));
+    }
 
     private Task<GoalExecutionResult> StepAsync(ShipModel ship, SupplyConstructionGoal trip)
         => new SupplyConstructionGoalExecutor(
