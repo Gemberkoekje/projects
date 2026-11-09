@@ -3,21 +3,27 @@
 _To understand this, start by reading [DESIGN.md](DESIGN.md), then [DEPLOY.md](DEPLOY.md), then
 gembernodes `apps/zeef/README.md` and `infrastructure/pvcs/zeef.yaml`._
 
-## Audiobooks: Audiobookshelf and AudioBookRequest (2026-11-08, waiting for the merge)
+## Audiobooks: Audiobookshelf, AudioBookRequest and Chaptarr (2026-11-09, waiting for the merge)
 
-**Summary.** Audiobooks get the same pattern as films: requested in AudioBookRequest, grabbed
-through Prowlarr into qBittorrent, and played from Audiobookshelf (browser and phone app).
-qBittorrent saves them straight into `Audiobooks/` on the Multimedia share, because there's no
-import step (Readarr is retired, and its forks were still beta). The setup steps are in
-[DEPLOY.md](DEPLOY.md) part D; the decisions and the local tests are in gembernodes `NOTES.md`
-(2026-11-08). Gembernodes PR #143.
+**Summary.** Audiobooks get the same chain as series: requested in AudioBookRequest, found and
+imported by Chaptarr (indexers from Prowlarr, downloads through qBittorrent), and played from
+Audiobookshelf (browser and phone app). Cleanuparr's Malware Blocker checks Chaptarr's downloads
+against an audiobook whitelist of their own; the shared video blacklist would block `.mp3`.
+
+The first version (merged here in #235) let AudioBookRequest grab through Prowlarr straight into
+`Audiobooks/`. That left audiobooks outside Cleanuparr, which only reads the *arr queues, so
+Chaptarr was added (a Readarr fork; Readarr is retired). Setup steps:
+[DEPLOY.md](DEPLOY.md) part D. Decisions and local tests: gembernodes `NOTES.md` (2026-11-09).
+Gembernodes PR #143.
 
 | File (gembernodes) | What |
 |---|---|
-| `apps/zeef/audiobookshelf.yaml` | Audiobookshelf (SQLite on `local-path`, library read-only), Service `.234:13378` |
+| `apps/zeef/chaptarr.yaml` | Chaptarr on PostgreSQL (`chaptarr-main/-log/-cache`), `/config` on `local-path`, Service `.234:8789` |
 | `apps/zeef/audiobookrequest.yaml` | AudioBookRequest on PostgreSQL, Service `.234:8000` |
-| `infrastructure/pvcs/zeef.yaml` | Plus `audiobookshelf-config` (`local-path`) and `audiobookshelf-metadata` (`qnap-nfs`) |
-| `infrastructure/lan-proxy/Caddyfile`, `index.html` | `audiobookshelf.lan…` and `audiobookrequest.lan…`, and their links |
+| `apps/zeef/audiobookshelf.yaml` | Audiobookshelf (SQLite on `local-path`, library read-only), Service `.234:13378` |
+| `apps/zeef/cleanuparr.yaml` | Cleanuparr 2.11.0, plus ConfigMap `cleanuparr-blocklists` (the audiobook whitelist) |
+| `infrastructure/pvcs/zeef.yaml` | Plus `chaptarr-config` and `audiobookshelf-config` (`local-path`), `audiobookshelf-metadata` (`qnap-nfs`) |
+| `infrastructure/lan-proxy/Caddyfile`, `index.html` | `audiobookshelf.lan…`, `audiobookrequest.lan…`, `chaptarr.lan…`, and their links |
 
 ## Phase 1: Seerr for films and series (done 2026-11-06)
 
