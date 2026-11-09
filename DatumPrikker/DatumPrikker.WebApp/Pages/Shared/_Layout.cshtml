@@ -1,5 +1,11 @@
+@inject Admins Admins
+@inject DatumPrikker.application.Queries.CountPendingRequestsHandler PendingRequests
 @{
     var account = AccountClaims.From(User);
+    var isAdmin = Admins.Includes(account);
+
+    // Only admins cost a query (D17); everybody else gets 0 straight away.
+    var pending = isAdmin ? await PendingRequests.HandleAsync(new DatumPrikker.application.Queries.CountPendingRequests { By = account }) : 0;
 }
 <!DOCTYPE html>
 <html lang="nl">
@@ -19,6 +25,10 @@
             }
             else
             {
+                @if (isAdmin)
+                {
+                    <a class="knop knop-licht" href="/Beheer" title="@(pending == 1 ? "1 aanvraag wacht" : $"{pending} aanvragen wachten")">Beheer@(pending > 0 ? $" ({pending})" : string.Empty)</a>
+                }
                 <a class="knop knop-licht" href="/Afspraken">Mijn afspraken</a>
                 @* asp-page, not action=: only then does the form tag helper add the antiforgery token. *@
                 <form method="post" asp-page="/Afmelden" class="inline">

@@ -1,0 +1,152 @@
+@page
+@model BeheerModel
+@{
+    ViewData["Title"] = "Beheer";
+    var overview = Model.Overview;
+
+    async Task Knop(string handler, string accountId, string label, string klasse)
+    {
+        <form method="post" asp-page-handler="@handler" class="inline">
+            <input type="hidden" name="accountId" value="@accountId" />
+            <button type="submit" class="knop @klasse">@label</button>
+        </form>
+    }
+}
+
+<section class="kaart">
+    <h1>Beheer</h1>
+    <p class="zacht">Je bent beheerder als <code>@Model.Account.Id</code>.</p>
+    <partial name="_Fouten" model="ModelState" />
+</section>
+
+<section class="kaart">
+    <h2>Aanvragen (@overview.Requested.Count)</h2>
+    @if (overview.Requested.Count == 0)
+    {
+        <p class="zacht">Er wachten geen aanvragen.</p>
+    }
+    else
+    {
+        <ul class="lijst">
+            @foreach (var request in overview.Requested)
+            {
+                <li class="lijst-regel">
+                    <div>
+                        <strong>@request.Name</strong>
+                        <span class="zacht">@request.Email · @request.Provider · @Weergave.Moment(request.RequestedOn)</span>
+                        @if (request.Note.Length > 0)
+                        {
+                            <span class="opmerking blok">“@request.Note”</span>
+                        }
+                    </div>
+                    <div class="knoppen">
+                        @{ await Knop("Toestaan", request.Id, "Toestaan", string.Empty); }
+                        @{ await Knop("Afwijzen", request.Id, "Afwijzen", "knop-licht"); }
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<section class="kaart">
+    <h2>Toegang</h2>
+    <p class="zacht">Intrekken stopt alleen nieuwe prikkers; bestaande prikkers blijven werken.</p>
+    @if (overview.Approved.Count == 0)
+    {
+        <p class="zacht">Nog niemand heeft toegang (behalve beheerders).</p>
+    }
+    else
+    {
+        <ul class="lijst">
+            @foreach (var approved in overview.Approved)
+            {
+                <li class="lijst-regel">
+                    <div>
+                        <strong>@approved.Name</strong>
+                        <span class="zacht">@approved.Email · @approved.Provider · sinds @Weergave.Moment(approved.DecidedOn)@(approved.DecidedBy == Access.PreApproved ? " (vooraf goedgekeurd)" : string.Empty)</span>
+                    </div>
+                    <div class="knoppen">@{ await Knop("Intrekken", approved.Id, "Intrekken", "knop-licht"); }</div>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (overview.Refused.Count > 0)
+    {
+        <h3>Afgewezen of ingetrokken</h3>
+        <ul class="lijst">
+            @foreach (var refused in overview.Refused)
+            {
+                <li class="lijst-regel">
+                    <div>
+                        <strong>@refused.Name</strong>
+                        <span class="label label-dicht">@Weergave.Stand(refused.State)</span>
+                        <span class="zacht">@refused.Email · @refused.Provider · @Weergave.Moment(refused.DecidedOn)</span>
+                    </div>
+                    <div class="knoppen">@{ await Knop("Toestaan", refused.Id, "Toch toestaan", "knop-licht"); }</div>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<section class="kaart">
+    <h2>Vooraf goedgekeurd</h2>
+    <p class="zacht">Wie met een van deze adressen inlogt en toegang vraagt, krijgt die meteen.</p>
+    @if (overview.PreApprovals.Count > 0)
+    {
+        <ul class="lijst">
+            @foreach (var preApproval in overview.PreApprovals)
+            {
+                <li class="lijst-regel">
+                    <div>@preApproval.Id <span class="zacht">· toegevoegd @Weergave.Moment(preApproval.AddedOn)</span></div>
+                    <form method="post" asp-page-handler="VerwijderVooraf" class="inline">
+                        <input type="hidden" name="email" value="@preApproval.Id" />
+                        <button type="submit" class="knop knop-licht">Verwijderen</button>
+                    </form>
+                </li>
+            }
+        </ul>
+    }
+    <form method="post" asp-page-handler="Vooraf" class="rij-formulier">
+        <input asp-for="Email" type="email" required placeholder="naam@voorbeeld.nl" aria-label="E-mailadres om vooraf goed te keuren" />
+        <button type="submit" class="knop">Toevoegen</button>
+    </form>
+</section>
+
+<section class="kaart">
+    <h2>Alle prikkers (@Model.Polls.Count)</h2>
+    @if (Model.Polls.Count == 0)
+    {
+        <p class="zacht">Er zijn nog geen prikkers.</p>
+    }
+    else
+    {
+        <div class="tabel-scroll">
+            <table class="uitslag beheer-tabel">
+                <thead>
+                    <tr>
+                        <th scope="col">Prikker</th>
+                        <th scope="col">Maker</th>
+                        <th scope="col">Gemaakt</th>
+                        <th scope="col">Antwoorden</th>
+                        <th scope="col">Stand</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in Model.Polls)
+                    {
+                        <tr>
+                            <th scope="row"><a href="/p/@line.Poll.ShareToken/uitslag">@line.Poll.Title</a></th>
+                            <td>@line.Poll.OwnerName</td>
+                            <td>@Weergave.Datum(line.Poll.CreatedOn)</td>
+                            <td>@line.AnswerCount</td>
+                            <td>@(line.Poll.IsOpen ? "open" : "gesloten")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

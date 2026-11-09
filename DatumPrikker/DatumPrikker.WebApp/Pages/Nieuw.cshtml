@@ -14,6 +14,37 @@
     }
 }
 
+@if (!Model.Status.CanCreatePolls)
+{
+    var state = Model.Status.Access.State;
+    <section class="kaart smal">
+        <h1>Nieuwe prikker</h1>
+        <partial name="_Fouten" model="ModelState" />
+
+        @if (state == AccessState.Requested)
+        {
+            <p><strong>Je aanvraag is verstuurd.</strong> De beheerder bekijkt hem. Kom later terug om je prikker te maken.</p>
+        }
+        else if (state is AccessState.Declined or AccessState.Revoked)
+        {
+            <p>Je kunt (nu) geen prikkers maken. Antwoorden op prikkers van anderen kan natuurlijk wel.</p>
+        }
+        else
+        {
+            <p>Prikkers maken kan met toestemming van de beheerder, zodat niet zomaar iedereen dat doet. Vraag het hieronder aan. Antwoorden kan altijd, ook zonder toestemming.</p>
+            <form method="post" asp-page-handler="Aanvragen" class="formulier">
+                <label>Wie ben je? <span class="zacht">(optioneel, dan weet de beheerder wie het vraagt)</span>
+                    <textarea name="Note" rows="2" maxlength="@Access.MaxNoteLength" placeholder="Bijvoorbeeld: Bea, buurvrouw van nr. 12">@Model.Note</textarea>
+                </label>
+                <button type="submit" class="knop knop-groot">Toegang vragen</button>
+            </form>
+        }
+
+        <p class="zacht">Je account-id: <code>@Model.Status.Account.Id</code></p>
+    </section>
+}
+else
+{
 <section class="kaart">
     <h1>Nieuwe prikker</h1>
     <partial name="_Fouten" model="ModelState" />
@@ -47,3 +78,4 @@
         <button type="submit" class="knop knop-groot">Prikker maken</button>
     </form>
 </section>
+}

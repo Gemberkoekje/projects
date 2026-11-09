@@ -1,6 +1,6 @@
 namespace DatumPrikker.WebApp.Pages.P;
 
-/// <summary>A poll's results, the share link and the close button; owner only (D9).</summary>
+/// <summary>A poll's results, the share link and the close button; for the owner (D9) and admins (D18).</summary>
 public sealed class UitslagModel(GetResultsHandler results, ClosePollHandler close) : PageModel
 {
     private readonly GetResultsHandler results = results ?? throw new ArgumentNullException(nameof(results));
@@ -18,6 +18,9 @@ public sealed class UitslagModel(GetResultsHandler results, ClosePollHandler clo
 
     /// <summary>The link to share.</summary>
     public string ShareUrl => $"{Request.Scheme}://{Request.Host}/p/{Results.Poll.ShareToken}";
+
+    /// <summary>True for the owner; an admin looking at somebody else's poll gets no close button.</summary>
+    public bool IsOwner => Results.Poll.IsOwnedBy(AccountClaims.From(User));
 
     /// <summary>Shows the results.</summary>
     /// <param name="token">The code from the link.</param>

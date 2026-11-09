@@ -24,6 +24,11 @@ public interface IPollStore
     /// <returns>The polls, in no particular order.</returns>
     Task<IReadOnlyList<Poll>> ListOwnedByAsync(string accountId, CancellationToken cancellationToken = default);
 
+    /// <summary>Every poll, for the admin page (D18).</summary>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>The polls, in no particular order.</returns>
+    Task<IReadOnlyList<Poll>> ListAllAsync(CancellationToken cancellationToken = default);
+
     /// <summary>The polls with these ids; ids without a poll are skipped.</summary>
     /// <param name="ids">The poll ids.</param>
     /// <param name="cancellationToken">Cancels the load.</param>

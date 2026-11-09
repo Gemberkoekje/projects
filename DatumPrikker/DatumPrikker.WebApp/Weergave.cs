@@ -94,6 +94,24 @@ public static class Weergave
     public static string Moment(DateTime utc)
         => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Amsterdam).ToString("d MMMM 'om' HH:mm", Nl);
 
+    /// <summary>A day in Dutch local time, such as "9 nov 2026".</summary>
+    /// <param name="utc">The moment in UTC.</param>
+    /// <returns>The text.</returns>
+    public static string Datum(DateTime utc)
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Amsterdam).ToString("d MMM yyyy", Nl);
+
+    /// <summary>The word for a refused access state.</summary>
+    /// <param name="state">The state.</param>
+    /// <returns>"afgewezen", "ingetrokken", or the plain state otherwise.</returns>
+    public static string Stand(AccessState state) => state switch
+    {
+        AccessState.Requested => "aangevraagd",
+        AccessState.Approved => "toegestaan",
+        AccessState.Declined => "afgewezen",
+        AccessState.Revoked => "ingetrokken",
+        _ => "geen",
+    };
+
     /// <summary>How many dates got each choice, such as "2× ja, 1× misschien".</summary>
     /// <param name="answer">The answer.</param>
     /// <returns>The text, leaving out choices nobody picked.</returns>

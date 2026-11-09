@@ -9,6 +9,11 @@ internal static class Fixtures
 
     public static readonly Account Stranger = new Account { Id = "microsoft:222", Name = "Bea", Email = "bea@example.com" };
 
+    public static readonly Account Admin = new Account { Id = "google:999", Name = "Beheerder", Email = "beheer@example.com" };
+
+    /// <summary>Only <see cref="Admin"/> is an admin.</summary>
+    public static readonly Admins Admins = Admins.Parse(Admin.Id);
+
     public static DateOption WholeDay(int day) => new DateOption { Date = new DateOnly(2026, 12, day) };
 
     public static DateOption Evening(int day) => new DateOption

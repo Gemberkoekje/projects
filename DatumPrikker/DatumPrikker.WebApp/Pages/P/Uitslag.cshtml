@@ -20,6 +20,11 @@ else
         <div class="melding melding-goed" role="status"><strong>Je prikker staat klaar!</strong> Deel de link hieronder met iedereen die mag antwoorden.</div>
     }
 
+    @if (!Model.IsOwner)
+    {
+        <div class="melding" role="status">Je bekijkt deze prikker van @poll.OwnerName als beheerder. Sluiten kan alleen de maker.</div>
+    }
+
     <section class="kaart">
         <h1>@poll.Title</h1>
         <div class="deel">
@@ -99,7 +104,7 @@ else
         }
     </section>
 
-    @if (poll.IsOpen)
+    @if (poll.IsOpen && Model.IsOwner)
     {
         <form method="post" asp-page-handler="Sluiten" data-bevestig="Prikker sluiten? Daarna kan niemand meer antwoorden.">
             <button type="submit" class="knop knop-licht">Prikker sluiten</button>

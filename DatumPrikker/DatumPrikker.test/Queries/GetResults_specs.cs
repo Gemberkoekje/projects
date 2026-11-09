@@ -5,7 +5,16 @@ public sealed class GetResults_specs
     private readonly InMemoryPollStore polls = new InMemoryPollStore();
     private readonly InMemoryAnswerStore answers = new InMemoryAnswerStore();
 
-    private GetResultsHandler Handler => new GetResultsHandler(new GetPollHandler(polls), answers, NullLogger<GetResultsHandler>.Instance);
+    private GetResultsHandler Handler => new GetResultsHandler(new GetPollHandler(polls), answers, Fixtures.Admins, NullLogger<GetResultsHandler>.Instance);
+
+    [Test]
+    public async Task an_admin_may_look_at_anybodys_results()
+    {
+        var poll = Fixtures.Poll();
+        await polls.SaveAsync(poll);
+
+        (await Handler.HandleAsync(new GetResults { ShareToken = poll.ShareToken, By = Fixtures.Admin })).IsValid.Should().BeTrue();
+    }
 
     [Test]
     public async Task the_owner_gets_the_tally()

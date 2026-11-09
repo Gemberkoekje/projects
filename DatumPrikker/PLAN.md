@@ -12,8 +12,8 @@ only a name and an email address.
 | Slice | What | State |
 |---|---|---|
 | 1 | Restart: the poll flow in one app | merged (projects#240) |
-| 2 | Accounts: "Mijn afspraken", prefilled email, gentle login nudges | built, PR open |
-| 3 | Admin and access: only approved people make polls | planned |
+| 2 | Accounts: "Mijn afspraken", prefilled email, gentle login nudges | merged (projects#241) |
+| 3 | Admin and access: only approved people make polls | built, PR open |
 | 4 | On gembernodes | planned |
 | 5 | The look: bold and playful | planned |
 
