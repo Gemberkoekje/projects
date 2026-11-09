@@ -190,11 +190,13 @@ public sealed class TradeContextReader(
             now,
             cancellationToken);
         stale.ExceptWith(predicted.Keys);
+        var feedersFirst = await FeedersFirstAsync(now, cancellationToken);
         var map = new TradeMarketMap(reachWaypoints, reachMarkets, basics.Chains)
         {
             ConstructionMaterials = home.Length > 0 ? await MaterialsAsync(home, cancellationToken) : new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             ConstructionSystemSymbol = home,
-            ConstructionFirst = await FeedersFirstAsync(now, cancellationToken),
+            ConstructionFirst = feedersFirst,
+            FeedersHeldBack = GateCanBeBuilt(now) && !feedersFirst,
             StaleMarkets = stale,
             PredictionWeights = predicted,
             Gates = network is null
@@ -251,11 +253,14 @@ public sealed class TradeContextReader(
             }
         }
 
+        var at = TimeProvider.System.GetUtcNow();
+        var feedersFirst = await FeedersFirstAsync(at, cancellationToken);
         return new TradeContext(
             new TradeMarketMap(systemWaypoints, systemMarkets, basics.Chains)
             {
                 ConstructionMaterials = await MaterialsAsync(systemSymbol, cancellationToken),
-                ConstructionFirst = await FeedersFirstAsync(TimeProvider.System.GetUtcNow(), cancellationToken),
+                ConstructionFirst = feedersFirst,
+                FeedersHeldBack = GateCanBeBuilt(at) && !feedersFirst,
                 PredictionWeights = predicted,
             },
             basics.Credits,

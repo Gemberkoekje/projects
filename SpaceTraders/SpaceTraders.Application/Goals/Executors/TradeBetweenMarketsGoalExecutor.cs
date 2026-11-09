@@ -258,7 +258,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
         }
 
         var system = ship.SystemSymbol ?? string.Empty;
-        var context = await tradeContexts.ReadTradeAsync(system, ct);
+        var context = await TripContextAsync(tradeContexts.ReadTradeAsync(system, ct), trade);
         var sellsHere = context.Map.TryGetGood(trade.SellWaypointSymbol, trade.TradeSymbol, out var here) && here.SellPrice > 0;
 
         // D90: a trip that feeds the jump gate's material only has to sell its goods for what they cost.
@@ -298,7 +298,7 @@ public sealed class TradeBetweenMarketsGoalExecutor(
             left -= batch;
             current = current with { Earned = current.Earned + revenue };
             await goals.SetActiveGoalAsync(ship.Symbol, current, ct);
-            map = (await tradeContexts.ReadTradeAsync(system, ct)).Map;
+            map = (await TripContextAsync(tradeContexts.ReadTradeAsync(system, ct), trade)).Map;
         }
 
         if (left > 0)
@@ -448,9 +448,23 @@ public sealed class TradeBetweenMarketsGoalExecutor(
     /// the map of the systems within the trade reach, so that the haul through the gates counts.
     /// </summary>
     private Task<TradeContext> HaulContextAsync(string system, TradeBetweenMarketsGoal trade, CancellationToken ct)
-        => string.Equals(system, WaypointSymbols.SystemOf(trade.SellWaypointSymbol), StringComparison.OrdinalIgnoreCase)
-            ? tradeContexts.ReadTradeAsync(system, ct)
-            : tradeContexts.ReadReachAsync(system, ct);
+        => TripContextAsync(
+            string.Equals(system, WaypointSymbols.SystemOf(trade.SellWaypointSymbol), StringComparison.OrdinalIgnoreCase)
+                ? tradeContexts.ReadTradeAsync(system, ct)
+                : tradeContexts.ReadReachAsync(system, ct),
+            trade);
+
+    /// <summary>
+    /// D145: a trip that started feeding the jump gate's chain keeps those terms when the gate's forecast later holds such trips
+    /// back (<see cref="TradeMarketMap.FeedersHeldBack"/>): it still sells at cost, and isn't dropped or moved for being
+    /// unprofitable. Asked on 2026-11-09: "I'd like a trader to finish a trip once they started it, if the reason of changing
+    /// the trip is these changing priorities."
+    /// </summary>
+    private static async Task<TradeContext> TripContextAsync(Task<TradeContext> read, TradeBetweenMarketsGoal trade)
+    {
+        var context = await read;
+        return trade.FeedsGate ? context with { Map = context.Map.WithFeedersFirst() } : context;
+    }
 
     /// <summary>
     /// Gives up a trip no longer worth it at the buy market (D14, D79): its units no longer earn the minimum a unit after fuel,

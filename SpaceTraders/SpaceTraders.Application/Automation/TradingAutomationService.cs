@@ -929,6 +929,7 @@ public sealed class TradingAutomationService(
             ExpectedSeconds = WholeSeconds(route.Seconds),
             Jumps = route.Jumps,
             FeedsTradeSymbol = route.FeedsTradeSymbol,
+            FeedsGate = route.FeedsConstruction,
             ReservedCredits = route.CargoCost,
         };
 

@@ -1226,6 +1226,7 @@ public sealed class TradingAutomationServiceTests
 
         var goal = _activeGoals["SHIP-1"].Should().BeOfType<TradeBetweenMarketsGoal>().Subject;
         (goal.TradeSymbol, goal.SellWaypointSymbol).Should().Be(("EQUIPMENT", D41));
+        goal.FeedsGate.Should().BeTrue("D145: it keeps its feeder terms should the forecast later hold feeders back");
         _log.Journal.Should().ContainSingle(entry => entry.EventKind == "TradeStarted")
             .Which.Message.Should().Contain("which makes the jump gate's FAB_MATS from it (D89)");
     }
