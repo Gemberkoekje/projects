@@ -15,7 +15,9 @@ only a name and an email address.
 | 2 | Accounts: "Mijn afspraken", prefilled email, gentle login nudges | merged (projects#241) |
 | 3 | Admin and access: only approved people make polls | merged (projects#242) |
 | 4 | On gembernodes | live since 2026-11-09 (gembernodes#155, projects#243) |
-| 5 | The look: bold and playful | built, PR open |
+| 5 | The look: bold and playful | merged (projects#244); deploy gembernodes#156 |
+| 6 | Respondents see the most likely date (D21) | later |
+| 7 | Deadline and final pick (D22) | later |
 
 Each slice is one PR. Work stops after each one for review.
 
@@ -114,6 +116,13 @@ Each slice is one PR. Work stops after each one for review.
   easier to fill in. Calendar tiles stay only as decoration on the home page. The results follow the
   same idea: one row per date, ranked from best to least favourite. From now on, every
   front-end change starts with a mock that the user approves before it's built.
+- **D21 Respondents see the most likely date, not each other's answers** (decided 2026-11-09, slice
+  6, later). The answer page shows which date is leading. Individual answers (names, choices,
+  comments) stay owner-only, so D9 still holds for them.
+- **D22 A deadline, and a final pick that tells everyone** (decided 2026-11-09, slice 7, later).
+  - The owner can set an optional deadline; past it, the poll closes by itself.
+  - The owner can pick "this is the date". The poll page, the results and Mijn afspraken then show
+    it to every respondent.
 
 ## Slices
 
@@ -208,13 +217,39 @@ live yet, so there are no existing poll makers to approve after the fact.
 
 ### 5. The look: bold and playful
 
-- Bright accent colours, big rounded cards, and a calendar-style grid of date options. Tap a date
-  to cycle Ja → Misschien → Nee, colour-coded.
-- Results as a heat strip, with the leading date celebrated.
-- A small celebration on submitting an answer.
+As built (projects#244):
+- Calendar paper, chunky outlines, and a violet/coral/sun palette, with green, amber and coral for
+  Ja, Misschien and Nee.
+- The answer page keeps one row per date (D20).
+- The results have a winner card and a ranking from best to least favourite.
+- Confetti after answering or making a poll.
 - Mobile first, with light and dark themes.
+
+### 6. The most likely date for respondents (later)
+
+D21. It starts with a mock for your approval.
+- On the answer page, a "Zo te zien wordt het…" card showing the leading date or dates: most Ja,
+  then most Misschien (the same ranking as the results). No names and no comments.
+- Before anyone has said Ja, the card says it's still open.
+- Tests: what a respondent may see. They must never see who said what.
+
+### 7. Deadline and final pick (later)
+
+D22. It starts with a mock for your approval.
+- **Deadline:** an optional "Sluit op" date and time when making the poll. Past it, the poll stops
+  taking answers, using the same rule as closing by hand.
+- **Final pick:** on the results page, the owner picks "Dit wordt het" for one date. That closes the
+  poll and shows the chosen date to everyone on the poll page and in Mijn afspraken.
+- Tests: the deadline passing, the pick (owner only, a date of this poll), and what respondents
+  see after the pick.
 
 ## Open questions
 
-- Should respondents see each other's answers, as on Doodle? v1 and slice 1 say no (D9).
-- Do you want a deadline, and a "this is the date" pick that tells everyone?
+For slice 6:
+- Should respondents see the most likely date before they answer, or only after (so their answer
+  isn't swayed)?
+
+For slice 7:
+- Does "tells everyone" stay on the site (the poll page and Mijn afspraken), or should respondents
+  also get an email? Email needs an SMTP account in 1Password; the app sends no mail yet (D17).
+- Can the owner change the pick afterwards?
