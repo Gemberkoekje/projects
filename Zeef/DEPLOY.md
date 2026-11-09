@@ -383,115 +383,170 @@ piped from their pods, never printed. Only the login and the OpenSubtitles accou
 The free OpenSubtitles tier (about 20 downloads a day) is the bottleneck for a backlog; new
 episodes trickle in well below it. VIP, or a second provider with an API key (Subdl), would raise it.
 
-## Part D: Audiobooks, Audiobookshelf and AudioBookRequest (added 2026-11-08)
+## Part D: Audiobooks: Audiobookshelf, AudioBookRequest and Chaptarr (added 2026-11-08, Chaptarr 2026-11-09)
 
-AudioBookRequest (ABR) is the request page for audiobooks, like Seerr for films. It grabs through
-Prowlarr into qBittorrent, and Audiobookshelf (ABS) plays the books, like Jellyfin. ABR has no
-import step, so qBittorrent saves audiobooks straight into the library folder `Audiobooks/` and
-seeds them from there. Manifests: gembernodes `apps/zeef/audiobookshelf.yaml` and
-`apps/zeef/audiobookrequest.yaml` (PR #143); the why is in gembernodes `NOTES.md` (2026-11-08).
+The same chain as for series: **AudioBookRequest** (ABR, requests, like Seerr) → **Chaptarr** (search,
+grab, import, like Sonarr) → **qBittorrent** → `Audiobooks/<Author>/<Title>/` → **Audiobookshelf**
+(ABS, playback, like Jellyfin).
+- Prowlarr feeds Chaptarr its indexers.
+- Cleanuparr checks Chaptarr's downloads, with an audiobook list of its own.
+
+Manifests: gembernodes `apps/zeef/chaptarr.yaml`, `audiobookrequest.yaml`, `audiobookshelf.yaml` and
+`cleanuparr.yaml` (PR #143). The why and the local tests are in gembernodes `NOTES.md` (2026-11-09).
+
+**If you followed the first version of this part** (merged 2026-11-09, before Chaptarr): remove
+qBittorrent's `audiobooks` category and Prowlarr's own qBittorrent download client. Neither is used
+any more. Also turn Audiobookshelf's watcher back **on** (D6).
 
 ### D1. Before the merge
 
-- **Database**, in DBeaver on the shared PostgreSQL (`192.168.1.232`, user `postgres`), with
-  auto-commit on:
+- **Databases**, in DBeaver on the shared PostgreSQL (`192.168.1.232`, user `postgres`, database
+  `postgres`), with auto-commit on. Run it as a script (Alt+X):
 
   ```sql
-  CREATE ROLE audiobookrequest LOGIN PASSWORD '<password>';
+  -- AudioBookRequest. Hex password only: it goes into a connection URL as-is.
+  CREATE ROLE audiobookrequest LOGIN PASSWORD '<hex-password-1>';
   CREATE DATABASE audiobookrequest OWNER audiobookrequest;
   REVOKE CONNECT, TEMPORARY ON DATABASE audiobookrequest FROM PUBLIC;
+
+  -- Chaptarr: three databases, which it doesn't create itself.
+  CREATE ROLE chaptarr LOGIN PASSWORD '<hex-password-2>';
+  CREATE DATABASE "chaptarr-main" OWNER chaptarr;
+  CREATE DATABASE "chaptarr-log" OWNER chaptarr;
+  CREATE DATABASE "chaptarr-cache" OWNER chaptarr;
+  REVOKE CONNECT, TEMPORARY ON DATABASE "chaptarr-main", "chaptarr-log", "chaptarr-cache" FROM PUBLIC;
   ```
 
-  Make the password with `openssl rand -hex 24`. **Hex only:** ABR puts it into a connection URL
-  as-is, so an `@`, `:` or `/` would break it.
-- **1Password:** add the field `AUDIOBOOKREQUEST__POSTGRES__PASSWORD` (exact label) to `zeef-stack`,
-  with the same password. Without it the ABR pod stays in `CreateContainerConfigError`.
+  Leave out the first block if `audiobookrequest` already exists. Make each password with
+  `openssl rand -hex 24`, or in DBeaver with
+  `SELECT replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');`.
+- **1Password**, item `zeef-stack`, exact labels:
+  - `AUDIOBOOKREQUEST__POSTGRES__PASSWORD`: password 1;
+  - `CHAPTARR__POSTGRES__PASSWORD`: password 2;
+  - `CHAPTARR__AUTH__APIKEY`: `openssl rand -hex 16`.
 
-ABS needs neither.
+  A missing field keeps that pod in `CreateContainerConfigError`.
 
 ### D2. The library folder
 
-Made by qBittorrent's user, so qBittorrent can write in it (ABS only reads it):
+Made by qBittorrent's user, so Chaptarr (same user) can write in it and ABS can read it:
 
 ```bash
 kubectl -n zeef exec deploy/qbittorrent -- s6-setuidgid abc sh -c 'mkdir -p /data/Audiobooks && chmod 775 /data/Audiobooks'
 ```
 
-### D3. qBittorrent: the category (`https://qbittorrent.lan.gemberkoekje.nl`)
+### D3. Chaptarr, first visit (`https://chaptarr.lan.gemberkoekje.nl`)
 
-**Before the first grab:** in the side panel, right-click Categories → Add category, with name
-`audiobooks` and save path `/data/Audiobooks`. If a grab arrives first, qBittorrent creates the
-category itself with its default path (`/data/@Downloads/complete/audiobooks`), and ABS won't see
-the book. Then edit the category's save path.
+- **Login:** the "Authentication Required" screen. Choose **Forms** and create the user
+  (1Password), as in Sonarr.
+- **Settings → Media Management:**
+  - **Add Root Folder:** path `/data/Audiobooks`, type Audiobook, Audiobook Quality Profile
+    "Audiobook", Audiobook Metadata Profile "Audiobook Default", and use it as the default
+    audiobook root folder.
+  - "Use Hardlinks instead of Copy" on (the default).
+  - **Recycling Bin** `/data/@Downloads/recycle/chaptarr/`, cleanup 7 days, as for Sonarr.
+- **Settings → Metadata:** leave "Tag Audio Files with Metadata" **off** (the default). Imports are
+  hardlinks of the files qBittorrent is seeding, and writing tags would change those too.
+- **Settings → Download Clients → qBittorrent:**
+  - host `qbittorrent.zeef.svc.cluster.local`, port `8080`;
+  - user `admin` plus the password (`QBITTORRENT__PASSWORD`);
+  - Audiobook Category `chaptarr` (the default);
+  - **Remove Completed** and **Remove Failed** on.
+- **Settings → Connect → AudioBookShelf** (after D6, which makes the API key):
+  - host `audiobookshelf.zeef.svc.cluster.local`, port `13378`, API key "chaptarr" from D6;
+  - triggers On Release Import, On Upgrade, On Rename and On Book File Delete;
+  - in the library mapping, map root folder `/data/Audiobooks` to library "Luisterboeken" (folder
+    `/media/Audiobooks`). Chaptarr translates the paths, so the different mount points are fine.
 
-The seeding limits from B3 apply: after ratio 1.0 or 7 days the torrent stops, and the book stays.
-Nothing removes stopped audiobook torrents (Sonarr/Radarr only remove their own). To delete a book,
-remove its torrent in qBittorrent with "Also remove the content files".
+### D4. Prowlarr: Chaptarr as a "Readarr" app (`https://prowlarr.lan.gemberkoekje.nl`)
 
-### D4. Prowlarr: a download client of its own (`https://prowlarr.lan.gemberkoekje.nl`)
+Prowlarr has no Chaptarr app type. Chaptarr speaks Readarr's API, so it's added as Readarr.
 
-**Settings → Download Clients → + → qBittorrent:**
+**Settings → Apps → + → Readarr:**
+- name "Chaptarr", sync level **Full Sync**;
+- Prowlarr server `http://prowlarr.zeef.svc.cluster.local:9696`;
+- Readarr server `http://chaptarr.zeef.svc.cluster.local:8789`;
+- API key `CHAPTARR__AUTH__APIKEY`;
+- sync categories as given (Audio/Audiobook 3030 and the Books ones).
 
-- host `qbittorrent.zeef.svc.cluster.local`, port `8080`;
-- user `admin` plus the password (`QBITTORRENT__PASSWORD`);
-- **Default Category `audiobooks`** (Prowlarr's default is `prowlarr`).
+Test, Save. The indexers then appear in Chaptarr with "(Prowlarr)" after the name.
 
-This client is used only for grabs made through Prowlarr itself: ABR, or the download button on
-Prowlarr's own search page. Sonarr and Radarr keep their own clients and categories. Anything
-grabbed by hand on Prowlarr's search page also lands in `Audiobooks/`. If that ever matters,
-Mapped Categories on this client can send only Audio/Audiobook (3030) there.
+### D5. Cleanuparr (`https://cleanuparr.lan.gemberkoekje.nl`, 2.11.0 after the merge)
 
-### D5. Audiobookshelf, first visit (`https://audiobookshelf.lan.gemberkoekje.nl`)
+- **Media Managers → Chaptarr:** `http://chaptarr.zeef.svc.cluster.local:8789`, key
+  `CHAPTARR__AUTH__APIKEY`. Test.
+- **Malware Blocker → Chaptarr:** Enable Blocklist, type **Whitelist**, path
+  `/blocklists/audiobooks.txt`.
+  - **Not** the shared blacklist that Sonarr and Radarr use. That one blocks `*.mp3`, `*.m4a`,
+    `*.flac`, covers and `.cue`, so it would throw away most audiobooks.
+  - The whitelist comes with the manifest (ConfigMap `cleanuparr-blocklists`). It holds audio,
+    cover and companion-file extensions; any other file (`.exe`, `.lnk`, archives, scripts) is
+    skipped.
+  - A release with nothing on the list is removed and blocklisted in Chaptarr, which then
+    searches again.
+  - To add an extension, edit that ConfigMap in gembernodes. Cleanuparr picks the change up
+    within about 5 minutes.
+- **Queue Cleaner:** nothing to change. It covers every Media Manager.
+
+### D6. Audiobookshelf, first visit (`https://audiobookshelf.lan.gemberkoekje.nl`)
 
 - **Root user:** the first visit asks for one. Store it in 1Password.
 - **Settings:**
-  - Switch **off** "Automatically watch libraries for changes". File watching doesn't see changes
-    on NFS made by another pod (as with Jellyfin's real-time monitoring); the scheduled scan below
-    does the job.
+  - Leave "Automatically watch libraries for changes" **on** (the default). Chaptarr reports each
+    import through this watcher. With it off, ABS answers but drops the update (tested on
+    2026-11-09).
   - Leave "Store covers with item" and "Store metadata with item" off (the defaults). The folder
     is read-only, and the files have to stay as they are for seeding.
 - **Libraries → Add:**
   - name "Luisterboeken", media type Books;
   - folder `/media/Audiobooks` (the share is mounted read-only at `/media`);
   - metadata provider Audible (`.com` or `.co.uk`);
-  - tab **Schedule:** "Schedule Automatic Library Scans" on, for example hourly.
+  - tab **Schedule:** "Schedule Automatic Library Scans" on, daily, as a fallback.
 - **Settings → Backups:** "Automatic backups" on, daily, "Number of backups to keep" 7. They land
   in `/metadata/backups`, on the QNAP.
-- **Settings → API Keys:** a new key "audiobookrequest" for the root user, for D6. Keep it in
-  1Password too.
+- **Settings → API Keys:** two keys for the root user, "chaptarr" (D3) and "audiobookrequest" (D7),
+  so each can be revoked on its own. Keep them in 1Password.
 - **Settings → Users:** an account for each listener.
 
-### D6. AudioBookRequest, first visit (`https://audiobookrequest.lan.gemberkoekje.nl`)
+### D7. AudioBookRequest, first visit (`https://audiobookrequest.lan.gemberkoekje.nl`)
 
 - **First admin:** the first visit goes to `/init`. Login type **Forms**, with a username and
   password (1Password).
-- **Settings → Prowlarr** (the page is called "Prowlarr / Chaptarr"):
-  - URL `http://prowlarr.zeef.svc.cluster.local:9696`;
-  - API key `PROWLARR__AUTH__APIKEY` from `zeef-stack`;
-  - category Audio/Audiobook (3030).
+- **Settings → Prowlarr / Chaptarr:**
+  - download backend **Chaptarr**;
+  - Chaptarr URL `http://chaptarr.zeef.svc.cluster.local:8789`, API key `CHAPTARR__AUTH__APIKEY`.
+    It should show as connected.
+  - The Prowlarr fields stay empty. With Chaptarr as the backend, ABR doesn't download through
+    Prowlarr itself.
 - **Settings → Audiobookshelf:**
-  - URL `http://audiobookshelf.zeef.svc.cluster.local:13378`, the API key from D5;
+  - URL `http://audiobookshelf.zeef.svc.cluster.local:13378`, API key "audiobookrequest" from D6;
   - library "Luisterboeken", and "Use ABS to mark existing books as downloaded" on.
-  - The connection test should list one library and start a scan.
-- **Settings → Download:** download backend Prowlarr (the default), and Auto Download on. Requests
-  from "trusted" users and admins are then grabbed at once; others wait for an admin.
+- **Settings → Download:** Auto Download on. Requests from "trusted" users and admins then go to
+  Chaptarr at once; others wait for an admin.
 - **Users:** an account for each person. Group "trusted" for those whose requests may download
   without approval.
 
-### D7. Listening
+### D8. Listening
 
 - **Phone:** the Audiobookshelf app (Android, iOS), server address
   `https://audiobookshelf.lan.gemberkoekje.nl`. It works at home and over Tailscale, and can keep
   books on the phone for offline listening.
 - **Browser:** the same address.
 
-### D8. Checks
+### D9. Checks
 
-- [ ] ABR runs on PostgreSQL: tables in `audiobookrequest`, and no `db.sqlite`.
-- [ ] A test request: Prowlarr sends it to qBittorrent with category `audiobooks`, and the finished
-      files appear in `/data/Audiobooks/<release name>/`.
-- [ ] ABS shows the book after the next scheduled scan, or after Scan by hand.
+- [ ] Chaptarr runs on PostgreSQL: tables in `chaptarr-main`. `/config` holds only `config.xml`,
+      logs, covers and `staging.db`.
+- [ ] ABR runs on PostgreSQL: tables in `audiobookrequest`.
+- [ ] Prowlarr's indexers appear in Chaptarr as "(Prowlarr)".
+- [ ] A test request in ABR appears in Chaptarr (author and book, monitored) and gets searched.
+- [ ] The grab is in qBittorrent with category `chaptarr`. Cleanuparr's log shows the Malware
+      Blocker checked it, with no files skipped for an ordinary book.
+- [ ] The finished book is in `/data/Audiobooks/<Author>/<Title>/` as a hardlink (`stat` shows 2
+      links).
+- [ ] ABS shows it within a minute or so (Chaptarr's push), without waiting for the daily scan.
 - [ ] ABR shows the request as in the library.
 - [ ] The phone app plays it, and progress matches in the browser.
-- [ ] After ratio 1.0 or 7 days the torrent stops, and the book stays in ABS.
+- [ ] After ratio 1.0 or 7 days, Chaptarr removes the torrent and its staging copy, and the book
+      stays.
 - [ ] The first ABS backup appears in `/metadata/backups`.
