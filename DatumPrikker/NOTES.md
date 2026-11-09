@@ -28,7 +28,7 @@ _To understand this, start with [PLAN.md](PLAN.md) (slices and decisions), then 
     who-said-what table, and a close button.
   - `/Fout` covers 404, 429 and exceptions.
 - **CI:** `.github/workflows/datumprikker-build-and-push.yml` builds and tests PRs, and pushes the
-  image to GHCR on main. It was planned for slice 3 but is cheap now.
+  image to GHCR on main. It was planned for the cluster slice (now 4) but is cheap now.
 - **Tests:** 51, all over in-memory stores. They cover the domain rules, last write wins (keeping
   `CreatedOn`), owner-only results and closing, malformed tokens, which providers get offered,
   account claims, parsing date rows, and a System.Text.Json round trip of the documents.
@@ -73,8 +73,9 @@ Every step below went as expected:
 
 - Slice 2: "Mijn afspraken" and claimed answers (D4). The answer page's nudge is a single line for
   now. Returning respondents don't see their earlier answer yet: an anonymous form starts empty.
-- Slice 3: the cluster. The image already builds, and `/healthz` exists for the probes.
-- Slice 4: the look. The CSS is deliberately plain.
+- Slice 3: admin and access (only approved people make polls).
+- Slice 4: the cluster. The image already builds, and `/healthz` exists for the probes.
+- Slice 5: the look. The CSS is deliberately plain.
 
 ### File map
 

@@ -1,4 +1,4 @@
-# Local development and a stand-alone run. Production runs on the gembernodes k3s cluster (slice 3),
+# Local development and a stand-alone run. Production runs on the gembernodes k3s cluster (slice 4),
 # against the cluster's shared PostgreSQL; this file is for your own machine.
 #
 #   docker compose up -d postgres     # just the database, then `dotnet run` the WebApp
