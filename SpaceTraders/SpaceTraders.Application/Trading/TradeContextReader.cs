@@ -45,13 +45,6 @@ public sealed record TradeContext
     public long CreditsForCargo => Math.Max(0, Credits - FuelReserveCredits);
 
     /// <summary>
-    /// What the jump gate's next load costs, once the gate can be built and the construction plan says it would buy one
-    /// (PLAN.md slice 6.50, D137): a new trade trip leaves it ("no new trade trip may hold back credits the next load needs");
-    /// a trip already on its way to buy keeps what it holds. 0 unless set.
-    /// </summary>
-    public long GateLoadCredits { get; init; }
-
-    /// <summary>
     /// Whether the jump gate's next load waits only for one of our ships, once the gate can be built, as the construction plan
     /// last said it (PLAN.md slice 6.52, D140, <see cref="PurchaseNeed.WaitsForShip"/>): the trading plan may then buy a light
     /// hauler for it. False unless set.
@@ -218,7 +211,6 @@ public sealed class TradeContextReader(
 
         return new TradeContext(map, basics.Credits, basics.MinProfitPerUnit, basics.FuelReserve)
         {
-            GateLoadCredits = GateLoadCredits(now),
             GateLoadWaitsForShip = GateLoadWaitsForShip(now),
         };
     }
@@ -314,18 +306,6 @@ public sealed class TradeContextReader(
     /// rank and pay as any other (<see cref="TradeMarketMap.ConstructionFirst"/>).
     /// </summary>
     private bool GateCanBeBuilt(DateTimeOffset now) => !purchaseNeeds.OpenBefore(PurchaseTier.Construction, now);
-
-    /// <summary>
-    /// D137: what the gate's next load costs, as the construction plan last said it (its need at the gate's place in the order),
-    /// once the gate can be built; 0 otherwise.
-    /// </summary>
-    private long GateLoadCredits(DateTimeOffset now)
-        => GateCanBeBuilt(now)
-            && purchaseNeeds.Reported().TryGetValue(AutomationPlan.Construction, out var reported)
-            && reported.Need.Tier == PurchaseTier.Construction
-            && purchaseNeeds.Counts(reported.At, now)
-                ? Math.Max(0, reported.Need.Price)
-                : 0;
 
     /// <summary>
     /// D140: whether the gate's next load waits only for one of our ships, as the construction plan last said it, once the gate

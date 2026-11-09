@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-09, slice 6.54)
+- B85: a new trade trip no longer leaves what the gate's next load costs (D137's second half, undone): cargo leaves only
+  `Trade.FuelReserveCredits` and what trips on their way to buy hold back (D24, D57). From 2026-11-08 18:30Z no trade trip
+  started for 14 hours, as the next load cost more than the credits. Asked: "trade should only leave a handful of credits
+  to pay for fuel".
+
 ### Code – Changed (2026-11-08, slice 6.53)
 - Drones that never move (D142, `Drones.Parked`, true): every mining and siphon drone parks at an asteroid or gas giant a
   market's goods come from and hands what it gathers to the light shuttle designated there; the shuttle sells each good
