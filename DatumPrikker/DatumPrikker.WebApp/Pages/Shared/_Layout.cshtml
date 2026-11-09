@@ -1,0 +1,36 @@
+@{
+    var account = AccountClaims.From(User);
+}
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>@(ViewData["Title"] is string title ? $"{title} · DatumPrikker" : "DatumPrikker")</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="kop">
+        <a class="merk" href="/">DatumPrikker</a>
+        <nav class="kop-nav">
+            @if (account.IsAnonymous)
+            {
+                <a class="knop knop-licht" href="/Aanmelden?ReturnUrl=@Uri.EscapeDataString(Context.Request.Path + Context.Request.QueryString)">Inloggen</a>
+            }
+            else
+            {
+                <a class="knop" href="/Nieuw">Nieuwe prikker</a>
+                @* asp-page, not action=: only then does the form tag helper add the antiforgery token. *@
+                <form method="post" asp-page="/Afmelden" class="inline">
+                    <button type="submit" class="knop knop-licht" title="Ingelogd als @account.Name">Uitloggen</button>
+                </form>
+            }
+        </nav>
+    </header>
+    <main class="inhoud">
+        @RenderBody()
+    </main>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

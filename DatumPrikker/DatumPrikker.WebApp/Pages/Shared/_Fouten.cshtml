@@ -1,0 +1,15 @@
+@model Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary
+@{
+    var fouten = Model.Values.SelectMany(entry => entry.Errors).Select(error => error.ErrorMessage).Distinct().ToArray();
+}
+@if (fouten.Length > 0)
+{
+    <div class="melding melding-fout" role="alert">
+        <ul>
+            @foreach (var fout in fouten)
+            {
+                <li>@fout</li>
+            }
+        </ul>
+    </div>
+}

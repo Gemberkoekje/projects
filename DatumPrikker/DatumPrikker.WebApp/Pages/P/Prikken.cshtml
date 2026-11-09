@@ -1,0 +1,77 @@
+@page "/p/{token}"
+@model DatumPrikker.WebApp.Pages.P.PrikkenModel
+@{
+    ViewData["Title"] = Model.Poll.Title;
+}
+
+<section class="kaart">
+    <p class="zacht">@Model.Poll.OwnerName wil een datum prikken</p>
+    <h1>@Model.Poll.Title</h1>
+    @if (Model.Poll.Location.Length > 0)
+    {
+        <p><strong>Waar:</strong> @Model.Poll.Location</p>
+    }
+    @if (Model.Poll.Description.Length > 0)
+    {
+        <p class="toelichting">@Model.Poll.Description</p>
+    }
+</section>
+
+@if (Model.Bedankt)
+{
+    <div class="melding melding-goed" role="status">
+        <strong>Dank je!</strong> Je antwoord is opgeslagen. Wil je het later wijzigen? Vul het formulier opnieuw in met hetzelfde e-mailadres.
+    </div>
+}
+
+@if (!Model.Poll.IsOpen)
+{
+    <div class="melding">Deze prikker is gesloten en neemt geen antwoorden meer aan.</div>
+}
+else
+{
+    @if (Model.Account.IsAnonymous)
+    {
+        <p class="duwtje">Heb je een account? <a href="@Model.LoginUrl">Log in</a>, dan vullen we je naam en e-mailadres alvast in.</p>
+    }
+
+    <form method="post" class="kaart formulier">
+        <partial name="_Fouten" model="ModelState" />
+
+        <fieldset class="keuzes">
+            <legend>Wanneer kun je?</legend>
+            @foreach (var option in Model.Poll.Options)
+            {
+                var gekozen = Model.Chosen(option.Id);
+                <div class="keuze-rij">
+                    <div class="keuze-datum">
+                        <strong>@Weergave.Dag(option)</strong>
+                        <span class="zacht">@Weergave.Tijd(option)</span>
+                    </div>
+                    <div class="keuze-knoppen" role="radiogroup" aria-label="@Weergave.DagLang(option), @Weergave.Tijd(option)">
+                        @foreach (var keuze in Weergave.Keuzes)
+                        {
+                            <label class="keuze keuze-@Weergave.Klasse(keuze)">
+                                <input type="radio" name="Input.Choices[@option.Id]" value="@keuze" checked="@(gekozen == keuze)" />
+                                <span>@Weergave.Woord(keuze)</span>
+                            </label>
+                        }
+                    </div>
+                </div>
+            }
+        </fieldset>
+
+        <label>Je naam
+            <input asp-for="Input.Name" autocomplete="name" maxlength="@Answer.MaxNameLength" required />
+        </label>
+        <label>Je e-mailadres
+            <input asp-for="Input.Email" type="email" autocomplete="email" required readonly="@(Model.Account.Email.Length > 0)" />
+        </label>
+        <p class="zacht">Alleen de maker ziet je e-mailadres. Met hetzelfde adres kun je je antwoord later wijzigen.</p>
+        <label>Opmerking <span class="zacht">(optioneel)</span>
+            <textarea asp-for="Input.Comment" rows="2" maxlength="@Answer.MaxCommentLength"></textarea>
+        </label>
+
+        <button type="submit" class="knop knop-groot">Antwoord versturen</button>
+    </form>
+}

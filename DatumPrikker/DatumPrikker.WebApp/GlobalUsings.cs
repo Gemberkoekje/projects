@@ -1,0 +1,17 @@
+global using DatumPrikker.application.Commands;
+global using DatumPrikker.application.Ports;
+global using DatumPrikker.application.Queries;
+global using DatumPrikker.core.Enums;
+global using DatumPrikker.core.Models;
+global using DatumPrikker.WebApp.Auth;
+global using Microsoft.AspNetCore.Authorization;
+global using Microsoft.AspNetCore.Http;
+global using Microsoft.AspNetCore.Mvc;
+global using Microsoft.AspNetCore.Mvc.RazorPages;
+global using Qowaiv;
+global using Qowaiv.Validation.Abstractions;
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading;
+global using System.Threading.Tasks;

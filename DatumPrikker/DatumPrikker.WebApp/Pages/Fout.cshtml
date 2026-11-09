@@ -1,0 +1,11 @@
+@page
+@model FoutModel
+@{
+    ViewData["Title"] = Model.Titel;
+}
+
+<section class="kaart smal">
+    <h1>@Model.Titel</h1>
+    <p>@Model.Uitleg</p>
+    <p><a class="knop" href="/">Naar de voorpagina</a></p>
+</section>
