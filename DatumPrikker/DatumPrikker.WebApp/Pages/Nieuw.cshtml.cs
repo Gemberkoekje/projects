@@ -8,7 +8,7 @@ namespace DatumPrikker.WebApp.Pages;
 /// Makes a new poll. Signing in is required (the fallback policy sends strangers to /Aanmelden), and
 /// so is the admin's approval (D14): without it, the page offers "Toegang vragen" instead of the form.
 /// </summary>
-public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler access, RequestAccessHandler request) : PageModel
+public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler access, RequestAccessHandler request, GetMakerNameHandler makerName) : PageModel
 {
     /// <summary>How many empty date rows a fresh form has.</summary>
     public const int StartRows = 3;
@@ -16,6 +16,7 @@ public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler acces
     private readonly CreatePollHandler handler = handler ?? throw new ArgumentNullException(nameof(handler));
     private readonly GetAccessHandler access = access ?? throw new ArgumentNullException(nameof(access));
     private readonly RequestAccessHandler request = request ?? throw new ArgumentNullException(nameof(request));
+    private readonly GetMakerNameHandler makerName = makerName ?? throw new ArgumentNullException(nameof(makerName));
 
     /// <summary>What the maker filled in.</summary>
     [BindProperty]
@@ -34,8 +35,13 @@ public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler acces
     /// <returns>A task that completes once loaded.</returns>
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        Status = await access.HandleAsync(new GetAccess { Account = AccountClaims.From(User) }, cancellationToken);
-        Input = new PollInput { Options = [.. Enumerable.Range(0, StartRows).Select(_ => new OptionInput())] };
+        var account = AccountClaims.From(User);
+        Status = await access.HandleAsync(new GetAccess { Account = account }, cancellationToken);
+        Input = new PollInput
+        {
+            OwnerName = await makerName.HandleAsync(new GetMakerName { Account = account }, cancellationToken),
+            Options = [.. Enumerable.Range(0, StartRows).Select(_ => new OptionInput())],
+        };
     }
 
     /// <summary>Asks the admin for access.</summary>
@@ -92,6 +98,7 @@ public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler acces
         var draft = new PollDraft
         {
             Title = Input.Title,
+            OwnerName = Input.OwnerName,
             Description = Input.Description,
             Location = Input.Location,
             Options = options,
@@ -129,6 +136,10 @@ public sealed class PollInput
     /// <summary>The title.</summary>
     [DisplayFormat(ConvertEmptyStringToNull = false)]
     public string Title { get; set; } = string.Empty;
+
+    /// <summary>The maker's name as respondents see it ("… wil een datum prikken").</summary>
+    [DisplayFormat(ConvertEmptyStringToNull = false)]
+    public string OwnerName { get; set; } = string.Empty;
 
     /// <summary>Optional details.</summary>
     [DisplayFormat(ConvertEmptyStringToNull = false)]

@@ -388,3 +388,19 @@ Live since about 20:50Z. All of these checked out:
 - Deploying this look needs a gembernodes PR that bumps the image to the merge commit of this PR.
 - The open questions in PLAN.md (respondents seeing each other's answers; a deadline and a final
   pick).
+
+## After slice 5: the maker's name (2026-11-09)
+
+The user's Google name showed on their polls as `Gember "Gemberkoekje" Koekje wil een datum prikken`.
+Now the maker chooses the name respondents see.
+
+- **Nieuwe prikker has a "Jouw naam" field** (`PollDraft.OwnerName`, at most 80 characters). Left
+  empty, the account's name stands in.
+- **The field suggests the name on your latest poll** (`GetMakerNameHandler`), so a name changed
+  once sticks. With no polls yet, it suggests the sign-in provider's name.
+- Polls made before this keep the name they were made with; nothing edits an existing poll's name.
+- Tests: 108 (5 new: the typed name, the fallback, the limit, and the suggestion).
+- Checked by hand: logged in as `Gember "Gemberkoekje" Koekje`, made a poll as "Gember".
+  Respondents see "Gember wil een datum prikken", and the next new poll suggests "Gember".
+- PLAN.md isn't touched here, because projects#245 (the later slices) changes it too. This is a
+  small addition, not a numbered slice.

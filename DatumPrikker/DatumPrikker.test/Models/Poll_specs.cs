@@ -15,6 +15,45 @@ public sealed class Poll_specs
     }
 
     [Test]
+    public void the_maker_chooses_the_name_respondents_see()
+    {
+        var poll = Poll.Create(Fixtures.Draft() with { OwnerName = "  Arie  " }, Fixtures.Owner with { Name = "Gember \"Gemberkoekje\" Koekje" }, "k7Gm2xQa", Fixtures.Now);
+
+        poll.Value.OwnerName.Should().Be("Arie");
+    }
+
+    [TestCase("")]
+    [TestCase("   ")]
+    public void without_a_name_the_accounts_name_stands_in(string typed)
+    {
+        Poll.Create(Fixtures.Draft() with { OwnerName = typed }, Fixtures.Owner, "k7Gm2xQa", Fixtures.Now)
+            .Value.OwnerName.Should().Be(Fixtures.Owner.Name);
+    }
+
+    [Test]
+    public void the_makers_name_has_a_limit()
+    {
+        Poll.Create(Fixtures.Draft() with { OwnerName = new string('x', Poll.MaxOwnerNameLength + 1) }, Fixtures.Owner, "k7Gm2xQa", Fixtures.Now)
+            .Errors().Should().Contain($"Je naam mag hooguit {Poll.MaxOwnerNameLength} tekens lang zijn.");
+    }
+
+    [Test]
+    public async Task the_name_field_suggests_the_name_on_the_latest_poll()
+    {
+        var polls = new InMemoryPollStore();
+        var handler = new GetMakerNameHandler(polls);
+        var gember = Fixtures.Owner with { Name = "Gember \"Gemberkoekje\" Koekje" };
+
+        (await handler.HandleAsync(new GetMakerName { Account = gember })).Should().Be(gember.Name, "no polls yet: the provider's name");
+
+        await polls.SaveAsync(Poll.Create(Fixtures.Draft() with { OwnerName = "Gember" }, gember, "k7Gm2xQa", Fixtures.Now.AddDays(-2)).Value);
+        await polls.SaveAsync(Poll.Create(Fixtures.Draft() with { OwnerName = "Arie" }, gember, "k7Gm2xQb", Fixtures.Now).Value);
+
+        (await handler.HandleAsync(new GetMakerName { Account = gember })).Should().Be("Arie");
+        (await handler.HandleAsync(new GetMakerName { Account = Account.Anonymous })).Should().BeEmpty();
+    }
+
+    [Test]
     public void nobody_anonymous_can_make_a_poll()
     {
         Poll.Create(Fixtures.Draft(), Account.Anonymous, "k7Gm2xQa", Fixtures.Now)

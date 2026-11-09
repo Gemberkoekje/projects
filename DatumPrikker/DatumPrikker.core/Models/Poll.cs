@@ -15,6 +15,9 @@ public sealed record Poll
     /// <summary>The longest description.</summary>
     public const int MaxDescriptionLength = 2000;
 
+    /// <summary>The longest maker's name.</summary>
+    public const int MaxOwnerNameLength = 80;
+
     /// <summary>The document id.</summary>
     public Guid Id { get; init; }
 
@@ -74,6 +77,13 @@ public sealed record Poll
         var location = draft.Location.Trim();
         var description = draft.Description.Trim();
 
+        // The maker chooses how respondents see them; left empty, the account's name stands in.
+        var ownerName = draft.OwnerName.Trim();
+        if (ownerName.Length == 0)
+        {
+            ownerName = owner.Name.Trim();
+        }
+
         if (owner.IsAnonymous)
         {
             errors.Add(ValidationMessage.Error("Log in om een prikker te maken.", nameof(owner)));
@@ -86,6 +96,11 @@ public sealed record Poll
         else if (title.Length > MaxTitleLength)
         {
             errors.Add(ValidationMessage.Error($"De titel mag hooguit {MaxTitleLength} tekens lang zijn.", nameof(draft.Title)));
+        }
+
+        if (ownerName.Length > MaxOwnerNameLength)
+        {
+            errors.Add(ValidationMessage.Error($"Je naam mag hooguit {MaxOwnerNameLength} tekens lang zijn.", nameof(draft.OwnerName)));
         }
 
         if (location.Length > MaxLocationLength)
@@ -113,7 +128,7 @@ public sealed record Poll
             Description = description,
             Location = location,
             OwnerAccountId = owner.Id,
-            OwnerName = owner.Name,
+            OwnerName = ownerName,
             Options = [.. draft.Options
                 .OrderBy(option => option.Date)
                 .ThenBy(option => option.HasTime)
