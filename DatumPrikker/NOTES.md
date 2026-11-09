@@ -377,6 +377,9 @@ Live since about 20:50Z. All of these checked out:
 - **White text on the bright choice colours fails contrast.** The tokens `--op-ja`, `--op-misschien`
   and `--op-nee` give white text in light mode (on a deeper green and coral) and dark text in dark
   mode.
+- **Razor reads `Beheer@if (…)` as an email address** and prints it literally, so text glued to an
+  `@` needs a line break or a tag in between. The user spotted it in the admin header; it was
+  fixed before merging.
 - **`MapStaticAssets` fingerprints `site.js`/`site.css` at build time.** After changing them,
   rebuild before checking the page.
 

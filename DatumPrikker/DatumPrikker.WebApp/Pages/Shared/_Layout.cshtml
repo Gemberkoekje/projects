@@ -41,7 +41,14 @@
             {
                 @if (isAdmin)
                 {
-                    <a class="knop knop-licht" href="/Beheer" title="@(pending == 1 ? "1 aanvraag wacht" : $"{pending} aanvragen wachten")">Beheer@if (pending > 0) {<span class="teller" aria-label="@pending wachtend">@pending</span>}</a>
+                    @* "Beheer@if" would read as an email address and print literally, so the code gets its own line. *@
+                    <a class="knop knop-licht" href="/Beheer" title="@(pending == 1 ? "1 aanvraag wacht" : $"{pending} aanvragen wachten")">
+                        Beheer
+                        @if (pending > 0)
+                        {
+                            <span class="teller" aria-label="@pending wachtend">@pending</span>
+                        }
+                    </a>
                 }
                 <a class="knop knop-licht" href="/Afspraken">Mijn afspraken</a>
                 @* asp-page, not action=: only then does the form tag helper add the antiforgery token. *@
