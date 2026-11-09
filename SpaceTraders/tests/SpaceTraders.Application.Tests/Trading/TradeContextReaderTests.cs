@@ -33,6 +33,7 @@ public sealed class TradeContextReaderTests
     private readonly MarketHistoryCache _history = new();
     private readonly PurchaseNeeds _purchaseNeeds = new();
     private readonly IMarketTradeRepository _trades = Substitute.For<IMarketTradeRepository>();
+    private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
 
     public TradeContextReaderTests()
     {
@@ -307,9 +308,29 @@ public sealed class TradeContextReaderTests
     private static MarketSnapshot Snapshot(string waypoint, string system, params TradeGoodSnapshot[] goods)
         => new(waypoint, system, goods, [], [], []);
 
+    [Theory]
+    [InlineData("", true)]
+    [InlineData(GateForecast.Supply, true)]
+    [InlineData(GateForecast.Money, false)]
+    [InlineData(GateForecast.Haul, false)]
+    [InlineData(GateForecast.Done, false)]
+    public async Task TheGatesChainGoesFirst_OnlyWhileTheForecastSaysSupplyFinishesItLast(string binding, bool first)
+    {
+        // D144, asked on 2026-11-09: "prioritize feeder trips only when supply binds". On 2026-11-09 two of the four cargo ships
+        // spent two hours on feeder trips of -700 to +700 credits while money set the finish: money 14.65 hours, supply 10.23.
+        // Before the first forecast (no binding yet) the chain goes first, as before.
+        ConstructionPlanOn(true);
+        _purchaseNeeds.Report(AutomationPlan.Construction, new PurchaseNeed(PurchaseTier.Construction, "FAB_MATS", "X1-FJ91-A1", 80_000), DateTimeOffset.UtcNow);
+        _plans.GetAsync<ConstructionPlanState>(PlanTypes.Construction, Arg.Any<CancellationToken>())
+            .Returns(new ConstructionPlanState { Sites = [], UpdatedAt = DateTimeOffset.UtcNow, Forecast = new GateForecastState { Binding = binding } });
+
+        (await Reader().ReadAsync(System, CancellationToken.None)).Map.ConstructionFirst.Should().Be(first);
+        (await Reader().ReadReachAsync(System, CancellationToken.None)).Map.ConstructionFirst.Should().Be(first);
+    }
+
     private void ConstructionPlanOn(bool on)
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), Arg.Any<CancellationToken>()).Returns(on);
 
     private TradeContextReader Reader()
-        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()), _purchaseNeeds);
+        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()), _purchaseNeeds, _plans);
 }
