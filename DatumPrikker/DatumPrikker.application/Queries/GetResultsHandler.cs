@@ -1,13 +1,14 @@
 namespace DatumPrikker.application.Queries;
 
-/// <summary>Tallies a poll for its owner; anybody else gets a refusal.</summary>
-public sealed class GetResultsHandler(GetPollHandler polls, IAnswerStore answers, ILogger<GetResultsHandler> logger)
+/// <summary>Tallies a poll for its owner or an admin (D18); anybody else gets a refusal.</summary>
+public sealed class GetResultsHandler(GetPollHandler polls, IAnswerStore answers, Admins admins, ILogger<GetResultsHandler> logger)
 {
     /// <summary>The refusal for anybody but the owner.</summary>
     public const string OwnerOnly = "Alleen de maker van deze prikker ziet de uitslag.";
 
     private readonly GetPollHandler polls = polls ?? throw new ArgumentNullException(nameof(polls));
     private readonly IAnswerStore answers = answers ?? throw new ArgumentNullException(nameof(answers));
+    private readonly Admins admins = admins ?? throw new ArgumentNullException(nameof(admins));
     private readonly ILogger<GetResultsHandler> logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>Handles the query.</summary>
@@ -29,7 +30,7 @@ public sealed class GetResultsHandler(GetPollHandler polls, IAnswerStore answers
             return Result.WithMessages<PollResults>(poll.Messages);
         }
 
-        if (!poll.Value.IsOwnedBy(query.By))
+        if (!poll.Value.IsOwnedBy(query.By) && !admins.Includes(query.By))
         {
             logger.LogWarning("Account {AccountId} asked for the results of poll {PollId}, which it did not make.", query.By.Id, poll.Value.Id);
             return Result.WithMessages<PollResults>(ValidationMessage.Error(OwnerOnly, nameof(query.By)));

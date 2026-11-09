@@ -1,11 +1,19 @@
 namespace DatumPrikker.application.Commands;
 
-/// <summary>Makes a poll with a share token no other poll uses.</summary>
-public sealed class CreatePollHandler(IPollStore polls, ILogger<CreatePollHandler> logger)
+/// <summary>
+/// Makes a poll with a share token no other poll uses, for admins and approved accounts only (D14).
+/// The gate lives here, not only on the page, so posting the form directly can't get round it.
+/// </summary>
+public sealed class CreatePollHandler(IPollStore polls, IAccessStore access, Admins admins, ILogger<CreatePollHandler> logger)
 {
+    /// <summary>The refusal for a signed-in account without approval.</summary>
+    public const string NoAccess = "Je hebt (nog) geen toestemming om prikkers te maken.";
+
     private const int TokenAttempts = 5;
 
     private readonly IPollStore polls = polls ?? throw new ArgumentNullException(nameof(polls));
+    private readonly IAccessStore access = access ?? throw new ArgumentNullException(nameof(access));
+    private readonly Admins admins = admins ?? throw new ArgumentNullException(nameof(admins));
     private readonly ILogger<CreatePollHandler> logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>Handles the command.</summary>
@@ -21,6 +29,17 @@ public sealed class CreatePollHandler(IPollStore polls, ILogger<CreatePollHandle
 
     private async Task<Result<Poll>> CreateAsync(CreatePoll command, CancellationToken cancellationToken)
     {
+        // Anonymous makers are refused by Poll.Create itself, with its own message.
+        if (!command.Owner.IsAnonymous && !admins.Includes(command.Owner))
+        {
+            var granted = await access.LoadAsync(command.Owner.Id, cancellationToken);
+            if (!granted.IsValid || !granted.Value.IsApproved)
+            {
+                logger.LogWarning("Account {AccountId} tried to make a poll without approval.", command.Owner.Id);
+                return Result.WithMessages<Poll>(ValidationMessage.Error(NoAccess, nameof(command.Owner)));
+            }
+        }
+
         var token = await FreeShareTokenAsync(cancellationToken);
         var poll = Poll.Create(command.Draft, command.Owner, token, Clock.UtcNow());
         if (!poll.IsValid)

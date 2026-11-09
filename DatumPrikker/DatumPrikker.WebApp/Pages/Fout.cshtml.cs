@@ -15,6 +15,7 @@ public sealed class FoutModel : PageModel
     /// <summary>The heading.</summary>
     public string Titel => Code switch
     {
+        StatusCodes.Status403Forbidden => "Geen toegang",
         StatusCodes.Status404NotFound => "Niet gevonden",
         StatusCodes.Status429TooManyRequests => "Even rustig aan",
         _ => "Er ging iets mis",
@@ -23,6 +24,7 @@ public sealed class FoutModel : PageModel
     /// <summary>The explanation.</summary>
     public string Uitleg => Code switch
     {
+        StatusCodes.Status403Forbidden => "Deze pagina is alleen voor de beheerder.",
         StatusCodes.Status404NotFound => "Deze pagina of prikker bestaat niet (meer). Controleer de link die je kreeg.",
         StatusCodes.Status429TooManyRequests => "Er kwamen vanaf jouw adres veel antwoorden achter elkaar binnen. Probeer het over een paar minuten opnieuw.",
         _ => "Probeer het zo nog eens. Blijft het misgaan, laat het de maker van de prikker weten.",

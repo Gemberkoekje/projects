@@ -24,6 +24,9 @@ internal sealed class InMemoryPollStore : IPollStore
     public Task<IReadOnlyList<Poll>> LoadManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<Poll>>([.. polls.Values.Where(x => ids.Contains(x.Id))]);
 
+    public Task<IReadOnlyList<Poll>> ListAllAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Poll>>([.. polls.Values]);
+
     public Task<Result> SaveAsync(Poll poll, CancellationToken cancellationToken = default)
     {
         polls[poll.Id] = poll;

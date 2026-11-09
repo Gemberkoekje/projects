@@ -46,6 +46,8 @@ services:
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:-}
       Authentication__Microsoft__ClientId: ${MICROSOFT_CLIENT_ID:-}
       Authentication__Microsoft__ClientSecret: ${MICROSOFT_CLIENT_SECRET:-}
+      # Admin account ids such as google:1234 (comma-separated); empty means nobody can approve anyone.
+      Admin__Accounts: ${ADMIN_ACCOUNTS:-}
 
 volumes:
   postgres_data:

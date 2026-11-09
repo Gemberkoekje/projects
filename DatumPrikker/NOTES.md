@@ -167,3 +167,94 @@ Every step below went as expected:
 - `DatumPrikker.WebApp/Auth/RespondentMemory.cs` (D19).
 - `DatumPrikker.WebApp/Pages/`: `Afspraken`, `Shared/_Afspraken`, a reworked `Index` and `P/Prikken`.
 - `DatumPrikker.WebApp/Weergave.cs`: `Bereik`, `Moment`, `Samenvatting`.
+
+## Slice 3: admin and access (2026-11-09)
+
+### What was done
+
+- **Domain:**
+  - `Access`, one per account, id = account id. `Access.Request` asks; a pre-approved request comes
+    out approved at once. `Access.Decide` follows the D14 transitions: approve from any state,
+    decline only a waiting request, revoke only an approval.
+  - `PreApproval`, one per normalised email (D15).
+  - `Admins`, parsed from `Admin:Accounts` (D16), with `Includes` and `Require`.
+  - The enums `AccessState` and `AccessDecision`.
+- **Application:**
+  - **Commands:** `RequestAccess`, `DecideAccess`, and `PreApprove`/`RemovePreApproval`, both handled
+    by `PreApprovalHandler`.
+    - Asking twice keeps one request. After a decline or a revoke, asking again is refused.
+    - Every admin-only handler checks `Admins` itself, whatever the page shows.
+  - **Queries:** `GetAccess`, `ListAccess`, `ListAllPolls` and `CountPendingRequests` (which answers
+    0 for non-admins without asking the store).
+  - **The gate** is in `CreatePollHandler`: a signed-in account that's neither admin nor approved
+    gets `NoAccess`. An anonymous maker still gets Poll.Create's own "Log in…" message.
+  - `GetResultsHandler` lets admins in (D18).
+- **Infrastructure:** `MartenAccessStore` (index on `State`) and `MartenPreApprovalStore`;
+  `MartenPollStore.ListAllAsync`.
+- **Web:**
+  - **Nieuwe prikker** shows the form only when you're allowed to make polls. Otherwise it shows a
+    "Toegang vragen" form with the "Wie ben je?" note, "Je aanvraag is verstuurd" while you wait,
+    or "Je kunt (nu) geen prikkers maken" after a decline or revoke. Each of those also shows
+    "Je account-id: …".
+  - **`/Beheer`** sits behind the `Beheerder` policy. It has requests (Toestaan/Afwijzen), access
+    (Intrekken, and "Toch toestaan" for refused accounts), pre-approved addresses (add/remove), and
+    every poll with a link to its results.
+  - **The header** shows "Beheer (n)" to admins.
+  - **The results page,** for an admin looking at someone else's poll, says "Je bekijkt deze
+    prikker van … als beheerder" and has no close button.
+  - **A denied page** (403) now shows "Geen toegang".
+- **Config:** `Admin:Accounts` is empty in `appsettings.json` and `dev:arie@example.com` in
+  `appsettings.Development.json`. Compose and `.env.example` gained `ADMIN_ACCOUNTS`.
+- **Tests:** 98 (29 new):
+  - `Access_specs`: the D14 transitions, both allowed and refused, plus parsing the admin list;
+  - `AccessFlow_specs`: asking twice, pre-approval, no asking after a decline, admin-only commands
+    and lists, the gate through every state, revoking keeping existing polls, the badge count and
+    the status;
+  - admins opening results.
+
+### Checked by hand (local Postgres, browser)
+
+Every step below went as expected:
+
+1. Bea (not an admin) opened Nieuwe prikker: the request form and her account id, with no poll
+   form.
+2. A crafted POST of the poll form, sent straight to `/Nieuw` with a valid antiforgery token, was
+   refused with "geen toestemming".
+3. She asked, with a note: "Je aanvraag is verstuurd".
+4. She opened `/Beheer`: "Geen toegang".
+5. Arie (admin in Development) saw "Beheer (1)" and Bea's request with its note. He approved her,
+   and the badge went away. He pre-approved `Dirk@Example.com`, which was stored as
+   `dirk@example.com`.
+6. Dirk asked and got the poll form straight away.
+7. Bea made a poll. Arie revoked her; she shows under "Afgewezen of ingetrokken".
+8. Bea's poll still took an anonymous answer.
+9. Bea's Nieuwe prikker said "Je kunt (nu) geen prikkers maken", with no ask button.
+10. Arie opened Bea's results from the poll list: the admin note, and no close button.
+11. 404 pages still work.
+
+### Gotchas
+
+- **`CookieAuthenticationOptions.AccessDeniedPath` is a `PathString`.** `"/Fout?code=403"` became
+  `/Fout%3Fcode=403` and a 404. Fixed with a route value: `@page "{code:int?}"` on Fout, and
+  `AccessDeniedPath = "/Fout/403"`. Status-code re-execution still passes `?code=`.
+- **A Razor local function that contains a tag helper** (`<form asp-page-handler>`) must be
+  `async Task` and called with `await` (MVC1006).
+- The layout injects `Admins` and `CountPendingRequestsHandler`. Only admins cost a query per page.
+
+### Left for later slices
+
+- Slice 4: the cluster. The 1Password item needs `Admin__Accounts` with your real account id. Log
+  in once on the live site, open Nieuwe prikker, and copy the id shown there.
+- Slice 5: the look. The admin page is plain.
+
+### File map (new or changed)
+
+- `DatumPrikker.core/Models/`: `Access`, `PreApproval`, `Admins`. `Enums/`: `AccessState`, `AccessDecision`.
+- `DatumPrikker.application/Ports/`: `IAccessStore`, `IPreApprovalStore`, and `IPollStore.ListAllAsync`.
+- `DatumPrikker.application/Commands/`: `RequestAccess`, `DecideAccess`, `PreApprove`, `RemovePreApproval`,
+  their handlers, and the gate in `CreatePollHandler`.
+- `DatumPrikker.application/Queries/`: `GetAccess`, `ListAccess`, `ListAllPolls`, `CountPendingRequests`.
+- `DatumPrikker.application/ReadModels/`: `AccessStatus`, `AccessOverview`, `PollOverview`.
+- `DatumPrikker.infrastructure/Adapters/`: `MartenAccessStore`, `MartenPreApprovalStore`.
+- `DatumPrikker.WebApp/`: `Pages/Beheer`, a reworked `Pages/Nieuw`, `Auth/Policies.cs`, the layout badge,
+  the Uitslag admin note, and `Fout` with 403.

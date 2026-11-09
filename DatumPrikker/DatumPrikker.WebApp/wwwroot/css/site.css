@@ -211,6 +211,23 @@ legend { font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem; }
 .label-open { background: var(--ja); }
 .label-dicht { color: var(--zacht); }
 
+.lijst { list-style: none; margin: 0 0 1rem; padding: 0; }
+.lijst-regel {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--rand);
+}
+.lijst-regel:last-child { border-bottom: 0; }
+.knoppen { display: flex; gap: 0.4rem; }
+.rij-formulier { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.rij-formulier input { flex: 1; min-width: 12rem; }
+.beheer-tabel td, .beheer-tabel th { text-align: left; }
+code { font-size: 0.9em; }
+
 @media (max-width: 520px) {
     .optie-rij { grid-template-columns: 1fr 1fr; }
     .optie-rij label:first-child { grid-column: 1 / -1; }

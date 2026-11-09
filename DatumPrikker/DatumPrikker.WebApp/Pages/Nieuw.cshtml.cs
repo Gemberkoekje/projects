@@ -4,22 +4,58 @@ using System.Globalization;
 
 namespace DatumPrikker.WebApp.Pages;
 
-/// <summary>Makes a new poll; signing in is required (the fallback policy sends strangers to /Aanmelden).</summary>
-public sealed class NieuwModel(CreatePollHandler handler) : PageModel
+/// <summary>
+/// Makes a new poll. Signing in is required (the fallback policy sends strangers to /Aanmelden), and
+/// so is the admin's approval (D14): without it, the page offers "Toegang vragen" instead of the form.
+/// </summary>
+public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler access, RequestAccessHandler request) : PageModel
 {
     /// <summary>How many empty date rows a fresh form has.</summary>
     public const int StartRows = 3;
 
     private readonly CreatePollHandler handler = handler ?? throw new ArgumentNullException(nameof(handler));
+    private readonly GetAccessHandler access = access ?? throw new ArgumentNullException(nameof(access));
+    private readonly RequestAccessHandler request = request ?? throw new ArgumentNullException(nameof(request));
 
     /// <summary>What the maker filled in.</summary>
     [BindProperty]
     public PollInput Input { get; set; } = new PollInput();
 
-    /// <summary>Shows an empty form.</summary>
-    public void OnGet()
+    /// <summary>The note with an access request.</summary>
+    [BindProperty]
+    [DisplayFormat(ConvertEmptyStringToNull = false)]
+    public string Note { get; set; } = string.Empty;
+
+    /// <summary>Where the signed-in account stands on making polls.</summary>
+    public AccessStatus Status { get; private set; } = new AccessStatus();
+
+    /// <summary>Shows the form, or where the account stands.</summary>
+    /// <param name="cancellationToken">Cancels the load.</param>
+    /// <returns>A task that completes once loaded.</returns>
+    public async Task OnGetAsync(CancellationToken cancellationToken)
     {
+        Status = await access.HandleAsync(new GetAccess { Account = AccountClaims.From(User) }, cancellationToken);
         Input = new PollInput { Options = [.. Enumerable.Range(0, StartRows).Select(_ => new OptionInput())] };
+    }
+
+    /// <summary>Asks the admin for access.</summary>
+    /// <param name="cancellationToken">Cancels the work.</param>
+    /// <returns>This page again, showing the new state.</returns>
+    public async Task<IActionResult> OnPostAanvragenAsync(CancellationToken cancellationToken)
+    {
+        var asked = await request.HandleAsync(new RequestAccess { By = AccountClaims.From(User), Note = Note }, cancellationToken);
+        if (!asked.IsValid)
+        {
+            foreach (var message in asked.Messages)
+            {
+                ModelState.AddModelError(string.Empty, message.Message ?? string.Empty);
+            }
+
+            Status = await access.HandleAsync(new GetAccess { Account = AccountClaims.From(User) }, cancellationToken);
+            return Page();
+        }
+
+        return RedirectToPage();
     }
 
     /// <summary>Makes the poll.</summary>
@@ -27,6 +63,8 @@ public sealed class NieuwModel(CreatePollHandler handler) : PageModel
     /// <returns>The results page of the new poll, or the form with what is wrong.</returns>
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
+        Status = await access.HandleAsync(new GetAccess { Account = AccountClaims.From(User) }, cancellationToken);
+
         var options = new List<DateOption>();
         for (var row = 0; row < Input.Options.Count; row++)
         {

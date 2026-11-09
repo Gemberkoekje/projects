@@ -4,10 +4,13 @@ public sealed class CreateAndClosePoll_specs
 {
     private readonly InMemoryPollStore polls = new InMemoryPollStore();
 
+    // The owner is an admin here, so the access gate (specced in Access_specs) stays out of the way.
+    private CreatePollHandler Create => new CreatePollHandler(polls, new InMemoryAccessStore(), Admins.Parse(Fixtures.Owner.Id), NullLogger<CreatePollHandler>.Instance);
+
     [Test]
     public async Task a_made_poll_is_stored_with_a_well_formed_token()
     {
-        var handler = new CreatePollHandler(polls, NullLogger<CreatePollHandler>.Instance);
+        var handler = Create;
 
         var created = await handler.HandleAsync(new CreatePoll { Draft = Fixtures.Draft(), Owner = Fixtures.Owner });
 
@@ -19,7 +22,7 @@ public sealed class CreateAndClosePoll_specs
     [Test]
     public async Task an_invalid_draft_stores_nothing()
     {
-        var handler = new CreatePollHandler(polls, NullLogger<CreatePollHandler>.Instance);
+        var handler = Create;
 
         var created = await handler.HandleAsync(new CreatePoll { Draft = Fixtures.Draft() with { Title = string.Empty }, Owner = Fixtures.Owner });
 

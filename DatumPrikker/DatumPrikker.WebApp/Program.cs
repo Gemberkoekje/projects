@@ -37,7 +37,12 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("Connection string 'Postgres' is not set.");
 }
 
-// Marten as a document store only (D2): polls, answers and the data-protection keys.
+// The admins, by account id (D16). Empty is allowed: then nobody can approve anybody, and the
+// Nieuwe prikker page shows your account id so you can add yourself.
+var admins = Admins.Parse(builder.Configuration["Admin:Accounts"] ?? string.Empty);
+builder.Services.AddSingleton(admins);
+
+// Marten as a document store only (D2): polls, answers, access, pre-approvals and the data-protection keys.
 builder.Services.AddMarten(options =>
 {
     options.Connection(connectionString);
@@ -48,6 +53,8 @@ builder.Services.AddMarten(options =>
 
     options.Schema.For<Poll>().Identity(x => x.Id).UniqueIndex(x => x.ShareToken).Index(x => x.OwnerAccountId);
     options.Schema.For<Answer>().Identity(x => x.Id).Index(x => x.PollId).Index(x => x.Email);
+    options.Schema.For<Access>().Identity(x => x.Id).Index(x => x.State);
+    options.Schema.For<PreApproval>().Identity(x => x.Id);
     options.Schema.For<DataProtectionKey>().Identity(x => x.Id);
 });
 
@@ -64,7 +71,8 @@ var authentication = builder.Services.AddAuthentication(CookieAuthenticationDefa
     {
         options.LoginPath = "/Aanmelden";
         options.LogoutPath = "/Afmelden";
-        options.AccessDeniedPath = "/Aanmelden";
+        // A route value, not "?code=403": the path is a PathString and its "?" would be escaped.
+        options.AccessDeniedPath = "/Fout/403";
         options.Cookie.Name = "datumprikker";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
@@ -106,8 +114,10 @@ foreach (var provider in LoginProviders.Configured(builder.Configuration))
 }
 
 // Every page is closed unless it says [AllowAnonymous]: answering is open, making is not.
+// The admin page has its own policy over Admin:Accounts; its handlers check again regardless.
 builder.Services.AddAuthorizationBuilder()
-    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+    .AddPolicy(Policies.Admin, policy => policy.RequireAssertion(context => admins.Includes(AccountClaims.From(context.User))));
 
 // Anonymous answering is the one thing a stranger can repeat at will (D11).
 builder.Services.AddRateLimiter(options =>
@@ -128,17 +138,28 @@ builder.Services.AddScoped<MartenPollStore>();
 builder.Services.AddScoped<IPollStore>(sp => sp.GetRequiredService<MartenPollStore>());
 builder.Services.AddScoped<MartenAnswerStore>();
 builder.Services.AddScoped<IAnswerStore>(sp => sp.GetRequiredService<MartenAnswerStore>());
+builder.Services.AddScoped<MartenAccessStore>();
+builder.Services.AddScoped<IAccessStore>(sp => sp.GetRequiredService<MartenAccessStore>());
+builder.Services.AddScoped<MartenPreApprovalStore>();
+builder.Services.AddScoped<IPreApprovalStore>(sp => sp.GetRequiredService<MartenPreApprovalStore>());
 
 // Command handlers.
 builder.Services.AddScoped<CreatePollHandler>();
 builder.Services.AddScoped<GiveAnswerHandler>();
 builder.Services.AddScoped<ClosePollHandler>();
+builder.Services.AddScoped<RequestAccessHandler>();
+builder.Services.AddScoped<DecideAccessHandler>();
+builder.Services.AddScoped<PreApprovalHandler>();
 
 // Query handlers.
 builder.Services.AddScoped<GetPollHandler>();
 builder.Services.AddScoped<GetResultsHandler>();
 builder.Services.AddScoped<GetAnswerHandler>();
 builder.Services.AddScoped<ListAppointmentsHandler>();
+builder.Services.AddScoped<GetAccessHandler>();
+builder.Services.AddScoped<ListAccessHandler>();
+builder.Services.AddScoped<ListAllPollsHandler>();
+builder.Services.AddScoped<CountPendingRequestsHandler>();
 
 // Stateless over the data-protection provider.
 builder.Services.AddSingleton<RespondentMemory>();
