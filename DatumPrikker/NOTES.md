@@ -258,3 +258,52 @@ Every step below went as expected:
 - `DatumPrikker.infrastructure/Adapters/`: `MartenAccessStore`, `MartenPreApprovalStore`.
 - `DatumPrikker.WebApp/`: `Pages/Beheer`, a reworked `Pages/Nieuw`, `Auth/Policies.cs`, the layout badge,
   the Uitslag admin note, and `Fout` with 403.
+
+## Slice 4: on gembernodes (2026-11-09)
+
+### What was done
+
+- **gembernodes PR** (branch `claude/datumprikker-deploy`), a copy of Kluskat's and
+  CharacterCreator's setup:
+  - `namespaces/datumprikker-namespace.yaml` (pod security `baseline`);
+  - `ingress/datumprikker-ingress.yaml` (`nginx-public`, letsencrypt-prod,
+    `datumprikker.gemberkoekje.nl`);
+  - `apps/datumprikker/`: `deployment.yaml`, `service.yaml`, `datumprikker-secrets.yaml`
+    (OnePasswordItem), `kustomization.yaml`, `create-database.sql` and `README.md` (the runbook);
+  - the three kustomization entries.
+- **The deployment** runs one pod (`Recreate`), non-root with all capabilities dropped, probed on
+  `/healthz`, at 25m/128Mi requests and 500m/384Mi limits. The image is
+  `ghcr.io/gemberkoekje/datumprikker:a14f0cac…` (the merge of #242).
+  - Only `ConnectionStrings__Postgres` is a required secret key.
+  - `Admin__Accounts` and the four OAuth keys are `optional: true`. The pod starts without them,
+    which the admin bootstrap needs: your account id only exists after a first login.
+- **This repo:** `DEPLOY.md` (your steps, the production configuration, updating), and the plan's
+  status row. No code changed: forwarded headers, the key ring in Postgres and `/healthz` were
+  already there from slice 1.
+
+### Checked
+
+- `kubectl kustomize` renders `apps/datumprikker`, `apps`, `ingress` and `namespaces`.
+- `scripts/validate.py` needs `kubeconform`, which isn't installed here, so gembernodes CI runs it
+  on the PR.
+- `datumprikker.gemberkoekje.nl` already resolves to the public ingress's address (the same as
+  kluskat's), so no DNS record is needed.
+- Kluskat calls `FindSystemTimeZoneById("Europe/Amsterdam")` on the same aspnet base image in
+  production, so `Weergave.Moment` will find the zone in the container.
+- **Not checked:** the app on the cluster itself, because that waits on your steps (database,
+  1Password item, OAuth apps).
+
+### Gotchas
+
+- **The 1Password operator syncs every 10 minutes and doesn't restart pods.** After changing a
+  field (adding `Admin__Accounts`, a provider, a renewed Microsoft secret), wait for
+  `Updating kubernetes secret 'datumprikker-secrets'` in its log, then run
+  `kubectl -n datumprikker rollout restart deployment datumprikker`.
+- **The first push makes a new GHCR package,** private and linked to this repo. gembernodes'
+  "Images exist" check then only warns that it can't see the image. The cluster pulls with the
+  `ghcr-login` secret, which can.
+- **A Microsoft client secret expires** (24 months at most); Microsoft sign-in stops when it does.
+
+### Left for later slices
+
+- Slice 5: the look.

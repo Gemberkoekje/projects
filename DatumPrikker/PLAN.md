@@ -13,8 +13,8 @@ only a name and an email address.
 |---|---|---|
 | 1 | Restart: the poll flow in one app | merged (projects#240) |
 | 2 | Accounts: "Mijn afspraken", prefilled email, gentle login nudges | merged (projects#241) |
-| 3 | Admin and access: only approved people make polls | built, PR open |
-| 4 | On gembernodes | planned |
+| 3 | Admin and access: only approved people make polls | merged (projects#242) |
+| 4 | On gembernodes | manifests ready (gembernodes PR); your steps in DEPLOY.md |
 | 5 | The look: bold and playful | planned |
 
 Each slice is one PR. Work stops after each one for review.
