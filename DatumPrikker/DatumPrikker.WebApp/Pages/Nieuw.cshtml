@@ -53,6 +53,9 @@ else
         <label>Waar gaat het over?
             <input asp-for="Input.Title" maxlength="@Poll.MaxTitleLength" required placeholder="Etentje met de buren" />
         </label>
+        <label>Jouw naam <span class="zacht">(zo zien anderen je: "… wil een datum prikken")</span>
+            <input asp-for="Input.OwnerName" maxlength="@Poll.MaxOwnerNameLength" autocomplete="name" placeholder="Bijvoorbeeld: Arie" />
+        </label>
         <label>Waar? <span class="zacht">(optioneel)</span>
             <input asp-for="Input.Location" maxlength="@Poll.MaxLocationLength" />
         </label>

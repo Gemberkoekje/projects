@@ -6,6 +6,9 @@ public sealed record PollDraft
     /// <summary>The title.</summary>
     public string Title { get; init; } = string.Empty;
 
+    /// <summary>The maker's name as respondents will see it; empty means the account's name.</summary>
+    public string OwnerName { get; init; } = string.Empty;
+
     /// <summary>Optional details.</summary>
     public string Description { get; init; } = string.Empty;
 
