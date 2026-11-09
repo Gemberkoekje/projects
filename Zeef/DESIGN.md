@@ -16,6 +16,8 @@ Status (2026-11-06):
 - **Phase 1 is done:** Seerr for films and series, Maintainerr, and every UI on
   `https://<app>.lan.gemberkoekje.nl` (gembernodes PRs #122–#128).
 - **Phase 2**, the Zeef app for software & games, is next.
+- **Audiobooks** (added 2026-11-08): Audiobookshelf plus AudioBookRequest, next to the stack.
+  Setup in [DEPLOY.md](DEPLOY.md) part D.
 
 See [NOTES.md](NOTES.md) and [DEPLOY.md](DEPLOY.md).
 
@@ -26,6 +28,7 @@ See [NOTES.md](NOTES.md) and [DEPLOY.md](DEPLOY.md).
 | A **film** | Radarr, through Zeef's search box | `Movies/Title (Year)/Title (Year).mkv` |
 | A **series**, now and future episodes | Sonarr, through Zeef ("Volgen") | `TV Shows/Show (Year)/Season 01/Show (Year) - S01E01.mkv` |
 | **Software or a game** | Zeef's own pipeline | `Software/…` or `Games/…` |
+| An **audiobook** | AudioBookRequest, through Prowlarr | `Audiobooks/<release name>/`, played from Audiobookshelf |
 | _Later:_ a plain download link or a video page | Zeef, with aria2 / yt-dlp | `Other/…`, `Videos/…` |
 
 - **One search box.** Zeef is the only screen you use day to day. Behind it, Prowlarr searches your

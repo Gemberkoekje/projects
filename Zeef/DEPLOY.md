@@ -382,3 +382,116 @@ piped from their pods, never printed. Only the login and the OpenSubtitles accou
 
 The free OpenSubtitles tier (about 20 downloads a day) is the bottleneck for a backlog; new
 episodes trickle in well below it. VIP, or a second provider with an API key (Subdl), would raise it.
+
+## Part D: Audiobooks, Audiobookshelf and AudioBookRequest (added 2026-11-08)
+
+AudioBookRequest (ABR) is the request page for audiobooks, like Seerr for films. It grabs through
+Prowlarr into qBittorrent, and Audiobookshelf (ABS) plays the books, like Jellyfin. ABR has no
+import step, so qBittorrent saves audiobooks straight into the library folder `Audiobooks/` and
+seeds them from there. Manifests: gembernodes `apps/zeef/audiobookshelf.yaml` and
+`apps/zeef/audiobookrequest.yaml` (PR #143); the why is in gembernodes `NOTES.md` (2026-11-08).
+
+### D1. Before the merge
+
+- **Database**, in DBeaver on the shared PostgreSQL (`192.168.1.232`, user `postgres`), with
+  auto-commit on:
+
+  ```sql
+  CREATE ROLE audiobookrequest LOGIN PASSWORD '<password>';
+  CREATE DATABASE audiobookrequest OWNER audiobookrequest;
+  REVOKE CONNECT, TEMPORARY ON DATABASE audiobookrequest FROM PUBLIC;
+  ```
+
+  Make the password with `openssl rand -hex 24`. **Hex only:** ABR puts it into a connection URL
+  as-is, so an `@`, `:` or `/` would break it.
+- **1Password:** add the field `AUDIOBOOKREQUEST__POSTGRES__PASSWORD` (exact label) to `zeef-stack`,
+  with the same password. Without it the ABR pod stays in `CreateContainerConfigError`.
+
+ABS needs neither.
+
+### D2. The library folder
+
+Made by qBittorrent's user, so qBittorrent can write in it (ABS only reads it):
+
+```bash
+kubectl -n zeef exec deploy/qbittorrent -- s6-setuidgid abc sh -c 'mkdir -p /data/Audiobooks && chmod 775 /data/Audiobooks'
+```
+
+### D3. qBittorrent: the category (`https://qbittorrent.lan.gemberkoekje.nl`)
+
+**Before the first grab:** in the side panel, right-click Categories → Add category, with name
+`audiobooks` and save path `/data/Audiobooks`. If a grab arrives first, qBittorrent creates the
+category itself with its default path (`/data/@Downloads/complete/audiobooks`), and ABS won't see
+the book. Then edit the category's save path.
+
+The seeding limits from B3 apply: after ratio 1.0 or 7 days the torrent stops, and the book stays.
+Nothing removes stopped audiobook torrents (Sonarr/Radarr only remove their own). To delete a book,
+remove its torrent in qBittorrent with "Also remove the content files".
+
+### D4. Prowlarr: a download client of its own (`https://prowlarr.lan.gemberkoekje.nl`)
+
+**Settings → Download Clients → + → qBittorrent:**
+
+- host `qbittorrent.zeef.svc.cluster.local`, port `8080`;
+- user `admin` plus the password (`QBITTORRENT__PASSWORD`);
+- **Default Category `audiobooks`** (Prowlarr's default is `prowlarr`).
+
+This client is used only for grabs made through Prowlarr itself: ABR, or the download button on
+Prowlarr's own search page. Sonarr and Radarr keep their own clients and categories. Anything
+grabbed by hand on Prowlarr's search page also lands in `Audiobooks/`. If that ever matters,
+Mapped Categories on this client can send only Audio/Audiobook (3030) there.
+
+### D5. Audiobookshelf, first visit (`https://audiobookshelf.lan.gemberkoekje.nl`)
+
+- **Root user:** the first visit asks for one. Store it in 1Password.
+- **Settings:**
+  - Switch **off** "Automatically watch libraries for changes". File watching doesn't see changes
+    on NFS made by another pod (as with Jellyfin's real-time monitoring); the scheduled scan below
+    does the job.
+  - Leave "Store covers with item" and "Store metadata with item" off (the defaults). The folder
+    is read-only, and the files have to stay as they are for seeding.
+- **Libraries → Add:**
+  - name "Luisterboeken", media type Books;
+  - folder `/media/Audiobooks` (the share is mounted read-only at `/media`);
+  - metadata provider Audible (`.com` or `.co.uk`);
+  - tab **Schedule:** "Schedule Automatic Library Scans" on, for example hourly.
+- **Settings → Backups:** "Automatic backups" on, daily, "Number of backups to keep" 7. They land
+  in `/metadata/backups`, on the QNAP.
+- **Settings → API Keys:** a new key "audiobookrequest" for the root user, for D6. Keep it in
+  1Password too.
+- **Settings → Users:** an account for each listener.
+
+### D6. AudioBookRequest, first visit (`https://audiobookrequest.lan.gemberkoekje.nl`)
+
+- **First admin:** the first visit goes to `/init`. Login type **Forms**, with a username and
+  password (1Password).
+- **Settings → Prowlarr** (the page is called "Prowlarr / Chaptarr"):
+  - URL `http://prowlarr.zeef.svc.cluster.local:9696`;
+  - API key `PROWLARR__AUTH__APIKEY` from `zeef-stack`;
+  - category Audio/Audiobook (3030).
+- **Settings → Audiobookshelf:**
+  - URL `http://audiobookshelf.zeef.svc.cluster.local:13378`, the API key from D5;
+  - library "Luisterboeken", and "Use ABS to mark existing books as downloaded" on.
+  - The connection test should list one library and start a scan.
+- **Settings → Download:** download backend Prowlarr (the default), and Auto Download on. Requests
+  from "trusted" users and admins are then grabbed at once; others wait for an admin.
+- **Users:** an account for each person. Group "trusted" for those whose requests may download
+  without approval.
+
+### D7. Listening
+
+- **Phone:** the Audiobookshelf app (Android, iOS), server address
+  `https://audiobookshelf.lan.gemberkoekje.nl`. It works at home and over Tailscale, and can keep
+  books on the phone for offline listening.
+- **Browser:** the same address.
+
+### D8. Checks
+
+- [ ] ABR runs on PostgreSQL: tables in `audiobookrequest`, and no `db.sqlite`.
+- [ ] A test request: Prowlarr sends it to qBittorrent with category `audiobooks`, and the finished
+      files appear in `/data/Audiobooks/<release name>/`.
+- [ ] ABS shows the book after the next scheduled scan, or after Scan by hand.
+- [ ] ABR shows the request as in the library.
+- [ ] The phone app plays it, and progress matches in the browser.
+- [ ] After ratio 1.0 or 7 days the torrent stops, and the book stays in ABS.
+- [ ] The first ABS backup appears in `/metadata/backups`.

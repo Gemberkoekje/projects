@@ -3,6 +3,22 @@
 _To understand this, start by reading [DESIGN.md](DESIGN.md), then [DEPLOY.md](DEPLOY.md), then
 gembernodes `apps/zeef/README.md` and `infrastructure/pvcs/zeef.yaml`._
 
+## Audiobooks: Audiobookshelf and AudioBookRequest (2026-11-08, waiting for the merge)
+
+**Summary.** Audiobooks get the same pattern as films: requested in AudioBookRequest, grabbed
+through Prowlarr into qBittorrent, and played from Audiobookshelf (browser and phone app).
+qBittorrent saves them straight into `Audiobooks/` on the Multimedia share, because there's no
+import step (Readarr is retired, and its forks were still beta). The setup steps are in
+[DEPLOY.md](DEPLOY.md) part D; the decisions and the local tests are in gembernodes `NOTES.md`
+(2026-11-08). Gembernodes PR #143.
+
+| File (gembernodes) | What |
+|---|---|
+| `apps/zeef/audiobookshelf.yaml` | Audiobookshelf (SQLite on `local-path`, library read-only), Service `.234:13378` |
+| `apps/zeef/audiobookrequest.yaml` | AudioBookRequest on PostgreSQL, Service `.234:8000` |
+| `infrastructure/pvcs/zeef.yaml` | Plus `audiobookshelf-config` (`local-path`) and `audiobookshelf-metadata` (`qnap-nfs`) |
+| `infrastructure/lan-proxy/Caddyfile`, `index.html` | `audiobookshelf.lan…` and `audiobookrequest.lan…`, and their links |
+
 ## Phase 1: Seerr for films and series (done 2026-11-06)
 
 **Summary.** Films and series are now requested in Seerr; Sonarr/Radarr fetch them and Jellyfin
