@@ -10,7 +10,7 @@ through Prowlarr into qBittorrent, and played from Audiobookshelf (browser and p
 qBittorrent saves them straight into `Audiobooks/` on the Multimedia share, because there's no
 import step (Readarr is retired, and its forks were still beta). The setup steps are in
 [DEPLOY.md](DEPLOY.md) part D; the decisions and the local tests are in gembernodes `NOTES.md`
-(2026-11-08).
+(2026-11-08). Gembernodes PR #143.
 
 | File (gembernodes) | What |
 |---|---|

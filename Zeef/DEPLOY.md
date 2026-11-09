@@ -389,7 +389,7 @@ AudioBookRequest (ABR) is the request page for audiobooks, like Seerr for films.
 Prowlarr into qBittorrent, and Audiobookshelf (ABS) plays the books, like Jellyfin. ABR has no
 import step, so qBittorrent saves audiobooks straight into the library folder `Audiobooks/` and
 seeds them from there. Manifests: gembernodes `apps/zeef/audiobookshelf.yaml` and
-`apps/zeef/audiobookrequest.yaml`; the why is in gembernodes `NOTES.md` (2026-11-08).
+`apps/zeef/audiobookrequest.yaml` (PR #143); the why is in gembernodes `NOTES.md` (2026-11-08).
 
 ### D1. Before the merge
 
