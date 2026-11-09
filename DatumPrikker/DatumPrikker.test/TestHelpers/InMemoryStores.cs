@@ -18,6 +18,12 @@ internal sealed class InMemoryPollStore : IPollStore
     public Task<bool> IsShareTokenTakenAsync(string shareToken, CancellationToken cancellationToken = default)
         => Task.FromResult(polls.Values.Any(x => x.ShareToken == shareToken));
 
+    public Task<IReadOnlyList<Poll>> ListOwnedByAsync(string accountId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Poll>>([.. polls.Values.Where(x => x.OwnerAccountId == accountId)]);
+
+    public Task<IReadOnlyList<Poll>> LoadManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Poll>>([.. polls.Values.Where(x => ids.Contains(x.Id))]);
+
     public Task<Result> SaveAsync(Poll poll, CancellationToken cancellationToken = default)
     {
         polls[poll.Id] = poll;
@@ -39,6 +45,15 @@ internal sealed class InMemoryAnswerStore : IAnswerStore
 
     public Task<IReadOnlyList<Answer>> ListForPollAsync(Guid pollId, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<Answer>>([.. answers.Values.Where(x => x.PollId == pollId)]);
+
+    public Task<IReadOnlyList<Answer>> ListByEmailAsync(string email, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Answer>>([.. answers.Values.Where(x => x.Email == email)]);
+
+    public Task<IReadOnlyDictionary<Guid, int>> CountForPollsAsync(IReadOnlyCollection<Guid> pollIds, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyDictionary<Guid, int>>(answers.Values
+            .Where(x => pollIds.Contains(x.PollId))
+            .GroupBy(x => x.PollId)
+            .ToDictionary(group => group.Key, group => group.Count()));
 
     public Task<Result> SaveAsync(Answer answer, CancellationToken cancellationToken = default)
     {

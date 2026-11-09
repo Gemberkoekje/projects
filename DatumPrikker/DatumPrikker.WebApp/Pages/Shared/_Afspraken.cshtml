@@ -1,0 +1,46 @@
+@model IReadOnlyList<DatumPrikker.application.ReadModels.Appointment>
+
+@if (Model.Count == 0)
+{
+    <p>Je hebt nog geen afspraken. Maak een <a href="/Nieuw">nieuwe prikker</a>, of antwoord op een link die je kreeg.</p>
+    <p class="zacht">Antwoordde je eerder zonder in te loggen? Dan zie je die prikkers hier zodra je met hetzelfde e-mailadres inlogt.</p>
+}
+else
+{
+    <ul class="afspraken">
+        @foreach (var afspraak in Model)
+        {
+            var poll = afspraak.Poll;
+            <li class="afspraak">
+                <div class="afspraak-kop">
+                    <a class="afspraak-titel" href="@(afspraak.IsOwner ? $"/p/{poll.ShareToken}/uitslag" : $"/p/{poll.ShareToken}")">@poll.Title</a>
+                    <span class="label @(poll.IsOpen ? "label-open" : "label-dicht")">@(poll.IsOpen ? "open" : "gesloten")</span>
+                </div>
+                <div class="zacht">
+                    @(afspraak.IsOwner ? "Jouw prikker" : $"Van {poll.OwnerName}") · @Weergave.Bereik(poll)
+                </div>
+                @if (afspraak.IsOwner)
+                {
+                    <div>
+                        @afspraak.AnswerCount @(afspraak.AnswerCount == 1 ? "antwoord" : "antwoorden") ·
+                        <a href="/p/@poll.ShareToken/uitslag">uitslag</a>
+                    </div>
+                }
+                @if (afspraak.HasAnswered)
+                {
+                    <div>
+                        Jouw antwoord: @Weergave.Samenvatting(afspraak.MyAnswer)
+                        @if (poll.IsOpen)
+                        {
+                            <span>· <a href="/p/@poll.ShareToken">wijzigen</a></span>
+                        }
+                    </div>
+                }
+                else if (poll.IsOpen)
+                {
+                    <div><a href="/p/@poll.ShareToken">Zelf ook antwoorden</a></div>
+                }
+            </li>
+        }
+    </ul>
+}

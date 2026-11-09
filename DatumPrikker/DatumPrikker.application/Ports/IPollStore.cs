@@ -18,6 +18,18 @@ public interface IPollStore
     /// <returns>True when taken.</returns>
     Task<bool> IsShareTokenTakenAsync(string shareToken, CancellationToken cancellationToken = default);
 
+    /// <summary>Every poll one account made.</summary>
+    /// <param name="accountId">The account (see <see cref="Account.Id"/>).</param>
+    /// <param name="cancellationToken">Cancels the query.</param>
+    /// <returns>The polls, in no particular order.</returns>
+    Task<IReadOnlyList<Poll>> ListOwnedByAsync(string accountId, CancellationToken cancellationToken = default);
+
+    /// <summary>The polls with these ids; ids without a poll are skipped.</summary>
+    /// <param name="ids">The poll ids.</param>
+    /// <param name="cancellationToken">Cancels the load.</param>
+    /// <returns>The polls found, in no particular order.</returns>
+    Task<IReadOnlyList<Poll>> LoadManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
+
     /// <summary>Stores a new or changed poll.</summary>
     /// <param name="poll">The poll.</param>
     /// <param name="cancellationToken">Cancels the save.</param>

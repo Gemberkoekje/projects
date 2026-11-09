@@ -1,0 +1,14 @@
+@page
+@model AfsprakenModel
+@{
+    ViewData["Title"] = "Mijn afspraken";
+}
+
+<section class="kaart">
+    <div class="kaart-kop">
+        <h1>Mijn afspraken</h1>
+        <a class="knop" href="/Nieuw">Nieuwe prikker</a>
+    </div>
+    <p class="zacht">De prikkers die je maakte, en de prikkers waarop je antwoordde met @Model.Email.</p>
+    <partial name="_Afspraken" model="Model.Appointments" />
+</section>

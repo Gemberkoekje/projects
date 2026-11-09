@@ -63,4 +63,50 @@ public static class Weergave
 
     /// <summary>The choices a respondent can make, in the order they are offered.</summary>
     public static IReadOnlyList<Availability> Keuzes { get; } = [Availability.Yes, Availability.Maybe, Availability.No];
+
+    /// <summary>The span of a poll's dates, such as "12 dec", "12 – 14 dec" or "30 nov – 2 dec".</summary>
+    /// <param name="poll">The poll.</param>
+    /// <returns>The text; empty for a poll without dates.</returns>
+    public static string Bereik(Poll poll)
+    {
+        ArgumentNullException.ThrowIfNull(poll);
+
+        if (poll.Options.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var first = poll.Options.Min(option => option.Date);
+        var last = poll.Options.Max(option => option.Date);
+        if (first == last)
+        {
+            return first.ToString("d MMM", Nl);
+        }
+
+        return first.Month == last.Month && first.Year == last.Year
+            ? $"{first.ToString("%d", Nl)} – {last.ToString("d MMM", Nl)}"
+            : $"{first.ToString("d MMM", Nl)} – {last.ToString("d MMM", Nl)}";
+    }
+
+    /// <summary>A moment in Dutch local time, such as "9 november om 20:15".</summary>
+    /// <param name="utc">The moment in UTC.</param>
+    /// <returns>The text.</returns>
+    public static string Moment(DateTime utc)
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Amsterdam).ToString("d MMMM 'om' HH:mm", Nl);
+
+    /// <summary>How many dates got each choice, such as "2× ja, 1× misschien".</summary>
+    /// <param name="answer">The answer.</param>
+    /// <returns>The text, leaving out choices nobody picked.</returns>
+    public static string Samenvatting(Answer answer)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+
+        var parts = Keuzes
+            .Select(keuze => (Keuze: keuze, Aantal: answer.Choices.Count(choice => choice.Availability == keuze)))
+            .Where(part => part.Aantal > 0)
+            .Select(part => $"{part.Aantal}× {Woord(part.Keuze).ToLowerInvariant()}");
+        return string.Join(", ", parts);
+    }
+
+    private static readonly TimeZoneInfo Amsterdam = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
 }

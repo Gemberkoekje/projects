@@ -188,6 +188,29 @@ legend { font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem; }
 .cel-nee { background: var(--nee); }
 .cel-geen { color: var(--zacht); }
 
+.kaart-kop { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.kaart-kop h1 { margin: 0; }
+.blok { display: block; margin-top: 0.25rem; }
+
+.knop-link {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.afspraken { list-style: none; margin: 0; padding: 0; }
+.afspraak { padding: 0.75rem 0; border-bottom: 1px solid var(--rand); }
+.afspraak:last-child { border-bottom: 0; }
+.afspraak-kop { display: flex; align-items: center; gap: 0.5rem; }
+.afspraak-titel { font-weight: 700; font-size: 1.05rem; }
+.label { font-size: 0.8rem; padding: 0.05rem 0.5rem; border-radius: 999px; border: 1px solid var(--rand); }
+.label-open { background: var(--ja); }
+.label-dicht { color: var(--zacht); }
+
 @media (max-width: 520px) {
     .optie-rij { grid-template-columns: 1fr 1fr; }
     .optie-rij label:first-child { grid-column: 1 / -1; }

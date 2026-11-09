@@ -9,6 +9,9 @@ public sealed record Answer
     /// <summary>The longest comment.</summary>
     public const int MaxCommentLength = 1000;
 
+    /// <summary>The refusal when somebody anonymous tries to replace a claimed answer (D4).</summary>
+    public const string ClaimedMessage = "Dit antwoord is gegeven door iemand die was ingelogd. Log in om het te wijzigen.";
+
     /// <summary>The document id: see <see cref="IdFor"/>.</summary>
     public string Id { get; init; } = string.Empty;
 
@@ -35,6 +38,21 @@ public sealed record Answer
 
     /// <summary>When it was last changed (UTC).</summary>
     public DateTime UpdatedOn { get; init; }
+
+    /// <summary>True when it was given while signed in; then only a signed-in respondent may replace it (D4).</summary>
+    public bool IsClaimed => AccountId.Length > 0;
+
+    /// <summary>Whether this (earlier) answer may be replaced by a new one from <paramref name="by"/>.</summary>
+    /// <param name="by">Who is answering now. Signed in, they can only answer as their own address, so any account may.</param>
+    /// <returns>OK, or <see cref="ClaimedMessage"/> for somebody anonymous replacing a claimed answer.</returns>
+    public Result ReplaceableBy(Account by)
+    {
+        ArgumentNullException.ThrowIfNull(by);
+
+        return IsClaimed && by.IsAnonymous
+            ? Result.WithMessages(ValidationMessage.Error(ClaimedMessage, nameof(by)))
+            : Result.OK;
+    }
 
     /// <summary>The respondent's choice for one date option.</summary>
     /// <param name="optionId">The option.</param>

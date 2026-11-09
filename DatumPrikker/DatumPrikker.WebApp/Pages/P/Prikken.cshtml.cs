@@ -5,19 +5,33 @@ using System.ComponentModel.DataAnnotations;
 
 namespace DatumPrikker.WebApp.Pages.P;
 
-/// <summary>Answers a poll: no account needed, a name and an email address are enough (D3).</summary>
+/// <summary>
+/// Answers a poll: no account needed, a name and an email address are enough (D3). Signed in, or
+/// remembered from an earlier anonymous answer, the form starts from your earlier answer.
+/// </summary>
 [AllowAnonymous]
 [EnableRateLimiting(RateLimits.Answers)]
-public sealed class PrikkenModel(GetPollHandler polls, GiveAnswerHandler answers) : PageModel
+public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierAnswers, GiveAnswerHandler answers, RespondentMemory memory) : PageModel
 {
     private readonly GetPollHandler polls = polls ?? throw new ArgumentNullException(nameof(polls));
+    private readonly GetAnswerHandler earlierAnswers = earlierAnswers ?? throw new ArgumentNullException(nameof(earlierAnswers));
     private readonly GiveAnswerHandler answers = answers ?? throw new ArgumentNullException(nameof(answers));
+    private readonly RespondentMemory memory = memory ?? throw new ArgumentNullException(nameof(memory));
 
     /// <summary>The poll being answered.</summary>
     public Poll Poll { get; private set; } = new Poll();
 
     /// <summary>Who is answering.</summary>
     public Account Account { get; private set; } = Account.Anonymous;
+
+    /// <summary>Who this browser answered as before, when anonymous.</summary>
+    public Remembered Remembered { get; private set; } = Remembered.Nobody;
+
+    /// <summary>The earlier answer the form starts from; an empty <see cref="Answer"/> when there is none.</summary>
+    public Answer Earlier { get; private set; } = new Answer();
+
+    /// <summary>True when the form starts from an earlier answer.</summary>
+    public bool HasEarlier => Earlier.Id.Length > 0;
 
     /// <summary>What the respondent filled in.</summary>
     [BindProperty]
@@ -30,7 +44,10 @@ public sealed class PrikkenModel(GetPollHandler polls, GiveAnswerHandler answers
     /// <summary>The sign-in link that comes back here.</summary>
     public string LoginUrl => $"/Aanmelden?ReturnUrl={Uri.EscapeDataString(Request.Path)}";
 
-    /// <summary>Shows the poll, with name and email filled in when signed in.</summary>
+    /// <summary>The sign-in link that ends on "Mijn afspraken".</summary>
+    public static string LoginToAppointmentsUrl => $"/Aanmelden?ReturnUrl={Uri.EscapeDataString("/Afspraken")}";
+
+    /// <summary>Shows the poll, starting from the earlier answer when there is one.</summary>
     /// <param name="token">The code from the link.</param>
     /// <param name="cancellationToken">Cancels the load.</param>
     /// <returns>The page, or 404.</returns>
@@ -41,11 +58,26 @@ public sealed class PrikkenModel(GetPollHandler polls, GiveAnswerHandler answers
             return NotFound();
         }
 
-        Input = new AnswerInput { Name = Account.Name, Email = Account.Email };
+        var email = Account.Email.Length > 0 ? Account.Email : Remembered.Email;
+        if (email.Length > 0)
+        {
+            var earlier = await earlierAnswers.HandleAsync(new GetAnswer { PollId = Poll.Id, Email = email }, cancellationToken);
+            Earlier = earlier.IsValid ? earlier.Value : new Answer();
+        }
+
+        if (HasEarlier)
+        {
+            Input = AnswerInput.From(Earlier, Account);
+        }
+        else
+        {
+            Input = new AnswerInput { Name = Account.IsAnonymous ? Remembered.Name : Account.Name, Email = email };
+        }
+
         return Page();
     }
 
-    /// <summary>Stores the answer.</summary>
+    /// <summary>Stores the answer, and remembers an anonymous respondent for next time.</summary>
     /// <param name="token">The code from the link.</param>
     /// <param name="cancellationToken">Cancels the work.</param>
     /// <returns>The thank-you state, the form with what is wrong, or 404.</returns>
@@ -67,7 +99,21 @@ public sealed class PrikkenModel(GetPollHandler polls, GiveAnswerHandler answers
             return Page();
         }
 
+        if (Account.IsAnonymous)
+        {
+            memory.Write(Response, given.Value.Name, given.Value.Email);
+        }
+
         return RedirectToPage(new { token, bedankt = true });
+    }
+
+    /// <summary>"Niet jij?": forgets who this browser answered as, and shows an empty form.</summary>
+    /// <param name="token">The code from the link.</param>
+    /// <returns>This page again.</returns>
+    public IActionResult OnPostVergeten(string token)
+    {
+        RespondentMemory.Forget(Response);
+        return RedirectToPage(new { token });
     }
 
     /// <summary>The choice currently selected for a date.</summary>
@@ -86,6 +132,7 @@ public sealed class PrikkenModel(GetPollHandler polls, GiveAnswerHandler answers
 
         Poll = poll.Value;
         Account = AccountClaims.From(User);
+        Remembered = Account.IsAnonymous ? memory.Read(Request) : Remembered.Nobody;
         return true;
     }
 }
@@ -108,6 +155,24 @@ public sealed class AnswerInput
 
     /// <summary>The choice per date option, posted as <c>Input.Choices[optionId]=Yes</c>.</summary>
     public Dictionary<Guid, Availability> Choices { get; set; } = new Dictionary<Guid, Availability>();
+
+    /// <summary>The form filled from an earlier answer. Signed in, the email is the account's (D3).</summary>
+    /// <param name="earlier">The earlier answer.</param>
+    /// <param name="account">Who is answering now.</param>
+    /// <returns>The form.</returns>
+    public static AnswerInput From(Answer earlier, Account account)
+    {
+        ArgumentNullException.ThrowIfNull(earlier);
+        ArgumentNullException.ThrowIfNull(account);
+
+        return new AnswerInput
+        {
+            Name = earlier.Name,
+            Email = account.Email.Length > 0 ? account.Email : earlier.Email,
+            Comment = earlier.Comment,
+            Choices = earlier.Choices.ToDictionary(choice => choice.OptionId, choice => choice.Availability),
+        };
+    }
 
     /// <summary>The form as a draft for <see cref="Answer.Give"/>.</summary>
     /// <returns>The draft.</returns>

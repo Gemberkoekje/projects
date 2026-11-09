@@ -137,6 +137,11 @@ builder.Services.AddScoped<ClosePollHandler>();
 // Query handlers.
 builder.Services.AddScoped<GetPollHandler>();
 builder.Services.AddScoped<GetResultsHandler>();
+builder.Services.AddScoped<GetAnswerHandler>();
+builder.Services.AddScoped<ListAppointmentsHandler>();
+
+// Stateless over the data-protection provider.
+builder.Services.AddSingleton<RespondentMemory>();
 
 var app = builder.Build();
 
