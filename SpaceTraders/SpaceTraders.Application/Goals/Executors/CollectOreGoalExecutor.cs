@@ -16,10 +16,14 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// Executor for <see cref="CollectOreGoal"/>: one round of a collecting shuttle (PLAN.md slice 6.18, D83). It flies to the
 /// asteroid, through refuelling stops when it must, and waits there in orbit while the parked drones hand it their ore
 /// (<see cref="MineForShuttleGoalExecutor"/>), making no API call, until its hold is full, or until no drone is left there
-/// with ore aboard. Then it flies to the market, docks, fetches its hold from the API (the drones' transfers wrote it into
-/// the cache from what they handed over), and sells every good the market buys, in batches of the market's trade volume,
-/// fetching the market again afterwards (D25). What the market doesn't buy is jettisoned, as nothing else would take it
-/// off the shuttle (D42). The round is booked as a trip (D46) and the goal ends; the mining plan gives the next round.
+/// with ore aboard. Then it sells what it holds, since slice 6.53 (D142, asked on 2026-11-08 with "Gate chain first, per
+/// good") each good where it is wanted most: at a market that makes a good of the jump gate's chain from it, the nearest step
+/// first, else where it fetches most after fuel, a market that makes something from it first (D91,
+/// <see cref="TradeRoutePlanner.TryFindBestSale"/>). At each market it docks, fetches its hold from the API (the drones'
+/// transfers wrote it into the cache from what they handed over), sells there every good whose best market that is, in
+/// batches of the market's trade volume, fetches the market again afterwards (D25), and flies on to the next good's market.
+/// What no market it can reach buys is jettisoned, as nothing else would take it off the shuttle (D42). The round is booked
+/// as a trip (D46) and the goal ends; the plan gives the next round.
 /// </summary>
 public sealed class CollectOreGoalExecutor(
     IShipRepository ships,
@@ -64,8 +68,8 @@ public sealed class CollectOreGoalExecutor(
     {
         if (ship.CargoCapacity > 0 && ship.CargoCurrent >= ship.CargoCapacity)
         {
-            await goals.SetActiveGoalAsync(ship.Symbol, round with { Selling = true }, ct);
-            return GoalExecutionResult.Progressing($"Hold full; next, selling at {round.SellWaypointSymbol}.");
+            var full = await StartSellingAsync(ship, round, ct);
+            return GoalExecutionResult.Progressing($"Hold full; next, selling at {full.SellWaypointSymbol}.");
         }
 
         if (!IsAt(ship, round.AsteroidWaypointSymbol))
@@ -85,13 +89,60 @@ public sealed class CollectOreGoalExecutor(
         // A part hold goes when no drone is left there with ore to hand over: nothing more would come.
         if (ship.CargoCurrent > 0 && !await DroneWithOreAsync(round, ct))
         {
-            await goals.SetActiveGoalAsync(ship.Symbol, round with { Selling = true }, ct);
-            return GoalExecutionResult.Progressing($"No drone with ore left at {round.AsteroidWaypointSymbol}; selling what it holds at {round.SellWaypointSymbol}.");
+            var part = await StartSellingAsync(ship, round, ct);
+            return GoalExecutionResult.Progressing($"No drone with ore left at {round.AsteroidWaypointSymbol}; selling what it holds at {part.SellWaypointSymbol}.");
         }
 
         return GoalExecutionResult.WaitingForCooldown(
             $"Collecting at {round.AsteroidWaypointSymbol}: {ship.CargoCurrent} of {ship.CargoCapacity}.",
             TimeProvider.System.GetUtcNow() + WaitForOre);
+    }
+
+    /// <summary>
+    /// Turns the round to selling (D142): its first market is where the good aboard that is wanted most sells best
+    /// (<see cref="TryChooseNextSale"/>); the point's market while none it can reach buys anything aboard.
+    /// </summary>
+    private async Task<CollectOreGoal> StartSellingAsync(ShipModel ship, CollectOreGoal round, CancellationToken ct)
+    {
+        var map = (await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct)).Map;
+        var selling = round with
+        {
+            Selling = true,
+            SellWaypointSymbol = TryChooseNextSale(map, ship, out var market) ? market : round.SellWaypointSymbol,
+        };
+        await goals.SetActiveGoalAsync(ship.Symbol, selling, ct);
+        return selling;
+    }
+
+    /// <summary>
+    /// Where a collecting shuttle sells next (PLAN.md slice 6.53, D142): of the goods aboard, the one whose best sale feeds the
+    /// jump gate's chain, the nearest step first, else the one whose best sale fetches most; its best market, by
+    /// <see cref="TradeRoutePlanner.TryFindBestSale"/> with the gate first.
+    /// </summary>
+    /// <param name="map">The shuttle's system.</param>
+    /// <param name="ship">The shuttle, where it is now, with its hold.</param>
+    /// <param name="market">Where it sells next.</param>
+    /// <returns>False when no market it can reach buys anything aboard.</returns>
+    internal static bool TryChooseNextSale(TradeMarketMap map, ShipModel ship, out string market)
+    {
+        market = string.Empty;
+        var best = (Step: int.MaxValue, Revenue: long.MinValue);
+        foreach (var item in (ship.CargoInventory ?? []).Where(item => item.Units > 0))
+        {
+            if (!TradeRoutePlanner.TryFindBestSale(map, ship, item.Symbol, item.Units, out var sale, supplyFirst: true, gateFirst: true))
+            {
+                continue;
+            }
+
+            var step = map.ConstructionFeedOf(sale.WaypointSymbol, item.Symbol) is { Step: > 0 } feed && sale.NetRevenue > 0 ? feed.Step : int.MaxValue;
+            if (market.Length == 0 || step < best.Step || (step == best.Step && sale.NetRevenue > best.Revenue))
+            {
+                market = sale.WaypointSymbol;
+                best = (step, sale.NetRevenue);
+            }
+        }
+
+        return market.Length > 0;
     }
 
     /// <summary>Whether a drone parked at the asteroid holds ore or mines there still, so more will come.</summary>
@@ -135,25 +186,29 @@ public sealed class CollectOreGoalExecutor(
         var hold = await port.GetShipCargoAsync(ship.Symbol, ct);
         await ships.UpdateCargoAsync(ship.Symbol, hold, ct);
 
-        // The arrival has just refreshed the market's prices.
+        // The arrival has just refreshed the market's prices. D142: a good sells here when this is where it is wanted most.
         var map = (await tradeContexts.ReadAsync(ship.SystemSymbol ?? string.Empty, ct)).Map;
+        var here = ship with { CargoInventory = hold.Inventory, CargoCurrent = hold.Units };
         var earned = 0L;
+        var left = hold;
         foreach (var item in (hold.Inventory ?? []).Where(item => item.Units > 0).ToList())
         {
-            if (!map.TryGetGood(round.SellWaypointSymbol, item.Symbol, out var good) || good.SellPrice <= 0)
+            if (!map.TryGetGood(round.SellWaypointSymbol, item.Symbol, out var good)
+                || good.SellPrice <= 0
+                || (TradeRoutePlanner.TryFindBestSale(map, here, item.Symbol, item.Units, out var best, supplyFirst: true, gateFirst: true)
+                    && !best.WaypointSymbol.Equals(round.SellWaypointSymbol, StringComparison.OrdinalIgnoreCase)))
             {
-                // Nothing else takes cargo off a collecting shuttle (D42).
-                await jettison.JettisonAsync(ship with { CargoInventory = hold.Inventory, CargoCurrent = hold.Units }, item, "no_buyer", ct);
                 continue;
             }
 
             // One sale may not exceed the market's trade volume, so a larger load goes in several.
             var batchSize = good.TradeVolume > 0 ? good.TradeVolume : item.Units;
-            for (var left = item.Units; left > 0;)
+            for (var unsold = item.Units; unsold > 0;)
             {
-                var batch = Math.Min(left, batchSize);
+                var batch = Math.Min(unsold, batchSize);
                 var sale = await port.SellCargoAsync(ship.Symbol, item.Symbol, batch, ct);
                 await ships.UpdateCargoAsync(ship.Symbol, sale.Cargo, ct);
+                left = sale.Cargo;
                 await agents.SetCreditsAsync(bus, sale.AgentCredits, ct);
 
                 // The ledger and the credits-earned metric (B7), and the units sold to this market.
@@ -174,15 +229,38 @@ public sealed class CollectOreGoalExecutor(
                     round.SellWaypointSymbol,
                     sale.Revenue);
                 earned += sale.Revenue;
-                left -= batch;
+                unsold -= batch;
             }
         }
 
         // The sales moved the prices: the market again, while the shuttle is still there (D25).
-        await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, round.SellWaypointSymbol, ship.Symbol, ct);
+        if (earned > 0)
+        {
+            await marketRefresher.RefreshAfterTradeAsync(ship.SystemSymbol ?? string.Empty, round.SellWaypointSymbol, ship.Symbol, ct);
+        }
 
-        await EndRoundAsync(ship.Symbol, round with { Earned = round.Earned + earned }, TripBook.Sold, ct);
-        return GoalExecutionResult.Completed($"Sold the round's ore at {round.SellWaypointSymbol}; the round is done.");
+        var sold = round with { Earned = round.Earned + earned };
+        if (left.Units <= 0)
+        {
+            await EndRoundAsync(ship.Symbol, sold, TripBook.Sold, ct);
+            return GoalExecutionResult.Completed($"Sold the round's cargo, the last at {round.SellWaypointSymbol}; the round is done.");
+        }
+
+        // D142: the next good's market; what no market in reach buys goes overboard, as nothing else takes it off (D42).
+        var rest = ship with { CargoInventory = left.Inventory, CargoCurrent = left.Units };
+        if (TryChooseNextSale(map, rest, out var next) && !next.Equals(round.SellWaypointSymbol, StringComparison.OrdinalIgnoreCase))
+        {
+            await goals.SetActiveGoalAsync(ship.Symbol, sold with { SellWaypointSymbol = next }, ct);
+            return GoalExecutionResult.Progressing($"Sold here what sells best at {round.SellWaypointSymbol}; next, {next}.");
+        }
+
+        foreach (var item in (left.Inventory ?? []).Where(item => item.Units > 0).ToList())
+        {
+            await jettison.JettisonAsync(rest, item, "no_buyer", ct);
+        }
+
+        await EndRoundAsync(ship.Symbol, sold, TripBook.Sold, ct);
+        return GoalExecutionResult.Completed($"Sold the round's cargo at {round.SellWaypointSymbol}; what no market buys went overboard.");
     }
 
     /// <summary>Ends the round: clears its goal, so the mining plan gives the next, and books what it made (D46).</summary>

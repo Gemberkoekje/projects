@@ -50,6 +50,7 @@ public sealed class DefaultSettingsSeedTests
         "FleetExpansion.ReservePerTradingCargoUnit",
         "Mining.MaxDrones",
         "Mining.GateMinerIntervalMinutes",
+        "Drones.Parked",
         "ActivityLog.RetentionDays",
         "Alerts.WebhookUrl",
 

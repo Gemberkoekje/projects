@@ -71,6 +71,10 @@ public sealed class AutomationSwitchesTests
         AutomationSwitches.PlanFor(new SupplyConstructionGoal { TradeSymbol = "FAB_MATS", ConstructionSiteWaypointSymbol = "X1-AB-I55" }).Should().Be(AutomationPlan.Construction);
         AutomationSwitches.PlanFor(new MineForShuttleGoal { TradeSymbol = "GOLD_ORE", AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7" }).Should().Be(AutomationPlan.Mining);
         AutomationSwitches.PlanFor(new CollectOreGoal { AsteroidWaypointSymbol = "X1-AB-B44", SellWaypointSymbol = "X1-AB-B7" }).Should().Be(AutomationPlan.Mining);
+
+        // Slice 6.53 (D142): a siphon drone parked at a gas giant, and the shuttle collecting there, are the siphon plan's.
+        AutomationSwitches.PlanFor(new MineForShuttleGoal { TradeSymbol = "LIQUID_HYDROGEN", AsteroidWaypointSymbol = "X1-AB-C37", SellWaypointSymbol = "X1-AB-C38", Siphon = true }).Should().Be(AutomationPlan.Siphon);
+        AutomationSwitches.PlanFor(new CollectOreGoal { AsteroidWaypointSymbol = "X1-AB-C37", SellWaypointSymbol = "X1-AB-C38", Siphon = true }).Should().Be(AutomationPlan.Siphon);
         AutomationSwitches.PlanFor(new IdleGoal()).Should().BeNull();
     }
 }

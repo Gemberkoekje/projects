@@ -1041,6 +1041,69 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
+    public async Task WithTheDronesParked_AFreeDroneParksAtTheNearestAsteroidThatWantsOne_AndAShuttleIsBoughtForIt()
+    {
+        // Slice 6.53 (D142), asked on 2026-11-08: "Can we set up that miners and siphoners don't move at all anymore, and they
+        // move stuff to some kind of hauler which does the actual selling?" The drone of
+        // AFreeMiner_ServesTheScarcestMarketFirst_AndSellsItThere takes no trip: it parks at XB5C, 19 from it, where F49's silicon
+        // and H51's ores come from and which sells fuel itself, and a light shuttle is bought to collect there.
+        DronesParked();
+        Fleet(Drone());
+
+        await RunAsync();
+
+        var job = _activeGoals["SHIP-3"].Should().BeOfType<MineForShuttleGoal>().Subject;
+        (job.AsteroidWaypointSymbol, job.SellWaypointSymbol, job.Siphon).Should().Be((XB5C, XB5C, false));
+        _order.Of(AutomationPlan.Mining).Should().Match<PurchaseNeed>(need => need.ShipType == "SHIP_LIGHT_SHUTTLE" && need.Tier == PurchaseTier.Coverage);
+        _state!.CollectionPoints.Should().Contain(point => point.AsteroidWaypointSymbol == XB5C && point.DroneSymbols.Contains("SHIP-3"));
+    }
+
+    [Fact]
+    public async Task WithTheDronesParked_WhileTheGateNeedsMaterials_OnlyItsChainsAsteroidsCount_AndTheirShuttleStandsAtTheGatesPlace()
+    {
+        // D142, "Only for gate-chain sites": the gate needs FAB_MATS, made from the IRON H51 makes from IRON_ORE; XB5C yields
+        // it, and the drone mines it there first. B7's gold from B14 goes into nothing of the gate: no point there.
+        DronesParked();
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(
+            new TradeMarketMap(
+                Waypoints,
+                [
+                    .. Markets().Where(market => market.WaypointSymbol != H51),
+                    Market(H51, Good("IRON_ORE", "IMPORT", 118, 58, 60, "LIMITED"), Good("IRON", "EXPORT", 310, 150, 60, "MODERATE"), Good("FUEL", "EXCHANGE", 95, 80, 180, "MODERATE")),
+                ],
+                new Dictionary<string, IReadOnlyList<string>> { ["FAB_MATS"] = ["IRON"], ["IRON"] = ["IRON_ORE"] })
+            {
+                ConstructionMaterials = new HashSet<string>(["FAB_MATS"], StringComparer.OrdinalIgnoreCase),
+            },
+            [],
+            129_357,
+            Now));
+        Fleet(Drone());
+
+        await RunAsync();
+
+        var job = _activeGoals["SHIP-3"].Should().BeOfType<MineForShuttleGoal>().Subject;
+        (job.TradeSymbol, job.AsteroidWaypointSymbol).Should().Be(("IRON_ORE", XB5C));
+        _state!.CollectionPoints.Should().OnlyContain(point => point.AsteroidWaypointSymbol == XB5C);
+        _order.Of(AutomationPlan.Mining).Should().Match<PurchaseNeed>(need => need.ShipType == "SHIP_LIGHT_SHUTTLE" && need.Tier == PurchaseTier.Construction);
+    }
+
+    [Fact]
+    public async Task WithTheDronesParked_ADroneWhoseAsteroidIsNoPointAnyMore_LeavesIt()
+    {
+        // D142: a drone parked at B13 for B7's ores, once B7 buys none of them (nothing else comes from B13), parks elsewhere.
+        DronesParked();
+        _contexts.ReadAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new MiningContext(Map([.. Markets().Where(market => market.WaypointSymbol != B7)]), [], 129_357, Now));
+        _activeGoals["SHIP-3"] = new MineForShuttleGoal { TradeSymbol = "IRON_ORE", AsteroidWaypointSymbol = B13, SellWaypointSymbol = B7 };
+        Fleet(Drone(waypoint: B13, status: "IN_ORBIT"));
+
+        await RunAsync();
+
+        await _goals.Received(1).ClearActiveGoalAsync("SHIP-3", Arg.Any<CancellationToken>());
+        _log.Entries.Should().Contain(entry => entry.Message.Contains("is no collection point any more", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ADroneWithNothingUncoveredToServe_TakesAPlaceAtTheFarAsteroid_DriftingToItsMarketFirst()
     {
         // D83, asked on 2026-10-05: "We park a light shuttle ... at the asteroid, and have the drones drop their ore into the
@@ -1294,6 +1357,15 @@ public sealed class MiningAutomationServiceTests
     }
 
     /// <summary>H52 sells these ships.</summary>
+    /// <summary>D142: the drones park (<c>Drones.Parked</c>), and H52 sells mining drones and light shuttles.</summary>
+    private void DronesParked()
+    {
+        _settings.GetAsync<bool>(MiningAutomationService.ParkedDronesSetting, Arg.Any<CancellationToken>()).Returns(true);
+        ShipyardSells(
+            new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 48_328, FuelCapacity = 80, CargoCapacity = 15 },
+            new ShipyardShipDto { Type = "SHIP_LIGHT_SHUTTLE", PurchasePrice = 82_905, FuelCapacity = 300, CargoCapacity = 40 });
+    }
+
     private void ShipyardSells(params ShipyardShipDto[] ships)
         => _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns(
         [

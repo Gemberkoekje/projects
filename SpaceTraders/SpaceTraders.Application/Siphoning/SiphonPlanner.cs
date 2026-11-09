@@ -211,6 +211,51 @@ public static class SiphonPlanner
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(drone);
 
+        var served = new Lazy<HashSet<string>>(() => SiphonTargets(map, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+            .Select(target => target.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase));
+        return GateGasesShort(map, (market, gas) => served.Value.Contains(MiningPlanner.OpportunityKey(market, gas)));
+    }
+
+    /// <summary>
+    /// The gases a gate siphoner would be bought for while drones park (PLAN.md slice 6.53, D142): as
+    /// <see cref="GateGasesShort(TradeMarketMap, ShipModel)"/>, but a gas is served when one of the parked points yields it, as
+    /// its shuttle carries it to the market; a drone parked at the gas giant needn't reach the market itself.
+    /// </summary>
+    /// <param name="map">The system, with the gate's materials.</param>
+    /// <param name="points">The parked points (<see cref="ParkedPoints"/>).</param>
+    /// <returns>The gases, by the lowest supply among their markets, then by symbol.</returns>
+    public static IReadOnlyList<string> GateGasesShortAtPoints(TradeMarketMap map, IReadOnlyList<CollectionPoint> points)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(points);
+        return GateGasesShort(map, (_, gas) => points.Any(point => point.Ores.Contains(gas, StringComparer.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>
+    /// The gas giants where siphon drones park while a shuttle collects (PLAN.md slice 6.53, D142), as the mining drones'
+    /// asteroids (<see cref="MiningPlanner.ParkedPoints"/>): for each gas a market buys below ABUNDANT, the gas giant nearest it
+    /// that yields it, when a drone gets there and a shuttle flies there and back from the market nearest it that sells fuel.
+    /// In X1-VP96 on 2026-11-08 the only gas giant, C37, was 231 from F45, which made the EXPLOSIVES of the gate's chain: a siphon
+    /// drone's 80-unit tank never got its gas there, and C38, at the same spot, sells fuel.
+    /// </summary>
+    /// <param name="map">The system.</param>
+    /// <param name="drone">A siphon drone, for its tank.</param>
+    /// <param name="shuttle">A collecting shuttle, for its tank.</param>
+    /// <returns>The points, by market and gas giant.</returns>
+    public static IReadOnlyList<CollectionPoint> ParkedPoints(TradeMarketMap map, ShipModel drone, ShipModel shuttle)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        return MiningPlanner.Parked(
+            map,
+            GasGiants.Gases,
+            (gas, market, allowed) => TryFindNearestGasGiant(map, gas, market, allowed, out var gasGiant) ? gasGiant : string.Empty,
+            drone,
+            shuttle);
+    }
+
+    private static IReadOnlyList<string> GateGasesShort(TradeMarketMap map, Func<string, string, bool> served)
+    {
         var wanting = new List<(string Market, string Gas, string Supply)>();
         foreach (var market in map.MarketWaypoints.Order(StringComparer.Ordinal))
         {
@@ -233,11 +278,8 @@ public static class SiphonPlanner
             return [];
         }
 
-        var served = SiphonTargets(map, drone, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
-            .Select(target => target.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return [.. wanting
-            .Where(entry => served.Contains(MiningPlanner.OpportunityKey(entry.Market, entry.Gas)))
+            .Where(entry => served(entry.Market, entry.Gas))
             .GroupBy(entry => entry.Gas, StringComparer.OrdinalIgnoreCase)
             .OrderBy(gas => gas.Min(entry => MiningPlanner.SupplyRank(entry.Supply)))
             .ThenBy(gas => gas.Key, StringComparer.Ordinal)

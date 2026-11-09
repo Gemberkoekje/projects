@@ -356,4 +356,22 @@ public sealed class SiphonPlannerTests
         SiphonPlanner.GateGasesShort(GateMap(constructionFirst: false), SiphonDrone()).Should().Equal("LIQUID_NITROGEN", "LIQUID_HYDROGEN");
         SiphonPlanner.GateGasesShort(Map(), SiphonDrone()).Should().BeEmpty("with no gate to build, no gas goes into one");
     }
+
+    [Fact]
+    public void TheDronesParkAtTheGasGiant_AndAMarketBeyondTheirReachIsServedThroughItsShuttle()
+    {
+        // Slice 6.53 (D142), asked on 2026-11-08: "miners and siphoners don't move at all anymore, and they move stuff to some
+        // kind of hauler which does the actual selling". F48 is beyond a drone's tank, so a drone of its own buys nothing for
+        // it (D141); parked at C38, the shuttle takes its gases there.
+        var map = FarGateMap();
+
+        var points = SiphonPlanner.ParkedPoints(map, SiphonDrone(), Shuttle());
+
+        var point = points.Should().ContainSingle().Subject;
+        (point.AsteroidSymbol, point.SellWaypointSymbol).Should().Be((C38, C39));
+        point.Ores.Should().Equal("LIQUID_HYDROGEN", "LIQUID_NITROGEN");
+        point.ScarceOres.Should().Equal("LIQUID_HYDROGEN", "LIQUID_NITROGEN");
+        SiphonPlanner.GateGasesShort(map, SiphonDrone()).Should().BeEmpty("a drone's tank never gets the gas to F48");
+        SiphonPlanner.GateGasesShortAtPoints(map, points).Should().Equal("LIQUID_NITROGEN", "LIQUID_HYDROGEN");
+    }
 }
