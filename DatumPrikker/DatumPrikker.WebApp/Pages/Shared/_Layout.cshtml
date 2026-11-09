@@ -19,7 +19,7 @@
             }
             else
             {
-                <a class="knop" href="/Nieuw">Nieuwe prikker</a>
+                <a class="knop knop-licht" href="/Afspraken">Mijn afspraken</a>
                 @* asp-page, not action=: only then does the form tag helper add the antiforgery token. *@
                 <form method="post" asp-page="/Afmelden" class="inline">
                     <button type="submit" class="knop knop-licht" title="Ingelogd als @account.Name">Uitloggen</button>

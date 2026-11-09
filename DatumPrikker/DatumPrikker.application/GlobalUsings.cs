@@ -1,4 +1,5 @@
 global using DatumPrikker.application.Ports;
+global using DatumPrikker.application.ReadModels;
 global using DatumPrikker.core.Enums;
 global using DatumPrikker.core.Models;
 global using Microsoft.Extensions.Logging;

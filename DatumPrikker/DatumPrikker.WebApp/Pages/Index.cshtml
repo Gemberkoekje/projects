@@ -4,9 +4,23 @@
     ViewData["Title"] = "Prik samen een datum";
 }
 
-<section class="kaart held">
-    <h1>Prik samen een datum.</h1>
-    <p class="groot">Stel een paar datums voor, deel de link, en zie welke dag het beste uitkomt.</p>
-    <p><a class="knop knop-groot" href="/Nieuw">Nieuwe prikker</a></p>
-    <p class="zacht">Antwoorden kan iedereen, zonder account. Alleen voor het maken van een prikker log je in.</p>
-</section>
+@if (Model.Account.IsAnonymous)
+{
+    <section class="kaart held">
+        <h1>Prik samen een datum.</h1>
+        <p class="groot">Stel een paar datums voor, deel de link, en zie welke dag het beste uitkomt.</p>
+        <p><a class="knop knop-groot" href="/Nieuw">Nieuwe prikker</a></p>
+        <p class="zacht">Antwoorden kan iedereen, zonder account. Met een account maak je prikkers en zie je al je afspraken op één plek.</p>
+    </section>
+}
+else
+{
+    <section class="kaart">
+        <div class="kaart-kop">
+            <h1>Hoi @Model.Account.Name!</h1>
+            <a class="knop" href="/Nieuw">Nieuwe prikker</a>
+        </div>
+        <h2>Je afspraken</h2>
+        <partial name="_Afspraken" model="Model.Appointments" />
+    </section>
+}

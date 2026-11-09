@@ -1,6 +1,9 @@
 namespace DatumPrikker.application.Commands;
 
-/// <summary>Stores an answer; the same email address replaces its earlier answer (last write wins).</summary>
+/// <summary>
+/// Stores an answer; the same email address replaces its earlier answer (last write wins), except
+/// that an answer given while signed in can't be replaced anonymously (D4).
+/// </summary>
 public sealed class GiveAnswerHandler(IPollStore polls, IAnswerStore answers, ILogger<GiveAnswerHandler> logger)
 {
     private readonly IPollStore polls = polls ?? throw new ArgumentNullException(nameof(polls));
@@ -33,6 +36,16 @@ public sealed class GiveAnswerHandler(IPollStore polls, IAnswerStore answers, IL
         }
 
         var earlier = await answers.LoadAsync(answer.Value.Id, cancellationToken);
+        if (earlier.IsValid)
+        {
+            var replaceable = earlier.Value.ReplaceableBy(command.By);
+            if (!replaceable.IsValid)
+            {
+                logger.LogWarning("Anonymous answer to poll {PollId} refused: the earlier answer was given signed in.", earlier.Value.PollId);
+                return Result.WithMessages<Answer>(replaceable.Messages);
+            }
+        }
+
         var toStore = earlier.IsValid
             ? answer.Value with { CreatedOn = earlier.Value.CreatedOn }
             : answer.Value;

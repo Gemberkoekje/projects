@@ -11,8 +11,8 @@ only a name and an email address.
 
 | Slice | What | State |
 |---|---|---|
-| 1 | Restart: the poll flow in one app | built, PR open |
-| 2 | Accounts: "Mijn afspraken", prefilled email, gentle login nudges | planned |
+| 1 | Restart: the poll flow in one app | merged (projects#240) |
+| 2 | Accounts: "Mijn afspraken", prefilled email, gentle login nudges | built, PR open |
 | 3 | Admin and access: only approved people make polls | planned |
 | 4 | On gembernodes | planned |
 | 5 | The look: bold and playful | planned |
@@ -103,6 +103,12 @@ Each slice is one PR. Work stops after each one for review.
   - From that list, an admin may open any poll's results. This is an exception to D9 (owner only):
     the operator could read the database anyway.
   - Closing and deleting stay with the owner.
+- **D19 This browser remembers an anonymous respondent** (slice 2). After an anonymous answer, a
+  cookie keeps the name and email for a year, so the next visit starts from the earlier answer.
+  - The cookie is protected with data protection, not merely encoded. Otherwise anybody could plant
+    a neighbour's address in it and read the neighbour's answer.
+  - "Niet jij? Begin met een leeg formulier" forgets it, which matters on a shared computer.
+  - Logged in, the account's email is used instead and no cookie is written.
 
 ## Slices
 

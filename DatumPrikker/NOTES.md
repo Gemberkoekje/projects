@@ -88,3 +88,82 @@ Every step below went as expected:
 - `DatumPrikker.WebApp/Auth/`: `LoginProviders` (D5) and `AccountClaims` (D6).
 - `DatumPrikker.WebApp/Pages/`: the pages listed above. `Weergave.cs` holds the Dutch formatting.
 - `DatumPrikker.test/`: specs per layer, plus `TestHelpers/` (in-memory stores, fixtures).
+
+## Slice 2: accounts (2026-11-09)
+
+### What was done
+
+- **Claimed answers (D4).** `Answer.IsClaimed` (given while logged in) and
+  `Answer.ReplaceableBy(account)`. `GiveAnswerHandler` refuses an anonymous replacement of a claimed
+  answer with `Answer.ClaimedMessage`.
+  - Logging in and answering again claims an anonymous answer.
+  - Another account with the same email may replace a claimed answer: logged in, you can only answer
+    as your own address.
+- **Mijn afspraken** at `/Afspraken`, and on the home page when logged in. `ListAppointmentsHandler`
+  merges the polls you made (by account id) with the polls answered under your email (D6).
+  - The list puts open polls first, then the latest activity (made, or your last answer).
+  - Each poll shows its state and date span.
+  - The owner also sees the answer count and a results link.
+  - A respondent sees their own answer summarised ("1× ja, 1× misschien"), with a link to change it.
+- **Your earlier answer fills the form** on the answer page, with "Je antwoordde al op …" and an
+  "Antwoord bijwerken" button.
+  - Logged in, it's found by the account's email.
+  - Anonymous, it's found by `RespondentMemory` (D19), a protected cookie with the name and email
+    this browser last answered with. "Niet jij? Begin met een leeg formulier" forgets it.
+- **Nudges, never walls:**
+  - the answer page says "Log in, dan vullen we je gegevens in … Hoeft niet: antwoorden kan ook zo";
+  - after an anonymous answer: "Bewaar deze afspraak in je overzicht: log in, met hetzelfde
+    e-mailadres";
+  - after a logged-in answer: a link to Mijn afspraken.
+- **The header** shows "Mijn afspraken" and "Uitloggen" when logged in. "Nieuwe prikker" moved onto
+  the home and afspraken pages, which keeps the header to two buttons on a phone.
+- **Ports:** `IPollStore.ListOwnedByAsync` and `LoadManyAsync`; `IAnswerStore.ListByEmailAsync` and
+  `CountForPollsAsync`. Marten serves these from the existing indexes on `OwnerAccountId`, `PollId`
+  and `Email`.
+- **Tests:** 69 (18 new). They cover the claim rule in the domain and the handler, merging,
+  ordering and counting afspraken, finding an earlier answer by any spelling of the email, the
+  cookie (round trip, unreadable, forged, other key ring), and the Dutch date span, summary and
+  local time.
+
+### Checked by hand (local Postgres, browser)
+
+Every step below went as expected:
+
+1. Arie made a poll.
+2. Carla answered anonymously. The thank-you offered "log in" to save the poll in her overview.
+3. On her next visit the page said "Je antwoordde al op 9 november om 21:05", with her choices and
+   comment filled in.
+4. "Niet jij?" emptied the form.
+5. Bea answered logged in: her name was filled in and editable (she changed it), and her email was
+   locked.
+6. An anonymous answer with `bea@example.com` was refused with the claimed message, and Bea's answer
+   stayed.
+7. Carla logged in with the same email: her home page listed both polls she had answered
+   anonymously, open first.
+8. Arie's Mijn afspraken showed both his polls with their answer counts.
+9. The results showed Bea's edited name.
+
+### Gotchas
+
+- **A line in a Razor code block that starts with `<br />` ends the markup right there.** The rest
+  of the line is parsed as C#, which gave confusing CS0246 errors on Dutch words. Wrap the line in
+  one element (`<span class="blok">`).
+- **Sonar S2092 wants `Secure` on every cookie.** It is now always on. Browsers accept Secure
+  cookies on `http://localhost`, so local runs still work, as checked above.
+- `Europe/Amsterdam` resolves on Windows too (.NET uses ICU for IANA ids), so `Weergave.Moment`
+  needs no Windows id fallback.
+
+### Left for later slices
+
+- Slice 3: admin and access (D14–D18).
+- Slice 4: the cluster.
+- Slice 5: the look. The afspraken list and the nudges are plain.
+
+### File map (new or changed)
+
+- `DatumPrikker.core/Models/Answer.cs`: `IsClaimed`, `ReplaceableBy`, `ClaimedMessage`.
+- `DatumPrikker.application/ReadModels/Appointment.cs`.
+- `DatumPrikker.application/Queries/`: `ListAppointments(+Handler)` and `GetAnswer(+Handler)`.
+- `DatumPrikker.WebApp/Auth/RespondentMemory.cs` (D19).
+- `DatumPrikker.WebApp/Pages/`: `Afspraken`, `Shared/_Afspraken`, a reworked `Index` and `P/Prikken`.
+- `DatumPrikker.WebApp/Weergave.cs`: `Bereik`, `Moment`, `Samenvatting`.

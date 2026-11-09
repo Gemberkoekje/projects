@@ -2,6 +2,7 @@
 @model DatumPrikker.WebApp.Pages.P.PrikkenModel
 @{
     ViewData["Title"] = Model.Poll.Title;
+    var anoniem = Model.Account.IsAnonymous;
 }
 
 <section class="kaart">
@@ -20,7 +21,15 @@
 @if (Model.Bedankt)
 {
     <div class="melding melding-goed" role="status">
-        <strong>Dank je!</strong> Je antwoord is opgeslagen. Wil je het later wijzigen? Vul het formulier opnieuw in met hetzelfde e-mailadres.
+        <strong>Dank je!</strong> Je antwoord is opgeslagen.
+        @if (anoniem)
+        {
+            <span>Bewaar deze afspraak in je overzicht: <a href="@PrikkenModel.LoginToAppointmentsUrl">log in</a>, met hetzelfde e-mailadres.</span>
+        }
+        else
+        {
+            <span>Je vindt hem terug onder <a href="/Afspraken">Mijn afspraken</a>.</span>
+        }
     </div>
 }
 
@@ -30,9 +39,30 @@
 }
 else
 {
-    @if (Model.Account.IsAnonymous)
+    @if (anoniem && Model.Remembered.IsNobody)
     {
-        <p class="duwtje">Heb je een account? <a href="@Model.LoginUrl">Log in</a>, dan vullen we je naam en e-mailadres alvast in.</p>
+        <p class="duwtje">
+            <a href="@Model.LoginUrl">Log in</a>, dan vullen we je gegevens in en zie je al je afspraken op één plek. Hoeft niet: antwoorden kan ook zo.
+        </p>
+    }
+
+    @if (anoniem && !Model.Remembered.IsNobody)
+    {
+        <form method="post" asp-page-handler="Vergeten" class="duwtje">
+            Ingevuld voor @Model.Remembered.Name (@Model.Remembered.Email). Niet jij?
+            <button type="submit" class="knop-link">Begin met een leeg formulier</button>
+        </form>
+    }
+
+    @if (Model.HasEarlier && !Model.Bedankt)
+    {
+        <div class="melding" role="status">
+            Je antwoordde al op @Weergave.Moment(Model.Earlier.UpdatedOn). Pas je antwoord hieronder aan en verstuur het opnieuw.
+            @if (anoniem && Model.Earlier.IsClaimed)
+            {
+                <span class="blok"><strong>Dit antwoord gaf je terwijl je was ingelogd.</strong> <a href="@Model.LoginUrl">Log in</a> om het te wijzigen.</span>
+            }
+        </div>
     }
 
     <form method="post" class="kaart formulier">
@@ -67,11 +97,21 @@ else
         <label>Je e-mailadres
             <input asp-for="Input.Email" type="email" autocomplete="email" required readonly="@(Model.Account.Email.Length > 0)" />
         </label>
-        <p class="zacht">Alleen de maker ziet je e-mailadres. Met hetzelfde adres kun je je antwoord later wijzigen.</p>
+        <p class="zacht">
+            @if (Model.Account.Email.Length > 0)
+            {
+                <span>Je antwoordt met het e-mailadres van je account.</span>
+            }
+            else
+            {
+                <span>Met hetzelfde adres kun je je antwoord later wijzigen.</span>
+            }
+            Alleen de maker ziet je e-mailadres.
+        </p>
         <label>Opmerking <span class="zacht">(optioneel)</span>
             <textarea asp-for="Input.Comment" rows="2" maxlength="@Answer.MaxCommentLength"></textarea>
         </label>
 
-        <button type="submit" class="knop knop-groot">Antwoord versturen</button>
+        <button type="submit" class="knop knop-groot">@(Model.HasEarlier ? "Antwoord bijwerken" : "Antwoord versturen")</button>
     </form>
 }

@@ -25,6 +25,25 @@ public sealed class MartenPollStore(IDocumentStore store) : IPollStore
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Poll>> ListOwnedByAsync(string accountId, CancellationToken cancellationToken = default)
+    {
+        using var session = store.QuerySession();
+        return await session.Query<Poll>().Where(x => x.OwnerAccountId == accountId).ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Poll>> LoadManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids is not { Count: > 0 })
+        {
+            return [];
+        }
+
+        using var session = store.QuerySession();
+        return await session.LoadManyAsync<Poll>(cancellationToken, ids);
+    }
+
+    /// <inheritdoc />
     public Task<Result> SaveAsync(Poll poll, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(poll);
