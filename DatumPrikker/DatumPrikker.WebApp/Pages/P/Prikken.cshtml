@@ -5,12 +5,12 @@
     var anoniem = Model.Account.IsAnonymous;
 }
 
-<section class="kaart">
-    <p class="zacht">@Model.Poll.OwnerName wil een datum prikken</p>
+<section class="kaart poll-kop">
+    <span class="eigenaar">@Model.Poll.OwnerName wil een datum prikken</span>
     <h1>@Model.Poll.Title</h1>
     @if (Model.Poll.Location.Length > 0)
     {
-        <p><strong>Waar:</strong> @Model.Poll.Location</p>
+        <p class="waar">📍 @Model.Poll.Location</p>
     }
     @if (Model.Poll.Description.Length > 0)
     {
@@ -20,7 +20,7 @@
 
 @if (Model.Bedankt)
 {
-    <div class="melding melding-goed" role="status">
+    <div class="melding melding-goed" role="status" data-feest>
         <strong>Dank je!</strong> Je antwoord is opgeslagen.
         @if (anoniem)
         {
@@ -70,25 +70,31 @@ else
 
         <fieldset class="keuzes">
             <legend>Wanneer kun je?</legend>
-            @foreach (var option in Model.Poll.Options)
-            {
-                var gekozen = Model.Chosen(option.Id);
-                <div class="keuze-rij">
-                    <div class="keuze-datum">
-                        <strong>@Weergave.Dag(option)</strong>
-                        <span class="zacht">@Weergave.Tijd(option)</span>
+            <p class="zacht hint">Kies per datum ja, misschien of nee.</p>
+            <div class="rijen">
+                @foreach (var option in Model.Poll.Options)
+                {
+                    var gekozen = Model.Chosen(option.Id);
+                    <div class="keuze-rij">
+                        <div class="keuze-datum">
+                            <span class="mini-kalender" aria-hidden="true"><span>@Weergave.Maand(option.Date)</span><b>@Weergave.DagNummer(option.Date)</b></span>
+                            <div>
+                                <strong>@Weergave.Weekdag(option.Date)</strong>
+                                <span class="zacht">@Weergave.Tijd(option)</span>
+                            </div>
+                        </div>
+                        <div class="keuze-knoppen" role="radiogroup" aria-label="@Weergave.DagLang(option), @Weergave.Tijd(option)">
+                            @foreach (var keuze in Weergave.Keuzes)
+                            {
+                                <label class="keuze keuze-@Weergave.Klasse(keuze)">
+                                    <input type="radio" name="Input.Choices[@option.Id]" value="@keuze" checked="@(gekozen == keuze)" />
+                                    <span>@Weergave.Woord(keuze)</span>
+                                </label>
+                            }
+                        </div>
                     </div>
-                    <div class="keuze-knoppen" role="radiogroup" aria-label="@Weergave.DagLang(option), @Weergave.Tijd(option)">
-                        @foreach (var keuze in Weergave.Keuzes)
-                        {
-                            <label class="keuze keuze-@Weergave.Klasse(keuze)">
-                                <input type="radio" name="Input.Choices[@option.Id]" value="@keuze" checked="@(gekozen == keuze)" />
-                                <span>@Weergave.Woord(keuze)</span>
-                            </label>
-                        }
-                    </div>
-                </div>
-            }
+                }
+            </div>
         </fieldset>
 
         <label>Je naam

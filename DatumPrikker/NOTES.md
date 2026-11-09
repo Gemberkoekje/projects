@@ -303,7 +303,85 @@ Every step below went as expected:
   "Images exist" check then only warns that it can't see the image. The cluster pulls with the
   `ghcr-login` secret, which can.
 - **A Microsoft client secret expires** (24 months at most); Microsoft sign-in stops when it does.
+- **A new text field in 1Password gets the label `text`.** On the first deploy the connection string
+  synced as key `text`, and the pod sat in `CreateContainerConfigError`
+  (`couldn't find key ConnectionStrings__Postgres`) until the field was renamed. Check the label
+  with
+  `kubectl -n datumprikker get secret datumprikker-secrets -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}'`,
+  which lists the key names only.
+- **PowerShell has no `$(date +%s)`.** For the refresh annotation use
+  `"datumprikker/refresh=$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"`.
+
+### Live (2026-11-09)
+
+Live since about 20:50Z. All of these checked out:
+- `/healthz` answers;
+- http redirects to https;
+- the certificate is Ready;
+- both providers are offered, and the dev login is a 404;
+- the OAuth `redirect_uri`s are https (forwarded headers work);
+- the pod sees one Google admin id.
 
 ### Left for later slices
 
 - Slice 5: the look.
+
+## Slice 5: the look (2026-11-09)
+
+### What was done
+
+- **The design** (`wwwroot/css/site.css`, rewritten):
+  - **Base:** cream calendar paper with a dot grid, chunky ink outlines with hard offset shadows,
+    and rounded cards.
+  - **Colours:** violet as the main colour, with coral and sun as accents. Green, amber and coral
+    stand for Ja, Misschien and Nee.
+  - **Type:** a rounded system font stack, with no web font, so no third-party requests.
+  - **Themes:** light and deep indigo, following the system setting.
+  - **Mobile first:** wide-screen rules sit at the bottom.
+- **The header:** a calendar-and-pin logo (inline SVG, also `wwwroot/favicon.svg`), theme-colour
+  meta tags, and the admin badge as a coral counter bubble.
+- **Answer page:** one row per date (D20).
+  - Each row has a mini calendar (month/day) with the weekday and time, and Ja/Misschien/Nee beside
+    it.
+  - The row turns the colour of the choice (`:has()`).
+  - On a phone the buttons drop below the date and share the full width.
+  - The owner shows as a tilted sun sticker.
+- **Results:**
+  - a "De winnaar" card in sun yellow with a tilted date ticket;
+  - "Zo staat het ervoor", a ranking with one row per date, best on top and least favourite at the
+    bottom (as the user asked). Each row has its rank (★ for a shared first place), the date, a
+    horizontal ja/misschien/nee bar and the counts. The winners' rows are sun yellow, and on a
+    phone the bar drops below the date;
+  - the table cells as tinted chips.
+- **Home:** three tilted calendar tiles (ja/misschien/nee), "Prik samen een datum." with a marker
+  underline, and three numbered steps.
+- **Lists:** each afspraak gets a mini calendar of its first date. The admin lists and the
+  new-poll date rows use the same building blocks.
+- **Confetti** (`site.js`, about 50 lines, the Web Animations API) after an answer is stored and
+  after a poll is made. It never runs with `prefers-reduced-motion`.
+- **`Weergave`:** `Maand`, `DagNummer`, `Weekdag`, `WeekdagKort` and `Procent` (the CSS
+  percentages, always with a dot as decimal separator). 5 new tests, 103 in all.
+
+### Checked by hand (local, browser)
+
+- The home page in light and dark.
+- The answer page at desktop and phone width, light and dark.
+- The thank-you plus confetti (the user saw it; screenshots don't catch animations).
+- The results page's winner card, ranking (desktop, and phone in dark) and table.
+- The new-poll rows.
+
+### Gotchas
+
+- **The first answer-page design was a grid of calendar tiles with tap-to-cycle.** It was turned
+  down as harder to fill in than rows (D20). That's what led to the mock-first rule.
+- **White text on the bright choice colours fails contrast.** The tokens `--op-ja`, `--op-misschien`
+  and `--op-nee` give white text in light mode (on a deeper green and coral) and dark text in dark
+  mode.
+- **`MapStaticAssets` fingerprints `site.js`/`site.css` at build time.** After changing them,
+  rebuild before checking the page.
+
+### Left for later
+
+- Deploying this look needs a gembernodes PR that bumps the image to the merge commit of this PR.
+- The open questions in PLAN.md (respondents seeing each other's answers; a deadline and a final
+  pick).

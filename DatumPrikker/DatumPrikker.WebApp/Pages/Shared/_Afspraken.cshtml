@@ -11,35 +11,39 @@ else
         @foreach (var afspraak in Model)
         {
             var poll = afspraak.Poll;
+            var eerste = poll.Options.Count > 0 ? poll.Options.Min(option => option.Date) : DateOnly.FromDateTime(poll.CreatedOn);
             <li class="afspraak">
-                <div class="afspraak-kop">
-                    <a class="afspraak-titel" href="@(afspraak.IsOwner ? $"/p/{poll.ShareToken}/uitslag" : $"/p/{poll.ShareToken}")">@poll.Title</a>
-                    <span class="label @(poll.IsOpen ? "label-open" : "label-dicht")">@(poll.IsOpen ? "open" : "gesloten")</span>
-                </div>
-                <div class="zacht">
-                    @(afspraak.IsOwner ? "Jouw prikker" : $"Van {poll.OwnerName}") · @Weergave.Bereik(poll)
-                </div>
-                @if (afspraak.IsOwner)
-                {
-                    <div>
-                        @afspraak.AnswerCount @(afspraak.AnswerCount == 1 ? "antwoord" : "antwoorden") ·
-                        <a href="/p/@poll.ShareToken/uitslag">uitslag</a>
+                <span class="mini-kalender" aria-hidden="true"><span>@Weergave.Maand(eerste)</span><b>@Weergave.DagNummer(eerste)</b></span>
+                <div class="afspraak-inhoud">
+                    <div class="afspraak-kop">
+                        <a class="afspraak-titel" href="@(afspraak.IsOwner ? $"/p/{poll.ShareToken}/uitslag" : $"/p/{poll.ShareToken}")">@poll.Title</a>
+                        <span class="label @(poll.IsOpen ? "label-open" : "label-dicht")">@(poll.IsOpen ? "open" : "gesloten")</span>
                     </div>
-                }
-                @if (afspraak.HasAnswered)
-                {
-                    <div>
-                        Jouw antwoord: @Weergave.Samenvatting(afspraak.MyAnswer)
-                        @if (poll.IsOpen)
-                        {
-                            <span>· <a href="/p/@poll.ShareToken">wijzigen</a></span>
-                        }
+                    <div class="zacht">
+                        @(afspraak.IsOwner ? "Jouw prikker" : $"Van {poll.OwnerName}") · @Weergave.Bereik(poll)
                     </div>
-                }
-                else if (poll.IsOpen)
-                {
-                    <div><a href="/p/@poll.ShareToken">Zelf ook antwoorden</a></div>
-                }
+                    @if (afspraak.IsOwner)
+                    {
+                        <div>
+                            @afspraak.AnswerCount @(afspraak.AnswerCount == 1 ? "antwoord" : "antwoorden") ·
+                            <a href="/p/@poll.ShareToken/uitslag">uitslag</a>
+                        </div>
+                    }
+                    @if (afspraak.HasAnswered)
+                    {
+                        <div>
+                            Jouw antwoord: @Weergave.Samenvatting(afspraak.MyAnswer)
+                            @if (poll.IsOpen)
+                            {
+                                <span>· <a href="/p/@poll.ShareToken">wijzigen</a></span>
+                            }
+                        </div>
+                    }
+                    else if (poll.IsOpen)
+                    {
+                        <div><a href="/p/@poll.ShareToken">Zelf ook antwoorden</a></div>
+                    }
+                </div>
             </li>
         }
     </ul>
