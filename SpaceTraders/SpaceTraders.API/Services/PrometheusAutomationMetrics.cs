@@ -75,6 +75,7 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly RunGauge _creditReserve;
     private readonly RunGauge _constructionBlocker;
     private readonly SampledGauge _constructionChainSupply;
+    private readonly SampledGauge _gateForecastHours;
     private readonly RunGauge _exploreSystemsLeft;
     private readonly RunGauge _otherAgentTrades;
     private readonly RunGauge _exploreExplorersWanted;
@@ -248,6 +249,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
             "good",
             "step",
             "kind"));
+        _gateForecastHours = new SampledGauge(Labelled(
+            "spacetraders_gate_forecast_hours",
+            "When the home jump gate will be finished, in hours from now, as the construction plan forecast it at most a minute ago (slice 6.55, D143): limit eta, the slowest of money (the credits paying for what it still needs at the fleet's recent earnings), supply (its sellers giving it without falling short; also per good) and haul (the builders carrying it); 999 for a limit that can't be met.",
+            "limit",
+            "good"));
         _extractedUnits = ZeroFirst(
             "spacetraders_extracted_units_total",
             "Units ships extracted, by ship and good: each extraction's or siphon's yield, before what isn't wanted is jettisoned.",
@@ -725,6 +731,21 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         if (code >= 0)
         {
             _constructionBlocker.Set(code);
+        }
+    }
+
+    /// <inheritdoc />
+    public void GateForecast(IReadOnlyCollection<(string Limit, string Good, double Hours)> hours)
+    {
+        lock (_lock)
+        {
+            _gateForecastHours.Begin();
+            foreach (var (limit, good, value) in hours)
+            {
+                _gateForecastHours.Set(value, limit, good);
+            }
+
+            _gateForecastHours.End();
         }
     }
 

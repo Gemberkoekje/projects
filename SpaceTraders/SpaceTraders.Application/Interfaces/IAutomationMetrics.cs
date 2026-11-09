@@ -179,6 +179,14 @@ public interface IAutomationMetrics
     void ConstructionChain(IReadOnlyCollection<ConstructionChainMetricsSample> chain);
 
     /// <summary>
+    /// Records the home jump gate's forecast (PLAN.md slice 6.55, D143: <c>spacetraders_gate_forecast_hours{limit,good}</c>):
+    /// the hours until it is finished (limit eta) and by each limit (money, supply, haul), each material's supply hours with its
+    /// good; no series without a forecast.
+    /// </summary>
+    /// <param name="hours">The hours, by limit and good (empty for a limit of the whole gate).</param>
+    void GateForecast(IReadOnlyCollection<(string Limit, string Good, double Hours)> hours);
+
+    /// <summary>
     /// Records the cached markets: when each was observed
     /// (<c>spacetraders_market_observed_timestamp_seconds{system,waypoint,waypoint_type}</c>) and, once a
     /// ship has been there, each good's prices, trade volume, supply and activity

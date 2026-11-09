@@ -152,6 +152,7 @@ public sealed class PrometheusMetricsService(
         var (blockerCode, chain) = GateSamples(constructionOn, constructionState);
         metrics.ConstructionBlocker(blockerCode);
         metrics.ConstructionChain(chain);
+        metrics.GateForecast(ForecastSamples(constructionOn, constructionState));
 
         // D51: what a ship purchase must leave, by what the ships that trade can carry, next to the credits; the dearest full
         // hold a trader saves up for (D56); and what the trade and construction trips on their way to buy hold back (D57, D64).
@@ -215,6 +216,50 @@ public sealed class PrometheusMetricsService(
             .Select(side => new ConstructionChainMetricsSample(site.WaypointSymbol, good.TradeSymbol, good.Step, side.Kind, SupplyLevel(side.Supply))))),
         ];
         return (ConstructionBlockers.CodeOf(state.Blocker), chain);
+    }
+
+    /// <summary>
+    /// The home gate's forecast (slice 6.55, D143), from the construction plan's state's JSON: eta, money, supply and haul, and
+    /// each material's supply hours; none while the plan is off, without a readable state, or before a forecast with a limit.
+    /// </summary>
+    private static readonly IReadOnlySet<string> ForecastLimits = new HashSet<string>(StringComparer.Ordinal)
+    {
+        GateForecast.Money,
+        GateForecast.Supply,
+        GateForecast.Haul,
+        GateForecast.Done,
+    };
+
+    internal static IReadOnlyCollection<(string Limit, string Good, double Hours)> ForecastSamples(bool on, string? stateJson)
+    {
+        if (!on || string.IsNullOrWhiteSpace(stateJson))
+        {
+            return [];
+        }
+
+        GateForecastState forecast;
+        try
+        {
+            forecast = JsonSerializer.Deserialize<ConstructionPlanState>(stateJson)?.Forecast ?? new GateForecastState();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+
+        if (!ForecastLimits.Contains(forecast.Binding))
+        {
+            return [];
+        }
+
+        return
+        [
+            ("eta", string.Empty, forecast.EtaHours),
+            (GateForecast.Money, string.Empty, forecast.MoneyHours),
+            (GateForecast.Supply, string.Empty, forecast.SupplyHours),
+            (GateForecast.Haul, string.Empty, forecast.HaulHours),
+            .. forecast.Materials.Select(material => (GateForecast.Supply, material.TradeSymbol, material.SupplyHours)),
+        ];
     }
 
     /// <summary>A supply level as a number: 1 SCARCE to 5 ABUNDANT; 0 when unknown or empty.</summary>

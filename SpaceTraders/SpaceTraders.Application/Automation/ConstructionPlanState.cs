@@ -39,6 +39,13 @@ public sealed record ConstructionPlanState
     /// </summary>
     public string Blocker { get; init; } = string.Empty;
 
+    /// <summary>
+    /// When the home jump gate will be finished, by the slowest of its limits (PLAN.md slice 6.55, D143,
+    /// <see cref="SpaceTraders.Application.Construction.GateForecast"/>), as made at most once a minute; empty in a state
+    /// written before.
+    /// </summary>
+    public GateForecastState Forecast { get; init; } = new();
+
     /// <summary>When the state was written.</summary>
     public required DateTimeOffset UpdatedAt { get; init; }
 }
@@ -96,4 +103,50 @@ public sealed record ConstructionChainGoodState
     /// what it goes into); empty where none does.
     /// </summary>
     public string ImportSupply { get; init; } = string.Empty;
+}
+
+/// <summary>The jump gate's forecast (PLAN.md slice 6.55, D143, <see cref="SpaceTraders.Application.Construction.GateForecast"/>).</summary>
+public sealed record GateForecastState
+{
+    /// <summary>The hours until the gate is finished: the slowest limit.</summary>
+    public double EtaHours { get; init; }
+
+    /// <summary>The hours until the credits pay for what the gate still needs.</summary>
+    public double MoneyHours { get; init; }
+
+    /// <summary>The hours until the slowest material's sellers have given what the gate still needs of it.</summary>
+    public double SupplyHours { get; init; }
+
+    /// <summary>The hours until the builders have carried what the gate still needs.</summary>
+    public double HaulHours { get; init; }
+
+    /// <summary>The slowest limit: money, supply or haul; done when nothing is left to buy; empty before any forecast.</summary>
+    public string Binding { get; init; } = string.Empty;
+
+    /// <summary>What the units the gate still needs will cost, about.</summary>
+    public long RemainingCost { get; init; }
+
+    /// <summary>What the fleet's trades earned an hour lately.</summary>
+    public double EarnedPerHour { get; init; }
+
+    /// <summary>Each material the gate still needs, with its sellers' pace.</summary>
+    public IReadOnlyList<GateForecastMaterialState> Materials { get; init; } = [];
+
+    /// <summary>When the forecast was made.</summary>
+    public DateTimeOffset ComputedAt { get; init; }
+}
+
+/// <summary>One material in the jump gate's forecast (D143).</summary>
+public sealed record GateForecastMaterialState
+{
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>The units still needed that no trip carries or goes to buy.</summary>
+    public required int Remaining { get; init; }
+
+    /// <summary>What its sellers give an hour without falling short, about.</summary>
+    public required double SupplyPerHour { get; init; }
+
+    /// <summary>The hours until they have given what is still needed.</summary>
+    public required double SupplyHours { get; init; }
 }

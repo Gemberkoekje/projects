@@ -1513,6 +1513,49 @@ public sealed class PrometheusAutomationMetricsTests
     /// good and side, and a good that leaves the chain loses its series.
     /// </summary>
     [Fact]
+    public async Task TheGatesForecast_IsOneSeriesPerLimit_AndOnePerMaterial()
+    {
+        // Slice 6.55 (D143): the forecast's hours, by limit, and each material's supply hours by good.
+        _metrics.GateForecast([("eta", string.Empty, 42.33), ("money", string.Empty, 42.33), ("supply", "FAB_MATS", 10)]);
+
+        var text = await ExportAsync();
+        text.Should().Contain("spacetraders_gate_forecast_hours{reset_date=\"2026-09-27\",limit=\"eta\",good=\"\"} 42.33\n");
+        text.Should().Contain("spacetraders_gate_forecast_hours{reset_date=\"2026-09-27\",limit=\"supply\",good=\"FAB_MATS\"} 10\n");
+
+        _metrics.GateForecast([]);
+
+        (await ExportAsync()).Should().NotContain("spacetraders_gate_forecast_hours{");
+    }
+
+    [Fact]
+    public void TheGatesForecast_IsReadFromTheConstructionPlansState_OnlyWhileThePlanIsOn()
+    {
+        var state = JsonSerializer.Serialize(new ConstructionPlanState
+        {
+            Sites = [],
+            Forecast = new GateForecastState
+            {
+                EtaHours = 42.33,
+                MoneyHours = 42.33,
+                SupplyHours = 10,
+                HaulHours = 6.25,
+                Binding = GateForecast.Money,
+                Materials = [new GateForecastMaterialState { TradeSymbol = "FAB_MATS", Remaining = 1_600, SupplyPerHour = 160, SupplyHours = 10 }],
+            },
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+
+        PrometheusMetricsService.ForecastSamples(true, state).Should().Equal(
+            ("eta", string.Empty, 42.33),
+            ("money", string.Empty, 42.33),
+            ("supply", string.Empty, 10.0),
+            ("haul", string.Empty, 6.25),
+            ("supply", "FAB_MATS", 10.0));
+        PrometheusMetricsService.ForecastSamples(false, state).Should().BeEmpty();
+        PrometheusMetricsService.ForecastSamples(true, JsonSerializer.Serialize(new ConstructionPlanState { Sites = [], UpdatedAt = DateTimeOffset.UtcNow })).Should().BeEmpty("a state written before has no forecast");
+    }
+
+    [Fact]
     public async Task WhatStopsTheGate_IsOneSeries_AndTheChainsSupplyOnePerGoodAndSide()
     {
         _metrics.ConstructionBlocker(-1);
