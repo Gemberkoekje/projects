@@ -2,16 +2,38 @@
 @model IndexModel
 @{
     ViewData["Title"] = "Prik samen een datum";
+
+    void Tegel(string maand, string dag, string weekdag, string stempel)
+    {
+        <div class="tegel" aria-hidden="true">
+            <div class="tegel-blad">
+                <span class="tegel-maand">@maand</span>
+                <span class="tegel-dag">@dag</span>
+                <span class="tegel-weekdag">@weekdag</span>
+                <span class="tegel-stempel">@stempel</span>
+            </div>
+        </div>
+    }
 }
 
 @if (Model.Account.IsAnonymous)
 {
     <section class="kaart held">
-        <h1>Prik samen een datum.</h1>
-        <p class="groot">Stel een paar datums voor, deel de link, en zie welke dag het beste uitkomt.</p>
+        <div class="held-plaatje">
+            @{ Tegel("dec", "12", "vrijdag", "Ja!"); }
+            @{ Tegel("dec", "13", "zaterdag", "Misschien"); }
+            @{ Tegel("dec", "14", "zondag", "Nee"); }
+        </div>
+        <h1>Prik samen een <span class="markeer">datum</span>.</h1>
+        <p class="groot">Stel een paar datums voor, deel de link, en zie in één oogopslag welke dag het beste uitkomt.</p>
         <p><a class="knop knop-groot" href="/Nieuw">Nieuwe prikker</a></p>
-        <p class="zacht">Antwoorden kan iedereen, zonder account. Met een account maak je prikkers en zie je al je afspraken op één plek.</p>
+        <ol class="stappen">
+            <li>Kies een paar datums</li>
+            <li>Deel de link</li>
+            <li>Iedereen prikt, zonder account</li>
+        </ol>
     </section>
+    <p class="zacht" style="text-align: center">Met een account maak je prikkers en zie je al je afspraken op één plek.</p>
 }
 else
 {

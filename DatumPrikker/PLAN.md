@@ -14,8 +14,8 @@ only a name and an email address.
 | 1 | Restart: the poll flow in one app | merged (projects#240) |
 | 2 | Accounts: "Mijn afspraken", prefilled email, gentle login nudges | merged (projects#241) |
 | 3 | Admin and access: only approved people make polls | merged (projects#242) |
-| 4 | On gembernodes | manifests ready (gembernodes PR); your steps in DEPLOY.md |
-| 5 | The look: bold and playful | planned |
+| 4 | On gembernodes | live since 2026-11-09 (gembernodes#155, projects#243) |
+| 5 | The look: bold and playful | built, PR open |
 
 Each slice is one PR. Work stops after each one for review.
 
@@ -109,6 +109,11 @@ Each slice is one PR. Work stops after each one for review.
     a neighbour's address in it and read the neighbour's answer.
   - "Niet jij? Begin met een leeg formulier" forgets it, which matters on a shared computer.
   - Logged in, the account's email is used instead and no cookie is written.
+- **D20 The answer page keeps one row per date** (2026-11-09, slice 5). A grid of calendar tiles,
+  with tap-to-cycle, was built and then turned down: rows with Ja/Misschien/Nee beside the date are
+  easier to fill in. Calendar tiles stay only as decoration on the home page. The results follow the
+  same idea: one row per date, ranked from best to least favourite. From now on, every
+  front-end change starts with a mock that the user approves before it's built.
 
 ## Slices
 

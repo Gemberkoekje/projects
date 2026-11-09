@@ -27,6 +27,33 @@ public static class Weergave
         return option.Date.ToString("dddd d MMMM yyyy", Nl);
     }
 
+    /// <summary>The short month for a calendar tile, such as "dec".</summary>
+    /// <param name="date">The day.</param>
+    /// <returns>The text, without a trailing dot.</returns>
+    public static string Maand(DateOnly date) => date.ToString("MMM", Nl).TrimEnd('.');
+
+    /// <summary>The day of the month for a calendar tile, such as "14".</summary>
+    /// <param name="date">The day.</param>
+    /// <returns>The text.</returns>
+    public static string DagNummer(DateOnly date) => date.Day.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>The weekday for a calendar tile, such as "zaterdag".</summary>
+    /// <param name="date">The day.</param>
+    /// <returns>The text.</returns>
+    public static string Weekdag(DateOnly date) => date.ToString("dddd", Nl);
+
+    /// <summary>The short weekday, such as "za".</summary>
+    /// <param name="date">The day.</param>
+    /// <returns>The text.</returns>
+    public static string WeekdagKort(DateOnly date) => date.ToString("ddd", Nl).TrimEnd('.');
+
+    /// <summary>A share of a total as a CSS percentage, such as "66.7%"; 0% when the total is 0.</summary>
+    /// <param name="part">The part.</param>
+    /// <param name="total">The total.</param>
+    /// <returns>The percentage, with a dot as decimal separator whatever the culture.</returns>
+    public static string Procent(int part, int total)
+        => total <= 0 ? "0%" : (100.0 * part / total).ToString("0.#", CultureInfo.InvariantCulture) + "%";
+
     /// <summary>The time range, such as "19:00–22:00", or "hele dag".</summary>
     /// <param name="option">The date option.</param>
     /// <returns>The text.</returns>

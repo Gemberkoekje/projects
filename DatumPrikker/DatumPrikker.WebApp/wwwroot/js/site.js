@@ -77,6 +77,46 @@
         setTimeout(() => { button.textContent = label; }, 2000);
     };
 
+    // A little party when an answer was stored or a poll was made; never for reduced motion.
+    const party = () => {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || typeof Element.prototype.animate !== 'function') {
+            return;
+        }
+
+        const colours = ['#6c3bff', '#ff5c7a', '#ffc83d', '#2ec4a0', '#23a866', '#e8960c'];
+        const layer = document.createElement('div');
+        layer.className = 'confetti';
+        layer.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(layer);
+
+        for (let i = 0; i < 90; i++) {
+            const piece = document.createElement('i');
+            piece.style.left = `${Math.random() * 100}%`;
+            piece.style.background = colours[i % colours.length];
+            if (i % 3 === 0) {
+                piece.style.borderRadius = '50%';
+                piece.style.width = '0.7rem';
+                piece.style.height = '0.7rem';
+            }
+            layer.appendChild(piece);
+
+            const drift = (Math.random() - 0.5) * 240;
+            const fall = window.innerHeight + 60;
+            piece.animate(
+                [
+                    { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+                    { transform: `translate(${drift}px, ${fall}px) rotate(${Math.random() * 720 - 360}deg)`, opacity: 0.9 },
+                ],
+                { duration: 1600 + Math.random() * 1400, delay: Math.random() * 350, easing: 'cubic-bezier(.2,.6,.35,1)', fill: 'forwards' });
+        }
+
+        setTimeout(() => layer.remove(), 3600);
+    };
+
+    if (document.querySelector('[data-feest]')) {
+        party();
+    }
+
     document.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;
         if (!target) {

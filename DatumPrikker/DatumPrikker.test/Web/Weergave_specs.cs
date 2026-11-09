@@ -28,4 +28,24 @@ public sealed class Weergave_specs
     {
         Weergave.Moment(new DateTime(2026, 11, 09, 19, 15, 00, DateTimeKind.Utc)).Should().Be("9 november om 20:15");
     }
+
+    [Test]
+    public void a_calendar_tile_reads_month_day_and_weekday()
+    {
+        var date = new DateOnly(2026, 12, 05);
+
+        Weergave.Maand(date).Should().Be("dec");
+        Weergave.DagNummer(date).Should().Be("5");
+        Weergave.Weekdag(date).Should().Be("zaterdag");
+        Weergave.WeekdagKort(date).Should().Be("za");
+    }
+
+    [TestCase(2, 3, "66.7%")]
+    [TestCase(3, 3, "100%")]
+    [TestCase(0, 3, "0%")]
+    [TestCase(1, 0, "0%")]
+    public void a_share_becomes_a_css_percentage(int part, int total, string expected)
+    {
+        Weergave.Procent(part, total).Should().Be(expected);
+    }
 }

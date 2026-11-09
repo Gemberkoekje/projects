@@ -2,6 +2,8 @@
 @model DatumPrikker.WebApp.Pages.P.UitslagModel
 @{
     var poll = Model.Results.Poll;
+    var total = Model.Results.Answers.Count;
+    var best = Model.Results.Best.Select(tally => tally.Option.Id).ToHashSet();
     ViewData["Title"] = Model.Refusal.Length > 0 ? "Uitslag" : $"Uitslag: {poll.Title}";
 }
 
@@ -17,7 +19,7 @@ else
 {
     @if (Model.Nieuw)
     {
-        <div class="melding melding-goed" role="status"><strong>Je prikker staat klaar!</strong> Deel de link hieronder met iedereen die mag antwoorden.</div>
+        <div class="melding melding-goed" role="status" data-feest><strong>Je prikker staat klaar!</strong> Deel de link hieronder met iedereen die mag antwoorden.</div>
     }
 
     @if (!Model.IsOwner)
@@ -26,14 +28,16 @@ else
     }
 
     <section class="kaart">
-        <h1>@poll.Title</h1>
+        <div class="kaart-kop">
+            <h1>@poll.Title</h1>
+            <span class="label @(poll.IsOpen ? "label-open" : "label-dicht")">@(poll.IsOpen ? "open" : "gesloten")</span>
+        </div>
         <div class="deel">
             <input class="deel-link" readonly value="@Model.ShareUrl" aria-label="Link naar de prikker" />
             <button type="button" class="knop" data-kopieer="@Model.ShareUrl">Kopieer link</button>
         </div>
-        <p class="zacht">
-            @Model.Results.Answers.Count @(Model.Results.Answers.Count == 1 ? "antwoord" : "antwoorden") ·
-            @(poll.IsOpen ? "open" : "gesloten") ·
+        <p class="zacht" style="margin-top: 0.8rem">
+            @total @(total == 1 ? "antwoord" : "antwoorden") ·
             <a href="/p/@poll.ShareToken">zelf antwoorden</a>
         </p>
     </section>
@@ -41,19 +45,59 @@ else
     @if (Model.Results.Best.Count > 0)
     {
         <section class="kaart beste">
-            <h2>@(Model.Results.Best.Count == 1 ? "Beste keuze" : "Beste keuzes")</h2>
-            <ul>
+            <span class="lint">@(Model.Results.Best.Count == 1 ? "De winnaar" : "Gedeelde eerste plaats")</span>
+            <div class="beste-lijst">
                 @foreach (var tally in Model.Results.Best)
                 {
-                    <li><strong>@Weergave.DagLang(tally.Option)</strong>, @Weergave.Tijd(tally.Option): @tally.Yes&times; ja, @tally.Maybe&times; misschien</li>
+                    <div class="beste-datum">
+                        <span class="mini-kalender"><span>@Weergave.Maand(tally.Option.Date)</span><b>@Weergave.DagNummer(tally.Option.Date)</b></span>
+                        <div>
+                            <strong>@Weergave.Weekdag(tally.Option.Date), @Weergave.Tijd(tally.Option)</strong>
+                            @tally.Yes&times; ja@(tally.Maybe > 0 ? $", {tally.Maybe}× misschien" : string.Empty)
+                        </div>
+                    </div>
                 }
-            </ul>
+            </div>
+        </section>
+    }
+
+    @if (total > 0)
+    {
+        <section class="kaart">
+            <h2>Zo staat het ervoor</h2>
+            <p class="zacht hint">Van beste naar minst gunstige datum: meeste ja, dan meeste misschien.</p>
+            <ol class="ranglijst">
+                @for (var plek = 0; plek < Model.Results.Ranked.Count; plek++)
+                {
+                    var tally = Model.Results.Ranked[plek];
+                    var isBest = best.Contains(tally.Option.Id);
+                    <li class="rang-rij @(isBest ? "rang-beste" : string.Empty)">
+                        <span class="rang-nummer" aria-label="Plek @(plek + 1)">@(isBest ? "★" : (plek + 1).ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+                        <div class="keuze-datum">
+                            <span class="mini-kalender" aria-hidden="true"><span>@Weergave.Maand(tally.Option.Date)</span><b>@Weergave.DagNummer(tally.Option.Date)</b></span>
+                            <div>
+                                <strong>@Weergave.Weekdag(tally.Option.Date)</strong>
+                                <span class="zacht">@Weergave.Tijd(tally.Option)</span>
+                            </div>
+                        </div>
+                        <div class="rang-score">
+                            <div class="rang-balk" aria-hidden="true">
+                                <span class="balk-ja" style="width: @Weergave.Procent(tally.Yes, total)"></span>
+                                <span class="balk-misschien" style="width: @Weergave.Procent(tally.Maybe, total)"></span>
+                                <span class="balk-nee" style="width: @Weergave.Procent(tally.No, total)"></span>
+                            </div>
+                            <div class="rang-telling">@tally.Yes ja · @tally.Maybe misschien · @tally.No nee</div>
+                        </div>
+                    </li>
+                }
+            </ol>
+            <div class="legenda"><span><i class="l-ja"></i>ja</span><span><i class="l-misschien"></i>misschien</span><span><i class="l-nee"></i>nee</span></div>
         </section>
     }
 
     <section class="kaart">
         <h2>Wie kan wanneer</h2>
-        @if (Model.Results.Answers.Count == 0)
+        @if (total == 0)
         {
             <p>Nog niemand heeft geantwoord. Deel de link!</p>
         }
