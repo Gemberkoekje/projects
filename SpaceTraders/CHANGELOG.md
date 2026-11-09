@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-09, slice 6.55)
+- The jump gate's forecast (D143): when it will be finished, by the slowest of money, supply and haul, made at most once a
+  minute; `spacetraders_gate_forecast_hours{limit,good}`. It only observes: no purchase reads it yet.
+
 ### Code – Fixed (2026-11-09, slice 6.54)
 - B85: a new trade trip no longer leaves what the gate's next load costs (D137's second half, undone): cargo leaves only
   `Trade.FuelReserveCredits` and what trips on their way to buy hold back (D24, D57). From 2026-11-08 18:30Z no trade trip

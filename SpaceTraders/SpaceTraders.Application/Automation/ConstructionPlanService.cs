@@ -61,6 +61,7 @@ public sealed class ConstructionPlanService(
     IPurchaseOrder purchaseOrder,
     ConstructionRetries retries,
     PassedOverShips passedOver,
+    ILedgerRepository ledger,
     ILogger<ConstructionPlanService> logger) : IConstructionPlanService
 {
     /// <summary>A free builder bought no load: a purchase before it in the order ships are bought in (D64).</summary>
@@ -73,6 +74,24 @@ public sealed class ConstructionPlanService(
     private const string Purchase = "purchase";
 
     private static readonly JsonSerializerOptions CompareOptions = new();
+
+    /// <summary>How often the gate's forecast is made (D143).</summary>
+    private static readonly TimeSpan ForecastInterval = TimeSpan.FromMinutes(1);
+
+    /// <summary>The time the fleet's earnings are measured over (D143).</summary>
+    private static readonly TimeSpan EarningsWindow = TimeSpan.FromHours(2);
+
+    /// <summary>The time what was bought of each material is measured over (D143).</summary>
+    private static readonly TimeSpan SupplyWindow = TimeSpan.FromHours(6);
+
+    /// <summary>What the fleet's trades earn by, after their cargo and fuel (D143).</summary>
+    private static readonly IReadOnlySet<string> EarningCategories = new HashSet<string>(StringComparer.Ordinal)
+    {
+        nameof(LedgerCategory.TradeSell),
+        nameof(LedgerCategory.TradeBuy),
+        nameof(LedgerCategory.MiningSell),
+        nameof(LedgerCategory.FuelPurchase),
+    };
 
     /// <inheritdoc />
     public async Task EnsureBootstrappedAsync(CancellationToken cancellationToken = default)
@@ -132,7 +151,44 @@ public sealed class ConstructionPlanService(
             builders.Select(ship => ship.Symbol),
             pass.FreeBuilders().Select(ship => ship.Symbol));
 
+        pass.Forecast = await ForecastAsync(pass, now, cancellationToken);
         await SaveStateAsync(pass, now, cancellationToken);
+    }
+
+    /// <summary>
+    /// The home gate's forecast (PLAN.md slice 6.55, D143, <see cref="GateForecast"/>), made at most once a minute, else the
+    /// last one: what a load may spend, what the fleet's trades earned in the last <see cref="EarningsWindow"/>, what was bought
+    /// of each material in the last <see cref="SupplyWindow"/>, and the builders' holds there. Only observes.
+    /// </summary>
+    private async Task<GateForecastState> ForecastAsync(Pass pass, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var last = (await plans.GetAsync<ConstructionPlanState>(PlanTypes.Construction, cancellationToken))?.Forecast ?? new GateForecastState();
+        if (now - last.ComputedAt < ForecastInterval)
+        {
+            return last;
+        }
+
+        if (pass.Sites.Count == 0)
+        {
+            return new GateForecastState { Binding = pass.GateDone ? GateForecast.Done : string.Empty, ComputedAt = now };
+        }
+
+        var (site, map, system) = pass.Sites[0];
+        var spendable = (await budget.EvaluateConstructionAsync(cancellationToken)).SpendableCredits;
+        var entries = await ledger.GetRangeAsync(from: now - SupplyWindow, limit: 20_000, cancellationToken: cancellationToken);
+        var earned = entries
+            .Where(entry => entry.OccurredAt >= now - EarningsWindow && EarningCategories.Contains(entry.Category))
+            .Sum(entry => entry.Amount) / EarningsWindow.TotalHours;
+        var bought = entries
+            .Where(entry => (entry.Category == nameof(LedgerCategory.ConstructionBuy) || entry.Category == nameof(LedgerCategory.TradeBuy))
+                && entry.GoodSymbol is { Length: > 0 }
+                && entry.Units is > 0)
+            .GroupBy(entry => entry.GoodSymbol!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Sum(entry => entry.Units!.Value) / SupplyWindow.TotalHours, StringComparer.OrdinalIgnoreCase);
+        var capacity = pass.Builders
+            .Where(builder => string.Equals(builder.SystemSymbol, system, StringComparison.OrdinalIgnoreCase))
+            .Sum(builder => builder.CargoCapacity);
+        return GateForecast.Of(map, ConstructionPlanner.Needs(site, pass.Trips), system, spendable, earned, capacity, bought, now);
     }
 
     /// <summary>
@@ -382,6 +438,7 @@ public sealed class ConstructionPlanService(
             ReadyShipSymbols = [.. pass.Ready.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal)],
             Waiting = pass.Waiting,
             Blocker = pass.Blocker,
+            Forecast = pass.Forecast,
             UpdatedAt = now,
         };
 
@@ -415,6 +472,9 @@ public sealed class ConstructionPlanService(
 
         /// <summary>What stops the gate, as this pass saw it (D139).</summary>
         public string Blocker { get; set; } = string.Empty;
+
+        /// <summary>The gate's forecast (D143).</summary>
+        public GateForecastState Forecast { get; set; } = new();
 
         /// <summary>The builders that are free now.</summary>
         public IEnumerable<ShipModel> FreeBuilders()

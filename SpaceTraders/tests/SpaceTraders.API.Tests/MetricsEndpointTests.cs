@@ -75,6 +75,7 @@ public sealed class MetricsEndpointTests
         "spacetraders_construction_units_fulfilled",
         "spacetraders_construction_blocker",
         "spacetraders_construction_chain_supply",
+        "spacetraders_gate_forecast_hours",
         "spacetraders_api_requests_initiated_total",
         "spacetraders_api_requests_total",
         "spacetraders_api_throttled_total",

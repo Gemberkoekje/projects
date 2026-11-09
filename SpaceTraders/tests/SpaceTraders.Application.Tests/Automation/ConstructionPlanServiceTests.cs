@@ -37,6 +37,7 @@ public sealed class ConstructionPlanServiceTests
     private readonly ConstructionRetries _retries = new();
     private readonly LogRecorder _log = new();
     private readonly PassedOverShips _passedOver = new();
+    private readonly ILedgerRepository _ledger = Substitute.For<ILedgerRepository>();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private ConstructionPlanState? _state;
 
@@ -362,6 +363,11 @@ public sealed class ConstructionPlanServiceTests
         _state.BuilderShipSymbols.Should().Equal("SHIP-6");
         _state.ReadyShipSymbols.Should().Equal("SHIP-6");
         _state.Waiting.Should().BeEmpty();
+
+        // Slice 6.55 (D143): with the gate's forecast, made from the ledger's last hours, which is empty here: no earnings.
+        _state.Forecast.Binding.Should().Be(GateForecast.Money);
+        _state.Forecast.MoneyHours.Should().Be(GateForecast.Never);
+        _state.Forecast.Materials.Select(material => material.TradeSymbol).Should().Equal("FAB_MATS", "ADVANCED_CIRCUITRY");
     }
 
     [Fact]
@@ -481,6 +487,7 @@ public sealed class ConstructionPlanServiceTests
                 _order,
                 _retries,
                 _passedOver,
+                _ledger,
                 _log.For<ConstructionPlanService>())
             .EnsureBootstrappedAsync();
 }
