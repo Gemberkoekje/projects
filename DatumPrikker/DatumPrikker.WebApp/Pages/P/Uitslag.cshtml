@@ -1,0 +1,108 @@
+@page "/p/{token}/uitslag"
+@model DatumPrikker.WebApp.Pages.P.UitslagModel
+@{
+    var poll = Model.Results.Poll;
+    ViewData["Title"] = Model.Refusal.Length > 0 ? "Uitslag" : $"Uitslag: {poll.Title}";
+}
+
+@if (Model.Refusal.Length > 0)
+{
+    <section class="kaart smal">
+        <h1>Uitslag</h1>
+        <p>@Model.Refusal</p>
+        <p><a class="knop" href="/">Naar de voorpagina</a></p>
+    </section>
+}
+else
+{
+    @if (Model.Nieuw)
+    {
+        <div class="melding melding-goed" role="status"><strong>Je prikker staat klaar!</strong> Deel de link hieronder met iedereen die mag antwoorden.</div>
+    }
+
+    <section class="kaart">
+        <h1>@poll.Title</h1>
+        <div class="deel">
+            <input class="deel-link" readonly value="@Model.ShareUrl" aria-label="Link naar de prikker" />
+            <button type="button" class="knop" data-kopieer="@Model.ShareUrl">Kopieer link</button>
+        </div>
+        <p class="zacht">
+            @Model.Results.Answers.Count @(Model.Results.Answers.Count == 1 ? "antwoord" : "antwoorden") ·
+            @(poll.IsOpen ? "open" : "gesloten") ·
+            <a href="/p/@poll.ShareToken">zelf antwoorden</a>
+        </p>
+    </section>
+
+    @if (Model.Results.Best.Count > 0)
+    {
+        <section class="kaart beste">
+            <h2>@(Model.Results.Best.Count == 1 ? "Beste keuze" : "Beste keuzes")</h2>
+            <ul>
+                @foreach (var tally in Model.Results.Best)
+                {
+                    <li><strong>@Weergave.DagLang(tally.Option)</strong>, @Weergave.Tijd(tally.Option): @tally.Yes&times; ja, @tally.Maybe&times; misschien</li>
+                }
+            </ul>
+        </section>
+    }
+
+    <section class="kaart">
+        <h2>Wie kan wanneer</h2>
+        @if (Model.Results.Answers.Count == 0)
+        {
+            <p>Nog niemand heeft geantwoord. Deel de link!</p>
+        }
+        else
+        {
+            <div class="tabel-scroll">
+                <table class="uitslag">
+                    <thead>
+                        <tr>
+                            <th scope="col">Wie</th>
+                            @foreach (var option in poll.Options)
+                            {
+                                <th scope="col">@Weergave.Dag(option)<br /><small>@Weergave.Tijd(option)</small></th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var answer in Model.Results.Answers)
+                        {
+                            <tr>
+                                <th scope="row">
+                                    @answer.Name
+                                    <small class="zacht">@answer.Email</small>
+                                    @if (answer.Comment.Length > 0)
+                                    {
+                                        <span class="opmerking">“@answer.Comment”</span>
+                                    }
+                                </th>
+                                @foreach (var option in poll.Options)
+                                {
+                                    var keuze = answer.ChoiceFor(option.Id);
+                                    <td class="cel cel-@Weergave.Klasse(keuze)">@Weergave.Woord(keuze)</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th scope="row">Ja / misschien / nee</th>
+                            @foreach (var tally in Model.Results.Options)
+                            {
+                                <td>@tally.Yes / @tally.Maybe / @tally.No</td>
+                            }
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </section>
+
+    @if (poll.IsOpen)
+    {
+        <form method="post" asp-page-handler="Sluiten" data-bevestig="Prikker sluiten? Daarna kan niemand meer antwoorden.">
+            <button type="submit" class="knop knop-licht">Prikker sluiten</button>
+        </form>
+    }
+}

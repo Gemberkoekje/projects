@@ -1,0 +1,29 @@
+@page
+@model AanmeldenModel
+@{
+    ViewData["Title"] = "Inloggen";
+}
+
+<section class="kaart smal">
+    <h1>Inloggen</h1>
+    <p>Met een account maak je prikkers en vind je ze later terug. Antwoorden op een prikker kan ook zonder.</p>
+
+    @if (Model.Providers.Count == 0 && !Model.DevLogin)
+    {
+        <div class="melding">Inloggen is nog niet ingesteld. Vraag de beheerder om Google of Microsoft te koppelen.</div>
+    }
+
+    @foreach (var provider in Model.Providers)
+    {
+        <form method="post" class="aanmeld-knop">
+            <input type="hidden" name="provider" value="@provider.Scheme" />
+            <input type="hidden" asp-for="ReturnUrl" />
+            <button type="submit" class="knop knop-groot knop-blok">Inloggen met @provider.Label</button>
+        </form>
+    }
+
+    @if (Model.DevLogin)
+    {
+        <p class="zacht">Development: <a href="/Dev/Aanmelden?ReturnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">inloggen zonder provider</a>.</p>
+    }
+</section>

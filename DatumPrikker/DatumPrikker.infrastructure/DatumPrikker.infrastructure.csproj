@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DatumPrikker.infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DatumPrikker.test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- For IXmlRepository: the data-protection key ring lives in PostgreSQL next to everything else. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Marten" />
+    <PackageReference Include="Qowaiv" />
+    <PackageReference Include="Qowaiv.Validation.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DatumPrikker.application/DatumPrikker.application.csproj" />
+    <ProjectReference Include="../DatumPrikker.core/DatumPrikker.core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,17 @@
+@page
+@model DatumPrikker.WebApp.Pages.Dev.AanmeldenModel
+@{
+    ViewData["Title"] = "Dev-login";
+}
+
+<section class="kaart smal">
+    <h1>Dev-login</h1>
+    <p class="zacht">Alleen in Development: log in als wie je wilt, zonder Google of Microsoft.</p>
+    <partial name="_Fouten" model="ModelState" />
+    <form method="post" class="formulier">
+        <input type="hidden" asp-for="ReturnUrl" />
+        <label>Naam <input asp-for="Name" autocomplete="name" /></label>
+        <label>E-mailadres <input asp-for="Email" type="email" autocomplete="email" /></label>
+        <button type="submit" class="knop">Inloggen</button>
+    </form>
+</section>

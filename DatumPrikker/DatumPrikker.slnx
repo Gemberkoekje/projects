@@ -1,8 +1,14 @@
 <Solution>
-  <Project Path=".net.csproj" />
-  <Project Path="DatumPrikker.ApiService/DatumPrikker.ApiService.csproj" />
-  <Project Path="DatumPrikker.AppHost/DatumPrikker.AppHost.csproj" />
-  <Project Path="DatumPrikker.ServiceDefaults/DatumPrikker.ServiceDefaults.csproj" />
-  <Project Path="DatumPrikker.Tests/DatumPrikker.Tests.csproj" />
-  <Project Path="DatumPrikker.Web/DatumPrikker.Web.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path=".globalconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="Dockerfile" />
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="DatumPrikker.core/DatumPrikker.core.csproj" />
+  <Project Path="DatumPrikker.application/DatumPrikker.application.csproj" />
+  <Project Path="DatumPrikker.infrastructure/DatumPrikker.infrastructure.csproj" />
+  <Project Path="DatumPrikker.WebApp/DatumPrikker.WebApp.csproj" />
+  <Project Path="DatumPrikker.test/DatumPrikker.test.csproj" />
 </Solution>
