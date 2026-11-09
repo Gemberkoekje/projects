@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-09, slice 6.57)
+- D145: a trade trip that started feeding the jump gate's chain finishes on those terms when the gate's forecast later holds
+  feeder trips back: it isn't dropped or moved for earning too little. Asked: "I'd like a trader to finish a trip once they
+  started it, if the reason of changing the trip is these changing priorities."
+
+### Code – Changed (2026-11-09, slice 6.56)
+- D144: the trips that feed the jump gate's chain go first only while the gate's forecast says supply finishes it last (or
+  before its first forecast); while money does, they rank and pay as any other trip. Asked: "prioritize feeder trips only
+  when supply binds".
+
 ### Code – Added (2026-11-09, slice 6.55)
 - The jump gate's forecast (D143): when it will be finished, by the slowest of money, supply and haul, made at most once a
   minute; `spacetraders_gate_forecast_hours{limit,good}`. It only observes: no purchase reads it yet.

@@ -108,7 +108,8 @@ public sealed class TradeContextReader(
     ISystemRepository systems,
     IMarketPredictions predictions,
     IPredictionConfidence confidence,
-    PurchaseNeeds purchaseNeeds) : ITradeContextReader
+    PurchaseNeeds purchaseNeeds,
+    IPlanRepository plans) : ITradeContextReader
 {
     /// <summary>The setting that holds the profit per unit, after fuel, a trip must earn (D14).</summary>
     public const string MinProfitPerUnitSetting = "Trade.MinProfitPerUnit";
@@ -189,11 +190,13 @@ public sealed class TradeContextReader(
             now,
             cancellationToken);
         stale.ExceptWith(predicted.Keys);
+        var feedersFirst = await FeedersFirstAsync(now, cancellationToken);
         var map = new TradeMarketMap(reachWaypoints, reachMarkets, basics.Chains)
         {
             ConstructionMaterials = home.Length > 0 ? await MaterialsAsync(home, cancellationToken) : new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             ConstructionSystemSymbol = home,
-            ConstructionFirst = GateCanBeBuilt(now),
+            ConstructionFirst = feedersFirst,
+            FeedersHeldBack = GateCanBeBuilt(now) && !feedersFirst,
             StaleMarkets = stale,
             PredictionWeights = predicted,
             Gates = network is null
@@ -250,11 +253,14 @@ public sealed class TradeContextReader(
             }
         }
 
+        var at = TimeProvider.System.GetUtcNow();
+        var feedersFirst = await FeedersFirstAsync(at, cancellationToken);
         return new TradeContext(
             new TradeMarketMap(systemWaypoints, systemMarkets, basics.Chains)
             {
                 ConstructionMaterials = await MaterialsAsync(systemSymbol, cancellationToken),
-                ConstructionFirst = GateCanBeBuilt(TimeProvider.System.GetUtcNow()),
+                ConstructionFirst = feedersFirst,
+                FeedersHeldBack = GateCanBeBuilt(at) && !feedersFirst,
                 PredictionWeights = predicted,
             },
             basics.Credits,
@@ -306,6 +312,24 @@ public sealed class TradeContextReader(
     /// rank and pay as any other (<see cref="TradeMarketMap.ConstructionFirst"/>).
     /// </summary>
     private bool GateCanBeBuilt(DateTimeOffset now) => !purchaseNeeds.OpenBefore(PurchaseTier.Construction, now);
+
+    /// <summary>
+    /// Whether the routes that feed the jump gate's chain go first (<see cref="TradeMarketMap.ConstructionFirst"/>): once the gate
+    /// can be built (D136), and only while its forecast says supply is what finishes it last (PLAN.md slice 6.56, D144). Asked on
+    /// 2026-11-09, "prioritize feeder trips only when supply binds", after two of the four cargo ships spent two hours on feeder
+    /// trips of −700 to +700 credits each while money set the finish (money 14.65 hours, supply 10.23). Before the first forecast
+    /// they go first, as before.
+    /// </summary>
+    private async Task<bool> FeedersFirstAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (!GateCanBeBuilt(now))
+        {
+            return false;
+        }
+
+        var binding = (await plans.GetAsync<ConstructionPlanState>(PlanTypes.Construction, cancellationToken))?.Forecast.Binding ?? string.Empty;
+        return binding.Length == 0 || binding == GateForecast.Supply;
+    }
 
     /// <summary>
     /// D140: whether the gate's next load waits only for one of our ships, as the construction plan last said it, once the gate

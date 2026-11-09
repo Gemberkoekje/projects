@@ -418,6 +418,13 @@ public sealed record TradeBetweenMarketsGoal : TripGoal
     public string FeedsTradeSymbol { get; init; } = string.Empty;
 
     /// <summary>
+    /// True when the trip was chosen as one that feeds the jump gate's chain, while those went first (D89, D90): it keeps the
+    /// terms it started on, selling at cost, when the gate's forecast later holds such trips back (PLAN.md slice 6.57, D145).
+    /// False for a trip stored before slice 6.57.
+    /// </summary>
+    public bool FeedsGate { get; init; }
+
+    /// <summary>
     /// The credits the trip holds back for its cargo from the moment it starts towards the buy market until the cargo is
     /// aboard (D57): what its units were expected to cost when it was chosen, each batch a step dearer (D79), less what the
     /// batches bought so far cost. Other trips and ship purchases leave them. 0 for cargo the ship already held, and for a trip

@@ -626,6 +626,66 @@ public sealed class TradeBetweenMarketsGoalExecutorTests
         _log.Journal.Should().ContainSingle(e => e.EventKind == "CargoSold" && Equals(e.Properties["Revenue"], 139_480L));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AtTheBuyMarket_ATripThatStartedFeedingTheGate_KeepsItsTerms_WhenTheForecastHoldsFeedersBack(bool startedAsFeeder)
+    {
+        // D145, asked on 2026-11-09: "I'd like a trader to finish a trip once they started it, if the reason of changing the
+        // trip is these changing priorities". K85 charges 3,487, what D41 pays: a trip chosen as a feeder still buys, though money
+        // now finishes the gate last (D144); one that wasn't is dropped, as before.
+        PricesAre(HeldBack(K85Market(equipmentPrice: 3_487), D41Market(), A1Market()));
+        BuyReturns(units: 40, total: 139_480);
+
+        await StepAsync(CommandShip(K85), Trip() with { FeedsGate = startedAsFeeder });
+
+        if (startedAsFeeder)
+        {
+            await _port.Received(1).BuyCargoAsync("SHIP-1", "EQUIPMENT", 40, Arg.Any<CancellationToken>());
+            _log.Journal.Should().NotContain(e => e.EventKind == "TradeDropped");
+        }
+        else
+        {
+            await _port.DidNotReceiveWithAnyArgs().BuyCargoAsync(default!, default!, default, default);
+            _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeDropped" && Equals(e.Properties["MinProfitPerUnit"], 200));
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AtTheSellMarket_ATripThatStartedFeedingTheGate_SellsThere_WhenTheForecastHoldsFeedersBack(bool startedAsFeeder)
+    {
+        // D145: D41 pays 3,300, 46 a unit over what the cargo cost; A1 pays 3,499. The feeder trip sells at D41 as it set out to;
+        // another trip takes the cargo to A1.
+        PricesAre(HeldBack(K85Market(), D41Market(equipmentPrice: 3_300), A1Market()));
+        SellReturns(total: 132_000);
+
+        await StepAsync(Loaded(D41), Trip(bought: true) with { FeedsGate = startedAsFeeder });
+
+        if (startedAsFeeder)
+        {
+            await _port.Received(1).SellCargoAsync("SHIP-1", "EQUIPMENT", 40, Arg.Any<CancellationToken>());
+        }
+        else
+        {
+            await _port.DidNotReceiveWithAnyArgs().SellCargoAsync(default!, default!, default, default);
+            _log.Journal.Should().ContainSingle(e => e.EventKind == "TradeRerouted" && Equals(e.Properties["SellWaypoint"], A1));
+        }
+    }
+
+    /// <summary>
+    /// The markets given, the jump gate needing SHIP_PARTS, but its forecast holding the feeder trips back (D144): money finishes
+    /// it last.
+    /// </summary>
+    private static TradeMarketMap HeldBack(params MarketSnapshot[] markets)
+        => new(Waypoints, markets, MadeFrom)
+        {
+            ConstructionMaterials = new HashSet<string>(["SHIP_PARTS"], StringComparer.OrdinalIgnoreCase),
+            ConstructionFirst = false,
+            FeedersHeldBack = true,
+        };
+
     /// <summary>The markets given, with the jump gate needing SHIP_PARTS, which D41 makes from EQUIPMENT, or nothing (D89).</summary>
     private static TradeMarketMap GateNeeds(bool shipParts, params MarketSnapshot[] markets)
         => new(Waypoints, markets, MadeFrom)

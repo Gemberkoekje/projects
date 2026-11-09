@@ -157,6 +157,13 @@ public sealed class TradeMarketMap
     public bool ConstructionFirst { get; init; } = true;
 
     /// <summary>
+    /// Whether <see cref="ConstructionFirst"/> is off only because the gate's forecast says money or haul finishes it last
+    /// (PLAN.md slices 6.56 and 6.57, D144, D145): the gate can be built. A trip that started feeding the chain then keeps
+    /// its terms (<see cref="WithFeedersFirst"/>). False unless set.
+    /// </summary>
+    public bool FeedersHeldBack { get; init; }
+
+    /// <summary>
     /// The system whose jump gate needs <see cref="ConstructionMaterials"/> (D68: the headquarters'): only its markets feed the
     /// gate (D89). Empty for any market, as a map of that one system has it.
     /// </summary>
@@ -169,6 +176,14 @@ public sealed class TradeMarketMap
     /// <returns>The map, every waypoint of another system out of reach.</returns>
     public TradeMarketMap WithoutJumps()
         => ReferenceEquals(Gates, TradeGates.None) ? this : new TradeMarketMap(this);
+
+    /// <summary>
+    /// The same map with the routes that feed the jump gate's chain going first (D145): what a trip that started as one trades
+    /// by while the gate's forecast holds such trips back (<see cref="FeedersHeldBack"/>). Otherwise the map itself.
+    /// </summary>
+    /// <returns>The map, feeders first.</returns>
+    public TradeMarketMap WithFeedersFirst()
+        => FeedersHeldBack ? new TradeMarketMap(this) { Gates = Gates, ConstructionFirst = true } : this;
 
     /// <summary>
     /// The same map with the markets whose prices are too old to decide by (<see cref="StaleMarkets"/>): what mining abroad reads
