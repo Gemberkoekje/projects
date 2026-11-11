@@ -492,20 +492,25 @@ kubectl -n zeef exec deploy/qbittorrent -- s6-setuidgid abc sh -c 'mkdir -p /dat
     searches fail until you make a new one.
   - Test. It detects the user class and VIP status.
   - "Protect Unsatisfied Slots" on (the default), Safety Reserve `5`.
-  - Seed Time `96` hours. MAM's minimum is 72; the margin covers restarts.
+  - Seed Time at least `72` hours (set to 256). The force-started torrents below ignore it; it
+    only counts for a MAM torrent that isn't force-started.
   - Priority (Show Advanced) `10`, below the public indexers' 25. Chaptarr ranks title match,
     category, format, profile and protocol first, then indexer priority, then size and seeders.
     Without it, a busy public torrent wins over the same book on MAM.
 - **A second qBittorrent client, for MAM.** A torrent waiting in qBittorrent's queue doesn't
   announce, so it earns no seeding time on MAM. Settings → Download Clients → + → qBittorrent:
-  - name "qBittorrent MAM", the same host and API key, Audiobook Category `chaptarr-mam`;
+  - name "qbittorrent MAM", the same host and API key, Audiobook Category `chaptarr mam`;
   - **Initial State: Force Start**, Remove Completed and Remove Failed on;
-  - then, in the MyAnonaMouse indexer: Download Client (Show Advanced) "qBittorrent MAM".
+  - then, in the MyAnonaMouse indexer: Download Client (Show Advanced) "qbittorrent MAM".
 
   Forced torrents skip the queue, and qBittorrent applies no seeding limits to them: they seed
   until you stop them, and Chaptarr never removes them. The library copy is a hardlink, so that
-  costs no extra space. Stop old ones by hand (category `chaptarr-mam`) once MAM counts them as
+  costs no extra space. Stop old ones by hand (category `chaptarr mam`) once MAM counts them as
   seeded, or leave them running for MAM's bonus points.
+
+  **A MAM torrent added to qBittorrent by hand** gets no Force Start. Give it category
+  `chaptarr mam` (Chaptarr then imports it, as it did *Elantris*), then right-click → Force Start.
+  Otherwise the global limits apply (ratio 2.0 or 7 days), and it can wait in the queue.
 - **Searching again:** Chaptarr has no scheduled search for missing books, and RSS only sees new
   uploads. After adding an indexer, or to retry: Wanted → Missing → **Search All**, or tick books
   and Search Selected. Interactive Search (the person icon) lists every release, with the reason
@@ -614,6 +619,6 @@ after such a failure Prowlarr pauses the indexer for a while.
 - [ ] The phone app plays it, and progress matches in the browser.
 - [ ] A public torrent: after 7 days (ratio doesn't count in category `chaptarr`), Chaptarr
       removes it and its staging copy, and the book stays.
-- [ ] A MAM torrent is in category `chaptarr-mam`, force-started, with every file wanted, and keeps
+- [ ] A MAM torrent is in category `chaptarr mam`, force-started, with every file wanted, and keeps
       seeding.
 - [ ] The first ABS backup appears in `/metadata/backups`.
