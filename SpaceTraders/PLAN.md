@@ -74,6 +74,7 @@
   - B83 (found on 2026-10-29), B81 and B82 (B80's alarm is fixed; its wait is D124, yours), B17 in part, and B24 (below).
   - D79's second step: learning the price steps per good and market from the bot's own trades. Until then a trip's
     batches are estimated with the measured medians (slice 6.16).
+  - B88 (found on 2026-11-11): the bot's memory grew to its 2 GiB limit, which started the outage of that day (B86, B87).
 - **The cluster** (gembernodes):
   - Postgres is one Bitnami instance every app shares (`postgresql.flux-system`, LAN address 192.168.1.232). Its 32Gi
     volume sits on the QNAP NFS share that every PVC uses, and the NFS CSI driver most likely doesn't enforce the 32Gi,
@@ -101,6 +102,9 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B82 | **Ships left idle while a plan has work they could do** (found on 2026-10-11, by phase 6's check; not investigated yet).<br>• `ShipLeftIdle` still fired 48 times after B74–B77's deploy: probes while their system's markets were due, the survey ship SPECTER-2C while targets waited, cargo ships while trade routes waited.<br>• Some came about 20 minutes after a pod start; others didn't. | 26 ProbeDeployment, 11 Survey, 11 Trading raises; e.g. 2026-10-09 19:59–20:01Z (B78's pod up at 19:38Z) and 2026-10-10 18:11Z (B79's at 17:51Z), but also 2026-10-09 23:0xZ | 3.2 |
 | B83 | **A navigate that lost its answer was sent again on every step** (found on 2026-10-29, from Loki).<br>• On 2026-10-18 at 06:45:45Z SPECTER-226's navigate from X1-QK87-X45A to X1-QK87-XF4Z failed with a cancelled connection, but the API had carried it out; the cache kept the ship in orbit at X45A.<br>• Every step sent the navigate again: 16 times the API answered that the ship was in transit, then 200 times over six hours, until the reset, that it was already at the destination. One failing step a tick never trips the circuit breaker, which counts steps a minute.<br>• Fix: those refusals (4200, 4214, 4204) become `NavigateRefusedException`; the navigate then reads the ship's nav from the API, stores it and schedules its arrival. | `@i=843e475f` for SPECTER-226, 2026-10-18 06:45:58–12:57:36Z; `LostNavigateAnswerTests` (failed before the fix) | 6.4 (`GoalFlight`); fixed in projects#218 |
 | B85 | **No trade trip for 14 hours: D137 held the gate's next load back from every new trade** (seen on 2026-11-09, fixed in slice 6.54).<br>• From 2026-11-08 18:30Z, minutes before slice 6.50 went live, no `TradeStarted`: a new trade trip left what the gate's next load cost (`TradeContext.GateLoadCredits`, 128,000 to 361,000) while the credits stood at 65,000 to 123,000. Nothing was left to buy cargo with, the command ship stood idle from 03:51Z, and the gate got a FAB_MATS load every few hours from the B36 shuttle's ore sales.<br>• Asked on 2026-11-09: "trade should only leave a handful of credits to pay for fuel" (D24). Fix: cargo leaves `Trade.FuelReserveCredits` and the trips' holds (D57, D64), nothing else; `GateLoadCredits` is gone. A gate load still keeps only the floor, the fuel reserve and the trips' holds (D137's other half). |
+| B86 | **One ship's failing step stopped every restart** (seen on 2026-11-11, fixed in slice 6.58).<br>• An OOM kill at 07:19:03Z (B88) restarted the bot; from then on every start stopped the host about 12 seconds in. Startup recovery ran SPECTER-68's goal step, its sale was refused (B87), nothing caught the error, and the deferred startup failed: CrashLoopBackOff, 106 restarts by 16:28Z, the bot down from 07:19Z until the fix's deploy.<br>• The game loop steps each ship in its own scope and try/catch (`GameLoopService.RunStepAsync`); startup recovery had neither.<br>• Fix: each ship is recovered in its own scope and try/catch; a failure is logged as an Error and left to the game loop. | Loki: "Deferred startup initialization failed; stopping the host" 106 times from 07:19:19Z; `StartupRecoveryService.cs` | 6.58 |
+| B87 | **A trade batch above the market's unit limit was refused on every step** (seen on 2026-11-11, fixed in slice 6.58).<br>• From 05:46:46Z SPECTER-68 sold 64 LIQUID_NITROGEN at X1-ZZ33-E49, the trade volume that market showed at 05:46:43Z. The API refused: 4604, "has a limit of 60 units per transaction". The market is fetched again only after a trade, so its trade volume stayed 64 and the same sale was refused on every step for 93 minutes (`ShipStuck` at 06:18Z), then at every restart (B86).<br>• Every sale and purchase sizes its batch by the trade volume last seen (D79, D81): seven calls in six executors.<br>• Fix: the port trades a refused batch in parts of the limit the API names (`SpaceTradersPortAdapter.TradeInPartsAsync`); the market's refresh after the trade then brings its new trade volume. | `market_price_samples`: trade volume 103 (01:41Z), 70 (05:11Z), 64 (05:19Z and 05:46:43Z); Loki: four Wolverine retries at 05:46Z, then a failed goal step about every 10 minutes | 6.58 |
+| B88 | **The bot's memory grew to its 2 GiB limit and it was killed** (found on 2026-11-11; not investigated yet).<br>• Gen 2 after a collection went from 40 MiB (2026-11-10 01:00Z) to 1,060 MiB (2026-11-11 07:00Z) and allocation from 5 to 120 MB/s, while the run spread to 83 systems and 1,138 markets with 161 ships. Killed at 07:19:03Z (exit 137, `OOMKilled`), which started B86.<br>• At the end of the run of 2026-10-25, with 912 ships and 4,328 markets seen, gen 2 was 400 MiB and the working set 1.5 GiB: a sixth of the ships and a quarter of the markets now hold 2.6 times as much. The change is probably in slices 6.45–6.57, deployed on 2026-11-08 and 11-09. `MarketHistoryCache` (D131) holds summaries only, so it isn't the bulk.<br>• Next: a heap snapshot of a process that has run for some hours. | Prometheus: `system_runtime_dotnet_gc_last_collection_heap_size{gc_heap_generation="gen2"}`, `rate(system_runtime_dotnet_gc_heap_total_allocated[1h])`, `kube_pod_container_status_last_terminated_reason` | — |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
@@ -367,6 +371,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.55 The gate's forecast (D143), deployed (below)
 - 6.56 Feeder trips first only while supply binds (D144), built (below)
 - 6.57 A feeder trip keeps its terms when priorities change (D145), built (below)
+- 6.58 A restart survives a failing ship; trades within the market's unit limit (B86, B87), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -628,3 +633,20 @@ the gates of other systems (D68).
   - Tests: `TradeBetweenMarketsGoalExecutorTests` (`…KeepsItsTerms…`, `…SellsThere_WhenTheForecastHoldsFeedersBack`, two cases
     each), `TradingAutomationServiceTests.ARouteThatFeedsTheJumpGatesMaterials_IsTakenFirst_AndTheJournalSaysSo`.
   - To understand this, start with `TripContextAsync` in `Goals/Executors/TradeBetweenMarketsGoalExecutor.cs`.
+- **6.58 A restart survives a failing ship; trades within the market's unit limit** (B86, B87; found on 2026-11-11, asked:
+  "Can you check spacetraders? It was offline multiple times today."): built on branch
+  `claude/spacetraders-transaction-limit`.
+  - `StartupRecoveryService.RecoverInItsOwnScopeAsync`: each ship is recovered in its own scope and try/catch, as
+    `GameLoopService.RunStepAsync` steps it; a failure is logged as an Error and left to the game loop, and a stopping host
+    still ends the recovery.
+  - `SpaceTradersPortAdapter.TradeInPartsAsync`: a sale or purchase the API refuses with 4604 (`marketTradeUnitLimitError`,
+    from docs.spacetraders.io's error codes) is traded in parts of the limit its message names ("has a limit of 60 units
+    per transaction"), each part the same way; a refusal without a smaller limit stays the API's error. The result has the
+    last part's credits and cargo and the parts' revenue together, so the callers are unchanged. The docs don't show the
+    error's `data`, hence the message.
+  - Tests: `StartupRecoveryServiceTests` (two), `TradeUnitLimitTests` (six).
+  - To check on the run: the start gets past "StartupRecovery: recovering … ship(s)" and stays up; SPECTER-68's `CargoSold`
+    of LIQUID_NITROGEN at X1-ZZ33-E49; no "units per transaction" errors after it.
+  - To understand this, start with `TradeInPartsAsync` in
+    `SpaceTraders.Infrastructure.SpaceTradersAPI/Adapters/SpaceTradersPortAdapter.cs`, then `RecoverInItsOwnScopeAsync` in
+    `SpaceTraders.API/Services/StartupRecoveryService.cs`.

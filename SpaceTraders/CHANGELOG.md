@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-11, slice 6.58)
+- B86: a restart recovers each ship in its own scope and try/catch, as the game loop steps it, so one ship whose step fails
+  no longer stops the host. From 2026-11-11 07:19Z every start stopped about 12 seconds in, 106 times by 16:28Z.
+- B87: a sale or purchase the API refuses for more units than the market takes a transaction (4604) is traded in parts of
+  the limit the refusal names. From 05:46Z SPECTER-68's sale of 64 LIQUID_NITROGEN, refused with "a limit of 60 units per
+  transaction", was sent again on every step.
+- Tests: `StartupRecoveryServiceTests`, `TradeUnitLimitTests`.
+
 ### Code – Changed (2026-11-09, slice 6.57)
 - D145: a trade trip that started feeding the jump gate's chain finishes on those terms when the gate's forecast later holds
   feeder trips back: it isn't dropped or moved for earning too little. Asked: "I'd like a trader to finish a trip once they

@@ -33,8 +33,18 @@ public interface ISpaceTradersPort
 
     Task<NavModel> OrbitShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Sells the units at the market the ship is docked at. When the market takes fewer a transaction than asked, they are sold
+    /// in parts of what it takes, one transaction each (B87); the result has the last part's credits and cargo and what the
+    /// parts fetched together.
+    /// </summary>
     Task<TradeActionResult> SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Buys the units at the market the ship is docked at. When the market sells fewer a transaction than asked, they are
+    /// bought in parts of what it sells, one transaction each (B87); the result has the last part's credits and cargo and what
+    /// the parts cost together.
+    /// </summary>
     Task<TradeActionResult> BuyCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
 
     Task<RefuelActionResult> RefuelShipAsync(string shipSymbol, bool fromCargo = false, CancellationToken cancellationToken = default);
