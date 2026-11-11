@@ -7,14 +7,16 @@ namespace DatumPrikker.WebApp.Pages.P;
 
 /// <summary>
 /// Answers a poll: no account needed, a name and an email address are enough (D3). Signed in, or
-/// remembered from an earlier anonymous answer, the form starts from your earlier answer.
+/// remembered from an earlier anonymous answer, the form starts from your earlier answer, and the
+/// page shows which date is leading (D21). It never holds anybody else's answers.
 /// </summary>
 [AllowAnonymous]
 [EnableRateLimiting(RateLimits.Answers)]
-public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierAnswers, GiveAnswerHandler answers, RespondentMemory memory) : PageModel
+public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierAnswers, GetLikelyDateHandler likelyDates, GiveAnswerHandler answers, RespondentMemory memory) : PageModel
 {
     private readonly GetPollHandler polls = polls ?? throw new ArgumentNullException(nameof(polls));
     private readonly GetAnswerHandler earlierAnswers = earlierAnswers ?? throw new ArgumentNullException(nameof(earlierAnswers));
+    private readonly GetLikelyDateHandler likelyDates = likelyDates ?? throw new ArgumentNullException(nameof(likelyDates));
     private readonly GiveAnswerHandler answers = answers ?? throw new ArgumentNullException(nameof(answers));
     private readonly RespondentMemory memory = memory ?? throw new ArgumentNullException(nameof(memory));
 
@@ -32,6 +34,12 @@ public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierA
 
     /// <summary>True when the form starts from an earlier answer.</summary>
     public bool HasEarlier => Earlier.Id.Length > 0;
+
+    /// <summary>The leading dates and their counts (D21); only filled in when <see cref="ShowsLikely"/>.</summary>
+    public LikelyDate Likely { get; private set; } = new LikelyDate();
+
+    /// <summary>True when the "Zo te zien wordt het…" card shows: only once this respondent answered (D21).</summary>
+    public bool ShowsLikely { get; private set; }
 
     /// <summary>What the respondent filled in.</summary>
     [BindProperty]
@@ -68,6 +76,10 @@ public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierA
         if (HasEarlier)
         {
             Input = AnswerInput.From(Earlier, Account);
+
+            var likely = await likelyDates.HandleAsync(new GetLikelyDate { ShareToken = token, Email = Earlier.Email }, cancellationToken);
+            ShowsLikely = likely.IsValid;
+            Likely = likely.IsValid ? likely.Value : new LikelyDate();
         }
         else
         {

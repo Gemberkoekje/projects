@@ -17,7 +17,7 @@ only a name and an email address.
 | 4 | On gembernodes | live since 2026-11-09 (gembernodes#155, projects#243) |
 | 5 | The look: bold and playful | live (projects#244, gembernodes#156) |
 | – | The maker chooses their name (not a numbered slice; NOTES.md) | live (projects#246, gembernodes#157) |
-| 6 | Respondents see the most likely date (D21) | mock settled 2026-11-11 (`mocks/slice6-*`); to build |
+| 6 | Respondents see the most likely date (D21) | built 2026-11-11, waiting for review (branch `ccr-48575899-3y4ua3`) |
 | 7 | Deadline and final pick (D22) | mock settled 2026-11-11 (`mocks/slice7-*`); to build |
 
 Each slice is one PR. Work stops after each one for review.
@@ -259,6 +259,10 @@ the new CSS sits in `mocks/mock.css` under its slice heading). Its open points w
   answers.
 - Tests: the card only after an answer; ties; nobody said Ja yet; and that the page model holds no
   answers.
+- **As built** (2026-11-11): `GetLikelyDateHandler` checks "only after answering" itself, as
+  `CreatePollHandler` holds its own gate, and returns a `LikelyDate` (the leading `OptionTally`s and
+  the answer count). On a closed poll, someone who answered still sees the card, under "Deze prikker
+  is gesloten" (see the open question below).
 
 ### 7. Deadline and final pick (later)
 
@@ -304,5 +308,10 @@ D22. The mock is in `mocks/` (`slice7-*.html`, as for slice 6). Its open points 
 
 ## Open questions
 
-None. Everything asked so far was answered on 2026-11-11 and sits in D21 and D22. Mail for the
-final pick stays a possible later addition (D17, D22).
+- **Slice 6: the likely-date card on a closed poll.** D21 doesn't say. As built, someone who
+  answered still sees "Zo te zien wordt het…" under "Deze prikker is gesloten", since the date
+  isn't picked yet. The alternative is to hide it once the poll closes. Slice 7's pick card
+  replaces it either way once a date is picked.
+
+Everything else was answered on 2026-11-11 and sits in D21 and D22. Mail for the final pick stays a
+possible later addition (D17, D22).

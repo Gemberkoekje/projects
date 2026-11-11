@@ -3,6 +3,33 @@
 @{
     ViewData["Title"] = Model.Poll.Title;
     var anoniem = Model.Account.IsAnonymous;
+
+    // D21: which date leads, only once you answered. Dashed soft violet, apart from the owner's
+    // sun-yellow winner card. Tallies only: no names, no comments.
+    void Vermoedelijk()
+    {
+        var likely = Model.Likely;
+        <section class="kaart vermoedelijk">
+            <span class="lint">Zo te zien wordt het…</span>
+            @if (likely.Leading.Count == 0)
+            {
+                <p class="vermoedelijk-leeg">Nog niemand zei ja op een datum. Alles kan nog.</p>
+            }
+            else
+            {
+                <div class="beste-lijst">
+                    @foreach (var tally in likely.Leading)
+                    {
+                        <div class="beste-datum">
+                            <span class="mini-kalender"><span>@Weergave.Maand(tally.Option.Date)</span><b>@Weergave.DagNummer(tally.Option.Date)</b></span>
+                            <div><strong>@Weergave.Weekdag(tally.Option.Date), @Weergave.Tijd(tally.Option)</strong>@Weergave.Telling(tally)</div>
+                        </div>
+                    }
+                </div>
+                <p class="zacht vermoedelijk-uitleg">@Weergave.Vermoedelijk(likely, Model.Poll.OwnerName)</p>
+            }
+        </section>
+    }
 }
 
 <section class="kaart poll-kop">
@@ -31,11 +58,21 @@
             <span>Je vindt hem terug onder <a href="/Afspraken">Mijn afspraken</a>.</span>
         }
     </div>
+
+    @if (Model.ShowsLikely)
+    {
+        Vermoedelijk();
+    }
 }
 
 @if (!Model.Poll.IsOpen)
 {
     <div class="melding">Deze prikker is gesloten en neemt geen antwoorden meer aan.</div>
+
+    @if (Model.ShowsLikely && !Model.Bedankt)
+    {
+        Vermoedelijk();
+    }
 }
 else
 {
@@ -63,6 +100,11 @@ else
                 <span class="blok"><strong>Dit antwoord gaf je terwijl je was ingelogd.</strong> <a href="@Model.LoginUrl">Log in</a> om het te wijzigen.</span>
             }
         </div>
+
+        @if (Model.ShowsLikely)
+        {
+            Vermoedelijk();
+        }
     }
 
     <form method="post" class="kaart formulier">

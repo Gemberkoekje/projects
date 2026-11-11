@@ -53,7 +53,7 @@ else
                         <span class="mini-kalender"><span>@Weergave.Maand(tally.Option.Date)</span><b>@Weergave.DagNummer(tally.Option.Date)</b></span>
                         <div>
                             <strong>@Weergave.Weekdag(tally.Option.Date), @Weergave.Tijd(tally.Option)</strong>
-                            @tally.Yes&times; ja@(tally.Maybe > 0 ? $", {tally.Maybe}× misschien" : string.Empty)
+                            @Weergave.Telling(tally)
                         </div>
                     </div>
                 }

@@ -565,6 +565,17 @@ legend { font-weight: 900; font-size: 1.25rem; margin-bottom: 0.3rem; padding: 0
 .cel-nee { background: var(--nee-zacht); color: var(--nee); }
 .cel-geen { color: var(--zacht); }
 
+/* ---------- The most likely date, for respondents (D21) ---------- */
+
+/* Tentative, so dashed and soft violet: not the owner's sun-yellow winner card. The tickets are the
+   winner card's, white with dark text in both themes. */
+.vermoedelijk { background: var(--paars-zacht); border-style: dashed; box-shadow: none; }
+.vermoedelijk .lint { background: var(--paars); color: var(--op-paars); }
+.vermoedelijk .beste-lijst { margin-bottom: 0.8rem; }
+.vermoedelijk .beste-datum { color: #1d1a39; }
+.vermoedelijk-uitleg { margin: 0; font-size: 0.95rem; }
+.vermoedelijk-leeg { margin: 0; font-weight: 700; }
+
 /* ---------- Home ---------- */
 
 .held { text-align: center; padding: 2rem 1.2rem 2.2rem; overflow: hidden; }

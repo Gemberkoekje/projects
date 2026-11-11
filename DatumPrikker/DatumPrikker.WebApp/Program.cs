@@ -155,6 +155,7 @@ builder.Services.AddScoped<PreApprovalHandler>();
 builder.Services.AddScoped<GetPollHandler>();
 builder.Services.AddScoped<GetResultsHandler>();
 builder.Services.AddScoped<GetAnswerHandler>();
+builder.Services.AddScoped<GetLikelyDateHandler>();
 builder.Services.AddScoped<ListAppointmentsHandler>();
 builder.Services.AddScoped<GetMakerNameHandler>();
 builder.Services.AddScoped<GetAccessHandler>();
