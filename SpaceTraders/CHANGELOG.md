@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-11, slice 6.59)
+- B88 (its memory): the trading plan's pass keeps each good's furthest judgement and its sentence (`FurthestJudgements`), not
+  every free trader's judgement of every route and each system's map until the pass ends. With predictions across about
+  1,100 markets (D132) the pass climbed to about 1.4 GB, and the pod was killed at 2 GiB on 2026-11-11 at 07:19Z. The
+  not-traded state (D76) comes out the same.
+- Tests: `TradeRouteJudgementTests`.
+
 ### Code – Fixed (2026-11-11, slice 6.58)
 - B86: a restart recovers each ship in its own scope and try/catch, as the game loop steps it, so one ship whose step fails
   no longer stops the host. From 2026-11-11 07:19Z every start stopped about 12 seconds in, 106 times by 16:28Z.
