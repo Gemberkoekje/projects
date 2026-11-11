@@ -417,7 +417,8 @@ No app code changed.
 - **Your answers to its open questions are in D21 and D22:**
   - respondents see the likely date only after answering;
   - the final pick shows on the site only (mail perhaps later);
-  - the owner can change or undo the pick, and a new "Prikker heropenen" opens a closed poll.
+  - the owner can change or undo the pick. (Reopening was proposed here too, then dropped: see
+    below.)
 - **Mocks** (D20's mock-first rule) are in `mocks/`: three for slice 6 and seven for slice 7.
   - They are static HTML that load the real `../DatumPrikker.WebApp/wwwroot/css/site.css`, plus
     `mocks/mock.css` for the new rules, grouped per slice so they can move into `site.css` as they
@@ -429,3 +430,15 @@ No app code changed.
 - Gotcha: Chromium shows `<input type="time">` in 12-hour format unless the browser's language is
   Dutch. For screenshots, launch Playwright with `args: ['--lang=nl-NL']`; a context `locale`
   alone doesn't change it.
+
+### Settled the same day
+
+Your answers on the mocks, now in D21 and D22 and the slice sections:
+- the card shows the counts;
+- the deadline is fixed once the poll is made;
+- there's no reopening (make a new poll instead), so `slice7-6` is now "vanzelf gesloten, nog geen
+  keuze" without a reopen button;
+- "Jij zei: …" stays;
+- the pick card gets "📅 In je agenda zetten" (an .ics download).
+
+Both slices are ready to build: 6 first, then 7.

@@ -17,8 +17,8 @@ only a name and an email address.
 | 4 | On gembernodes | live since 2026-11-09 (gembernodes#155, projects#243) |
 | 5 | The look: bold and playful | live (projects#244, gembernodes#156) |
 | – | The maker chooses their name (not a numbered slice; NOTES.md) | live (projects#246, gembernodes#157) |
-| 6 | Respondents see the most likely date (D21) | mock waiting for approval (`mocks/slice6-*`) |
-| 7 | Deadline and final pick (D22) | mock waiting for approval (`mocks/slice7-*`) |
+| 6 | Respondents see the most likely date (D21) | mock settled 2026-11-11 (`mocks/slice6-*`); to build |
+| 7 | Deadline and final pick (D22) | mock settled 2026-11-11 (`mocks/slice7-*`); to build |
 
 Each slice is one PR. Work stops after each one for review.
 
@@ -123,6 +123,8 @@ Each slice is one PR. Work stops after each one for review.
   - **Only after answering** (2026-11-11), so a first answer isn't swayed. The card shows on the
     thank-you and whenever the page finds your earlier answer (logged in, or this browser's
     memory, D19).
+  - **With the counts** (2026-11-11): "5× ja, 1× misschien" under each leading date, as on the
+    owner's winner card. Still no names and no comments.
   - Accepted: anyone can see it early by answering with a made-up address. The likely date isn't
     a secret; the rule is only there not to sway honest answers.
 - **D22 A deadline, and a final pick that tells everyone** (decided 2026-11-09, slice 7, later).
@@ -131,8 +133,14 @@ Each slice is one PR. Work stops after each one for review.
     it to every respondent.
   - **On the site only** (2026-11-11). No email for now; mail may come later, together with the
     SMTP account D17 already mentions.
-  - **The owner can change or undo the pick** (2026-11-11). Undoing leaves the poll closed. A new
-    "Prikker heropenen" opens a closed poll again.
+  - **The deadline is set when making the poll** (2026-11-11). Nothing changes or removes it
+    afterwards; closing by hand still works before it.
+  - **The owner can change or undo the pick** (2026-11-11). Undoing leaves the poll closed.
+  - **No reopening** (2026-11-11). A closed poll stays closed; to ask again, the owner makes a new
+    poll.
+  - **"Jij zei: …" on the pick card** (2026-11-11), for respondents who answered.
+  - **"In je agenda zetten"** (2026-11-11): the pick card offers an .ics download of the picked
+    date.
 
 ## Slices
 
@@ -238,11 +246,12 @@ As built (projects#244):
 ### 6. The most likely date for respondents (later)
 
 D21. The mock is in `mocks/` (open `slice6-*.html` in a browser; it loads the real `site.css`, and
-the new CSS sits in `mocks/mock.css` under its slice heading). It waits for your approval.
+the new CSS sits in `mocks/mock.css` under its slice heading). Its open points were settled on
+2026-11-11.
 - On the answer page, after you've answered, a "Zo te zien wordt het…" card under the thank-you
   or the "Je antwoordde al" note. It shows the leading date or dates (`PollResults.Best`: most Ja,
-  then most Misschien), as white tickets on a dashed soft-violet card. That keeps it apart from the
-  owner's sun-yellow winner card and the solid violet of a final pick.
+  then most Misschien), as white tickets with their counts on a dashed soft-violet card. That
+  keeps it apart from the owner's sun-yellow winner card and the solid violet of a final pick.
 - Under the tickets: "Meeste ja, dan meeste misschien, uit 7 antwoorden. Nog niet definitief: dat
   beslist Arie." A tie says "Deze 2 staan gelijk".
 - Before anyone has said Ja: "Nog niemand zei ja op een datum. Alles kan nog."
@@ -253,7 +262,8 @@ the new CSS sits in `mocks/mock.css` under its slice heading). It waits for your
 
 ### 7. Deadline and final pick (later)
 
-D22. The mock is in `mocks/` (`slice7-*.html`, as for slice 6). It waits for your approval.
+D22. The mock is in `mocks/` (`slice7-*.html`, as for slice 6). Its open points were settled on
+2026-11-11.
 - **Deadline:**
   - Nieuwe prikker gets "Wanneer sluit hij? (optioneel)": a day plus an optional time. Without a
     time it closes at the end of that day (Amsterdam time).
@@ -262,38 +272,37 @@ D22. The mock is in `mocks/` (`slice7-*.html`, as for slice 6). It waits for you
     "sluit … om …".
   - Past the deadline the poll is closed by the same rule as closing by hand: `IsOpen` becomes a
     question about now, and `Answer.Give` refuses.
+  - It can't be changed or removed after making the poll.
 - **Final pick:**
   - In the results' ranking, every row gets a "Dit wordt het" button for the owner. Picking closes
     the poll (after a confirm) and puts a solid violet "📌 Dit wordt het" card where the winner
-    card was. The card has a big calendar tile, the date, the time, the place and "Keuze ongedaan
-    maken".
+    card was. The card has a big calendar tile, the date, the time, the place, "📅 In je agenda
+    zetten" and "Keuze ongedaan maken". Undoing leaves the poll closed; the owner can pick again.
   - After a pick, the other rows say "Kies deze" (change the pick) and the picked row says
     "✓ gekozen". The poll's label reads "gekozen".
   - The ranking shows even with no answers yet, so the owner can pick a date agreed elsewhere.
-  - Everyone opening the poll link sees the pick card instead of the form. Someone who answered
-    also sees "Jij zei: ja" (or misschien, nee). In Mijn afspraken the item shows the picked date in
-    its mini calendar, a "gekozen" label and "Dit wordt het: …".
+  - Everyone opening the poll link sees the pick card instead of the form, with "📅 In je agenda
+    zetten". Someone who answered also sees "Jij zei: ja" (or misschien, nee).
+  - In Mijn afspraken the item shows the picked date in its mini calendar, a "gekozen" label and
+    "Dit wordt het: …".
   - Only the owner picks, changes or undoes, and only a date of this poll. Admins looking at
     someone else's results don't get the buttons (D18).
-- **Reopening:** a closed poll without a pick gets "Prikker heropenen". Reopening removes the
-  deadline, otherwise a passed deadline would close it again at once. To reopen a picked poll,
-  undo the pick first.
+- **Closed without a pick** (by hand or by the deadline): the ranking keeps its "Dit wordt het"
+  buttons, and under it "Toch opnieuw vragen? Maak een nieuwe prikker." There's no reopening.
+- **The agenda file:** `/p/{token}/agenda.ics`, open to anyone with the link, and a 404 until a
+  date is picked.
+  - One `VEVENT`: the title as summary, the place as location, the description plus the poll's
+    link.
+  - A whole day is a `VALUE=DATE` event (the end is the next day). A time range is converted from
+    Amsterdam time to UTC.
+  - The `UID` is the poll's id, so a changed pick imported again replaces the old event instead of
+    adding a second one. A `SEQUENCE` from the pick's time helps calendars that check it.
 - Tests: the deadline passing (and a time-less deadline closing at the end of the day), the pick
-  (owner only, a date of this poll, changing, undoing), reopening (removes the deadline, refused
-  while picked), and what respondents see after the pick.
+  (owner only, a date of this poll, changing, undoing), what respondents see after the pick, and
+  the .ics (whole day, time range across a DST change, escaping of commas and newlines, 404
+  without a pick).
 
 ## Open questions
 
-Answered on 2026-11-11, now in D21 and D22: only after answering; on the site only; the pick can
-be changed or undone.
-
-To settle when approving the mocks:
-- **Slice 6:** should the card show the counts ("5× ja, 1× misschien"), as the mock does, or only
-  the date?
-- **Slice 7:**
-  - May the owner change or remove the deadline after making the poll? The mock says no: it's set
-    when making the poll, and reopening removes it.
-  - Is reopening (and that it removes the deadline) what you want?
-  - Keep "Jij zei: ja" on the pick card?
-  - An idea, not in the mock: an "In je agenda zetten" link on the pick card that downloads an
-    .ics file.
+None. Everything asked so far was answered on 2026-11-11 and sits in D21 and D22. Mail for the
+final pick stays a possible later addition (D17, D22).

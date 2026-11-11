@@ -45,6 +45,7 @@
 .gekozen { background: var(--paars); color: var(--op-paars); overflow: hidden; }
 .gekozen .lint { background: var(--zon); color: #1d1a39; }
 .gekozen a { color: var(--op-paars); }
+.gekozen a.knop-licht, .gekozen a.knop-licht:hover { color: var(--tekst); }
 
 .gekozen::after {
     content: "";
