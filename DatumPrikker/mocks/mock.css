@@ -1,0 +1,93 @@
+/* Mock-only additions on top of the real site.css. When a slice is built, the rules under its
+   heading move into site.css; the strip at the top stays mock-only. */
+
+.mock-strook {
+    padding: 0.25rem 0.5rem;
+    border-bottom: 2px solid #1d1a39;
+    background: repeating-linear-gradient(45deg, #ffc83d, #ffc83d 10px, #ffd96b 10px, #ffd96b 20px);
+    color: #1d1a39;
+    font-size: 0.75rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+/* ---------- Slice 6: the most likely date, for respondents (D21) ---------- */
+
+/* Tentative, so dashed and soft violet: not the owner's sun-yellow winner card, and not the solid
+   violet of a final pick. */
+.vermoedelijk { background: var(--paars-zacht); border-style: dashed; box-shadow: none; }
+.vermoedelijk .lint { background: var(--paars); color: var(--op-paars); }
+.vermoedelijk .beste-lijst { margin-bottom: 0.8rem; }
+.vermoedelijk-uitleg { margin: 0; font-size: 0.95rem; }
+.vermoedelijk-leeg { margin: 0; font-weight: 700; }
+
+/* ---------- Slice 7: deadline and final pick (D22) ---------- */
+
+/* The deadline on the answer page, under the location. */
+.poll-kop .sluit { font-weight: 700; }
+
+/* New poll: the optional deadline. */
+.sluit-rij {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 0.5rem;
+    padding: 0.7rem;
+    border: 2px dashed var(--zacht);
+    border-radius: 16px;
+    background: var(--papier);
+}
+
+.sluit-rij label { display: flex; flex-direction: column; gap: 0.2rem; font-weight: 700; font-size: 0.85rem; }
+
+/* The final pick: solid violet, with a big calendar tile. */
+.gekozen { background: var(--paars); color: var(--op-paars); overflow: hidden; }
+.gekozen .lint { background: var(--zon); color: #1d1a39; }
+.gekozen a { color: var(--op-paars); }
+
+.gekozen::after {
+    content: "";
+    position: absolute;
+    right: -2.5rem;
+    top: -2.5rem;
+    width: 8rem;
+    height: 8rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    pointer-events: none;
+}
+
+.gekozen-datum { position: relative; z-index: 1; display: flex; align-items: center; gap: 1.1rem; }
+.gekozen .tegel { flex: none; width: 5.6rem; color: var(--tekst); transform: rotate(-4deg); }
+.gekozen .tegel-dag { font-size: 2.3rem; }
+.gekozen-tekst strong { display: block; font-size: 1.45rem; font-weight: 900; line-height: 1.15; }
+.gekozen-tekst span { display: block; font-weight: 700; }
+
+.gekozen-tekst .jij-zei {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.1rem 0.6rem;
+    border: 2px solid #1d1a39;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 900;
+}
+
+.jij-zei-ja { background: var(--ja-zacht); color: var(--ja); }
+
+.gekozen-knoppen { position: relative; z-index: 1; display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.gekozen-knoppen .knop { padding: 0.35rem 0.85rem; font-size: 0.9rem; }
+
+/* Picking from the ranking: a button per row, "gekozen" on the chosen one. */
+.rang-kies { flex: 1 1 100%; margin: 0; }
+.rang-kies .knop { width: 100%; padding: 0.35rem 0.85rem; font-size: 0.9rem; }
+.label-gekozen { background: var(--paars); color: var(--op-paars); }
+.rang-gekozen { outline: 3px solid var(--paars); outline-offset: 2px; }
+
+@media (min-width: 640px) {
+    .rang-kies { flex: none; }
+    .rang-kies .knop { width: auto; }
+    .gekozen .tegel { width: 6.4rem; }
+    .gekozen .tegel-dag { font-size: 2.6rem; }
+}

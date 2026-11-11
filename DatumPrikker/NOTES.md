@@ -404,3 +404,28 @@ Now the maker chooses the name respondents see.
   Respondents see "Gember wil een datum prikken", and the next new poll suggests "Gember".
 - PLAN.md isn't touched here, because projects#245 (the later slices) changes it too. This is a
   small addition, not a numbered slice.
+
+## Loose ends, and the mocks for slices 6 and 7 (2026-11-11)
+
+No app code changed.
+
+- **Everything built is live.** gembernodes#156 deployed the look and gembernodes#157 the maker's
+  name (image `70cd550e`, the merge of projects#246). The PLAN.md status rows now say so, and the
+  maker's name has a row of its own.
+- **projects#245** (the plan for slices 6 and 7) is merged into this branch rather than merged on
+  its own, so it closes when this one merges.
+- **Your answers to its open questions are in D21 and D22:**
+  - respondents see the likely date only after answering;
+  - the final pick shows on the site only (mail perhaps later);
+  - the owner can change or undo the pick, and a new "Prikker heropenen" opens a closed poll.
+- **Mocks** (D20's mock-first rule) are in `mocks/`: three for slice 6 and seven for slice 7.
+  - They are static HTML that load the real `../DatumPrikker.WebApp/wwwroot/css/site.css`, plus
+    `mocks/mock.css` for the new rules, grouped per slice so they can move into `site.css` as they
+    are.
+  - Open them from a local web server, or straight from disk; the striped strip on top marks them
+    as mocks.
+  - PLAN.md's slice 6 and 7 sections describe what they show. Its open questions list what to
+    settle when approving.
+- Gotcha: Chromium shows `<input type="time">` in 12-hour format unless the browser's language is
+  Dutch. For screenshots, launch Playwright with `args: ['--lang=nl-NL']`; a context `locale`
+  alone doesn't change it.

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<!-- Mock for slice 7 · sluitdatum bij het maken. Not part of the app: it loads the real site.css plus mock.css. -->
+<html lang="nl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nieuwe prikker · mock</title>
+    <link rel="stylesheet" href="../DatumPrikker.WebApp/wwwroot/css/site.css" />
+    <link rel="stylesheet" href="mock.css" />
+</head>
+<body>
+    <div class="mock-strook">Mock · slice 7 · sluitdatum bij het maken</div>
+    <header class="kop">
+        <a class="merk" href="#">
+            <svg class="merk-icoon" viewBox="0 0 32 32" aria-hidden="true">
+                <rect class="vel" x="3" y="6" width="24" height="23" rx="5" stroke-width="2.5" />
+                <path d="M3 13V11a5 5 0 0 1 5-5h14a5 5 0 0 1 5 5v2z" fill="#ff5c7a" class="rand" stroke-width="2.5" stroke-linejoin="round" />
+                <rect x="8" y="17" width="4" height="4" rx="1" fill="#23a866" />
+                <rect x="14" y="17" width="4" height="4" rx="1" fill="#e8960c" />
+                <rect x="8" y="23" width="4" height="3" rx="1" fill="#e83d62" />
+                <line x1="20" y1="25" x2="26.5" y2="31" class="rand" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx="24" cy="20" r="5" fill="#6c3bff" class="rand" stroke-width="2.5" />
+            </svg>
+            <span>Datum<b>Prikker</b></span>
+        </a>
+        <nav class="kop-nav">
+            <a class="knop knop-licht" href="#">Mijn afspraken</a>
+            <button type="button" class="knop knop-licht">Uitloggen</button>
+        </nav>
+    </header>
+    <main class="inhoud">
+        <section class="kaart">
+            <h1>Nieuwe prikker</h1>
+            <form class="formulier">
+                <label>Waar gaat het over? <input value="Etentje met de buren" /></label>
+                <p class="zacht" style="margin: 0">(Naam, plaats en toelichting blijven zoals ze zijn.)</p>
+                <fieldset class="opties">
+                    <legend>Welke datums stel je voor?</legend>
+                    <p class="zacht">Laat de tijden leeg voor de hele dag. Lege rijen tellen niet mee.</p>
+                    <div data-opties>
+                        <div class="optie-rij"><label>Dag <input type="date" value="2026-12-11" /></label><label>Van <input type="time" value="19:00" /></label><label>Tot <input type="time" value="22:00" /></label><button type="button" class="knop-icoon">&times;</button></div>
+                    </div>
+                    <button type="button" class="knop-toevoegen">+ Nog een datum</button>
+                </fieldset>
+                <fieldset class="opties">
+                    <legend>Wanneer sluit hij? <span class="zacht">(optioneel)</span></legend>
+                    <p class="zacht">Daarna kan niemand meer antwoorden. Zonder tijd sluit hij aan het eind van die dag. Leeg laten: hij blijft open tot je hem zelf sluit.</p>
+                    <div class="sluit-rij"><label>Dag <input type="date" value="2026-12-04" /></label><label>Tijd <input type="time" value="18:00" /></label></div>
+                </fieldset>
+                <button type="button" class="knop knop-groot">Prikker maken</button>
+            </form>
+        </section>
+
+    </main>
+</body>
+</html>

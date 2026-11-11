@@ -15,9 +15,10 @@ only a name and an email address.
 | 2 | Accounts: "Mijn afspraken", prefilled email, gentle login nudges | merged (projects#241) |
 | 3 | Admin and access: only approved people make polls | merged (projects#242) |
 | 4 | On gembernodes | live since 2026-11-09 (gembernodes#155, projects#243) |
-| 5 | The look: bold and playful | merged (projects#244); deploy gembernodes#156 |
-| 6 | Respondents see the most likely date (D21) | later |
-| 7 | Deadline and final pick (D22) | later |
+| 5 | The look: bold and playful | live (projects#244, gembernodes#156) |
+| – | The maker chooses their name (not a numbered slice; NOTES.md) | live (projects#246, gembernodes#157) |
+| 6 | Respondents see the most likely date (D21) | mock waiting for approval (`mocks/slice6-*`) |
+| 7 | Deadline and final pick (D22) | mock waiting for approval (`mocks/slice7-*`) |
 
 Each slice is one PR. Work stops after each one for review.
 
@@ -119,10 +120,19 @@ Each slice is one PR. Work stops after each one for review.
 - **D21 Respondents see the most likely date, not each other's answers** (decided 2026-11-09, slice
   6, later). The answer page shows which date is leading. Individual answers (names, choices,
   comments) stay owner-only, so D9 still holds for them.
+  - **Only after answering** (2026-11-11), so a first answer isn't swayed. The card shows on the
+    thank-you and whenever the page finds your earlier answer (logged in, or this browser's
+    memory, D19).
+  - Accepted: anyone can see it early by answering with a made-up address. The likely date isn't
+    a secret; the rule is only there not to sway honest answers.
 - **D22 A deadline, and a final pick that tells everyone** (decided 2026-11-09, slice 7, later).
   - The owner can set an optional deadline; past it, the poll closes by itself.
   - The owner can pick "this is the date". The poll page, the results and Mijn afspraken then show
     it to every respondent.
+  - **On the site only** (2026-11-11). No email for now; mail may come later, together with the
+    SMTP account D17 already mentions.
+  - **The owner can change or undo the pick** (2026-11-11). Undoing leaves the poll closed. A new
+    "Prikker heropenen" opens a closed poll again.
 
 ## Slices
 
@@ -227,29 +237,63 @@ As built (projects#244):
 
 ### 6. The most likely date for respondents (later)
 
-D21. It starts with a mock for your approval.
-- On the answer page, a "Zo te zien wordt het…" card showing the leading date or dates: most Ja,
-  then most Misschien (the same ranking as the results). No names and no comments.
-- Before anyone has said Ja, the card says it's still open.
-- Tests: what a respondent may see. They must never see who said what.
+D21. The mock is in `mocks/` (open `slice6-*.html` in a browser; it loads the real `site.css`, and
+the new CSS sits in `mocks/mock.css` under its slice heading). It waits for your approval.
+- On the answer page, after you've answered, a "Zo te zien wordt het…" card under the thank-you
+  or the "Je antwoordde al" note. It shows the leading date or dates (`PollResults.Best`: most Ja,
+  then most Misschien), as white tickets on a dashed soft-violet card. That keeps it apart from the
+  owner's sun-yellow winner card and the solid violet of a final pick.
+- Under the tickets: "Meeste ja, dan meeste misschien, uit 7 antwoorden. Nog niet definitief: dat
+  beslist Arie." A tie says "Deze 2 staan gelijk".
+- Before anyone has said Ja: "Nog niemand zei ja op een datum. Alles kan nog."
+- No names and no comments. A respondent's page model gets only the leading tallies, never the
+  answers.
+- Tests: the card only after an answer; ties; nobody said Ja yet; and that the page model holds no
+  answers.
 
 ### 7. Deadline and final pick (later)
 
-D22. It starts with a mock for your approval.
-- **Deadline:** an optional "Sluit op" date and time when making the poll. Past it, the poll stops
-  taking answers, using the same rule as closing by hand.
-- **Final pick:** on the results page, the owner picks "Dit wordt het" for one date. That closes the
-  poll and shows the chosen date to everyone on the poll page and in Mijn afspraken.
-- Tests: the deadline passing, the pick (owner only, a date of this poll), and what respondents
-  see after the pick.
+D22. The mock is in `mocks/` (`slice7-*.html`, as for slice 6). It waits for your approval.
+- **Deadline:**
+  - Nieuwe prikker gets "Wanneer sluit hij? (optioneel)": a day plus an optional time. Without a
+    time it closes at the end of that day (Amsterdam time).
+  - The answer page says "⏳ Antwoorden kan tot vrijdag 4 december om 18:00". The results say
+    "Sluit vanzelf op …", and after the deadline "Vanzelf gesloten op …". Mijn afspraken adds
+    "sluit … om …".
+  - Past the deadline the poll is closed by the same rule as closing by hand: `IsOpen` becomes a
+    question about now, and `Answer.Give` refuses.
+- **Final pick:**
+  - In the results' ranking, every row gets a "Dit wordt het" button for the owner. Picking closes
+    the poll (after a confirm) and puts a solid violet "📌 Dit wordt het" card where the winner
+    card was. The card has a big calendar tile, the date, the time, the place and "Keuze ongedaan
+    maken".
+  - After a pick, the other rows say "Kies deze" (change the pick) and the picked row says
+    "✓ gekozen". The poll's label reads "gekozen".
+  - The ranking shows even with no answers yet, so the owner can pick a date agreed elsewhere.
+  - Everyone opening the poll link sees the pick card instead of the form. Someone who answered
+    also sees "Jij zei: ja" (or misschien, nee). In Mijn afspraken the item shows the picked date in
+    its mini calendar, a "gekozen" label and "Dit wordt het: …".
+  - Only the owner picks, changes or undoes, and only a date of this poll. Admins looking at
+    someone else's results don't get the buttons (D18).
+- **Reopening:** a closed poll without a pick gets "Prikker heropenen". Reopening removes the
+  deadline, otherwise a passed deadline would close it again at once. To reopen a picked poll,
+  undo the pick first.
+- Tests: the deadline passing (and a time-less deadline closing at the end of the day), the pick
+  (owner only, a date of this poll, changing, undoing), reopening (removes the deadline, refused
+  while picked), and what respondents see after the pick.
 
 ## Open questions
 
-For slice 6:
-- Should respondents see the most likely date before they answer, or only after (so their answer
-  isn't swayed)?
+Answered on 2026-11-11, now in D21 and D22: only after answering; on the site only; the pick can
+be changed or undone.
 
-For slice 7:
-- Does "tells everyone" stay on the site (the poll page and Mijn afspraken), or should respondents
-  also get an email? Email needs an SMTP account in 1Password; the app sends no mail yet (D17).
-- Can the owner change the pick afterwards?
+To settle when approving the mocks:
+- **Slice 6:** should the card show the counts ("5× ja, 1× misschien"), as the mock does, or only
+  the date?
+- **Slice 7:**
+  - May the owner change or remove the deadline after making the poll? The mock says no: it's set
+    when making the poll, and reopening removes it.
+  - Is reopening (and that it removes the deadline) what you want?
+  - Keep "Jij zei: ja" on the pick card?
+  - An idea, not in the mock: an "In je agenda zetten" link on the pick card that downloads an
+    .ics file.

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<!-- Mock for slice 7 · na de keuze, voor de maker. Not part of the app: it loads the real site.css plus mock.css. -->
+<html lang="nl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Uitslag: Etentje met de buren · mock</title>
+    <link rel="stylesheet" href="../DatumPrikker.WebApp/wwwroot/css/site.css" />
+    <link rel="stylesheet" href="mock.css" />
+</head>
+<body>
+    <div class="mock-strook">Mock · slice 7 · na de keuze, voor de maker</div>
+    <header class="kop">
+        <a class="merk" href="#">
+            <svg class="merk-icoon" viewBox="0 0 32 32" aria-hidden="true">
+                <rect class="vel" x="3" y="6" width="24" height="23" rx="5" stroke-width="2.5" />
+                <path d="M3 13V11a5 5 0 0 1 5-5h14a5 5 0 0 1 5 5v2z" fill="#ff5c7a" class="rand" stroke-width="2.5" stroke-linejoin="round" />
+                <rect x="8" y="17" width="4" height="4" rx="1" fill="#23a866" />
+                <rect x="14" y="17" width="4" height="4" rx="1" fill="#e8960c" />
+                <rect x="8" y="23" width="4" height="3" rx="1" fill="#e83d62" />
+                <line x1="20" y1="25" x2="26.5" y2="31" class="rand" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx="24" cy="20" r="5" fill="#6c3bff" class="rand" stroke-width="2.5" />
+            </svg>
+            <span>Datum<b>Prikker</b></span>
+        </a>
+        <nav class="kop-nav">
+            <a class="knop knop-licht" href="#">Mijn afspraken</a>
+            <button type="button" class="knop knop-licht">Uitloggen</button>
+        </nav>
+    </header>
+    <main class="inhoud">
+        <div class="melding melding-goed" role="status"><strong>Gekozen!</strong> De prikker is gesloten. Iedereen met de link ziet nu zaterdag 12 december.</div>
+        <section class="kaart">
+            <div class="kaart-kop">
+                <h1>Etentje met de buren</h1>
+                <span class="label label-gekozen">gekozen</span>
+            </div>
+            <p class="zacht">Gesloten op 1 december om 21:12.</p>
+            <div class="deel">
+                <input class="deel-link" readonly value="https://datumprikker.gemberkoekje.nl/p/k3x9qw" />
+                <button type="button" class="knop">Kopieer link</button>
+            </div>
+            <p class="zacht" style="margin-top: 0.8rem">7 antwoorden · <a href="#">zelf antwoorden</a></p>
+        </section>
+        <section class="kaart gekozen">
+            <span class="lint">📌 Dit wordt het</span>
+            <div class="gekozen-datum">
+                <div class="tegel"><div class="tegel-blad"><span class="tegel-maand">dec</span><span class="tegel-dag">12</span><span class="tegel-weekdag">za</span></div></div>
+                <div class="gekozen-tekst">
+                    <strong>zaterdag 12 december</strong>
+                    <span>19:00–22:00</span>
+                    <span>📍 Bij Arie, nr. 14</span>
+                    
+                </div>
+            </div>
+            <div class="gekozen-knoppen">
+                <button type="button" class="knop knop-licht">Keuze ongedaan maken</button>
+            </div>
+            <p style="position: relative; z-index: 1; margin: 0.8rem 0 0; font-size: 0.95rem">Een andere datum? Kies hem hieronder in de lijst.</p>
+        </section>
+        <section class="kaart">
+            <h2>Zo staat het ervoor</h2>
+            <p class="zacht hint">Van beste naar minst gunstige datum: meeste ja, dan meeste misschien.</p>
+            <ol class="ranglijst">
+                <li class="rang-rij rang-beste rang-gekozen">
+                    <span class="rang-nummer">★</span>
+                    <div class="keuze-datum"><span class="mini-kalender" aria-hidden="true"><span>dec</span><b>12</b></span><div><strong>zaterdag</strong><span class="zacht">19:00–22:00</span></div></div>
+                    <div class="rang-score">
+                        <div class="rang-balk"><span class="balk-ja" style="width: 71.4%"></span><span class="balk-misschien" style="width: 14.3%"></span><span class="balk-nee" style="width: 14.3%"></span></div>
+                        <div class="rang-telling">5 ja · 1 misschien · 1 nee</div>
+                    </div>
+                    <div class="rang-kies"><span class="label label-gekozen">✓ gekozen</span></div>
+                </li>
+                <li class="rang-rij">
+                    <span class="rang-nummer">2</span>
+                    <div class="keuze-datum"><span class="mini-kalender" aria-hidden="true"><span>dec</span><b>11</b></span><div><strong>vrijdag</strong><span class="zacht">19:00–22:00</span></div></div>
+                    <div class="rang-score">
+                        <div class="rang-balk"><span class="balk-ja" style="width: 42.9%"></span><span class="balk-misschien" style="width: 28.6%"></span><span class="balk-nee" style="width: 28.6%"></span></div>
+                        <div class="rang-telling">3 ja · 2 misschien · 2 nee</div>
+                    </div>
+                    <form class="rang-kies"><button type="button" class="knop knop-licht">Kies deze</button></form>
+                </li>
+                <li class="rang-rij">
+                    <span class="rang-nummer">3</span>
+                    <div class="keuze-datum"><span class="mini-kalender" aria-hidden="true"><span>dec</span><b>19</b></span><div><strong>zaterdag</strong><span class="zacht">19:00–22:00</span></div></div>
+                    <div class="rang-score">
+                        <div class="rang-balk"><span class="balk-ja" style="width: 42.9%"></span><span class="balk-misschien" style="width: 14.3%"></span><span class="balk-nee" style="width: 42.9%"></span></div>
+                        <div class="rang-telling">3 ja · 1 misschien · 3 nee</div>
+                    </div>
+                    <form class="rang-kies"><button type="button" class="knop knop-licht">Kies deze</button></form>
+                </li>
+                <li class="rang-rij">
+                    <span class="rang-nummer">4</span>
+                    <div class="keuze-datum"><span class="mini-kalender" aria-hidden="true"><span>dec</span><b>13</b></span><div><strong>zondag</strong><span class="zacht">hele dag</span></div></div>
+                    <div class="rang-score">
+                        <div class="rang-balk"><span class="balk-ja" style="width: 14.3%"></span><span class="balk-misschien" style="width: 28.6%"></span><span class="balk-nee" style="width: 57.1%"></span></div>
+                        <div class="rang-telling">1 ja · 2 misschien · 4 nee</div>
+                    </div>
+                    <form class="rang-kies"><button type="button" class="knop knop-licht">Kies deze</button></form>
+                </li>
+            </ol>
+            <div class="legenda"><span><i class="l-ja"></i>ja</span><span><i class="l-misschien"></i>misschien</span><span><i class="l-nee"></i>nee</span></div>
+        </section>
+        <section class="kaart">
+            <h2>Wie kan wanneer</h2>
+            <p class="zacht">(De tabel blijft zoals hij is.)</p>
+        </section>
+
+    </main>
+</body>
+</html>

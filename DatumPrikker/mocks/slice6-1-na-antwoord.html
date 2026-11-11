@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!-- Mock for slice 6 · net geantwoord. Not part of the app: it loads the real site.css plus mock.css. -->
+<html lang="nl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Etentje met de buren · mock</title>
+    <link rel="stylesheet" href="../DatumPrikker.WebApp/wwwroot/css/site.css" />
+    <link rel="stylesheet" href="mock.css" />
+</head>
+<body>
+    <div class="mock-strook">Mock · slice 6 · net geantwoord</div>
+    <header class="kop">
+        <a class="merk" href="#">
+            <svg class="merk-icoon" viewBox="0 0 32 32" aria-hidden="true">
+                <rect class="vel" x="3" y="6" width="24" height="23" rx="5" stroke-width="2.5" />
+                <path d="M3 13V11a5 5 0 0 1 5-5h14a5 5 0 0 1 5 5v2z" fill="#ff5c7a" class="rand" stroke-width="2.5" stroke-linejoin="round" />
+                <rect x="8" y="17" width="4" height="4" rx="1" fill="#23a866" />
+                <rect x="14" y="17" width="4" height="4" rx="1" fill="#e8960c" />
+                <rect x="8" y="23" width="4" height="3" rx="1" fill="#e83d62" />
+                <line x1="20" y1="25" x2="26.5" y2="31" class="rand" stroke-width="2.5" stroke-linecap="round" />
+                <circle cx="24" cy="20" r="5" fill="#6c3bff" class="rand" stroke-width="2.5" />
+            </svg>
+            <span>Datum<b>Prikker</b></span>
+        </a>
+        <nav class="kop-nav">
+            <a class="knop knop-licht" href="#">Inloggen</a>
+        </nav>
+    </header>
+    <main class="inhoud">
+        <section class="kaart poll-kop">
+            <span class="eigenaar">Arie wil een datum prikken</span>
+            <h1>Etentje met de buren</h1>
+            <p class="waar">📍 Bij Arie, nr. 14</p>
+            <p class="toelichting">Ik kook, jullie nemen een toetje mee.</p>
+        </section>
+        <div class="melding melding-goed" role="status">
+            <strong>Dank je!</strong> Je antwoord is opgeslagen.
+            <span>Bewaar deze afspraak in je overzicht: <a href="#">log in</a>, met hetzelfde e-mailadres.</span>
+        </div>
+        <section class="kaart vermoedelijk">
+            <span class="lint">Zo te zien wordt het…</span>
+            <div class="beste-lijst">
+                    <div class="beste-datum">
+                        <span class="mini-kalender" aria-hidden="true"><span>dec</span><b>12</b></span>
+                        <div><strong>zaterdag, 19:00–22:00</strong>5× ja, 1× misschien</div>
+                    </div>
+            </div>
+            <p class="zacht vermoedelijk-uitleg">Meeste ja, dan meeste misschien, uit 7 antwoorden. Nog niet definitief: dat beslist Arie.</p>
+        </section>
+        <form class="duwtje">Ingevuld voor Carla (carla@example.com). Niet jij? <button type="button" class="knop-link">Begin met een leeg formulier</button></form>
+        <form class="kaart formulier">
+            <fieldset class="keuzes">
+                <legend>Wanneer kun je?</legend>
+                <p class="zacht hint">Kies per datum ja, misschien of nee.</p>
+                <div class="rijen">
+                    <div class="keuze-rij">
+                        <div class="keuze-datum">
+                            <span class="mini-kalender" aria-hidden="true"><span>dec</span><b>11</b></span>
+                            <div><strong>vrijdag</strong><span class="zacht">19:00–22:00</span></div>
+                        </div>
+                        <div class="keuze-knoppen" role="radiogroup"><label class="keuze keuze-ja"><input type="radio" name="c-o1" value="Yes" /><span>Ja</span></label><label class="keuze keuze-misschien"><input type="radio" name="c-o1" value="Maybe" checked /><span>Misschien</span></label><label class="keuze keuze-nee"><input type="radio" name="c-o1" value="No" /><span>Nee</span></label></div>
+                    </div>
+                    <div class="keuze-rij">
+                        <div class="keuze-datum">
+                            <span class="mini-kalender" aria-hidden="true"><span>dec</span><b>12</b></span>
+                            <div><strong>zaterdag</strong><span class="zacht">19:00–22:00</span></div>
+                        </div>
+                        <div class="keuze-knoppen" role="radiogroup"><label class="keuze keuze-ja"><input type="radio" name="c-o2" value="Yes" checked /><span>Ja</span></label><label class="keuze keuze-misschien"><input type="radio" name="c-o2" value="Maybe" /><span>Misschien</span></label><label class="keuze keuze-nee"><input type="radio" name="c-o2" value="No" /><span>Nee</span></label></div>
+                    </div>
+                    <div class="keuze-rij">
+                        <div class="keuze-datum">
+                            <span class="mini-kalender" aria-hidden="true"><span>dec</span><b>13</b></span>
+                            <div><strong>zondag</strong><span class="zacht">hele dag</span></div>
+                        </div>
+                        <div class="keuze-knoppen" role="radiogroup"><label class="keuze keuze-ja"><input type="radio" name="c-o3" value="Yes" /><span>Ja</span></label><label class="keuze keuze-misschien"><input type="radio" name="c-o3" value="Maybe" /><span>Misschien</span></label><label class="keuze keuze-nee"><input type="radio" name="c-o3" value="No" checked /><span>Nee</span></label></div>
+                    </div>
+                    <div class="keuze-rij">
+                        <div class="keuze-datum">
+                            <span class="mini-kalender" aria-hidden="true"><span>dec</span><b>19</b></span>
+                            <div><strong>zaterdag</strong><span class="zacht">19:00–22:00</span></div>
+                        </div>
+                        <div class="keuze-knoppen" role="radiogroup"><label class="keuze keuze-ja"><input type="radio" name="c-o4" value="Yes" checked /><span>Ja</span></label><label class="keuze keuze-misschien"><input type="radio" name="c-o4" value="Maybe" /><span>Misschien</span></label><label class="keuze keuze-nee"><input type="radio" name="c-o4" value="No" /><span>Nee</span></label></div>
+                    </div>
+                </div>
+            </fieldset>
+            <label>Je naam <input value="Carla" /></label>
+            <label>Je e-mailadres <input type="email" value="carla@example.com" /></label>
+            <label>Opmerking <span class="zacht">(optioneel)</span><textarea rows="2"></textarea></label>
+            <button type="button" class="knop knop-groot">Antwoord bijwerken</button>
+        </form>
+
+    </main>
+</body>
+</html>
