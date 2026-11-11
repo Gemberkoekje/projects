@@ -85,11 +85,16 @@ pod network, and the router couldn't reach a pod address anyway.
 
 ### B3. qBittorrent (`http://192.168.1.234:8080`)
 
+Held at 5.2.4 since 2026-11-11, because MyAnonamouse (MAM, D3) doesn't allow 5.3.0 yet. 5.3.0 keeps
+the WebUI settings in another place in its config, so the move back reset the login and the API key
+(gembernodes `NOTES.md`, 2026-11-11).
+
 The first start prints a temporary password: `kubectl -n zeef logs deploy/qbittorrent | grep -i password`.
 In Options (the gear icon):
 
 - **Web UI:** your own password. Store it in `zeef-stack` as `QBITTORRENT__PASSWORD`. Leave
-  "bypass authentication" off.
+  "bypass authentication" off. Then make an **API key** on the same tab and Save. Sonarr, Radarr,
+  Chaptarr and Cleanuparr connect with that key (B6, B7, D3), not with the password.
 - **Downloads:**
   - Default Torrent Management Mode **Automatic**;
   - default save path `/data/@Downloads/complete`;
@@ -108,11 +113,33 @@ In Options (the gear icon):
   torrents including seeding ones**. With a gap-fill running, seeding episodes fill those slots and
   new downloads wait for hours (on 2026-11-06, 49 torrents with only ~5 moving). Use maximum active
   downloads `8`, uploads `20` and torrents `30`, and keep "Do not count slow torrents" on.
-- **BitTorrent:** seeding limits ratio `1.0` or `10080` minutes (7 days), then **Stop torrent**.
-  Sonarr/Radarr remove stopped torrents and their staging copy; the hardlinked library copy stays.
+- **BitTorrent:** seeding limits ratio `2.0` or `10080` minutes (7 days), then **Stop torrent**
+  (ratio `1.0` until 2026-11-11). Sonarr/Radarr remove stopped torrents and their staging copy; the
+  hardlinked library copy stays.
+- **Advanced → Disk IO type:** "Simple pread/pwrite" while qBittorrent is on 5.2.4 (libtorrent
+  2.0). There, "Default" maps the files into memory, the mode known for high memory use and trouble
+  on network storage such as the QNAP share. Back on 5.3.x (libtorrent 2.1), "Default" is pread.
 
-Categories don't need to be made by hand. Sonarr and Radarr create `sonarr` and `radarr` (saved
-under `complete/<category>`) on their first grab.
+Categories don't need to be made by hand. Sonarr, Radarr and Chaptarr create `sonarr`, `radarr` and
+`chaptarr` (saved under `complete/<category>`) on their first grab.
+
+**Category `chaptarr` without a ratio limit.** MAM wants each torrent seeded 72 hours within 30
+days, and a popular book can reach the ratio limit sooner. Without it, the category's torrents stop
+after the 7 days, or after the seed time that Chaptarr's MAM indexer sets. 5.2.4's WebUI can't edit
+a category's share limits (5.3.x's can, under Edit category), so write it into the file, then
+restart:
+
+```bash
+kubectl -n zeef exec deploy/qbittorrent -- s6-setuidgid abc cp /config/qBittorrent/categories.json /config/qBittorrent/categories.json.bak
+kubectl -n zeef exec deploy/qbittorrent -- s6-setuidgid abc python3 -c 'import json; p="/config/qBittorrent/categories.json"; d=json.load(open(p)); d["chaptarr"]["ratio_limit"]=-1; json.dump(d, open(p, "w"), indent=4)'
+kubectl -n zeef scale deploy/qbittorrent --replicas=0
+kubectl -n zeef wait --for=delete pod -l app=qbittorrent --timeout=120s
+kubectl -n zeef scale deploy/qbittorrent --replicas=1
+```
+
+qBittorrent only rewrites that file when a category changes, so the edit survives the restart.
+Restart qBittorrent this way, not with `kubectl rollout restart`: Flux removes the restart
+annotation again, and qBittorrent restarts a second time.
 
 ### B4. Prowlarr (`:9696`)
 
@@ -163,7 +190,7 @@ Both:
 - **Login:** Forms, as in Prowlarr.
 - **Download Clients → qBittorrent:**
   - host `qbittorrent.zeef.svc.cluster.local`, port `8080`;
-  - user `admin` plus your password;
+  - qBittorrent's API key (B3) instead of a user and password;
   - category `sonarr` / `radarr`;
   - **Remove Completed** and **Remove Failed** on.
 - **Media Management** (Show Advanced):
@@ -211,7 +238,8 @@ The menu calls the *arr apps **Media Managers**; the docs say "Arr".
 
 - **First visit:** create a local account. Skip OIDC.
 - **Download Clients:**
-  - qBittorrent, host `http://qbittorrent.zeef.svc.cluster.local:8080`, `admin` plus your password;
+  - qBittorrent, host `http://qbittorrent.zeef.svc.cluster.local:8080`, with qBittorrent's API key
+    (B3) instead of a user and password;
   - "Download Directory Source and Target" empty, because every app sees the same paths.
 - **Media Managers:**
   - Sonarr `http://sonarr.zeef.svc.cluster.local:8989` and Radarr
@@ -222,7 +250,8 @@ The menu calls the *arr apps **Media Managers**; the docs say "Arr".
   - **"Delete if any file is blocked" off** (the default). Blocked files are skipped, and a release
     is removed only when every file is blocked. With it on, harmless `.nfo`, ad `.txt` and cover
     `.png` files throw away good releases.
-  - Ignore Private on.
+  - **Ignore Private on.** Private trackers such as MAM want the whole torrent seeded, and a
+    skipped file leaves qBittorrent seeding only part of it.
   - Per app: Enable Blocklist, type **Blacklist**, path `https://cleanuparr.pages.dev/static/blacklist`.
 - **Queue Cleaner:**
   - Enable.
@@ -230,7 +259,10 @@ The menu calls the *arr apps **Media Managers**; the docs say "Arr".
   - Failed Import **Pattern Mode: Exclude**, with patterns `title mismatch`, `by ID` and
     `Remote Path Mapping`. Those failures need a manual fix, not deletion; everything else is
     removed and searched again.
-  - A stalled-download rule, enabled, Max Strikes 3.
+  - A stalled-download rule, enabled, Max Strikes 3, **Privacy Type Public**.
+  - Failed Import: **Ignore Private** on.
+  - Private downloads get a look by hand instead: MAM counts every torrent not yet seeded 72 hours
+    against a limit (D3).
 - **Seeker:** keep **"Search" on** and turn **"Proactive search" off**. "Proactive search" hunts for
   better copies of what you already have. "Search" is the main switch and also runs the
   replacement search after Cleanuparr removes a download. Cleanuparr tells Sonarr/Radarr to skip
@@ -388,7 +420,7 @@ episodes trickle in well below it. VIP, or a second provider with an API key (Su
 The same chain as for series: **AudioBookRequest** (ABR, requests, like Seerr) → **Chaptarr** (search,
 grab, import, like Sonarr) → **qBittorrent** → `Audiobooks/<Author>/<Title>/` → **Audiobookshelf**
 (ABS, playback, like Jellyfin).
-- Prowlarr feeds Chaptarr its indexers.
+- Prowlarr feeds Chaptarr its indexers, except MyAnonamouse (MAM), which Chaptarr has built in (D3).
 - Cleanuparr checks Chaptarr's downloads, with an audiobook list of its own.
 
 Manifests: gembernodes `apps/zeef/chaptarr.yaml`, `audiobookrequest.yaml`, `audiobookshelf.yaml` and
@@ -449,9 +481,40 @@ kubectl -n zeef exec deploy/qbittorrent -- s6-setuidgid abc sh -c 'mkdir -p /dat
   hardlinks of the files qBittorrent is seeding, and writing tags would change those too.
 - **Settings → Download Clients → qBittorrent:**
   - host `qbittorrent.zeef.svc.cluster.local`, port `8080`;
-  - user `admin` plus the password (`QBITTORRENT__PASSWORD`);
+  - qBittorrent's API key (B3). User and password stay empty: Chaptarr refuses them next to a key;
   - Audiobook Category `chaptarr` (the default);
   - **Remove Completed** and **Remove Failed** on.
+- **Settings → Indexers → + → MyAnonaMouse** (MAM, a private tracker that needs an account). Use
+  Chaptarr's own MAM indexer, not Prowlarr's (D4). It knows MAM's rules: it skips VIP-only torrents
+  unless the account is VIP, and it stops MAM grabs before the limit on torrents not yet seeded 72
+  hours. Going over that limit means a 24-hour download suspension.
+  - `mam_id` from MAM → Preferences → Security. It's tied to the home IP: if the ISP changes that,
+    searches fail until you make a new one.
+  - Test. It detects the user class and VIP status.
+  - "Protect Unsatisfied Slots" on (the default), Safety Reserve `5`.
+  - Seed Time at least `72` hours (set to 256). The force-started torrents below ignore it; it
+    only counts for a MAM torrent that isn't force-started.
+  - Priority (Show Advanced) `10`, below the public indexers' 25. Chaptarr ranks title match,
+    category, format, profile and protocol first, then indexer priority, then size and seeders.
+    Without it, a busy public torrent wins over the same book on MAM.
+- **A second qBittorrent client, for MAM.** A torrent waiting in qBittorrent's queue doesn't
+  announce, so it earns no seeding time on MAM. Settings → Download Clients → + → qBittorrent:
+  - name "qbittorrent MAM", the same host and API key, Audiobook Category `chaptarr mam`;
+  - **Initial State: Force Start**, Remove Completed and Remove Failed on;
+  - then, in the MyAnonaMouse indexer: Download Client (Show Advanced) "qbittorrent MAM".
+
+  Forced torrents skip the queue, and qBittorrent applies no seeding limits to them: they seed
+  until you stop them, and Chaptarr never removes them. The library copy is a hardlink, so that
+  costs no extra space. Stop old ones by hand (category `chaptarr mam`) once MAM counts them as
+  seeded, or leave them running for MAM's bonus points.
+
+  **A MAM torrent added to qBittorrent by hand** gets no Force Start. Give it category
+  `chaptarr mam` (Chaptarr then imports it, as it did *Elantris*), then right-click → Force Start.
+  Otherwise the global limits apply (ratio 2.0 or 7 days), and it can wait in the queue.
+- **Searching again:** Chaptarr has no scheduled search for missing books, and RSS only sees new
+  uploads. After adding an indexer, or to retry: Wanted → Missing → **Search All**, or tick books
+  and Search Selected. Interactive Search (the person icon) lists every release, with the reason
+  for any rejection.
 - **Settings → Connect → AudioBookShelf** (after D6, which makes the API key):
   - host `audiobookshelf.zeef.svc.cluster.local`, port `13378`, API key "chaptarr" from D6;
   - triggers On Release Import, On Upgrade, On Rename and On Book File Delete;
@@ -471,6 +534,10 @@ Prowlarr has no Chaptarr app type. Chaptarr speaks Readarr's API, so it's added 
 
 Test, Save. The indexers then appear in Chaptarr with "(Prowlarr)" after the name.
 
+**Don't add MyAnonamouse in Prowlarr;** Chaptarr has its own (D3). Prowlarr's copy offered VIP-only
+torrents, which MAM refuses ("Download blocked: VIP torrent and you are not VIP or higher"), and
+after such a failure Prowlarr pauses the indexer for a while.
+
 ### D5. Cleanuparr (`https://cleanuparr.lan.gemberkoekje.nl`, 2.11.0 after the merge)
 
 - **Media Managers → Chaptarr:** `http://chaptarr.zeef.svc.cluster.local:8789`, key
@@ -486,7 +553,10 @@ Test, Save. The indexers then appear in Chaptarr with "(Prowlarr)" after the nam
     searches again.
   - To add an extension, edit that ConfigMap in gembernodes. Cleanuparr picks the change up
     within about 5 minutes.
-- **Queue Cleaner:** nothing to change. It covers every Media Manager.
+- The Malware Blocker leaves private torrents (MAM) alone (Ignore Private, B7), so they keep every
+  file.
+- **Queue Cleaner:** nothing to change. It covers every Media Manager, for public torrents only
+  (B7).
 
 ### D6. Audiobookshelf, first visit (`https://audiobookshelf.lan.gemberkoekje.nl`)
 
@@ -538,7 +608,7 @@ Test, Save. The indexers then appear in Chaptarr with "(Prowlarr)" after the nam
 - [ ] Chaptarr runs on PostgreSQL: tables in `chaptarr-main`. `/config` holds only `config.xml`,
       logs, covers and `staging.db`.
 - [ ] ABR runs on PostgreSQL: tables in `audiobookrequest`.
-- [ ] Prowlarr's indexers appear in Chaptarr as "(Prowlarr)".
+- [ ] Prowlarr's indexers appear in Chaptarr as "(Prowlarr)"; MyAnonaMouse appears without it.
 - [ ] A test request in ABR appears in Chaptarr (author and book, monitored) and gets searched.
 - [ ] The grab is in qBittorrent with category `chaptarr`. Cleanuparr's log shows the Malware
       Blocker checked it, with no files skipped for an ordinary book.
@@ -547,6 +617,8 @@ Test, Save. The indexers then appear in Chaptarr with "(Prowlarr)" after the nam
 - [ ] ABS shows it within a minute or so (Chaptarr's push), without waiting for the daily scan.
 - [ ] ABR shows the request as in the library.
 - [ ] The phone app plays it, and progress matches in the browser.
-- [ ] After ratio 1.0 or 7 days, Chaptarr removes the torrent and its staging copy, and the book
-      stays.
+- [ ] A public torrent: after 7 days (ratio doesn't count in category `chaptarr`), Chaptarr
+      removes it and its staging copy, and the book stays.
+- [ ] A MAM torrent is in category `chaptarr mam`, force-started, with every file wanted, and keeps
+      seeding.
 - [ ] The first ABS backup appears in `/metadata/backups`.
