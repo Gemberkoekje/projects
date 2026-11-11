@@ -18,7 +18,7 @@ only a name and an email address.
 | 5 | The look: bold and playful | live (projects#244, gembernodes#156) |
 | – | The maker chooses their name (not a numbered slice; NOTES.md) | live (projects#246, gembernodes#157) |
 | 6 | Respondents see the most likely date (D21) | live (projects#247, gembernodes#158) |
-| 7 | Deadline and final pick (D22) | built 2026-11-11, waiting for review (branch `ccr-0ac3368a-xnhnhs`) |
+| 7 | Deadline and final pick (D22) | built 2026-11-11, waiting for review (projects#252) |
 
 Each slice is one PR. Work stops after each one for review.
 
