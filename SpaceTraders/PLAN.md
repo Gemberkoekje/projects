@@ -74,7 +74,8 @@
   - B83 (found on 2026-10-29), B81 and B82 (B80's alarm is fixed; its wait is D124, yours), B17 in part, and B24 (below).
   - D79's second step: learning the price steps per good and market from the bot's own trades. Until then a trip's
     batches are estimated with the measured medians (slice 6.16).
-  - B88 (found on 2026-11-11): the bot's memory grew to its 2 GiB limit, which started the outage of that day (B86, B87).
+  - B88 (found on 2026-11-11): the trading plan's route checks over every predicted market. Their memory killed the pod
+    that morning (B86, B87), fixed in slice 6.59; the 15-minute tick they cause is open (slice 6.60, yours to choose).
 - **The cluster** (gembernodes):
   - Postgres is one Bitnami instance every app shares (`postgresql.flux-system`, LAN address 192.168.1.232). Its 32Gi
     volume sits on the QNAP NFS share that every PVC uses, and the NFS CSI driver most likely doesn't enforce the 32Gi,
@@ -104,7 +105,7 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B85 | **No trade trip for 14 hours: D137 held the gate's next load back from every new trade** (seen on 2026-11-09, fixed in slice 6.54).<br>• From 2026-11-08 18:30Z, minutes before slice 6.50 went live, no `TradeStarted`: a new trade trip left what the gate's next load cost (`TradeContext.GateLoadCredits`, 128,000 to 361,000) while the credits stood at 65,000 to 123,000. Nothing was left to buy cargo with, the command ship stood idle from 03:51Z, and the gate got a FAB_MATS load every few hours from the B36 shuttle's ore sales.<br>• Asked on 2026-11-09: "trade should only leave a handful of credits to pay for fuel" (D24). Fix: cargo leaves `Trade.FuelReserveCredits` and the trips' holds (D57, D64), nothing else; `GateLoadCredits` is gone. A gate load still keeps only the floor, the fuel reserve and the trips' holds (D137's other half). |
 | B86 | **One ship's failing step stopped every restart** (seen on 2026-11-11, fixed in slice 6.58).<br>• An OOM kill at 07:19:03Z (B88) restarted the bot; from then on every start stopped the host about 12 seconds in. Startup recovery ran SPECTER-68's goal step, its sale was refused (B87), nothing caught the error, and the deferred startup failed: CrashLoopBackOff, 106 restarts by 16:28Z, the bot down from 07:19Z until the fix's deploy.<br>• The game loop steps each ship in its own scope and try/catch (`GameLoopService.RunStepAsync`); startup recovery had neither.<br>• Fix: each ship is recovered in its own scope and try/catch; a failure is logged as an Error and left to the game loop. | Loki: "Deferred startup initialization failed; stopping the host" 106 times from 07:19:19Z; `StartupRecoveryService.cs` | 6.58 |
 | B87 | **A trade batch above the market's unit limit was refused on every step** (seen on 2026-11-11, fixed in slice 6.58).<br>• From 05:46:46Z SPECTER-68 sold 64 LIQUID_NITROGEN at X1-ZZ33-E49, the trade volume that market showed at 05:46:43Z. The API refused: 4604, "has a limit of 60 units per transaction". The market is fetched again only after a trade, so its trade volume stayed 64 and the same sale was refused on every step for 93 minutes (`ShipStuck` at 06:18Z), then at every restart (B86).<br>• Every sale and purchase sizes its batch by the trade volume last seen (D79, D81): seven calls in six executors.<br>• Fix: the port trades a refused batch in parts of the limit the API names (`SpaceTradersPortAdapter.TradeInPartsAsync`); the market's refresh after the trade then brings its new trade volume. | `market_price_samples`: trade volume 103 (01:41Z), 70 (05:11Z), 64 (05:19Z and 05:46:43Z); Loki: four Wolverine retries at 05:46Z, then a failed goal step about every 10 minutes | 6.58 |
-| B88 | **The bot's memory grew to its 2 GiB limit and it was killed** (found on 2026-11-11; not investigated yet).<br>• Gen 2 after a collection went from 40 MiB (2026-11-10 01:00Z) to 1,060 MiB (2026-11-11 07:00Z) and allocation from 5 to 120 MB/s, while the run spread to 83 systems and 1,138 markets with 161 ships. Killed at 07:19:03Z (exit 137, `OOMKilled`), which started B86.<br>• At the end of the run of 2026-10-25, with 912 ships and 4,328 markets seen, gen 2 was 400 MiB and the working set 1.5 GiB: a sixth of the ships and a quarter of the markets now hold 2.6 times as much. The change is probably in slices 6.45–6.57, deployed on 2026-11-08 and 11-09. `MarketHistoryCache` (D131) holds summaries only, so it isn't the bulk.<br>• Next: a heap snapshot of a process that has run for some hours. | Prometheus: `system_runtime_dotnet_gc_last_collection_heap_size{gc_heap_generation="gen2"}`, `rate(system_runtime_dotnet_gc_heap_total_allocated[1h])`, `kube_pod_container_status_last_terminated_reason` | — |
+| B88 | **The route checks over every predicted market: a 1.4 GB pass and a 15-minute tick** (found on 2026-11-11; the memory fixed in slice 6.59, the tick open).<br>• Not a leak. Live managed memory climbs for about 5 minutes, up to 1,481 MB at 17:19Z, and drops as the trading plan's pass ends; then again about 15 minutes later. Killed at 07:19:03Z (exit 137, `OOMKilled`), which started B86. The pass kept every free trader's judgement of every route with a price gap (`TradeRoutePlanner.Judge`, D76), and each system's reach map, until its end, for the one judgement per good its state says.<br>• Since slice 6.47 (D132) every market seen with prices is predicted for now, so it counts as fresh: about 1,100 markets instead of the ~135 seen within 30 minutes. `CheckRoutes` loops over every fresh buy market, its goods and every fresh sell market, and the role board and the trading plan run it per ship (and per round of `AssignRoutesAsync`); B84 measured it growing with the square of the fresh markets.<br>• The game loop runs it on one thread (1.03 cores, all the time): ticks per 3 hours went from 1,538 (7 s a tick, 2026-11-10 00:00Z) to 24 (7.5 minutes, 2026-11-11 03:00Z), as the known markets went from about 35 to 1,100. Now about 15 minutes; ships step once a tick, and few ship lines appear outside the minute after each trading pass. The run of 2026-10-25 ticked about once a minute at 797 ships, with 4,328 markets seen but ~135 fresh. | Prometheus: `dotnet_total_memory_bytes`, `system_runtime_dotnet_gc_collections`, `process_cpu_seconds_total`, `kube_pod_container_status_last_terminated_reason`; Loki: the `Tick` of each line, 2026-11-10 00:00Z to 2026-11-11 17:35Z | 6.59, 6.60 |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
@@ -371,7 +372,9 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.55 The gate's forecast (D143), deployed (below)
 - 6.56 Feeder trips first only while supply binds (D144), built (below)
 - 6.57 A feeder trip keeps its terms when priorities change (D145), built (below)
-- 6.58 A restart survives a failing ship; trades within the market's unit limit (B86, B87), built (below)
+- 6.58 A restart survives a failing ship; trades within the market's unit limit (B86, B87), deployed (below)
+- 6.59 The trading pass keeps one judgement per good (B88, its memory), built (below)
+- 6.60 The tick back to seconds (B88, its time), planned (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -645,8 +648,28 @@ the gates of other systems (D68).
     last part's credits and cargo and the parts' revenue together, so the callers are unchanged. The docs don't show the
     error's `data`, hence the message.
   - Tests: `StartupRecoveryServiceTests` (two), `TradeUnitLimitTests` (six).
-  - To check on the run: the start gets past "StartupRecovery: recovering … ship(s)" and stays up; SPECTER-68's `CargoSold`
-    of LIQUID_NITROGEN at X1-ZZ33-E49; no "units per transaction" errors after it.
+  - Deployed: merged as projects#248 (`53876d55`), deployed by gembernodes#159 on 2026-11-11 at 17:01Z. Checked there: the start
+    recovered 161 ships and was done at 17:01:56Z; SPECTER-68's 64 were refused once and sold as 60 and 4, then 42 more.
   - To understand this, start with `TradeInPartsAsync` in
     `SpaceTraders.Infrastructure.SpaceTradersAPI/Adapters/SpaceTradersPortAdapter.cs`, then `RecoverInItsOwnScopeAsync` in
     `SpaceTraders.API/Services/StartupRecoveryService.cs`.
+- **6.59 The trading pass keeps one judgement per good** (B88, its memory; asked on 2026-11-11: "Yes, start B88"): built on
+  branch `claude/spacetraders-b88-judgements`.
+  - `FurthestJudgements` (new, `Trading/`): each good's furthest judgement, kept as one trader's judgements after another come
+    in, in `TradeRouteJudgement.FurthestFirst`'s order (the order `FurthestPerGood` picks by, now shared). That order has no
+    ties, so the kept judgements are the ones `FurthestPerGood` picks from all of them, whatever order the traders come in.
+  - `TradingAutomationService`: `AssignRoutesAsync` adds each trader's judgements to it; a system's `JudgedSystem` holds each
+    good's judgement and its `Why` sentence, made from the reach map right away, not the map. The state comes out the same.
+  - Tests: `TradeRouteJudgementTests` (two new; the three of `FurthestPerGood` unchanged), and `TradingAutomationServiceTests`'
+    not-traded tests unchanged.
+  - To check on the run: `dotnet_total_memory_bytes` no longer climbs through the trading pass (17:14–17:19Z: 462 to 1,481 MB
+    before); one trader's judgements still come and go within its check. The tick stays slow until 6.60.
+  - To understand this, start with `FurthestJudgements.Add` in `Trading/FurthestJudgements.cs`, then the per-system loop of
+    `TradingAutomationService.EnsureBootstrappedAsync`.
+- **6.60 The tick back to seconds** (B88, its time): planned, the way is yours to choose. The route checks run over every
+  fresh market, and since D132 every market seen with prices counts as fresh. Either:
+  - make the checks cheaper with the same decisions: a ship's sell markets only those that trade the good (now every market),
+    `AssignRoutesAsync` checking each trader once instead of once a round, flight plans worked out once per pass; measured on
+    a made-up map of the cluster's size first, the gain not known yet; or
+  - check fewer markets: the predicted ones only within a reach, or above a confidence weight (D133). That changes which trips
+    are found, which is strategy.

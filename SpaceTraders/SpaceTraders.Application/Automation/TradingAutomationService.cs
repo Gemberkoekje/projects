@@ -247,14 +247,16 @@ public sealed class TradingAutomationService(
             }
 
             // D76: why the goods with a price gap that no route will carry aren't traded, as the free traders' checks found it.
-            // Without a free trader the plan checks no route here, and what it found before stays.
-            var judgements = new List<TradeRouteJudgement>();
-            if (traders.Count > 0)
+            // Without a free trader the plan checks no route here, and what it found before stays. B88: only each good's furthest
+            // judgement is kept, with its sentence, not every route checked and the system's map until the end of the pass.
+            var judgements = new FurthestJudgements();
+            var anyFreeTrader = traders.Count > 0;
+            var credits = await AssignRoutesAsync(context, MapOf, traders, held, heldKeys, pending, judgements, constructionTrips, constructionHolds, cancellationToken);
+            if (anyFreeTrader)
             {
-                judged[system.Key] = new JudgedSystem(context.Map, judgements);
+                judged[system.Key] = new JudgedSystem([.. judgements.ToList().Select(judgement => new JudgedGood(judgement, judgement.Why(context.Map)))]);
             }
 
-            var credits = await AssignRoutesAsync(context, MapOf, traders, held, heldKeys, pending, judgements, constructionTrips, constructionHolds, cancellationToken);
             idle += traders.Count;
 
             // After the other traders: a ship that gathers in its spare time takes a route that is left for it, in its system.
@@ -782,7 +784,7 @@ public sealed class TradingAutomationService(
         List<HeldRoute> held,
         HashSet<string> heldKeys,
         Dictionary<string, PendingRoute> pending,
-        List<TradeRouteJudgement> judgements,
+        FurthestJudgements judgements,
         IReadOnlyDictionary<string, SupplyConstructionGoal> constructionTrips,
         long constructionHolds,
         CancellationToken cancellationToken)
@@ -801,7 +803,7 @@ public sealed class TradingAutomationService(
         {
             NoteSaving(mapOf(trader), context.MinProfitPerUnit, trader, credits, heldKeys, heldBuys);
             var judged = TradeRoutePlanner.Judge(mapOf(trader), trader, credits, context.MinProfitPerUnit, heldKeys, heldBuys);
-            judgements.AddRange(judged);
+            judgements.Add(judged);
             foreach (var route in judged.Where(judgement => judgement.Check == TradeRouteCheck.Lucrative).Select(judgement => judgement.Route))
             {
                 pending[route.Key] = pending.TryGetValue(route.Key, out var known)
@@ -1161,8 +1163,9 @@ public sealed class TradingAutomationService(
         JudgedSystem system,
         IReadOnlySet<string> waiting,
         DateTimeOffset now)
-        => TradeRouteJudgement.FurthestPerGood(system.Judgements).Select(judgement =>
+        => system.Goods.Select(good =>
         {
+            var judgement = good.Judgement;
             var waits = judgement.Check == TradeRouteCheck.Lucrative && waiting.Contains(judgement.Route.TradeSymbol);
             return new TradingAutomationGoodNotTradedState
             {
@@ -1173,10 +1176,10 @@ public sealed class TradingAutomationService(
                 BuyWaypointSymbol = judgement.Route.BuyWaypointSymbol,
                 SellWaypointSymbol = judgement.Route.SellWaypointSymbol,
                 Why = judgement.Check != TradeRouteCheck.Lucrative
-                    ? judgement.Why(system.Map)
+                    ? good.Why
                     : waits
-                        ? $"{judgement.Why(system.Map)} It waits for a free trader: the free traders took routes that rank higher."
-                        : string.Create(CultureInfo.InvariantCulture, $"{judgement.Why(system.Map)} The {MaxPendingRoutes} waiting routes listed rank higher."),
+                        ? $"{good.Why} It waits for a free trader: the free traders took routes that rank higher."
+                        : string.Create(CultureInfo.InvariantCulture, $"{good.Why} The {MaxPendingRoutes} waiting routes listed rank higher."),
                 JudgedAt = now,
             };
         });
@@ -1219,8 +1222,15 @@ public sealed class TradingAutomationService(
         public string Key => TradeRoutePlanner.RouteKey(Goal.TradeSymbol, Goal.BuyWaypointSymbol, Goal.SellWaypointSymbol);
     }
 
-    /// <summary>A system whose free traders' routes were checked at this pass, and the map they were checked on (D76).</summary>
-    private sealed record JudgedSystem(TradeMarketMap Map, List<TradeRouteJudgement> Judgements);
+    /// <summary>
+    /// A system whose free traders' routes were checked at this pass (D76): each good's furthest judgement, in
+    /// <see cref="TradeRouteJudgement.FurthestPerGood"/>'s order. B88: the map they were checked on isn't kept to the end of the
+    /// pass; each judgement's sentence is made from it right away.
+    /// </summary>
+    private sealed record JudgedSystem(IReadOnlyList<JudgedGood> Goods);
+
+    /// <summary>A good's furthest judgement in a system, and why it isn't traded in a sentence (<see cref="TradeRouteJudgement.Why"/>).</summary>
+    private sealed record JudgedGood(TradeRouteJudgement Judgement, string Why);
 
     /// <summary>A lucrative route no trader holds, and the free traders that could have taken it.</summary>
     private sealed record PendingRoute(TradeRoute Best, IReadOnlyList<string> CandidateShipSymbols)

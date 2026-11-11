@@ -160,6 +160,53 @@ public sealed class TradeRouteJudgementTests
                 ("EQUIPMENT", TradeRouteCheck.TooFewCredits),
                 ("MEDICINE", TradeRouteCheck.TooFewCredits));
 
+    [Fact]
+    public void FurthestJudgements_KeepOnePerGood_TheOneFurthestPerGoodPicksFromThemAll()
+    {
+        // B88, seen on the cluster on 2026-11-11: the trading plan kept every judgement of every free trader until the end of its
+        // pass, for the one per good its state says (D76). With predictions across 1,138 markets (D132) that came to about
+        // 1.4 GB every pass, and the pod was killed at its 2 GiB limit. Kept as they come, ship after ship, they stay one per good.
+        var (full, empty, poor) = ThreeShipsJudged();
+        var kept = new FurthestJudgements();
+
+        kept.Add(full);
+        kept.Add(empty);
+        kept.Add(poor);
+
+        kept.Count.Should().Be(full.Concat(empty).Concat(poor).Select(judgement => judgement.Route.TradeSymbol).Distinct().Count());
+        kept.ToList().Should().Equal(TradeRouteJudgement.FurthestPerGood([.. full, .. empty, .. poor]));
+    }
+
+    [Fact]
+    public void FurthestJudgements_DontDependOnTheOrderTheShipsCameIn()
+    {
+        var (full, empty, poor) = ThreeShipsJudged();
+        var forwards = new FurthestJudgements();
+        var backwards = new FurthestJudgements();
+
+        forwards.Add(full);
+        forwards.Add(empty);
+        forwards.Add(poor);
+        backwards.Add(poor);
+        backwards.Add(empty);
+        backwards.Add(full);
+
+        backwards.ToList().Should().Equal(forwards.ToList());
+    }
+
+    /// <summary>
+    /// SHIP-1 with a full hold and SHIP-5 with an empty one on the SHIP_PARTS map, and SHIP-7 with 1,000 credits on the other:
+    /// goods that more than one ship judged, and routes that got as far as each other.
+    /// </summary>
+    private static (IReadOnlyList<TradeRouteJudgement> Full, IReadOnlyList<TradeRouteJudgement> Empty, IReadOnlyList<TradeRouteJudgement> Poor) ThreeShipsJudged()
+    {
+        var map = ShipPartsMap();
+        return (
+            TradeRoutePlanner.Judge(map, CommandShip(D41, cargo: [new CargoItemModel("COPPER_ORE", 40)]), 1_000_000, 300, NoneHeld),
+            TradeRoutePlanner.Judge(map, CommandShip(D41, symbol: "SHIP-5"), 1_000_000, 300, NoneHeld),
+            TradeRoutePlanner.Judge(Map(), CommandShip(symbol: "SHIP-7"), 1_000, 200, NoneHeld));
+    }
+
     private static TradeRouteJudgement Of(IEnumerable<TradeRouteJudgement> judged, string tradeSymbol)
         => judged.Single(judgement => judgement.Route.TradeSymbol == tradeSymbol);
 }

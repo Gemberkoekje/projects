@@ -96,15 +96,32 @@ public sealed record TradeRouteJudgement
 
         return [.. judgements
             .GroupBy(judgement => judgement.Route.TradeSymbol, StringComparer.OrdinalIgnoreCase)
-            .Select(good => good
-                .OrderByDescending(judgement => judgement.Check)
-                .ThenByDescending(judgement => judgement.PriceGap)
-                .ThenBy(judgement => judgement.Ship.Symbol, StringComparer.Ordinal)
-                .ThenBy(judgement => judgement.Route.Key, StringComparer.Ordinal)
-                .First())
+            .Select(good => good.Order(FurthestFirst).First())
             .OrderByDescending(judgement => judgement.Check)
             .ThenBy(judgement => judgement.Route.TradeSymbol, StringComparer.Ordinal)];
     }
+
+    /// <summary>
+    /// The order <see cref="FurthestPerGood"/> picks a good's judgement by: the furthest through the checks first, then the largest
+    /// price gap, then by ship and route. No two judgements of one pass are equal in it, as a ship judges each route once.
+    /// </summary>
+    public static IComparer<TradeRouteJudgement> FurthestFirst { get; } = Comparer<TradeRouteJudgement>.Create(static (x, y) =>
+    {
+        var byCheck = y.Check.CompareTo(x.Check);
+        if (byCheck != 0)
+        {
+            return byCheck;
+        }
+
+        var byGap = y.PriceGap.CompareTo(x.PriceGap);
+        if (byGap != 0)
+        {
+            return byGap;
+        }
+
+        var byShip = string.CompareOrdinal(x.Ship.Symbol, y.Ship.Symbol);
+        return byShip != 0 ? byShip : string.CompareOrdinal(x.Route.Key, y.Route.Key);
+    });
 
     /// <summary>
     /// Why the route isn't one of the ship's, in a sentence, with the figures of the check it failed; for a lucrative route,
