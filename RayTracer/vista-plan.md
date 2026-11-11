@@ -1012,7 +1012,9 @@ roughly. The phone records the white balance: automatic or manual in the standar
 mode the manual value too, in Samsung's own data at the end of the file ("4400K"). *Since 2026-10-30* the user also
 shoots RAW in Pro mode (a DNG beside each JPEG: 12 bits, linear, no curve and no stretch), so brightness and colour are
 measured from the DNG where there is one; the slice asks the user for it (the user keeps them in a shared folder, whose link
-stays out of this public repository). A picture pasted into a chat loses the RAW: it arrives as an 8-bit image.
+stays out of this public repository). A picture pasted into a chat loses the RAW: it arrives as an 8-bit image. Pro mode's
+RAW is a single frame: the 10-11 night RAW at 1/8 s, brightened, is full of colour noise a merged file would not have. The
+main camera's optical stabiliser steadies a handheld second by moving the optics, without changing the light.
 
 *Dusk under a grey cloud layer, 27-10-2026* (a phone, through a window and a cat net, over flat land
 facing the sunset; sunset at 17:25; white balance automatic throughout, so the series compares
@@ -1081,6 +1083,14 @@ with the phone's JPEG here: only a few pixels near the sun reach the top of the 
 | Photo (CET) | Camera | What it shows | Judges |
 |---|---|---|---|
 | 17:04:44 | Pro mode, 5500 K; the main lens, 1/500 s, ISO 50; RAW | Nine minutes before sunset, the sun 0.3° up behind a low bank on the horizon: patchy mid-level clouds lit salmon-pink on their sides toward the sun, already before sunset; a thick dark mass on the right lit by the sky alone; the low bank's top edge glowing bright where its thin edges stand in front of the sun (silver linings); a pale cream glow near the sun, blue in the gaps | M4 (silver linings, which §5.3's clouds name; clouds lit pink before sunset; a thick cloud dark beside lit ones) |
+
+*Night over a river, 10-11-2026* (from a bridge, not the home view; no moon, new the day before; Pro mode, 5500 K, RAW, ISO 400,
+f/1.8, handheld). The low cloud over the town is lit by its lights alone.
+
+| Photo (CET) | Camera | What it shows | Judges |
+|---|---|---|---|
+| 21:42:05 | 1/8 s | What the user's eyes saw: dark, little detail, the sky a dark brown-grey; in the RAW the typical pixel sits at 0.2% of the range, deep in the noise | M6 (the eye's night, the mesopic display's target) |
+| 21:42:34 | 1 s, 8× the light | Taken to make out the reflections: the cloud glowing warm, about 3400 K with a slight green tint, so olive at 5500 K; the river mirroring it 2.7× darker; lamps and lit windows reflected; sharp, the stabiliser holding a handheld second | M6 (the camera's night against the eye's; the parked town glow) |
 
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
@@ -2383,7 +2393,10 @@ last wavelength (661 nm), each within 1 ΔE₇₆ of dense integration or the mi
 Goal: moonlit scenes that look right for the right reason. Deliverable: moon position,
 phase and lunar spectrum; stars (catalogue or procedural fallback); procedural Milky Way
 and airglow; Purkinje / mesopic display transform. Verify: a moonlit scene reads blue
-with neutral-white materials, and the moon phase matches the date.
+with neutral-white materials, and the moon phase matches the date. *Added 2026-11-11:* the user's night photos (the truth
+references) set the display's question: the user's eyes saw about what a 1/8 s frame shows (dark, little detail or colour),
+while a 1 s frame shows the glow's colour and the reflections; the mesopic transform is judged between the two, the user
+picking. A town's glow on low cloud is parked for M6.
 
 **M7 — Winter.**
 Goal: winter as a first-class season. Deliverable: frozen lakes (ice + snow on ice);
@@ -2602,6 +2615,10 @@ any of them.
   camera's controls instead, ISO, shutter time and aperture (the exposure triangle of §5.6, the engine's `plan.md` §4) with the meter as
   a guide, the white balance in Kelvin as now, and the window's controls laid out as a camera's. *Belongs:* later, beside "Ongoing:
   camera filters"; feature creep the user asked to keep out of M1.
+- **A town's glow on low cloud** (the user's night photos, 10-11-2026, the truth references): with no moon, a low cloud deck over
+  a town glows warm from its street lights (about 3400 K with a slight green tint, olive at 5500 K) and the water mirrors it.
+  M6 plans only a dark wilderness sky (moon, stars, the Milky Way, airglow); a real alpine valley has a village under its clouds,
+  and Hamlet's villages would light theirs. *Belongs:* M6, with M8's props or Hamlet's villages as the light.
 
 ---
 
