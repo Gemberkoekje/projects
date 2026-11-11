@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using SpaceTraders.API.Services;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Goals;
@@ -17,6 +18,7 @@ namespace SpaceTraders.API.Tests.Services;
 /// <summary>
 /// D26: a restart reconsiders the contract's ships once, instead of waiting for their deliveries.
 /// B38: only a ship that is in transit is recovered as one.
+/// B86: a ship whose step fails doesn't stop the restart.
 /// </summary>
 public sealed class StartupRecoveryServiceTests
 {
@@ -129,6 +131,39 @@ public sealed class StartupRecoveryServiceTests
         await _goalExecutor.Received(1).ExecuteAsync("SPECTER-1", Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task StartAsync_AShipWhoseGoalStepThrows_IsLeftToTheGameLoop_AndTheShipsAfterItAreStillRecovered()
+    {
+        // B86, seen on the cluster on 2026-11-11: from 07:19Z every start stopped the host about 12 seconds in, 106 times by
+        // 16:28Z. SPECTER-68's goal step threw (the API refused its sale, B87), nothing here caught it, and the deferred
+        // startup failed. The game loop carries on past a ship whose step fails (GameLoopService.RunStepAsync); so does a
+        // restart now.
+        Fleet(Docked("SPECTER-1"), Docked("SPECTER-2"));
+        _goalExecutor.ExecuteAsync("SPECTER-1", Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("The API refused the sale."));
+
+        var start = () => StartAsync();
+
+        await start.Should().NotThrowAsync();
+        await _goalExecutor.Received(1).ExecuteAsync("SPECTER-2", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartAsync_StoppedWhileAShipsStepRuns_StopsThere()
+    {
+        // A host that stops cancels the step; that is no failure of the ship's to carry on past.
+        using var stopping = new CancellationTokenSource();
+        await stopping.CancelAsync();
+        Fleet(Docked("SPECTER-1"), Docked("SPECTER-2"));
+        _goalExecutor.ExecuteAsync("SPECTER-1", Arg.Any<CancellationToken>())
+            .ThrowsAsync(new OperationCanceledException(stopping.Token));
+
+        var start = async () => await StartAsync(stopping.Token);
+
+        await start.Should().ThrowAsync<OperationCanceledException>();
+        await _goalExecutor.DidNotReceive().ExecuteAsync("SPECTER-2", Arg.Any<CancellationToken>());
+    }
+
     private void ContractPlanIs(bool on)
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Contract), Arg.Any<CancellationToken>()).Returns(on);
 
@@ -138,7 +173,11 @@ public sealed class StartupRecoveryServiceTests
     private static ShipModel Ship(string status, DateTimeOffset arrivesAt)
         => new("SPECTER-1", "X1-FJ91", "X1-FJ91-H60", status, "CRUISE", 400, 400, arrivesAt, DestWaypointSymbol: "X1-FJ91-H60");
 
-    private async Task StartAsync()
+    /// <summary>A ship docked at X1-FJ91-H60 since its last route, two hours ago.</summary>
+    private static ShipModel Docked(string symbol)
+        => new(symbol, "X1-FJ91", "X1-FJ91-H60", "DOCKED", "CRUISE", 400, 400, DateTimeOffset.UtcNow.AddHours(-2), DestWaypointSymbol: "X1-FJ91-H60");
+
+    private async Task StartAsync(CancellationToken cancellationToken = default)
     {
         var services = new ServiceCollection();
         services.AddSingleton(_settings);
@@ -149,6 +188,6 @@ public sealed class StartupRecoveryServiceTests
         await using var provider = services.BuildServiceProvider();
 
         await new StartupRecoveryService(provider.GetRequiredService<IServiceScopeFactory>(), _names, NullLogger<StartupRecoveryService>.Instance)
-            .StartAsync(CancellationToken.None);
+            .StartAsync(cancellationToken);
     }
 }

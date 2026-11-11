@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Exceptions;
@@ -9,8 +11,11 @@ using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet;
 
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Adapters;
 
-public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISpaceTradersPort
+public sealed partial class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISpaceTradersPort
 {
+    /// <summary>The API's <c>marketTradeUnitLimitError</c>: more units than the market takes in one transaction (B87).</summary>
+    public const int MarketTradeUnitLimitErrorCode = 4604;
+
     public async Task<ServerStatusModel> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         var status = await client.GetStatusAsync(cancellationToken);
@@ -103,17 +108,60 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         return MapNav(result.Nav);
     }
 
-    public async Task<TradeActionResult> SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
+    public Task<TradeActionResult> SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
+        => TradeInPartsAsync(units, async part =>
+        {
+            var result = await client.SellCargoAsync(shipSymbol, tradeSymbol, part, cancellationToken);
+            return new TradeActionResult(result.Agent.Symbol, result.Agent.Credits, MapCargo(result.Cargo), result.Transaction.TotalPrice);
+        });
+
+    public Task<TradeActionResult> BuyCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
+        => TradeInPartsAsync(units, async part =>
+        {
+            var result = await client.BuyCargoAsync(shipSymbol, tradeSymbol, part, cancellationToken);
+            return new TradeActionResult(result.Agent.Symbol, result.Agent.Credits, MapCargo(result.Cargo), result.Transaction.TotalPrice);
+        });
+
+    /// <summary>
+    /// One transaction of <paramref name="units"/>; when the API refuses it for more units than the market takes a transaction
+    /// (B87), the units in parts of the limit the refusal names, each part traded the same way. The callers size a batch by the
+    /// trade volume they last saw, which can be out of date, and fetch the market again only after a trade: before B87 the
+    /// same refused batch was sent again on every step.
+    /// </summary>
+    /// <param name="units">The units to trade.</param>
+    /// <param name="trade">One transaction of the given units.</param>
+    /// <returns>The last part's credits and cargo, and what the parts fetched or cost together.</returns>
+    private static async Task<TradeActionResult> TradeInPartsAsync(int units, Func<int, Task<TradeActionResult>> trade)
     {
-        var result = await client.SellCargoAsync(shipSymbol, tradeSymbol, units, cancellationToken);
-        return new TradeActionResult(result.Agent.Symbol, result.Agent.Credits, MapCargo(result.Cargo), result.Transaction.TotalPrice);
+        try
+        {
+            return await trade(units);
+        }
+        catch (SpaceTradersApiException exception) when (UnitLimitOf(exception) is var limit && limit > 0 && limit < units)
+        {
+            var parts = new List<TradeActionResult>();
+            for (var left = units; left > 0; left -= limit)
+            {
+                parts.Add(await TradeInPartsAsync(Math.Min(left, limit), trade));
+            }
+
+            return parts[^1] with { Revenue = parts.Sum(part => part.Revenue) };
+        }
     }
 
-    public async Task<TradeActionResult> BuyCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
-    {
-        var result = await client.BuyCargoAsync(shipSymbol, tradeSymbol, units, cancellationToken);
-        return new TradeActionResult(result.Agent.Symbol, result.Agent.Credits, MapCargo(result.Cargo), result.Transaction.TotalPrice);
-    }
+    /// <summary>
+    /// The units a transaction the market takes, from the API's <see cref="MarketTradeUnitLimitErrorCode"/> refusal ("Trade good
+    /// LIQUID_NITROGEN has a limit of 60 units per transaction."); 0 for any other error, or a message without it.
+    /// </summary>
+    private static int UnitLimitOf(SpaceTradersApiException exception)
+        => exception.ErrorCode == MarketTradeUnitLimitErrorCode
+            && UnitLimitPattern().Match(exception.Message) is { Success: true } match
+            && int.TryParse(match.Groups["limit"].ValueSpan, NumberStyles.None, CultureInfo.InvariantCulture, out var limit)
+                ? limit
+                : 0;
+
+    [GeneratedRegex(@"limit of (?<limit>\d+) units per transaction", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex UnitLimitPattern();
 
     public async Task<RefuelActionResult> RefuelShipAsync(string shipSymbol, bool fromCargo = false, CancellationToken cancellationToken = default)
     {

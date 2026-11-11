@@ -22,7 +22,6 @@ public sealed class StartupRecoveryService(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = serviceScopeFactory.CreateAsyncScope();
-        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
         var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
         var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
         var now = TimeProvider.System.GetUtcNow();
@@ -41,8 +40,6 @@ public sealed class StartupRecoveryService(
             await scope.ServiceProvider.GetRequiredService<IContractPlanService>().ReleaseShipsAsync(cancellationToken);
         }
 
-        var goalExecutor = scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>();
-
         var fleet = await ships.GetAllAsync(cancellationToken);
         logger.LogInformation("StartupRecovery: recovering {Count} ship(s).", fleet.Count);
 
@@ -51,16 +48,45 @@ public sealed class StartupRecoveryService(
 
         foreach (var ship in fleet)
         {
-            await RecoverShipAsync(ship, ships, bus, goalExecutor, now, cancellationToken);
+            await RecoverInItsOwnScopeAsync(ship, now, cancellationToken);
         }
     }
 
     /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
+    /// <summary>
+    /// Recovers one ship in its own scope and try/catch, as the game loop steps each ship (<c>GameLoopService.RunStepAsync</c>):
+    /// a ship whose step throws, or leaves its DbContext unusable, is left to the game loop's next tick, and the ships after
+    /// it are still recovered. Before B86 one such ship stopped the host at every start.
+    /// </summary>
+    private async Task RecoverInItsOwnScopeAsync(Application.Ports.ShipModel ship, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var scope = serviceScopeFactory.CreateAsyncScope();
+            await RecoverShipAsync(
+                ship,
+                scope.ServiceProvider.GetRequiredService<IMessageBus>(),
+                scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>(),
+                now,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "StartupRecovery: recovering ship {ShipSymbol} failed; the game loop takes it from here, and the other ships carry on.",
+                ship.Symbol);
+        }
+    }
+
     private async Task RecoverShipAsync(
         Application.Ports.ShipModel ship,
-        IShipRepository ships,
         IMessageBus bus,
         IShipGoalExecutorService goalExecutor,
         DateTimeOffset now,
