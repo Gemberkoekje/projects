@@ -33,16 +33,18 @@ public sealed class ListAppointmentsHandler(IPollStore polls, IAnswerStore answe
         var answeredOnly = await polls.LoadManyAsync([.. mine.Select(answer => answer.PollId).Where(id => !ownedIds.Contains(id)).Distinct()], cancellationToken);
         var all = owned.Concat(answeredOnly).ToArray();
         var counts = await answers.CountForPollsAsync([.. ownedIds], cancellationToken);
+        var now = Clock.UtcNow();
 
         return [.. all
             .Select(poll => new Appointment
             {
                 Poll = poll,
+                IsOpen = poll.IsOpenAt(now),
                 IsOwner = ownedIds.Contains(poll.Id),
                 MyAnswer = mine.FirstOrDefault(answer => answer.PollId == poll.Id) ?? new Answer(),
                 AnswerCount = counts.TryGetValue(poll.Id, out var count) ? count : 0,
             })
-            .OrderByDescending(appointment => appointment.Poll.IsOpen)
+            .OrderByDescending(appointment => appointment.IsOpen)
             .ThenByDescending(appointment => appointment.LastActivity)];
     }
 }

@@ -38,9 +38,9 @@ public sealed class CreateAndClosePoll_specs
         var handler = new ClosePollHandler(polls, NullLogger<ClosePollHandler>.Instance);
 
         (await handler.HandleAsync(new ClosePoll { ShareToken = poll.ShareToken, By = Fixtures.Stranger })).IsValid.Should().BeFalse();
-        polls.All.Single().IsOpen.Should().BeTrue();
+        polls.All.Single().IsOpenAt(Fixtures.Now).Should().BeTrue();
 
         (await handler.HandleAsync(new ClosePoll { ShareToken = poll.ShareToken, By = Fixtures.Owner })).IsValid.Should().BeTrue();
-        polls.All.Single().IsOpen.Should().BeFalse();
+        polls.All.Single().IsOpenAt(Fixtures.Now).Should().BeFalse();
     }
 }

@@ -6,6 +6,9 @@ public sealed record PollOverview
     /// <summary>The poll.</summary>
     public Poll Poll { get; init; } = new Poll();
 
+    /// <summary>True while it takes answers.</summary>
+    public bool IsOpen { get; init; }
+
     /// <summary>How many people answered.</summary>
     public int AnswerCount { get; init; }
 }

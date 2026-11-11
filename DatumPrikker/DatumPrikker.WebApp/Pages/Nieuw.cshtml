@@ -78,6 +78,15 @@ else
             <button type="button" class="knop-toevoegen" data-voeg-toe>+ Nog een datum</button>
         </fieldset>
 
+        <fieldset class="opties">
+            <legend>Wanneer sluit hij? <span class="zacht">(optioneel)</span></legend>
+            <p class="zacht">Daarna kan niemand meer antwoorden. Zonder tijd sluit hij aan het eind van die dag. Leeg laten: hij blijft open tot je hem zelf sluit.</p>
+            <div class="sluit-rij">
+                <label>Dag <input type="date" asp-for="Input.DeadlineDate" min="@NieuwModel.Today" /></label>
+                <label>Tijd <input type="time" asp-for="Input.DeadlineTime" /></label>
+            </div>
+        </fieldset>
+
         <button type="submit" class="knop knop-groot">Prikker maken</button>
     </form>
 </section>

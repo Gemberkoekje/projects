@@ -27,6 +27,9 @@ public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler acces
     [DisplayFormat(ConvertEmptyStringToNull = false)]
     public string Note { get; set; } = string.Empty;
 
+    /// <summary>Today in Amsterdam as <c>yyyy-MM-dd</c>: the earliest deadline the date picker offers.</summary>
+    public static string Today => DutchTime.FromUtc(Clock.UtcNow()).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
     /// <summary>Where the signed-in account stands on making polls.</summary>
     public AccessStatus Status { get; private set; } = new AccessStatus();
 
@@ -90,6 +93,11 @@ public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler acces
             }
         }
 
+        if (!Input.TryParseDeadline(out var deadlineDate, out var deadlineHasTime, out var deadlineTime, out var deadlineError))
+        {
+            ModelState.AddModelError(string.Empty, $"Sluitdatum: {deadlineError}");
+        }
+
         if (!ModelState.IsValid)
         {
             return Redisplay();
@@ -102,6 +110,9 @@ public sealed class NieuwModel(CreatePollHandler handler, GetAccessHandler acces
             Description = Input.Description,
             Location = Input.Location,
             Options = options,
+            DeadlineDate = deadlineDate,
+            DeadlineHasTime = deadlineHasTime,
+            DeadlineTime = deadlineTime,
         };
 
         var created = await handler.HandleAsync(new CreatePoll { Draft = draft, Owner = AccountClaims.From(User) }, cancellationToken);
@@ -151,6 +162,54 @@ public sealed class PollInput
 
     /// <summary>The date rows, empty ones included.</summary>
     public List<OptionInput> Options { get; set; } = [];
+
+    /// <summary>The day it closes by itself as <c>yyyy-MM-dd</c>; empty for no deadline (D22).</summary>
+    [DisplayFormat(ConvertEmptyStringToNull = false)]
+    public string DeadlineDate { get; set; } = string.Empty;
+
+    /// <summary>The time it closes as <c>HH:mm</c>; empty for the end of the day.</summary>
+    [DisplayFormat(ConvertEmptyStringToNull = false)]
+    public string DeadlineTime { get; set; } = string.Empty;
+
+    /// <summary>Reads the optional deadline.</summary>
+    /// <param name="date">The day; <see langword="default"/> when both fields are empty.</param>
+    /// <param name="hasTime">True when a time was given.</param>
+    /// <param name="time">The time; only with <paramref name="hasTime"/>.</param>
+    /// <param name="error">What is wrong, in Dutch.</param>
+    /// <returns>True when the fields make sense, empty ones included.</returns>
+    public bool TryParseDeadline(out DateOnly date, out bool hasTime, out TimeOnly time, out string error)
+    {
+        date = default;
+        hasTime = !string.IsNullOrWhiteSpace(DeadlineTime);
+        time = default;
+        error = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(DeadlineDate))
+        {
+            if (hasTime)
+            {
+                hasTime = false;
+                error = "kies ook een dag, of laat de tijd leeg.";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!DateOnly.TryParseExact(DeadlineDate.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+        {
+            error = "kies een dag.";
+            return false;
+        }
+
+        if (hasTime && !TimeOnly.TryParse(DeadlineTime.Trim(), CultureInfo.InvariantCulture, out time))
+        {
+            error = "die tijd klopt niet.";
+            return false;
+        }
+
+        return true;
+    }
 }
 
 /// <summary>One date row: a day, and optionally a time range.</summary>

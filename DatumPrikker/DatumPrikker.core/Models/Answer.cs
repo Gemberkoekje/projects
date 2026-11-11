@@ -78,7 +78,7 @@ public sealed record Answer
         ArgumentNullException.ThrowIfNull(draft);
         ArgumentNullException.ThrowIfNull(by);
 
-        if (!poll.IsOpen)
+        if (!poll.IsOpenAt(now))
         {
             return Result.WithMessages<Answer>(ValidationMessage.Error("Deze prikker is gesloten en neemt geen antwoorden meer aan.", nameof(poll)));
         }

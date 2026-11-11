@@ -16,7 +16,7 @@ public sealed class Serialization_specs
         var copy = JsonSerializer.Deserialize<Poll>(JsonSerializer.Serialize(poll, Options), Options);
 
         copy.Should().BeEquivalentTo(poll);
-        copy.IsOpen.Should().BeFalse();
+        copy.IsOpenAt(Fixtures.Now).Should().BeFalse();
     }
 
     [Test]

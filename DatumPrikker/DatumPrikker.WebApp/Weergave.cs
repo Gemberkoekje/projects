@@ -118,14 +118,12 @@ public static class Weergave
     /// <summary>A moment in Dutch local time, such as "9 november om 20:15".</summary>
     /// <param name="utc">The moment in UTC.</param>
     /// <returns>The text.</returns>
-    public static string Moment(DateTime utc)
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Amsterdam).ToString("d MMMM 'om' HH:mm", Nl);
+    public static string Moment(DateTime utc) => DutchTime.FromUtc(utc).ToString("d MMMM 'om' HH:mm", Nl);
 
     /// <summary>A day in Dutch local time, such as "9 nov 2026".</summary>
     /// <param name="utc">The moment in UTC.</param>
     /// <returns>The text.</returns>
-    public static string Datum(DateTime utc)
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Amsterdam).ToString("d MMM yyyy", Nl);
+    public static string Datum(DateTime utc) => DutchTime.FromUtc(utc).ToString("d MMM yyyy", Nl);
 
     /// <summary>The word for a refused access state.</summary>
     /// <param name="state">The state.</param>
@@ -182,5 +180,129 @@ public static class Weergave
         return $"{hoe} Nog niet definitief: dat beslist {owner}.";
     }
 
-    private static readonly TimeZoneInfo Amsterdam = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
+    /// <summary>A day with its weekday, such as "zaterdag 12 december".</summary>
+    /// <param name="date">The day.</param>
+    /// <returns>The text.</returns>
+    public static string DagMaand(DateOnly date) => date.ToString("dddd d MMMM", Nl);
+
+    /// <summary>A day with its weekday and short month, such as "zaterdag 12 dec".</summary>
+    /// <param name="date">The day.</param>
+    /// <returns>The text.</returns>
+    public static string DagMaandKort(DateOnly date) => $"{Weekdag(date)} {DagNummer(date)} {Maand(date)}";
+
+    /// <summary>
+    /// The poll's state for its label: "gekozen" once a date is picked, otherwise "open" or "gesloten"
+    /// (D22: a passed deadline counts as closed).
+    /// </summary>
+    /// <param name="poll">The poll.</param>
+    /// <param name="isOpen">True while it takes answers.</param>
+    /// <returns>The word.</returns>
+    public static string Staat(Poll poll, bool isOpen)
+    {
+        ArgumentNullException.ThrowIfNull(poll);
+
+        if (poll.HasPick)
+        {
+            return "gekozen";
+        }
+
+        return isOpen ? "open" : "gesloten";
+    }
+
+    /// <summary>The CSS class of the label that goes with <see cref="Staat"/>.</summary>
+    /// <param name="poll">The poll.</param>
+    /// <param name="isOpen">True while it takes answers.</param>
+    /// <returns>The class name.</returns>
+    public static string StaatKlasse(Poll poll, bool isOpen)
+    {
+        ArgumentNullException.ThrowIfNull(poll);
+
+        if (poll.HasPick)
+        {
+            return "label-gekozen";
+        }
+
+        return isOpen ? "label-open" : "label-dicht";
+    }
+
+    /// <summary>
+    /// The answer page's deadline (D22): "Antwoorden kan tot vrijdag 4 december om 18:00", or for a
+    /// deadline without a time "Antwoorden kan tot en met vrijdag 4 december".
+    /// </summary>
+    /// <param name="poll">A poll with a deadline.</param>
+    /// <returns>The text.</returns>
+    public static string AntwoordenTot(Poll poll)
+    {
+        var dag = SluitDag(poll, out var tijd);
+        return tijd.Length > 0 ? $"Antwoorden kan tot {DagMaand(dag)} om {tijd}" : $"Antwoorden kan tot en met {DagMaand(dag)}";
+    }
+
+    /// <summary>
+    /// The results' deadline line (D22): "Sluit vanzelf op vrijdag 4 december om 18:00." before it,
+    /// "Vanzelf gesloten op …" after it. Without a time: "Sluit vanzelf na vrijdag 4 december.".
+    /// </summary>
+    /// <param name="poll">A poll with a deadline.</param>
+    /// <param name="passed">True once the deadline closed it.</param>
+    /// <returns>The text.</returns>
+    public static string SluitVanzelf(Poll poll, bool passed)
+    {
+        var wat = passed ? "Vanzelf gesloten" : "Sluit vanzelf";
+        var dag = SluitDag(poll, out var tijd);
+        return tijd.Length > 0 ? $"{wat} op {DagMaand(dag)} om {tijd}." : $"{wat} na {DagMaand(dag)}.";
+    }
+
+    /// <summary>The deadline in a list (D22): "sluit 18 december om 12:00", or "sluit na 18 december".</summary>
+    /// <param name="poll">A poll with a deadline.</param>
+    /// <returns>The text.</returns>
+    public static string SluitKort(Poll poll)
+    {
+        var dag = SluitDag(poll, out var tijd).ToString("d MMMM", Nl);
+        return tijd.Length > 0 ? $"sluit {dag} om {tijd}" : $"sluit na {dag}";
+    }
+
+    /// <summary>The question before picking a date (D22), for the browser's confirm.</summary>
+    /// <param name="option">The date to pick.</param>
+    /// <param name="closes">True when picking also closes the poll.</param>
+    /// <returns>The text.</returns>
+    public static string KiesVraag(DateOption option, bool closes)
+    {
+        ArgumentNullException.ThrowIfNull(option);
+
+        var gevolg = closes ? "Dan sluit de prikker en ziet iedereen met de link deze datum." : "Dan ziet iedereen met de link deze datum.";
+        return $"Dit wordt het: {DagMaand(option.Date)}, {Tijd(option)}? {gevolg}";
+    }
+
+    /// <summary>A file name for a poll's agenda file, from its title, such as "etentje-met-de-buren.ics".</summary>
+    /// <param name="title">The poll's title.</param>
+    /// <returns>The file name; "afspraak.ics" when the title has no plain letters or digits.</returns>
+    public static string AgendaBestand(string title)
+    {
+        ArgumentNullException.ThrowIfNull(title);
+
+        var slug = new string([.. title.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-')]);
+        slug = string.Join('-', slug.Split('-', StringSplitOptions.RemoveEmptyEntries));
+        if (slug.Length > 60)
+        {
+            slug = slug[..60].TrimEnd('-');
+        }
+
+        return slug.Length == 0 ? "afspraak.ics" : $"{slug}.ics";
+    }
+
+    /// <summary>The local day of the deadline, and its time ("18:00"); an empty time for the end of the day.</summary>
+    private static DateOnly SluitDag(Poll poll, out string tijd)
+    {
+        ArgumentNullException.ThrowIfNull(poll);
+
+        if (poll.DeadlineHasTime)
+        {
+            var local = DutchTime.FromUtc(poll.Deadline);
+            tijd = local.ToString("HH:mm", CultureInfo.InvariantCulture);
+            return DateOnly.FromDateTime(local);
+        }
+
+        // The end of a day is the next day's midnight: step back one tick to land on the day itself.
+        tijd = string.Empty;
+        return DateOnly.FromDateTime(DutchTime.FromUtc(poll.Deadline.AddTicks(-1)));
+    }
 }

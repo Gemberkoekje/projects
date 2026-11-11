@@ -17,8 +17,8 @@ only a name and an email address.
 | 4 | On gembernodes | live since 2026-11-09 (gembernodes#155, projects#243) |
 | 5 | The look: bold and playful | live (projects#244, gembernodes#156) |
 | – | The maker chooses their name (not a numbered slice; NOTES.md) | live (projects#246, gembernodes#157) |
-| 6 | Respondents see the most likely date (D21) | built 2026-11-11, waiting for review (branch `ccr-48575899-3y4ua3`) |
-| 7 | Deadline and final pick (D22) | mock settled 2026-11-11 (`mocks/slice7-*`); to build |
+| 6 | Respondents see the most likely date (D21) | live (projects#247, gembernodes#158) |
+| 7 | Deadline and final pick (D22) | built 2026-11-11, waiting for review (projects#252) |
 
 Each slice is one PR. Work stops after each one for review.
 
@@ -63,7 +63,7 @@ Each slice is one PR. Work stops after each one for review.
 - **D8 One comment per answer, not one per date.** v1 asked for a reason per date. Nobody fills
   in five reasons.
 - **D9 Results are visible only to the owner**, as in v1. The owner can close the poll, after which
-  it stops taking answers. There's no deadline yet.
+  it stops taking answers. Slice 7 added a deadline and a final pick (D22).
 - **D10 Dutch UI, English code.** Test methods are snake_case English sentences, as in Kluskat.
 - **D11 No cache, no Redis.** One pod and one shared PostgreSQL. Anonymous answering is rate limited
   per client IP (30 per 5 minutes), behind the ingress's forwarded headers.
@@ -305,13 +305,24 @@ D22. The mock is in `mocks/` (`slice7-*.html`, as for slice 6). Its open points 
   (owner only, a date of this poll, changing, undoing), what respondents see after the pick, and
   the .ics (whole day, time range across a DST change, escaping of commas and newlines, 404
   without a pick).
+- **As built** (2026-11-11):
+  - `Poll` got `Deadline` (a UTC moment) with `DeadlineHasTime`, and `PickedOptionId` with
+    `PickedOn`. `IsOpen` is now `IsOpenAt(now)`. Read models that lists show (`Appointment`,
+    `PollOverview`) carry an `IsOpen` worked out by their handler.
+  - Picking is `Poll.Pick` / `Poll.UndoPick`, behind one `PickDateHandler` for the `PickDate` and
+    `UndoPick` commands (as `PreApprovalHandler` does for its two). The .ics text comes from
+    `AgendaFile` in core, served by `GetAgendaHandler` and a minimal endpoint (`AgendaEndpoint`).
+  - The wording the mocks didn't show, for a deadline without a time: "Antwoorden kan tot en met
+    vrijdag 4 december", "Sluit vanzelf na …" / "Vanzelf gesloten na …", and "sluit na 4 december".
+    Closed by hand or by a pick, the results say "Gesloten op 1 december om 21:12" (as in
+    `slice7-4`). Right after undoing, a plain note says the poll stays closed.
 
 ## Open questions
 
 - **Slice 6: the likely-date card on a closed poll.** D21 doesn't say. As built, someone who
   answered still sees "Zo te zien wordt het…" under "Deze prikker is gesloten", since the date
-  isn't picked yet. The alternative is to hide it once the poll closes. Slice 7's pick card
-  replaces it either way once a date is picked.
+  isn't picked yet. That now includes a poll closed by its deadline. The alternative is to hide it
+  once the poll closes. Since slice 7, the pick card replaces it once a date is picked.
 
 Everything else was answered on 2026-11-11 and sits in D21 and D22. Mail for the final pick stays a
 possible later addition (D17, D22).

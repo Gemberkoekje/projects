@@ -142,7 +142,7 @@
                             <td>@line.Poll.OwnerName</td>
                             <td>@Weergave.Datum(line.Poll.CreatedOn)</td>
                             <td>@line.AnswerCount</td>
-                            <td>@(line.Poll.IsOpen ? "open" : "gesloten")</td>
+                            <td>@Weergave.Staat(line.Poll, line.IsOpen)</td>
                         </tr>
                     }
                 </tbody>
