@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Tools – Added (2026-11-11, slice 6.60)
+- The tick bench (B88, D146): `tools/bench/copy_world.py` copies the cluster's database into a local Postgres, read-only and
+  without the agent token; `TickBench` (`tests/SpaceTraders.API.Tests/Bench/`, skipped unless `SPACETRADERS_BENCH_DB` is set)
+  runs the API host on that copy with the game API stubbed, and times each trader's route work and each plan's pass. First
+  measures: one tick's plans 559 s and 862 s on two copies, the role board and the trading plan nearly all of it; two thirds
+  of ranking is the first trader on each map planning the hauls between its ~1,000 markets.
+- Plan: slices 6.60–6.63 and decisions D146 (the route work shared, the same decisions) and D147 (ships don't wait for the
+  plans, and the route table built in the background).
+
 ### Code – Fixed (2026-11-11, slice 6.59)
 - B88 (its memory): the trading plan's pass keeps each good's furthest judgement and its sentence (`FurthestJudgements`), not
   every free trader's judgement of every route and each system's map until the pass ends. With predictions across about
