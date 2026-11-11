@@ -4,6 +4,9 @@
     var poll = Model.Results.Poll;
     var total = Model.Results.Answers.Count;
     var best = Model.Results.Best.Select(tally => tally.Option.Id).ToHashSet();
+
+    // D22: only the owner picks, changes or undoes; an admin looking on gets no buttons (D18).
+    var kiest = Model.IsOwner;
     ViewData["Title"] = Model.Refusal.Length > 0 ? "Uitslag" : $"Uitslag: {poll.Title}";
 }
 
@@ -22,16 +25,38 @@ else
         <div class="melding melding-goed" role="status" data-feest><strong>Je prikker staat klaar!</strong> Deel de link hieronder met iedereen die mag antwoorden.</div>
     }
 
+    @if (Model.Gekozen && poll.HasPick)
+    {
+        <div class="melding melding-goed" role="status"><strong>Gekozen!</strong> De prikker is gesloten. Iedereen met de link ziet nu @Weergave.DagMaand(poll.PickedOption().Date).</div>
+    }
+
+    @if (Model.Ongedaan && !poll.HasPick)
+    {
+        <div class="melding" role="status">De keuze is ongedaan gemaakt. De prikker blijft gesloten; kies hieronder een andere datum of laat het zo.</div>
+    }
+
     @if (!Model.IsOwner)
     {
-        <div class="melding" role="status">Je bekijkt deze prikker van @poll.OwnerName als beheerder. Sluiten kan alleen de maker.</div>
+        <div class="melding" role="status">Je bekijkt deze prikker van @poll.OwnerName als beheerder. Sluiten en kiezen kan alleen de maker.</div>
     }
 
     <section class="kaart">
         <div class="kaart-kop">
             <h1>@poll.Title</h1>
-            <span class="label @(poll.IsOpen ? "label-open" : "label-dicht")">@(poll.IsOpen ? "open" : "gesloten")</span>
+            <span class="label @Weergave.StaatKlasse(poll, Model.IsOpen)">@Weergave.Staat(poll, Model.IsOpen)</span>
         </div>
+        @if (Model.IsOpen && poll.HasDeadline)
+        {
+            <p class="zacht">@Weergave.SluitVanzelf(poll, passed: false)</p>
+        }
+        else if (Model.ClosedByDeadline)
+        {
+            <p class="zacht">@Weergave.SluitVanzelf(poll, passed: true)</p>
+        }
+        else if (!Model.IsOpen)
+        {
+            <p class="zacht">Gesloten op @Weergave.Moment(poll.ClosedOn).</p>
+        }
         <div class="deel">
             <input class="deel-link" readonly value="@Model.ShareUrl" aria-label="Link naar de prikker" />
             <button type="button" class="knop" data-kopieer="@Model.ShareUrl">Kopieer link</button>
@@ -42,7 +67,11 @@ else
         </p>
     </section>
 
-    @if (Model.Results.Best.Count > 0)
+    @if (poll.HasPick)
+    {
+        <partial name="_Gekozen" model="Model.Pick" />
+    }
+    else if (Model.Results.Best.Count > 0)
     {
         <section class="kaart beste">
             <span class="lint">@(Model.Results.Best.Count == 1 ? "De winnaar" : "Gedeelde eerste plaats")</span>
@@ -61,38 +90,59 @@ else
         </section>
     }
 
-    @if (total > 0)
+    @* The ranking shows even without answers, so the owner can pick a date agreed elsewhere (D22). *@
+    <section class="kaart">
+        <h2>Zo staat het ervoor</h2>
+        <p class="zacht hint">
+            Van beste naar minst gunstige datum: meeste ja, dan meeste misschien.
+            @if (kiest && !poll.HasPick)
+            {
+                <span>Kies er een met <strong>Dit wordt het</strong>: dan @(Model.IsOpen ? "sluit de prikker en ziet" : "ziet") iedereen de datum.</span>
+            }
+        </p>
+        <ol class="ranglijst">
+            @for (var plek = 0; plek < Model.Results.Ranked.Count; plek++)
+            {
+                var tally = Model.Results.Ranked[plek];
+                var isBest = best.Contains(tally.Option.Id);
+                var isGekozen = poll.PickedOptionId == tally.Option.Id;
+                <li class="rang-rij @(isBest ? "rang-beste" : string.Empty) @(isGekozen ? "rang-gekozen" : string.Empty)">
+                    <span class="rang-nummer" aria-label="Plek @(plek + 1)">@(isBest ? "★" : (plek + 1).ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+                    <div class="keuze-datum">
+                        <span class="mini-kalender" aria-hidden="true"><span>@Weergave.Maand(tally.Option.Date)</span><b>@Weergave.DagNummer(tally.Option.Date)</b></span>
+                        <div>
+                            <strong>@Weergave.Weekdag(tally.Option.Date)</strong>
+                            <span class="zacht">@Weergave.Tijd(tally.Option)</span>
+                        </div>
+                    </div>
+                    <div class="rang-score">
+                        <div class="rang-balk" aria-hidden="true">
+                            <span class="balk-ja" style="width: @Weergave.Procent(tally.Yes, total)"></span>
+                            <span class="balk-misschien" style="width: @Weergave.Procent(tally.Maybe, total)"></span>
+                            <span class="balk-nee" style="width: @Weergave.Procent(tally.No, total)"></span>
+                        </div>
+                        <div class="rang-telling">@tally.Yes ja · @tally.Maybe misschien · @tally.No nee</div>
+                    </div>
+                    @if (isGekozen)
+                    {
+                        <div class="rang-kies"><span class="label label-gekozen">✓ gekozen</span></div>
+                    }
+                    else if (kiest)
+                    {
+                        <form method="post" asp-page-handler="Kies" class="rang-kies" data-bevestig="@Weergave.KiesVraag(tally.Option, Model.IsOpen)">
+                            <input type="hidden" name="optie" value="@tally.Option.Id" />
+                            <button type="submit" class="knop knop-licht">@(poll.HasPick ? "Kies deze" : "Dit wordt het")</button>
+                        </form>
+                    }
+                </li>
+            }
+        </ol>
+        <div class="legenda"><span><i class="l-ja"></i>ja</span><span><i class="l-misschien"></i>misschien</span><span><i class="l-nee"></i>nee</span></div>
+    </section>
+
+    @if (kiest && !Model.IsOpen && !poll.HasPick)
     {
-        <section class="kaart">
-            <h2>Zo staat het ervoor</h2>
-            <p class="zacht hint">Van beste naar minst gunstige datum: meeste ja, dan meeste misschien.</p>
-            <ol class="ranglijst">
-                @for (var plek = 0; plek < Model.Results.Ranked.Count; plek++)
-                {
-                    var tally = Model.Results.Ranked[plek];
-                    var isBest = best.Contains(tally.Option.Id);
-                    <li class="rang-rij @(isBest ? "rang-beste" : string.Empty)">
-                        <span class="rang-nummer" aria-label="Plek @(plek + 1)">@(isBest ? "★" : (plek + 1).ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
-                        <div class="keuze-datum">
-                            <span class="mini-kalender" aria-hidden="true"><span>@Weergave.Maand(tally.Option.Date)</span><b>@Weergave.DagNummer(tally.Option.Date)</b></span>
-                            <div>
-                                <strong>@Weergave.Weekdag(tally.Option.Date)</strong>
-                                <span class="zacht">@Weergave.Tijd(tally.Option)</span>
-                            </div>
-                        </div>
-                        <div class="rang-score">
-                            <div class="rang-balk" aria-hidden="true">
-                                <span class="balk-ja" style="width: @Weergave.Procent(tally.Yes, total)"></span>
-                                <span class="balk-misschien" style="width: @Weergave.Procent(tally.Maybe, total)"></span>
-                                <span class="balk-nee" style="width: @Weergave.Procent(tally.No, total)"></span>
-                            </div>
-                            <div class="rang-telling">@tally.Yes ja · @tally.Maybe misschien · @tally.No nee</div>
-                        </div>
-                    </li>
-                }
-            </ol>
-            <div class="legenda"><span><i class="l-ja"></i>ja</span><span><i class="l-misschien"></i>misschien</span><span><i class="l-nee"></i>nee</span></div>
-        </section>
+        <p class="zacht">Toch opnieuw vragen? Maak een <a href="/Nieuw">nieuwe prikker</a>.</p>
     }
 
     <section class="kaart">
@@ -148,7 +198,7 @@ else
         }
     </section>
 
-    @if (poll.IsOpen && Model.IsOwner)
+    @if (Model.IsOpen && Model.IsOwner)
     {
         <form method="post" asp-page-handler="Sluiten" data-bevestig="Prikker sluiten? Daarna kan niemand meer antwoorden.">
             <button type="submit" class="knop knop-licht">Prikker sluiten</button>

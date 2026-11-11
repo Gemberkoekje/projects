@@ -11,16 +11,31 @@ else
         @foreach (var afspraak in Model)
         {
             var poll = afspraak.Poll;
+            var gekozen = poll.PickedOption();
+
+            // The mini calendar shows the picked date once there is one (D22), otherwise the first date.
             var eerste = poll.Options.Count > 0 ? poll.Options.Min(option => option.Date) : DateOnly.FromDateTime(poll.CreatedOn);
+            if (poll.HasPick)
+            {
+                eerste = gekozen.Date;
+            }
             <li class="afspraak">
                 <span class="mini-kalender" aria-hidden="true"><span>@Weergave.Maand(eerste)</span><b>@Weergave.DagNummer(eerste)</b></span>
                 <div class="afspraak-inhoud">
                     <div class="afspraak-kop">
                         <a class="afspraak-titel" href="@(afspraak.IsOwner ? $"/p/{poll.ShareToken}/uitslag" : $"/p/{poll.ShareToken}")">@poll.Title</a>
-                        <span class="label @(poll.IsOpen ? "label-open" : "label-dicht")">@(poll.IsOpen ? "open" : "gesloten")</span>
+                        <span class="label @Weergave.StaatKlasse(poll, afspraak.IsOpen)">@Weergave.Staat(poll, afspraak.IsOpen)</span>
                     </div>
+                    @if (poll.HasPick)
+                    {
+                        <div><strong>Dit wordt het: @Weergave.DagMaandKort(gekozen.Date), @Weergave.Tijd(gekozen)</strong></div>
+                    }
                     <div class="zacht">
                         @(afspraak.IsOwner ? "Jouw prikker" : $"Van {poll.OwnerName}") · @Weergave.Bereik(poll)
+                        @if (afspraak.IsOpen && poll.HasDeadline)
+                        {
+                            <span>· @Weergave.SluitKort(poll)</span>
+                        }
                     </div>
                     @if (afspraak.IsOwner)
                     {
@@ -33,13 +48,13 @@ else
                     {
                         <div>
                             Jouw antwoord: @Weergave.Samenvatting(afspraak.MyAnswer)
-                            @if (poll.IsOpen)
+                            @if (afspraak.IsOpen)
                             {
                                 <span>· <a href="/p/@poll.ShareToken">wijzigen</a></span>
                             }
                         </div>
                     }
-                    else if (poll.IsOpen)
+                    else if (afspraak.IsOpen)
                     {
                         <div><a href="/p/@poll.ShareToken">Zelf ook antwoorden</a></div>
                     }

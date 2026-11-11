@@ -1,0 +1,43 @@
+@model DatumPrikker.WebApp.Pages.Shared.PickCard
+@{
+    // D22: the final pick, solid violet, for the owner and for everyone with the link.
+    var option = Model.Poll.PickedOption();
+}
+
+<section class="kaart gekozen">
+    <span class="lint">📌 Dit wordt het</span>
+    <div class="gekozen-datum">
+        <div class="tegel" aria-hidden="true">
+            <div class="tegel-blad">
+                <span class="tegel-maand">@Weergave.Maand(option.Date)</span>
+                <span class="tegel-dag">@Weergave.DagNummer(option.Date)</span>
+                <span class="tegel-weekdag">@Weergave.WeekdagKort(option.Date)</span>
+            </div>
+        </div>
+        <div class="gekozen-tekst">
+            <strong>@Weergave.DagMaand(option.Date)</strong>
+            <span>@Weergave.Tijd(option)</span>
+            @if (Model.Poll.Location.Length > 0)
+            {
+                <span>📍 @Model.Poll.Location</span>
+            }
+            @if (Model.YourChoice != Availability.None)
+            {
+                <span class="jij-zei jij-zei-@Weergave.Klasse(Model.YourChoice)">Jij zei: @Weergave.Woord(Model.YourChoice).ToLowerInvariant()</span>
+            }
+        </div>
+    </div>
+    <div class="gekozen-knoppen">
+        <a class="knop knop-licht" href="/p/@Model.Poll.ShareToken/agenda.ics">📅 In je agenda zetten</a>
+        @if (Model.ForOwner)
+        {
+            <form method="post" asp-page-handler="Ongedaan" data-bevestig="Keuze ongedaan maken? De prikker blijft gesloten.">
+                <button type="submit" class="knop knop-licht">Keuze ongedaan maken</button>
+            </form>
+        }
+    </div>
+    @if (Model.ForOwner)
+    {
+        <p class="gekozen-hint">Een andere datum? Kies hem hieronder in de lijst.</p>
+    }
+</section>

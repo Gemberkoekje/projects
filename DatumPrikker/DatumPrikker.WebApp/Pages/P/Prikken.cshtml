@@ -39,11 +39,20 @@
     {
         <p class="waar">📍 @Model.Poll.Location</p>
     }
+    @if (Model.IsOpen && Model.Poll.HasDeadline)
+    {
+        <p class="sluit">⏳ @Weergave.AntwoordenTot(Model.Poll)</p>
+    }
     @if (Model.Poll.Description.Length > 0)
     {
         <p class="toelichting">@Model.Poll.Description</p>
     }
 </section>
+
+@if (Model.Poll.HasPick)
+{
+    <partial name="_Gekozen" model="Model.Pick" />
+}
 
 @if (Model.Bedankt)
 {
@@ -65,7 +74,7 @@
     }
 }
 
-@if (!Model.Poll.IsOpen)
+@if (!Model.IsOpen)
 {
     <div class="melding">Deze prikker is gesloten en neemt geen antwoorden meer aan.</div>
 

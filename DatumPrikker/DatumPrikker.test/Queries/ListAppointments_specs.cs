@@ -78,6 +78,29 @@ public sealed class ListAppointments_specs
         (await handler.HandleAsync(new GetAnswer { PollId = poll.Id, Email = "geen-adres" })).IsValid.Should().BeFalse();
     }
 
+    [Test]
+    public async Task a_passed_deadline_or_a_pick_counts_as_closed()
+    {
+        var withDeadline = Poll.Create(Fixtures.Draft() with { DeadlineDate = new DateOnly(2026, 12, 04) }, Fixtures.Owner, "k7Gm2xQa", Fixtures.Now).Value;
+        await polls.SaveAsync(withDeadline);
+        var picked = await PollAsync("k7Gm2xQb", Fixtures.Owner);
+        await polls.SaveAsync(picked.Pick(picked.Options[1].Id, Fixtures.Owner, Fixtures.Now).Value);
+
+        using (Clock.SetTimeForCurrentContext(() => withDeadline.Deadline.AddSeconds(-1)))
+        {
+            var before = await Handler.HandleAsync(new ListAppointments { Account = Fixtures.Owner });
+            before.Single(afspraak => afspraak.Poll.Id == withDeadline.Id).IsOpen.Should().BeTrue();
+            before.Single(afspraak => afspraak.Poll.Id == picked.Id).IsOpen.Should().BeFalse();
+        }
+
+        using (Clock.SetTimeForCurrentContext(() => withDeadline.Deadline))
+        {
+            var after = await Handler.HandleAsync(new ListAppointments { Account = Fixtures.Owner });
+            after.Should().OnlyContain(afspraak => !afspraak.IsOpen);
+            after.Single(afspraak => afspraak.Poll.Id == picked.Id).Poll.PickedOption().Should().Be(picked.Options[1]);
+        }
+    }
+
     private async Task<Poll> PollAsync(string token, Account owner) => await PollAsync(token, owner, Fixtures.Now);
 
     private async Task<Poll> PollAsync(string token, Account owner, DateTime createdOn)

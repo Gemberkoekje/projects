@@ -147,6 +147,7 @@ builder.Services.AddScoped<IPreApprovalStore>(sp => sp.GetRequiredService<Marten
 builder.Services.AddScoped<CreatePollHandler>();
 builder.Services.AddScoped<GiveAnswerHandler>();
 builder.Services.AddScoped<ClosePollHandler>();
+builder.Services.AddScoped<PickDateHandler>();
 builder.Services.AddScoped<RequestAccessHandler>();
 builder.Services.AddScoped<DecideAccessHandler>();
 builder.Services.AddScoped<PreApprovalHandler>();
@@ -156,6 +157,7 @@ builder.Services.AddScoped<GetPollHandler>();
 builder.Services.AddScoped<GetResultsHandler>();
 builder.Services.AddScoped<GetAnswerHandler>();
 builder.Services.AddScoped<GetLikelyDateHandler>();
+builder.Services.AddScoped<GetAgendaHandler>();
 builder.Services.AddScoped<ListAppointmentsHandler>();
 builder.Services.AddScoped<GetMakerNameHandler>();
 builder.Services.AddScoped<GetAccessHandler>();
@@ -185,6 +187,9 @@ app.UseAuthorization();
 
 app.MapStaticAssets().AllowAnonymous();
 app.MapRazorPages().WithStaticAssets();
+
+// The picked date as an agenda file: open to anyone with the link, like the poll itself (D22).
+app.MapGet(AgendaEndpoint.Route, AgendaEndpoint.HandleAsync).AllowAnonymous();
 app.MapGet("/healthz", () => "ok").AllowAnonymous();
 
 await app.RunAsync();

@@ -528,3 +528,174 @@ Every step below went as expected:
 - `DatumPrikker.WebApp/wwwroot/css/site.css`, and `mocks/mock.css` (slice 6 block moved out).
 - `DatumPrikker.test/Queries/GetLikelyDate_specs.cs`, `Web/AnswerPage_specs.cs`,
   `Web/Weergave_specs.cs`, and `GlobalUsings.cs` (ReadModels).
+
+## Slice 7: deadline and final pick (2026-11-11)
+
+### What was done
+
+- **Domain** (`core`):
+  - `Poll` has `Deadline` (the UTC moment it closes by itself) and `DeadlineHasTime`. Without a
+    time it closes at the end of that day, Amsterdam time. It's set only by `Poll.Create`, which
+    refuses a moment already past, or a time without a day. Nothing changes it afterwards (D22).
+  - `IsOpen` became `IsOpenAt(now)`: not closed, and the deadline not yet passed. `Answer.Give`
+    asks it, so answering past the deadline is refused by the same rule as a closed poll.
+    `ClosedByDeadlineAt(now)` tells "Vanzelf gesloten" apart from closing by hand.
+  - `Poll.Pick(optionId, by, now)` is for the owner only, and only for one of this poll's dates. It
+    sets `PickedOptionId` and `PickedOn`, and closes an open poll. On a poll its deadline already
+    closed, it leaves `ClosedOn` empty. Picking another date changes the pick. `Poll.UndoPick`
+    clears the pick, and the poll stays closed: there's no reopening.
+  - `DutchTime`: Amsterdam's time zone, used by both the deadline and the .ics. `Weergave` now uses it
+    too. A time skipped by summer time counts as an hour later. The end of a day is that day's last
+    tick plus one, so `DateOnly.MaxValue` can't overflow.
+  - `AgendaFile.For(poll, link)` writes the .ics (RFC 5545):
+    - one `VEVENT`, with `UID` = the poll's id and `SEQUENCE` = the seconds between making the poll
+      and the latest pick, so a changed pick replaces the earlier event;
+    - a whole day as `VALUE=DATE` (the end is the next day), and a time range converted to UTC;
+    - TEXT escaping (`\`, `;`, `,`, line breaks), and lines folded at 75 octets without splitting
+      a UTF-8 character.
+- **Application:**
+  - `PickDate` and `UndoPick`, both handled by `PickDateHandler` (as `PreApprovalHandler` does
+    for its two commands).
+  - `GetAgenda` + `GetAgendaHandler` returns the read model `Agenda` (title + text). It refuses
+    with `NothingPicked` until a date is picked.
+  - `Appointment` and `PollOverview` carry `IsOpen`, worked out by their handlers from
+    `Clock.UtcNow()`. Mijn afspraken still puts open polls first, now counting the deadline.
+- **Web:**
+  - **Nieuwe prikker:** "Wanneer sluit hij? (optioneel)" with a day (no earlier than today) and a
+    time, as in `slice7-1`. `PollInput.TryParseDeadline` reads them.
+  - **Answer page:**
+    - while open, "⏳ Antwoorden kan tot vrijdag 4 december om 18:00" in the header (`slice7-2`);
+    - once a date is picked, the pick card instead of the form and instead of the likely-date
+      card, with "Jij zei: ja" for whoever answered (`slice7-5`).
+  - **The pick card** (`Shared/_Gekozen.cshtml` + `PickCard`):
+    - solid violet, with a big calendar tile, the date, time and place, and "📅 In je agenda
+      zetten";
+    - for the owner, also "Keuze ongedaan maken" and "Een andere datum? Kies hem hieronder in de
+      lijst.".
+  - **Results:**
+    - the label reads open / gesloten / gekozen;
+    - under the title: "Sluit vanzelf op …", "Vanzelf gesloten op …" or "Gesloten op …";
+    - the ranking always shows, even without answers, and for the owner each row has "Dit wordt
+      het", or "Kies deze" once a date is picked. The picked row says "✓ gekozen";
+    - picking asks first ("Dit wordt het: zaterdag 12 december, 19:00–22:00? Dan sluit de prikker
+      en …"), then shows "Gekozen! …" (`slice7-3`, `slice7-4`);
+    - closed without a pick: "Toch opnieuw vragen? Maak een nieuwe prikker." under the ranking
+      (`slice7-6`);
+    - an admin looking on gets the pick card and the agenda link, but no buttons. The note now says
+      "Sluiten en kiezen kan alleen de maker."
+  - **Mijn afspraken** (`slice7-7`):
+    - a picked poll shows the picked date in its mini calendar, a "gekozen" label and "Dit wordt
+      het: zaterdag 12 dec, 19:00–22:00";
+    - an open poll with a deadline adds "· sluit 18 december om 12:00".
+  - **Beheer:** the poll list's state column says gekozen too.
+  - **`/p/{token}/agenda.ics`:** a minimal endpoint (`AgendaEndpoint`, mapped in `Program.cs`), open
+    to anyone. It's a 404 (through the error page) until a date is picked, and named after the
+    title (`etentje-met-de-buren.ics`).
+- **CSS:** the slice 7 rules moved from `mocks/mock.css` into `site.css` ("Deadline and final
+  pick"). New: `.jij-zei-misschien` and `.jij-zei-nee`, `.gekozen-hint` (the mock's inline style),
+  and `.gekozen-knoppen form`.
+- **Tests:** 180 (60 new):
+  - `Deadline_specs`:
+    - open until the deadline, closed at it;
+    - a time-less deadline closes at the end of the day, in winter and summer;
+    - `Answer.Give` and `GiveAnswerHandler` refuse past it;
+    - closing by hand before it still works;
+    - refusing a past deadline or a time without a day;
+    - the summer-time gap, and the last day.
+  - `Pick_specs`:
+    - only the owner picks (not a stranger, an admin, or somebody anonymous), and only a date of
+      this poll;
+    - picking closes an open poll, and on a poll its deadline closed, keeps it closed by the
+      deadline;
+    - changing, re-picking the same date, undoing (stays closed), and who may undo;
+    - the JSON round trip.
+  - `PickDate_specs`: the handler, by owner, stranger and admin, plus a date of another poll and an
+    unknown token.
+  - `AgendaFile_specs`:
+    - a whole day;
+    - time ranges in winter, in summer, and across the switch to summer time (01:00–04:00 on 28
+      March 2027 is 00:00Z–02:00Z);
+    - escaping of commas, semicolons, backslashes and newlines;
+    - no `LOCATION` without a place;
+    - folding at 75 octets with multi-byte characters;
+    - CRLF endings and a single event;
+    - the same `UID` with a rising `SEQUENCE` after a changed pick.
+  - `GetAgenda_specs`: refused without a pick, the event with the poll's link, an unknown token,
+    and the endpoint: a 404 until a pick, then the file with its type and name.
+  - `PickedAnswerPage_specs` (the `PrikkenModel` over in-memory stores):
+    - before the pick: the likely date;
+    - after the pick: the card with "Jij zei" and no likely date, and for a stranger the card
+      without it;
+    - closed past the deadline.
+  - `DeadlineInput_specs`, `Weergave_specs` (the deadline phrases, state labels, the confirm
+    question, the file name) and `ListAppointments_specs` (a passed deadline or a pick counts as
+    closed).
+
+### Checked by hand (local Postgres 16 on 5436, Chromium)
+
+Every step below went as expected:
+
+1. Arie made "Etentje met de buren" with four dates and a deadline of 4 December 18:00. The
+   results said "Sluit vanzelf op vrijdag 4 december om 18:00." and showed the ranking with four
+   "Dit wordt het" buttons before anyone answered.
+2. A stranger's answer page showed "⏳ Antwoorden kan tot vrijdag 4 december om 18:00".
+3. Five anonymous respondents and Bea (logged in) answered. Arie picked 12 December, confirmed,
+   and got "Gekozen! …", the "gekozen" label, "Gesloten op 11 november om 15:30.", the violet card,
+   "✓ gekozen" on its row and "Kies deze" on the others (as `slice7-4`).
+4. Bea's answer page: the pick card with "Jij zei: ja", no form, no likely-date card (as
+   `slice7-5`). A stranger saw the card without "Jij zei". The .ics downloaded as
+   `etentje-met-de-buren.ics` (`text/calendar`), 19:00–22:00 as 18:00Z–21:00Z, the comma in the
+   place escaped.
+5. Bea's Mijn afspraken: 12 dec in the mini calendar, "gekozen", "Dit wordt het: zaterdag 12 dec,
+   19:00–22:00" (as `slice7-7`).
+6. Arie changed the pick to 19 December (the confirm left out "sluit de prikker"), then undid it.
+   The poll stayed "gesloten", with "Dit wordt het" back on every row and "Toch opnieuw vragen?".
+   There was no close button, the .ics became a 404, and a stranger saw only "Deze prikker is
+   gesloten".
+7. "Klusdag schuur", with a deadline without a time, read "Antwoorden kan tot en met vrijdag 20
+   november". After its deadline was moved into the past in the database, the results said
+   "Vanzelf gesloten na dinsdag 10 november." with the winner card, the buttons and "Toch opnieuw
+   vragen?" (as `slice7-6`). The answer page showed the closed note, and Mijn afspraken said
+   "gesloten".
+8. "Nieuwjaarsborrel" (deadline 18 December 12:00) read "· sluit 18 december om 12:00" in Arie's
+   Mijn afspraken. Beheer listed open / gesloten / gekozen.
+9. A past deadline and a time without a day were refused with their messages.
+10. Bea, once approved, made and picked a poll. Arie, as admin, saw the card and the agenda link
+    without pick or undo buttons, and a posted undo was refused (logged, pick unchanged).
+11. The results and answer page at phone width (390px) in dark mode, and the new-poll form in dark
+    mode, looked right.
+
+### Gotchas
+
+- **Analyzer QW0004 flags emoji in C#**, comments included ("Trojan Horse character"). Razor
+  markup is fine. In tests, write them as escapes (`"\U0001F370"`).
+- **`IsOpen` used to be serialised into every stored poll** (System.Text.Json writes get-only
+  properties). As a method `IsOpenAt(now)` it no longer is: a stored "open" would go stale at the
+  deadline. Old documents still hold an `IsOpen` field, which deserialisation ignores; nothing
+  reads it. `HasPick` and `HasDeadline` are stored the same way, which is harmless: they don't
+  depend on the time.
+- Polls made before this slice have no deadline and no pick, and the defaults mean exactly that. No
+  migration is needed.
+
+### Left for later
+
+- Deploying needs a gembernodes PR that bumps the image to this PR's merge commit. Nothing else
+  changes there: no new configuration.
+- The open question in PLAN.md (the likely-date card on a closed poll) still stands. It now also
+  covers polls closed by their deadline.
+- Mail for the final pick stays a possible later addition (D17, D22).
+
+### File map (new or changed)
+
+- `DatumPrikker.core/Models/Poll.cs`, `PollDraft.cs`, `Answer.cs`; new `DutchTime.cs`,
+  `AgendaFile.cs`.
+- `DatumPrikker.application/Commands/PickDate.cs`, `UndoPick.cs`, `PickDateHandler.cs`;
+  `Queries/GetAgenda.cs`, `GetAgendaHandler.cs`; `ReadModels/Agenda.cs`; `IsOpen` on
+  `Appointment` and `PollOverview` (and their handlers).
+- `DatumPrikker.WebApp/AgendaEndpoint.cs`, `Program.cs`, `Weergave.cs`; `Pages/Nieuw.cshtml(.cs)`,
+  `P/Prikken.cshtml(.cs)`, `P/Uitslag.cshtml(.cs)`, `Shared/_Gekozen.cshtml`, `Shared/PickCard.cs`,
+  `Shared/_Afspraken.cshtml`, `Beheer.cshtml`; `wwwroot/css/site.css`; `mocks/mock.css`.
+- `DatumPrikker.test`: `Models/Deadline_specs.cs`, `Pick_specs.cs`, `AgendaFile_specs.cs`;
+  `Commands/PickDate_specs.cs`; `Queries/GetAgenda_specs.cs`; `Web/PickedAnswerPage_specs.cs`,
+  `DeadlineInput_specs.cs`; additions to `Weergave_specs`, `ListAppointments_specs`; `IsOpenAt` in
+  the older specs.

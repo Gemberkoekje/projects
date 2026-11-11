@@ -24,12 +24,14 @@ public sealed class ListAllPollsHandler(IPollStore polls, IAnswerStore answers, 
     {
         var all = await polls.ListAllAsync(cancellationToken);
         var counts = await answers.CountForPollsAsync([.. all.Select(poll => poll.Id)], cancellationToken);
+        var now = Clock.UtcNow();
 
         IReadOnlyList<PollOverview> overview = [.. all
             .OrderByDescending(poll => poll.CreatedOn)
             .Select(poll => new PollOverview
             {
                 Poll = poll,
+                IsOpen = poll.IsOpenAt(now),
                 AnswerCount = counts.TryGetValue(poll.Id, out var count) ? count : 0,
             })];
 

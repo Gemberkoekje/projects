@@ -1,4 +1,5 @@
 using DatumPrikker.WebApp;
+using DatumPrikker.WebApp.Pages.Shared;
 using Microsoft.AspNetCore.RateLimiting;
 using Qowaiv.Diagnostics.Contracts;
 using System.ComponentModel.DataAnnotations;
@@ -8,7 +9,8 @@ namespace DatumPrikker.WebApp.Pages.P;
 /// <summary>
 /// Answers a poll: no account needed, a name and an email address are enough (D3). Signed in, or
 /// remembered from an earlier anonymous answer, the form starts from your earlier answer, and the
-/// page shows which date is leading (D21). It never holds anybody else's answers.
+/// page shows which date is leading (D21). Once the owner picked a date, everyone sees that instead
+/// of the form (D22). It never holds anybody else's answers.
 /// </summary>
 [AllowAnonymous]
 [EnableRateLimiting(RateLimits.Answers)]
@@ -22,6 +24,16 @@ public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierA
 
     /// <summary>The poll being answered.</summary>
     public Poll Poll { get; private set; } = new Poll();
+
+    /// <summary>True while the poll takes answers: not closed, and its deadline hasn't passed (D22).</summary>
+    public bool IsOpen { get; private set; }
+
+    /// <summary>The "Dit wordt het" card, once the owner picked a date (D22), with "Jij zei: …" for whoever answered.</summary>
+    public PickCard Pick => new PickCard
+    {
+        Poll = Poll,
+        YourChoice = HasEarlier ? Earlier.ChoiceFor(Poll.PickedOptionId) : Availability.None,
+    };
 
     /// <summary>Who is answering.</summary>
     public Account Account { get; private set; } = Account.Anonymous;
@@ -38,7 +50,7 @@ public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierA
     /// <summary>The leading dates and their counts (D21); only filled in when <see cref="ShowsLikely"/>.</summary>
     public LikelyDate Likely { get; private set; } = new LikelyDate();
 
-    /// <summary>True when the "Zo te zien wordt het…" card shows: only once this respondent answered (D21).</summary>
+    /// <summary>True when the "Zo te zien wordt het…" card shows: only once this respondent answered (D21), and only until a date is picked (D22).</summary>
     public bool ShowsLikely { get; private set; }
 
     /// <summary>What the respondent filled in.</summary>
@@ -77,9 +89,13 @@ public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierA
         {
             Input = AnswerInput.From(Earlier, Account);
 
-            var likely = await likelyDates.HandleAsync(new GetLikelyDate { ShareToken = token, Email = Earlier.Email }, cancellationToken);
-            ShowsLikely = likely.IsValid;
-            Likely = likely.IsValid ? likely.Value : new LikelyDate();
+            // The pick card replaces the likely date.
+            if (!Poll.HasPick)
+            {
+                var likely = await likelyDates.HandleAsync(new GetLikelyDate { ShareToken = token, Email = Earlier.Email }, cancellationToken);
+                ShowsLikely = likely.IsValid;
+                Likely = likely.IsValid ? likely.Value : new LikelyDate();
+            }
         }
         else
         {
@@ -143,6 +159,7 @@ public sealed class PrikkenModel(GetPollHandler polls, GetAnswerHandler earlierA
         }
 
         Poll = poll.Value;
+        IsOpen = Poll.IsOpenAt(Clock.UtcNow());
         Account = AccountClaims.From(User);
         Remembered = Account.IsAnonymous ? memory.Read(Request) : Remembered.Nobody;
         return true;

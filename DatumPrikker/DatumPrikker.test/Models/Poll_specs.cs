@@ -8,7 +8,7 @@ public sealed class Poll_specs
         var poll = Poll.Create(Fixtures.Draft(Fixtures.WholeDay(14), Fixtures.Evening(12)), Fixtures.Owner, "k7Gm2xQa", Fixtures.Now);
 
         poll.IsValid.Should().BeTrue();
-        poll.Value.IsOpen.Should().BeTrue();
+        poll.Value.IsOpenAt(Fixtures.Now).Should().BeTrue();
         poll.Value.OwnerAccountId.Should().Be("google:111");
         poll.Value.Options.Select(option => option.Date.Day).Should().Equal(12, 14);
         poll.Value.Options.Should().OnlyContain(option => option.Id != Guid.Empty);
@@ -116,6 +116,6 @@ public sealed class Poll_specs
 
         var closed = poll.Close(Fixtures.Owner, Fixtures.Now);
         closed.IsValid.Should().BeTrue();
-        closed.Value.IsOpen.Should().BeFalse();
+        closed.Value.IsOpenAt(Fixtures.Now).Should().BeFalse();
     }
 }

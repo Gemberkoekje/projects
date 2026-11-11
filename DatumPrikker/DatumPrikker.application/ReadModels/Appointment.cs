@@ -6,6 +6,9 @@ public sealed record Appointment
     /// <summary>The poll.</summary>
     public Poll Poll { get; init; } = new Poll();
 
+    /// <summary>True while it takes answers (D22: its deadline may have passed since it was stored).</summary>
+    public bool IsOpen { get; init; }
+
     /// <summary>True when you made it.</summary>
     public bool IsOwner { get; init; }
 
