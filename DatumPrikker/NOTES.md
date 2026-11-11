@@ -442,3 +442,89 @@ Your answers on the mocks, now in D21 and D22 and the slice sections:
 - the pick card gets "📅 In je agenda zetten" (an .ics download).
 
 Both slices are ready to build: 6 first, then 7.
+
+## Slice 6: the most likely date, for respondents (2026-11-11)
+
+### What was done
+
+- **Application:**
+  - `GetLikelyDate` + `GetLikelyDateHandler`, from a share token and the address the respondent
+    answered with.
+  - It refuses with `AnswerFirst` unless an answer with that address exists for the poll. So the
+    "only after answering" rule (D21) lives in the handler, not only on the page.
+  - It returns the read model `LikelyDate`: the leading `OptionTally`s (`PollResults.Best`: most
+    Ja, then most Misschien), the answer count and `IsTie`. There are no answers in it, so no
+    names, addresses or comments.
+- **Answer page:**
+  - `PrikkenModel` asks for it only when it found your earlier answer (`HasEarlier`). That covers
+    the thank-you too: the redirect after answering finds the answer you just gave, through your
+    account or the D19 cookie.
+  - So `?bedankt=true` without an answer shows no card, and neither does "Niet jij?".
+  - The card, "Zo te zien wordt het…", sits under the thank-you, under "Je antwoordde al", or on a
+    closed poll under "Deze prikker is gesloten". It's a Razor local function rendered in those
+    three places.
+  - It shows the leading dates as white tickets with "3× ja, 1× misschien", then "Meeste ja, dan
+    meeste misschien, uit 7 antwoorden. Nog niet definitief: dat beslist Arie." A tie says
+    "Deze 2 staan gelijk: evenveel ja en misschien, …". With no Ja anywhere: "Nog niemand zei ja op
+    een datum. Alles kan nog."
+- **`Weergave`:** `Telling` ("3× ja, 1× misschien", which the owner's winner card now uses as well)
+  and `Vermoedelijk` (the line under the tickets).
+- **CSS:** the slice 6 rules moved from `mocks/mock.css` into `site.css` ("The most likely date, for
+  respondents"). One rule is new: `.vermoedelijk .beste-datum { color: #1d1a39; }` (see Gotchas).
+- **Tests:** 120 (12 new):
+  - `GetLikelyDate_specs`:
+    - only after your own answer, with any spelling of your address;
+    - the leader by Ja, then Misschien;
+    - a tie in date order;
+    - nobody said Ja;
+    - still shown after closing;
+    - the serialised result contains no names, addresses or comments;
+    - an unknown token.
+  - `AnswerPage_specs`: no type reachable from `PrikkenModel`'s properties is `Answer` or
+    `PollResults`, apart from `Earlier`, which is your own answer. A planted
+    `IReadOnlyList<Answer>` on `LikelyDate` made it fail, as it should.
+  - `Weergave_specs`: the counts, and the line for one leader, a tie, and a single answer.
+
+### Checked by hand (local Postgres 16 on 5436, Chromium)
+
+Every step below went as expected:
+
+1. Arie made two polls. Dirk and Eva answered the first anonymously; each got the card on the
+   thank-you.
+2. Carla's first visit showed no card. After answering, she saw the thank-you, then the card
+   (12 dec, 3× ja, uit 3 antwoorden), then "Ingevuld voor Carla", as in `slice6-1`.
+3. Carla came back: "Je antwoordde al", then the card. After "Niet jij?", no card.
+4. A fresh browser opening `?bedankt=true`: no card.
+5. Bea, logged in, answered and made a tie (12 and 19 dec, 3× ja each). On her return: "Je
+   antwoordde al", then both tickets and "Deze 2 staan gelijk", as in `slice6-2`.
+6. Frank answered the second poll with only Misschien and Nee: "Nog niemand zei ja…", as in
+   `slice6-3`. Arie closed it; Frank's page showed the closed note and the card, without the form.
+7. Arie's own winner card still read "3× ja" (now through `Weergave.Telling`).
+8. Dark mode and phone width (390px) looked right.
+
+### Gotchas
+
+- **The tickets inherit the card's text colour.** On the owner's sun-yellow card that's dark, but
+  `.vermoedelijk` uses `var(--tekst)`, which is near-white in dark mode, on white tickets. The mock
+  had it too. Fixed with a dark ink colour on `.vermoedelijk .beste-datum`.
+- **No Docker daemon in a cloud session:** use the machine's PostgreSQL 16 instead (`initdb` as
+  the `postgres` user, `pg_ctl -o '-p 5436'`, then create the `datumprikker` user and database
+  from `appsettings.Development.json`).
+- **The .NET SDK isn't installed there either:** `dotnet-install.sh --channel 10.0` works.
+
+### Left for later
+
+- The open question in PLAN.md: should the card stay on a closed poll?
+- Slice 7: deadline and final pick. Its pick card takes the likely-date card's place once a date
+  is picked.
+
+### File map (new or changed)
+
+- `DatumPrikker.application/Queries/GetLikelyDate.cs`, `GetLikelyDateHandler.cs`;
+  `ReadModels/LikelyDate.cs`.
+- `DatumPrikker.WebApp/Pages/P/Prikken.cshtml(.cs)`: the card; `Uitslag.cshtml`: `Weergave.Telling`.
+- `DatumPrikker.WebApp/Weergave.cs`: `Telling`, `Vermoedelijk`.
+- `DatumPrikker.WebApp/Program.cs`: registers `GetLikelyDateHandler`.
+- `DatumPrikker.WebApp/wwwroot/css/site.css`, and `mocks/mock.css` (slice 6 block moved out).
+- `DatumPrikker.test/Queries/GetLikelyDate_specs.cs`, `Web/AnswerPage_specs.cs`,
+  `Web/Weergave_specs.cs`, and `GlobalUsings.cs` (ReadModels).

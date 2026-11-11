@@ -15,13 +15,7 @@
 
 /* ---------- Slice 6: the most likely date, for respondents (D21) ---------- */
 
-/* Tentative, so dashed and soft violet: not the owner's sun-yellow winner card, and not the solid
-   violet of a final pick. */
-.vermoedelijk { background: var(--paars-zacht); border-style: dashed; box-shadow: none; }
-.vermoedelijk .lint { background: var(--paars); color: var(--op-paars); }
-.vermoedelijk .beste-lijst { margin-bottom: 0.8rem; }
-.vermoedelijk-uitleg { margin: 0; font-size: 0.95rem; }
-.vermoedelijk-leeg { margin: 0; font-weight: 700; }
+/* Built: its rules now live in site.css under "The most likely date, for respondents". */
 
 /* ---------- Slice 7: deadline and final pick (D22) ---------- */
 

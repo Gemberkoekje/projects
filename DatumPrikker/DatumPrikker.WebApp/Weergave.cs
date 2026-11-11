@@ -153,5 +153,34 @@ public static class Weergave
         return string.Join(", ", parts);
     }
 
+    /// <summary>A date's counts, such as "5× ja, 1× misschien"; Misschien only when somebody said it.</summary>
+    /// <param name="tally">The date's tally.</param>
+    /// <returns>The text.</returns>
+    public static string Telling(OptionTally tally)
+    {
+        ArgumentNullException.ThrowIfNull(tally);
+
+        return tally.Maybe > 0 ? $"{tally.Yes}× ja, {tally.Maybe}× misschien" : $"{tally.Yes}× ja";
+    }
+
+    /// <summary>
+    /// The line under the most likely date (D21): how it was chosen, from how many answers, and that
+    /// the maker decides. For example: "Meeste ja, dan meeste misschien, uit 7 antwoorden. Nog niet
+    /// definitief: dat beslist Arie".
+    /// </summary>
+    /// <param name="likely">The likely date; it should have at least one leading date.</param>
+    /// <param name="owner">The maker's name, who decides.</param>
+    /// <returns>The text.</returns>
+    public static string Vermoedelijk(LikelyDate likely, string owner)
+    {
+        ArgumentNullException.ThrowIfNull(likely);
+
+        var uit = $"uit {likely.AnswerCount} {(likely.AnswerCount == 1 ? "antwoord" : "antwoorden")}";
+        var hoe = likely.IsTie
+            ? $"Deze {likely.Leading.Count} staan gelijk: evenveel ja en misschien, {uit}."
+            : $"Meeste ja, dan meeste misschien, {uit}.";
+        return $"{hoe} Nog niet definitief: dat beslist {owner}.";
+    }
+
     private static readonly TimeZoneInfo Amsterdam = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
 }

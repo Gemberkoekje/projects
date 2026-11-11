@@ -40,6 +40,25 @@ public sealed class Weergave_specs
         Weergave.WeekdagKort(date).Should().Be("za");
     }
 
+    [Test]
+    public void a_dates_counts_leave_out_maybe_when_nobody_said_it()
+    {
+        Weergave.Telling(new OptionTally { Yes = 5, Maybe = 1, No = 2 }).Should().Be("5× ja, 1× misschien");
+        Weergave.Telling(new OptionTally { Yes = 3, No = 1 }).Should().Be("3× ja");
+    }
+
+    [Test]
+    public void the_likely_date_says_how_it_was_chosen_and_who_decides()
+    {
+        var one = new LikelyDate { Leading = [new OptionTally { Yes = 5, Maybe = 1 }], AnswerCount = 7 };
+        var tie = new LikelyDate { Leading = [new OptionTally { Yes = 4, Maybe = 1 }, new OptionTally { Yes = 4, Maybe = 1 }], AnswerCount = 6 };
+        var alone = new LikelyDate { Leading = [new OptionTally { Yes = 1 }], AnswerCount = 1 };
+
+        Weergave.Vermoedelijk(one, "Arie").Should().Be("Meeste ja, dan meeste misschien, uit 7 antwoorden. Nog niet definitief: dat beslist Arie.");
+        Weergave.Vermoedelijk(tie, "Arie").Should().Be("Deze 2 staan gelijk: evenveel ja en misschien, uit 6 antwoorden. Nog niet definitief: dat beslist Arie.");
+        Weergave.Vermoedelijk(alone, "Arie").Should().Be("Meeste ja, dan meeste misschien, uit 1 antwoord. Nog niet definitief: dat beslist Arie.");
+    }
+
     [TestCase(2, 3, "66.7%")]
     [TestCase(3, 3, "100%")]
     [TestCase(0, 3, "0%")]
