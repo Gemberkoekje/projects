@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gembernodes</title>
+<meta name="description" content="Arie makes small tools for LARP groups, game nights and a calmer household, running on a little cluster at home.">
+<meta property="og:title" content="gembernodes">
+<meta property="og:description" content="Small tools for LARP, game nights and a calmer household, on a little cluster at home.">
+<meta property="og:type" content="website">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/fraunces-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+
+<svg class="sprite" width="0" height="0" aria-hidden="true">
+  <symbol id="gh" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="cookie" aria-hidden="true"></span>gembernodes</a>
+    <a class="gh" href="https://github.com/Gemberkoekje"><svg aria-hidden="true"><use href="#gh"/></svg>Gemberkoekje</a>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <div>
+    <h1>Hi, I'm Arie. I make <em>small tools</em> for the things I love doing.</h1>
+    <p class="lede">For my LARP groups, my game nights and a calmer household, all running on a little cluster at home. I come up with them, test them and steer them; Claude Code does the coding.</p>
+  </div>
+  <a class="pulsebox" href="#cluster" data-tab-link="cluster">
+    <div class="row"><span>gembernodes</span><span class="live" id="hero-live"><span class="dot pulse"></span><span id="hero-live-text">checking…</span></span></div>
+    <div class="nodes3" id="hero-nodes"><i></i><i></i><i></i></div>
+    <div class="row muted"><span id="hero-summary">checking the cluster…</span><span>details →</span></div>
+  </a>
+</div>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="wrap" role="tablist">
+    <button class="tab" role="tab" id="t-tools" aria-controls="tools" aria-selected="true">Tools</button>
+    <button class="tab" role="tab" id="t-cluster" aria-controls="cluster" aria-selected="false">Cluster</button>
+    <button class="tab" role="tab" id="t-about" aria-controls="about" aria-selected="false">About</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <section class="panel" id="tools" role="tabpanel" aria-labelledby="t-tools">
+    <div class="chips" role="group" aria-label="Filter tools">
+      <button class="chip" aria-pressed="true" data-filter="all">All</button>
+      <button class="chip" aria-pressed="false" data-filter="table">LARP and tabletop</button>
+      <button class="chip" aria-pressed="false" data-filter="games">Games</button>
+      <button class="chip" aria-pressed="false" data-filter="other">Other</button>
+    </div>
+
+    <div class="grid" id="public">
+      <article class="card wide" data-cat="table">
+        <span class="name">Vortex tools</span>
+        <p class="desc">For The Vortex, a Dutch fantasy LARP, I make the tools the crew works with behind the scenes: the plotboek the storytellers plan each event in, a workshop tracker for repairing props and costumes, and one shared look, dark mode included, across the organisation's apps and its sign-in page. They're for Vortex members only, but the game itself is worth a look.</p>
+        <div class="links"><a href="https://the-vortex.nl">the-vortex.nl ↗</a></div>
+      </article>
+      <article class="card" data-cat="table">
+        <span class="name"><span class="dot" data-app="plotboek"></span>Plotboek Generator <span class="badge">demo</span></span>
+        <p class="desc">Plan a LARP event's encounters together, export it as a book. The demo resets every night.</p>
+        <div class="links"><a href="https://plotboek.gemberkoekje.nl">Try the demo ↗</a><a class="code" href="https://github.com/Gemberkoekje/plotboek-generator"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="table">
+        <span class="name"><span class="dot" data-app="charactercreator"></span>Character Creator <span class="badge">demo</span></span>
+        <p class="desc">A new character builder for The Vortex. Proof of concept.</p>
+        <div class="links"><a href="https://charactercreator.gemberkoekje.nl">Try the demo ↗</a><a class="code" href="https://github.com/Gemberkoekje/projects/tree/main/CharacterCreator"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="table">
+        <span class="name"><span class="dot" data-app="curatool"></span>The Curatool</span>
+        <p class="desc">Runs the draft-style Curator mode for Blood on the Clocktower.</p>
+        <div class="links"><a href="https://curatool.gemberkoekje.nl">Open ↗</a><a class="code" href="https://github.com/Gemberkoekje/projects/tree/main/TheCuratool"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="table">
+        <span class="name"><span class="dot" data-app="bot-on-the-clocktower"></span>Bot on the Clocktower <span class="badge">fork</span></span>
+        <p class="desc">Mark Haines' Discord bot for running Clocktower games. I only forked it and reworked it for our own server.</p>
+        <div class="links"><a class="code" href="https://github.com/Gemberkoekje/bot-on-the-clocktower"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="games">
+        <span class="name"><span class="dot" data-app="armabot"></span>ArmaBot <span class="badge">Discord</span></span>
+        <p class="desc">Sign-ups for Arma 3 missions: pick your role, get a nudge before the op starts.</p>
+        <div class="links"><a class="code" href="https://github.com/Gemberkoekje/ArmaBot"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="games">
+        <span class="name"><span class="dot" data-app="bygalacticaccord"></span>By Galactic Accord</span>
+        <p class="desc">A space economy where everything is a contract.</p>
+        <div class="links"><a href="https://bygalacticaccord.gemberkoekje.nl">Open ↗</a><a class="code" href="https://github.com/Gemberkoekje/projects/tree/main/ByGalacticAccord"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="games">
+        <span class="name"><span class="dot" data-app="hackerminigames"></span>Hacker Minigames</span>
+        <p class="desc">Multiplayer hacking puzzles, right in the browser.</p>
+        <div class="links"><a href="https://hackerminigames.gemberkoekje.nl">Open ↗</a><a class="code" href="https://github.com/Gemberkoekje/projects/tree/main/HackerMinigames"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="games">
+        <span class="name"><span class="dot" data-app="adventureengine"></span>AdventureEngine</span>
+        <p class="desc">A text adventure that an AI tells as you play.</p>
+        <div class="links"><a href="https://adventureengine.gemberkoekje.nl">Open ↗</a><a class="code" href="https://github.com/Gemberkoekje/projects/tree/main/AdventureEngine"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="games">
+        <span class="name">Skyseed <span class="badge">Minecraft</span></span>
+        <p class="desc">Throw a seed into the void and a sky island grows where it lands.</p>
+        <div class="links"><a class="code" href="https://github.com/Gemberkoekje/Skyseed"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="other">
+        <span class="name"><span class="dot" data-app="datumprikker"></span>DatumPrikker</span>
+        <p class="desc">Find a date that works for everyone.</p>
+        <div class="links"><a href="https://datumprikker.gemberkoekje.nl">Open ↗</a><a class="code" href="https://github.com/Gemberkoekje/projects/tree/main/DatumPrikker"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card" data-cat="other">
+        <span class="name">COV Vlaardingen-Schiedam <span class="badge">website</span></span>
+        <p class="desc">A website I built for a Christian seniors' association. I'm not part of it; I just made the site.</p>
+        <div class="links"><a href="https://cov-vlaardingen-schiedam.nl/">cov-vlaardingen-schiedam.nl ↗</a></div>
+      </article>
+    </div>
+
+    <div class="private-head"><h2>Private</h2><span>Behind a sign-in</span></div>
+    <div class="grid">
+      <article class="card">
+        <span class="name"><span class="dot" data-app="dungeontable"></span>DungeonTable</span>
+        <p class="desc">A DM screen, plus a projector map the players uncover room by room.</p>
+        <div class="links"><a class="code" href="https://github.com/Gemberkoekje/DungeonTable"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card">
+        <span class="name"><span class="dot" data-app="kluskat"></span>Kluskat</span>
+        <p class="desc">One small chore at a time, cheered on by a pixel cat.</p>
+        <div class="links"><a class="code" href="https://github.com/Gemberkoekje/projects/tree/main/Kluskat"><svg aria-hidden="true"><use href="#gh"/></svg>GitHub</a></div>
+      </article>
+      <article class="card">
+        <span class="name"><span class="dot" data-app="ebi"></span>Eos Bureau Investigations</span>
+        <p class="desc">A shared investigation board for players of Eos Frontier, a sci-fi LARP.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="panel" id="cluster" role="tabpanel" aria-labelledby="t-cluster">
+    <div class="term" aria-live="polite">
+      <div class="term-head"><span id="term-title">gembernodes</span><span class="live" id="term-live"><span class="dot pulse"></span><span id="ago">checking…</span></span></div>
+      <p class="unavailable" id="unavailable" hidden>The cluster status is unavailable right now.</p>
+      <div class="nodes" id="nodes"></div>
+      <div class="stats" id="stats">
+        <div class="stat"><div class="v" id="s-apps">–</div><div class="k">apps</div></div>
+        <div class="stat"><div class="v" id="s-pods">–</div><div class="k">pods</div></div>
+        <div class="stat"><div class="v" id="s-version">–</div><div class="k">running version</div></div>
+        <div class="stat"><div class="v" id="s-changed">–</div><div class="k">last change</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="about" role="tabpanel" aria-labelledby="t-about">
+    <div class="about">
+      <div>
+        <h3>Who I am</h3>
+        <p>I'm Arie, from the Netherlands. Since 2011 I've worked at <a href="https://tjip.com/">TJIP</a> on mortgage software, as a tester, developer, information analyst and architect. Before that I studied Game Architecture and Design at Breda University of Applied Sciences.</p>
+        <p>In my spare time I'm at LARP events, behind a DM screen or on a Blood on the Clocktower night, and most of what's here started as a "wouldn't it be handy if…" at one of those.</p>
+        <h3>How I work</h3>
+        <p>I've written C# for fifteen years, but these days I don't write the code for my own projects: Claude Code does. I decide what gets made and how it should work, test it for real and send it back when it isn't right. That goes for everything on this site, the cluster and this page included.</p>
+      </div>
+      <div class="facts">
+        <div class="fact"><span class="k">Work</span><span><a href="https://tjip.com/">TJIP</a>, since 2011</span></div>
+        <div class="fact"><span class="k">Studied</span><span>Game Architecture and Design (BEng), Breda University of Applied Sciences</span></div>
+        <div class="fact"><span class="k">Experience</span><span>C# 15 years, C++ 5, Kubernetes 5 (my own cluster: 1)</span></div>
+        <div class="fact"><span class="k">Hobbies</span><span>LARP, D&amp;D, Clocktower, Minecraft</span></div>
+        <div class="fact"><span class="k">Elsewhere</span><span><a href="https://github.com/Gemberkoekje">GitHub</a> · <a href="https://www.linkedin.com/in/arie-hofland-436b1a22/">LinkedIn</a> · <a href="https://www.youtube.com/@gemberkoekje">YouTube</a></span></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Arie · gemberkoekje.nl</span>
+    <span>Made with Claude Code</span>
+  </div>
+</footer>
+
+<script src="/js/site.js"></script>
+</body>
+</html>
