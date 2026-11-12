@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".globalconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="Dockerfile" />
+  </Folder>
+  <Project Path="FrontPage.core/FrontPage.core.csproj" />
+  <Project Path="FrontPage.application/FrontPage.application.csproj" />
+  <Project Path="FrontPage.infrastructure/FrontPage.infrastructure.csproj" />
+  <Project Path="FrontPage.WebApp/FrontPage.WebApp.csproj" />
+  <Project Path="FrontPage.test/FrontPage.test.csproj" />
+</Solution>
