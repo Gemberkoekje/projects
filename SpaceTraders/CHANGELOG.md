@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-13, slice 6.61)
+- B88 (its tick), D146: the route work does less on each map, with the same decisions. The flights within a system are kept
+  per map, and the flights between systems are built from them; flights and gate ways are looked up by value; a good's sell
+  markets are only those that trade it; a route's prices are worked out once per batch of the trade volume, not per unit.
+  On a copy of the day's world (178 ships, 70 traders, maps up to 1,253 markets), one tick's plans took 616 s instead of
+  1,625 s and allocated 69 GB instead of 181 GB. Ranking routes is 3.5 times faster, the role board 3.8 times, the trading
+  plan 1.8 times.
+- Tests: `RoutePlannerGoldenTests`, a fingerprint of the planner's routes, judgements, rates and flights on a seeded world,
+  taken before the change.
+
 ### Tools – Added (2026-11-11, slice 6.60)
 - The tick bench (B88, D146): `tools/bench/copy_world.py` copies the cluster's database into a local Postgres, read-only and
   without the agent token; `TickBench` (`tests/SpaceTraders.API.Tests/Bench/`, skipped unless `SPACETRADERS_BENCH_DB` is set)

@@ -25,6 +25,7 @@ public sealed class TradeMarketMap
     private readonly Dictionary<string, string> _systems;
     private readonly Dictionary<string, Dictionary<string, TradeGoodSnapshot>> _goods;
     private readonly IReadOnlyDictionary<string, IReadOnlyList<string>> _madeFrom;
+    private readonly Dictionary<string, IReadOnlyList<string>> _marketsTrading;
     private readonly HashSet<string> _madeInto;
     private readonly long _averageFuelPrice;
     private readonly IReadOnlySet<string> _constructionMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -59,6 +60,7 @@ public sealed class TradeMarketMap
                 StringComparer.OrdinalIgnoreCase);
         _madeFrom = madeFrom;
         _madeInto = madeFrom.Values.SelectMany(inputs => inputs).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _marketsTrading = MarketsByGood(_goods);
 
         var fuelPrices = _goods.Values
             .Where(goods => goods.TryGetValue(FuelSymbol, out var fuel) && fuel.PurchasePrice > 0)
@@ -76,6 +78,7 @@ public sealed class TradeMarketMap
         _goods = other._goods;
         _madeFrom = other._madeFrom;
         _madeInto = other._madeInto;
+        _marketsTrading = other._marketsTrading;
         _averageFuelPrice = other._averageFuelPrice;
         _constructionMaterials = other._constructionMaterials;
         _constructionSteps = other._constructionSteps;
@@ -83,6 +86,7 @@ public sealed class TradeMarketMap
         ConstructionFirst = other.ConstructionFirst;
         StaleMarkets = other.StaleMarkets;
         PredictionWeights = other.PredictionWeights;
+        Legs = other.Legs;
     }
 
     /// <summary>The systems' waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
@@ -92,8 +96,18 @@ public sealed class TradeMarketMap
     /// The flights planned on this map, by start, end, fuel aboard and tank (slice 6.29): a pass weighs the same haul for every
     /// good two markets trade, and every trader, so each is planned once (<see cref="TradeRoutePlanner.TryPlanFlight(TradeMarketMap, string, string, int, int, out TradeFlight)"/>).
     /// </summary>
-    internal System.Collections.Concurrent.ConcurrentDictionary<string, (bool Found, TradeFlight Flight)> Flights { get; }
-        = new(StringComparer.OrdinalIgnoreCase);
+    internal System.Collections.Concurrent.ConcurrentDictionary<FlightKey, (bool Found, TradeFlight Flight)> Flights { get; }
+        = new(FlightKey.Comparer);
+
+    /// <summary>
+    /// The flights within one system planned on this map, shared with its copies (<see cref="WithoutJumps"/>,
+    /// <see cref="WithFeedersFirst"/>, <see cref="WithStaleMarkets"/>), which have its waypoints, markets and fuel prices: a leg
+    /// reads neither the gates nor which markets are stale. A flight to another system is two of
+    /// them and the jumps between (B88): the leg to the ship's gate, and the leg on from the last gate, each planned once for the
+    /// many hauls through that gate instead of once a haul.
+    /// </summary>
+    internal System.Collections.Concurrent.ConcurrentDictionary<FlightKey, (bool Found, TradeFlight Flight)> Legs { get; }
+        = new(FlightKey.Comparer);
 
     /// <summary>The waypoints that have a market with known prices.</summary>
     public IReadOnlyCollection<string> MarketWaypoints => _goods.Keys;
@@ -222,6 +236,35 @@ public sealed class TradeMarketMap
     /// <returns>The market's goods.</returns>
     public IEnumerable<TradeGoodSnapshot> GoodsAt(string waypointSymbol)
         => _goods.TryGetValue(waypointSymbol, out var goods) ? goods.Values : [];
+
+    /// <summary>
+    /// The markets that list a good, in <see cref="MarketWaypoints"/>' order: the only ones a route of it can sell at (B88). A route
+    /// check looked at every market for every good it could buy; on a map of about 1,000 markets that is most of its work.
+    /// </summary>
+    /// <param name="tradeSymbol">The good.</param>
+    /// <returns>The markets' waypoints; empty for a good no market lists.</returns>
+    public IReadOnlyList<string> MarketsTrading(string tradeSymbol)
+        => _marketsTrading.TryGetValue(tradeSymbol, out var markets) ? markets : [];
+
+    /// <summary>Each good's markets, in the markets' order, for <see cref="MarketsTrading"/>.</summary>
+    private static Dictionary<string, IReadOnlyList<string>> MarketsByGood(Dictionary<string, Dictionary<string, TradeGoodSnapshot>> goodsByMarket)
+    {
+        var markets = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (market, goods) in goodsByMarket)
+        {
+            foreach (var good in goods.Keys)
+            {
+                if (!markets.TryGetValue(good, out var trading))
+                {
+                    markets[good] = trading = [];
+                }
+
+                trading.Add(market);
+            }
+        }
+
+        return markets.ToDictionary(good => good.Key, good => (IReadOnlyList<string>)good.Value, StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>Looks up one good at one market.</summary>
     /// <param name="waypointSymbol">The market's waypoint.</param>
