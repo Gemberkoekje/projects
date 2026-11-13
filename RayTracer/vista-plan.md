@@ -1092,6 +1092,12 @@ f/1.8, handheld). The low cloud over the town is lit by its lights alone.
 | 21:42:05 | 1/8 s | What the user's eyes saw: dark, little detail, the sky a dark brown-grey; in the RAW the typical pixel sits at 0.2% of the range, deep in the noise | M6 (the eye's night, the mesopic display's target) |
 | 21:42:34 | 1 s, 8× the light | Taken to make out the reflections: the cloud glowing warm, about 3400 K with a slight green tint, so olive at 5500 K; the river mirroring it 2.7× darker; lamps and lit windows reflected; sharp, the stabiliser holding a handheld second | M6 (the camera's night against the eye's; the parked town glow) |
 
+*A rainbow at sunrise, 13-11-2026* (the dusk series' west view, facing away from the sun; Pro mode, 5500 K, with its RAW).
+
+| Photo (CET) | Camera | What it shows | Judges |
+|---|---|---|---|
+| 08:20:10 | Pro mode, 5500 K; the main lens, 1/90 s, ISO 50; RAW | 21 minutes after sunrise, the sun 2.0° up behind the camera: the autumn trees lit gold against a dark grey rain shower; in the shower one leg of a rainbow rising just left of the tower block and leaning right (the bow's centre 2° below the horizon to the west-north-west, its top about 40° up, out of frame). The bow is about 1% brighter than the sky beside it in the RAW; the user noticed it only on the phone's screen | M4 (a shower's curtain behind a sunlit foreground); M10 (the bow's place and strength); the parked rain showers |
+
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
 `Vista.App` / `Vista.Tests` in `RayTracer.slnx`; confirm which `RayTracer.Gpu` pieces
@@ -2619,6 +2625,12 @@ any of them.
   a town glows warm from its street lights (about 3400 K with a slight green tint, olive at 5500 K) and the water mirrors it.
   M6 plans only a dark wilderness sky (moon, stars, the Milky Way, airglow); a real alpine valley has a village under its clouds,
   and Hamlet's villages would light theirs. *Belongs:* M6, with M8's props or Hamlet's villages as the light.
+- **Rain showers and their rainbows** (the user's photo, 13-11-2026, the truth references): a grey shower curtain with a low sun
+  behind the camera, the foreground lit gold against it, and a rainbow in the shower at 42° around the point opposite the sun.
+  No milestone plans rain: M4 has fog and clouds, M10 rainbows only in waterfall spray. Measured in the RAW, the bow was about 1%
+  brighter than the sky beside it, and the user saw it only on the phone's screen, whose picture boosts small differences; Vista's
+  display does not, so a bow at its true strength may be as faint as the eye found it, a choice for then. *Belongs:* M4 (the
+  shower's curtain and its shadow), with M10's spectral Mie phase for the bow.
 
 ---
 
