@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-13, slice 6.62)
+- B88 (its tick), D147: the ships step in a loop of their own, beside the plans', so they keep flying and trading while a
+  plan works; before, a ship stepped once a tick, after every plan's pass, and `ShipStuck` fired for ships that only
+  waited. The plan loop's round is the tick; the step loop's round steps every ship, does the contract work, refreshes one
+  market and publishes API availability changes, whose lines carry `Round` instead of `Tick`.
+- A plan and a ship's step never write the ship's goal at once: every write of a goal waits until no step of the ship runs
+  (`StepGuardedShipGoalRepository`, with the step guard of B46), and a step writes its own ship's goal without waiting. A
+  write that waits more than 2 minutes is made anyway, with a Warning. The explore plan's orbit and scan wait for a pass in
+  which no step of the ship runs.
+- Tools: the soak sampler's `tick_step_failed` flag matches "the rest of the round carries on" too.
+- Tests: `GameLoopServiceTests`, `StepGuardedShipGoalRepositoryTests`, `ShipGoalWritesTests`.
+
 ### Code – Changed (2026-11-13, slice 6.61)
 - B88 (its tick), D146: the route work does less on each map, with the same decisions. The flights within a system are kept
   per map, and the flights between systems are built from them; flights and gate ways are looked up by value; a good's sell

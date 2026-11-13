@@ -10,21 +10,24 @@
 One process, `SpaceTraders.API`, hosts everything.
 
 - It serves an internal HTTP API under `/spacetraders/api`.
-- Once its startup chain has finished, a loop runs every 5 seconds on the leader instance (the
-  "tick"). The tick bootstraps the *plans* that are switched on, steps every ship's *goal*, and
-  drives contract work.
+- Once its startup chain has finished, two loops run side by side on the leader instance, each
+  5 seconds after its last round (slice 6.62, D147). The plan loop's round, the "tick", bootstraps
+  the *plans* that are switched on. The step loop's round steps every ship's *goal* and drives
+  contract work, so ships keep flying and trading while a plan works.
 - Ships act through in-process Wolverine commands and events, which call the SpaceTraders API
   through a rate-limited client.
 - State lives in PostgreSQL.
 - The React WebUI reads the internal API.
 
 ```text
-startup chain ─► tick every 5 s (leader only)
-                  ├─ bootstrap the plans that are on: Scout, Explore, Roles, Contract, ProbeDeployment, Survey, Mining, Siphon, Construction, Trading, SpareTime
-                  ├─ one goal step per ship ─► executor ─► commands ─► SpaceTraders API
-                  ├─ contract assignments: deliver, or mine
-                  ├─ refresh one market where a ship is, once due (the market watch)
-                  └─ publish API availability changes
+startup chain ─┬─► tick 5 s after the last (leader only)
+               │    └─ bootstrap the plans that are on: Scout, Explore, Roles, Contract, ProbeDeployment, Survey, Mining, Siphon, Construction, Trading, SpareTime
+               └─► step round 5 s after the last, beside the ticks (leader only)
+                    ├─ one goal step per ship ─► executor ─► commands ─► SpaceTraders API
+                    ├─ contract assignments: deliver, or mine
+                    ├─ refresh one market where a ship is, once due (the market watch)
+                    ├─ one goal step per gatherer
+                    └─ publish API availability changes
 arrival timer ─► ShipArrivedEvent ─► dock + refresh market ─► ShipNavigationCompletedEvent ─► goal step
 health monitor every minute ─► health rules ─► anomalies (metric + journal)
 ```
@@ -97,7 +100,7 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 10 | `DiscoverySnapshotService` | every minute | Another snapshot when the cache lists a ship type or good no snapshot of the run held (slice 2.15) |
 | 11 | `StartupRecoveryService` | once | Resumes ships; releases the contract's ships (D26) |
 | 12 | `SettingsStartupLoggingService` | once | Logs every setting |
-| 13 | `GameLoopService` | every 5 s | The tick |
+| 13 | `GameLoopService` | two loops, each every 5 s | The tick (the plans) and the step round (the ships), side by side |
 | 14 | `PrometheusMetricsService` | every 10 s | Exports the cached state: credits, ships, contracts |
 | 15 | `PrometheusMarketMetricsService` | every minute | Exports the cached markets and shipyards, and once the game's production chains (`GET market/supply-chain`, through `SupplyChainCache`, which the trading plan shares: one call per start, retried hourly after a failure) |
 | 16 | `HealthMonitorService` | at start, then every minute | Evaluates the health rules; see [Health rules](#12-health-rules) |
@@ -196,7 +199,7 @@ fixed). The cache holds less than the API returns for our own ships: no crew or 
 **Startup recovery** (`StartupRecoveryService`): skipped when `Automation.Enabled` is false. With
 the contract plan on, it first releases every ship on the contract that isn't in flight, so the
 first tick reconsiders it (D26, see
-[Contract](#contract-contractplanservice-plus-step-3-of-the-tick)). Then, for each cached ship:
+[Contract](#contract-contractplanservice-plus-step-2-of-the-step-round)). Then, for each cached ship:
 
 | Ship state | Recovery action |
 |---|---|
@@ -210,37 +213,49 @@ lines carry the ships' names from the start.
 
 ---
 
-## 2. The tick (`GameLoopService`)
+## 2. The tick and the step round (`GameLoopService`)
 
-- Runs 5 s after the previous tick ends, on the leader only.
-- Each tick:
-  1. `EnsureBootstrappedAsync` for each plan that is switched on, in this order: Scout, Explore, Roles (the
-     role board), Contract, ProbeDeployment, Survey, Mining, Siphon, Construction, Trading and SpareTime.
-  2. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`) but the gatherers: a ship whose goal is
-     the mining, siphon or survey plan's steps in step 5 (slice 6.41, D125).
-  3. If the contract plan is switched on, for every active `Contract` assignment:
+- Two loops side by side, on the leader only (slice 6.62, D147, asked on 2026-11-11: "can we maybe make it asynchronous?").
+  Each starts its next round 5 s after its last one ends. Before 6.62 one loop ran the plans, then the ships' steps, so
+  while the route work took minutes (B88) a ship stepped once in 10 to 30 minutes and `ShipStuck` fired for ships that
+  were only waiting.
+- Each tick, the plan loop's round: `EnsureBootstrappedAsync` for each plan that is switched on, in this order: Scout,
+  Explore, Roles (the role board), Contract, ProbeDeployment, Survey, Mining, Siphon, Construction, Trading and SpareTime.
+  Every tick, a paused one too, is recorded in `GameTicks` (B79); a step round is no tick.
+- Each step round, the step loop's:
+  1. One goal step for every cached ship (`ShipGoalExecutorService.ExecuteAsync`) but the gatherers: a ship whose goal is
+     the mining, siphon or survey plan's steps in step 4 (slice 6.41, D125).
+  2. If the contract plan is switched on, for every active `Contract` assignment:
      `FulfillContractDeliveryCommand` once the ship holds a whole trip (what the contract still
      needs, at most a full hold; with nothing left to deliver, that command fulfils the contract),
      otherwise `MineResourceVolumeCommand` (B8, fixed), with the best survey for the contract's ore
      when there is one (slice 6.4). Every miner on the contract has such an assignment (D23).
-  4. Refresh one market where a ship is, when one is due (the market watch, below): after the
+  3. Refresh one market where a ship is, when one is due (the market watch, below): after the
      other ships, because a refresh is a read, which can go later without loss, while moves and
      trades can't (D19).
-  5. One goal step for each gatherer (D125): mining "only gives a tiny amount of the total profits", so the rest of the tick
+  4. One goal step for each gatherer (D125): mining "only gives a tiny amount of the total profits", so the rest of the round
      doesn't wait for it. A gatherer's step, here or after an arrival, is held back while fewer than half the burst of the
-     rate limit is left (`GatheringHold`, read from `RequestBudget` through `IRequestPressure`); the next tick tries again.
+     rate limit is left (`GatheringHold`, read from `RequestBudget` through `IRequestPressure`); the next round tries again.
      `ShipStuck` starts a held ship's clock no earlier than its last hold.
-  6. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed, and log
+  5. Publish `ApiUnavailableEvent` or `ApiAvailableEvent` when availability changed, and log
      it (`ApiUnavailable`, `ApiAvailable`). Nothing handles the events.
 
-  With `Automation.Enabled` off, or while API calls are paused after a 502, it skips steps 1
-  to 5.
+  With `Automation.Enabled` off, or while API calls are paused after a 502, the tick bootstraps no plan and the step round
+  skips steps 1 to 4. Lines logged during a tick carry its number (`Tick`); during a step round, the round's (`Round`).
+- **A plan and a ship's step never write the ship's goal at once** (D147). Every write of a ship's goal
+  (`StepGuardedShipGoalRepository`, around the stored `ShipGoalRepository`) waits until no step of the ship runs, and the
+  ship's step skips a round while the write holds the ship (`IShipGoalStepGuard`, B46, which kept the tick's step and an
+  arrival's apart before). A step writes its own ship's goal without waiting for itself: who holds a ship is kept per call
+  chain. A write that waits more than 2 minutes is made anyway and logged as a Warning: that step is stuck. The explore
+  plan's orbit and scan act on a ship themselves, so they too wait for a pass in which no step of the ship runs. A plan
+  still decides on what it read at the start of its pass: a ship may have moved on meanwhile, as an arrival's step always
+  could.
 - Each plan bootstrap, each ship's goal step, each contract assignment and the market watch runs
   in its own DI scope and try/catch. A failure is logged at Error with the plan or the ship, and the rest of the
-  tick carries on. Its own scope means a step can't leave a broken DbContext to the steps after
+  tick or round carries on. Its own scope means a step can't leave a broken DbContext to the steps after
   it.
 - A failure outside those steps (reading the switches, listing the ships or assignments) ends
-  the tick; the next one starts 5 s later.
+  the tick or round; the next one starts 5 s later.
 
 ### Market watch (`MarketWatchService`)
 
@@ -254,8 +269,8 @@ Asked for in slice 6.5: any market that has one of our ships at its waypoint ref
   by an arrival or after a trade there (D25), so a ship that has just arrived or traded adds no call.
 - Each refresh goes through `MarketRefresher`, which the trade and mining executors use too: after
   each purchase and sale they fetch the market again while the ship is still docked there (D25).
-- One market a tick, the one that has waited longest (D19): twelve ticks a minute refresh 25 markets
-  in about two minutes, and the watch never holds the next tick up with a run of reads. A market the
+- One market a step round, the one that has waited longest (D19): at twelve rounds a minute, 25 markets in about two
+  minutes, and the watch never holds the next round up with a run of reads. A market the
   watch asked for waits an interval even when the answer failed or had no prices, so it can't stay
   the most overdue (`MarketWatchAttempts`, in memory).
 - Each refresh stores the market and publishes `MarketDataRefreshedEvent`, as an arrival does, so the
@@ -289,7 +304,7 @@ spare-time plan (slice 6.8), the role board (slice 6.9), the explore plan (slice
   survey and the survey ship's move, D54, mine-and-sell, siphon-and-sell, construction, trade, gather-and-sell). They
   resume when it is switched back on; the explore plan's command ship keeps its explore assignment meanwhile, so no other
   plan takes it (switched off away from home, it stays where it is);
-- for the contract plan: the tick's contract work (step 3) is skipped too;
+- for the contract plan: the step round's contract work (step 2) is skipped too;
 - for the role board, which gives no goals: the plans give work by the fixed rules below, whatever roles its
   state still holds.
 
@@ -610,7 +625,7 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
   `spacetraders_ship_role_credits_per_hour`, exported while the board is on, feed the SpaceTraders
   dashboard's **Roles** table (gembernodes).
 
-### Contract (`ContractPlanService`, plus step 3 of the tick)
+### Contract (`ContractPlanService`, plus step 2 of the step round)
 
 - **While the plan is Active,** bootstrap advances it from the cached contract, which every delivery
   updates: it records the units delivered and keeps the remaining units of every ship's contract
@@ -638,7 +653,7 @@ goals: it decides which plan each ship works for, and the plans read that (`Flee
      waiting (B27, fixed);
   7. picks the nearest asteroid;
   8. saves an Active plan and a `Contract` assignment.
-- **The work itself is step 3 of the tick:**
+- **The work itself is step 2 of the step round:**
   - **Mining:** `MineResourceVolumeCommand` travels to the asteroid as a goal's flight does (`CommandFlight`, D84: in
     BURN where that strands nothing, otherwise CRUISE), through refuelling stops when it is beyond one tank (B47,
     under Commands below), extracts once per cooldown,
@@ -1207,7 +1222,7 @@ buy.
   ship with the trade role, or with the mining or siphon role when that plan had no trip for it.
   "Had no trip for it" is what that plan recorded at its pass in the same tick (`PassedOverShips`, B63): the
   mining, siphon and construction plans each note the ships they work with and the free ones they gave no
-  work. An arrival's goal step runs outside the tick, so a trip can end after its plan's pass and before
+  work. Goal steps run beside the plans (slice 6.62), so a trip can end after its plan's pass and before
   the trading plan's; that ship wasn't passed over and waits for its own plan's next pass, a tick later,
   instead of trading. A plan that is switched off has no say. A trip can also end during a pass: the
   arrival empties the hold first and ends the goal after, so the mining, siphon and construction plans

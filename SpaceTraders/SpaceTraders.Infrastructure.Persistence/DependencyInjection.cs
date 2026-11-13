@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Services;
@@ -60,7 +62,12 @@ public static class DependencyInjection
         services.AddScoped<ILedgerRepository, LedgerRepository>();
         services.AddScoped<IShipTaskRecordRepository, ShipTaskRecordRepository>();
         services.AddScoped<IRunRepository, RunRepository>();
-        services.AddScoped<IShipGoalRepository, ShipGoalRepository>();
+        // Slice 6.62 (D147): every write of a ship's goal waits until no step of the ship runs, so plans write between steps.
+        services.AddScoped<ShipGoalRepository>();
+        services.AddScoped<IShipGoalRepository>(sp => new StepGuardedShipGoalRepository(
+            sp.GetRequiredService<ShipGoalRepository>(),
+            sp.GetRequiredService<IShipGoalStepGuard>(),
+            sp.GetRequiredService<ILogger<StepGuardedShipGoalRepository>>()));
         services.AddScoped<IFleetGoalRepository, FleetGoalRepository>();
         services.AddScoped<IShipGoalHistoryRepository, ShipGoalHistoryRepository>();
         services.AddScoped<IPlanRepository, PlanRepository>();

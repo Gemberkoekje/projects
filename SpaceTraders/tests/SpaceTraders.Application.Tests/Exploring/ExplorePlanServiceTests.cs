@@ -4,6 +4,7 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Exploring;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
@@ -315,6 +316,7 @@ public sealed class ExplorePlanServiceTests
                 _order,
                 new JumpRefusals(),
                 new WarpRefusals(),
+                new ShipGoalStepGuard(),
                 _log.For<ExplorePlanService>())
             .EnsureBootstrappedAsync(CancellationToken.None);
     }

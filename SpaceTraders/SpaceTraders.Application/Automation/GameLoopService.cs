@@ -14,15 +14,18 @@ using SpaceTraders.Domain.Events;
 namespace SpaceTraders.Application.Automation;
 
 /// <summary>
-/// Background service.
-/// Every 5 s:
-///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
-///  - Records that a tick began (<see cref="GameTicks"/>), a paused one too, which the order ships are bought in judges the
-///    plans' words by (B79).
-///  - With automation switched on (<see cref="AutomationSwitches"/>): bootstraps each plan that is
-///    switched on, runs one goal step per ship, runs the contract plan's assignments, and last
-///    refreshes one market where a ship is, when one is due (<see cref="IMarketWatchService"/>).
-///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
+/// Background service: two loops side by side, each pausing <see cref="Interval"/> after a round (PLAN.md slice 6.62, D147:
+/// "Ship steps get their own loop, so ships keep flying and trading while a plan works"). Before 6.62 one loop ran the plans,
+/// then the ships' steps, so with the route work taking minutes (B88) a ship stepped once in 10 to 30 minutes.
+///  - The plan loop, one tick a round: records that the tick began (<see cref="GameTicks"/>), a paused one too, which the
+///    order ships are bought in judges the plans' words by (B79); with automation switched on (<see cref="AutomationSwitches"/>),
+///    bootstraps each plan that is switched on, in order.
+///  - The step loop: with automation switched on, runs one goal step per ship, the contract plan's assignments, then refreshes
+///    one market where a ship is when one is due (<see cref="IMarketWatchService"/>), and steps the gatherers last (D125);
+///    then publishes ApiUnavailableEvent / ApiAvailableEvent on a change.
+/// Both skip their work when this instance is not the leader (<see cref="ILeaderElection"/>), and while API calls are paused
+/// after a 502. A plan and a ship's step never write the ship's goal at once: a plan's write waits for the step
+/// (<see cref="StepGuardedShipGoalRepository"/>).
 /// </summary>
 public sealed class GameLoopService(
     IServiceScopeFactory serviceScopeFactory,
@@ -31,17 +34,24 @@ public sealed class GameLoopService(
     GameTicks ticks,
     ILogger<GameLoopService> logger) : BackgroundService
 {
-    private static readonly TimeSpan DeadReckoningInterval = TimeSpan.FromSeconds(5);
-
     private long _tick;
+    private long _round;
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    /// <summary>The pause after each loop's round: 5 seconds; shorter in tests.</summary>
+    internal TimeSpan Interval { get; init; } = TimeSpan.FromSeconds(5);
+
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        => Task.WhenAll(
+            Task.Run(() => LoopAsync(TickAsync, "tick", stoppingToken), stoppingToken),
+            Task.Run(() => LoopAsync(StepRoundAsync, "step round", stoppingToken), stoppingToken));
+
+    private async Task LoopAsync(Func<CancellationToken, Task> round, string name, CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await TickAsync(stoppingToken);
+                await round(stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -49,14 +59,15 @@ public sealed class GameLoopService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error in GameLoopService tick.");
+                logger.LogError(ex, "Error in GameLoopService {Loop}.", name);
             }
 
-            await Task.Delay(DeadReckoningInterval, stoppingToken);
+            await Task.Delay(Interval, stoppingToken);
         }
     }
 
-    private async Task TickAsync(CancellationToken cancellationToken)
+    /// <summary>One round of the plan loop: a tick.</summary>
+    internal async Task TickAsync(CancellationToken cancellationToken)
     {
         if (!leaderElection.IsLeader)
         {
@@ -64,36 +75,63 @@ public sealed class GameLoopService(
             return;
         }
 
-        // Every line logged during the tick carries its number; each step adds its plan or ship.
+        // Every line logged during the tick carries its number; each plan adds its name.
         using var tickContext = logger.BeginScope(new Dictionary<string, object> { ["Tick"] = Interlocked.Increment(ref _tick) });
 
         // Every tick, a paused one too: what a plan said counts until its next pass, a tick later (B79), and after a pause
         // of many short ticks the plans say again before anything is bought.
         ticks.Begin(TimeProvider.System.GetUtcNow());
         await using var scope = serviceScopeFactory.CreateAsyncScope();
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+
+        if (TimeProvider.System.GetUtcNow() < apiAvailability.PausedUntil)
+        {
+            logger.LogDebug("GameLoopService: API calls are paused until {PausedUntil} after a 502; no plans this tick.", apiAvailability.PausedUntil);
+        }
+        else if (await settings.IsAutomationEnabledAsync(cancellationToken))
+        {
+            await RunPlansAsync(settings, cancellationToken);
+        }
+        else
+        {
+            logger.LogDebug("GameLoopService: automation is switched off; no plans this tick.");
+        }
+    }
+
+    /// <summary>One round of the step loop.</summary>
+    internal async Task StepRoundAsync(CancellationToken cancellationToken)
+    {
+        if (!leaderElection.IsLeader)
+        {
+            logger.LogTrace("GameLoopService: not the leader; skipping step round.");
+            return;
+        }
+
+        // Every line logged during the round carries its number; each step adds its ship.
+        using var roundContext = logger.BeginScope(new Dictionary<string, object> { ["Round"] = Interlocked.Increment(ref _round) });
+        await using var scope = serviceScopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
-        var bus = services.GetRequiredService<Wolverine.IMessageBus>();
         var settings = services.GetRequiredService<ISettingsRepository>();
 
         if (TimeProvider.System.GetUtcNow() < apiAvailability.PausedUntil)
         {
             logger.LogDebug(
-                "GameLoopService: API calls are paused until {PausedUntil} after a 502; no plans, goal steps or contract work this tick.",
+                "GameLoopService: API calls are paused until {PausedUntil} after a 502; no goal steps or contract work this round.",
                 apiAvailability.PausedUntil);
         }
         else if (await settings.IsAutomationEnabledAsync(cancellationToken))
         {
-            await RunAutomationAsync(settings, cancellationToken);
+            await RunStepsAsync(settings, cancellationToken);
         }
         else
         {
-            logger.LogDebug("GameLoopService: automation is switched off; no plans, goal steps or contract work this tick.");
+            logger.LogDebug("GameLoopService: automation is switched off; no goal steps or contract work this round.");
         }
 
-        await PublishApiAvailabilityEventsAsync(bus, cancellationToken);
+        await PublishApiAvailabilityEventsAsync(services.GetRequiredService<Wolverine.IMessageBus>(), cancellationToken);
     }
 
-    private async Task RunAutomationAsync(ISettingsRepository settings, CancellationToken cancellationToken)
+    private async Task RunPlansAsync(ISettingsRepository settings, CancellationToken cancellationToken)
     {
         // A plan that is switched off is not bootstrapped, so it doesn't buy anything either.
         foreach (var plan in Enum.GetValues<AutomationPlan>())
@@ -107,9 +145,12 @@ public sealed class GameLoopService(
                     cancellationToken);
             }
         }
+    }
 
+    private async Task RunStepsAsync(ISettingsRepository settings, CancellationToken cancellationToken)
+    {
         // D125: the gatherers (mining, siphoning, surveying) step last, after the market refresh: they earn least, and the rest
-        // of the tick shouldn't wait for them.
+        // of the round shouldn't wait for them.
         var gatherers = new List<string>();
         await using (var scope = serviceScopeFactory.CreateAsyncScope())
         {
@@ -132,12 +173,12 @@ public sealed class GameLoopService(
             await RunContractAssignmentsAsync(cancellationToken);
         }
 
-        // One market a tick, after the other ships: a refresh is a read, which can go later without
+        // One market a round, after the other ships: a refresh is a read, which can go later without
         // loss, while a move or a trade can't (D19, 6.5). Only the gatherers come after it (D125).
         await RunStepAsync(
             [],
             services => services.GetRequiredService<IMarketWatchService>().RefreshDueMarketAsync(cancellationToken),
-            exception => logger.LogError(exception, "GameLoopService: refreshing a market where a ship is failed; the next tick tries again."),
+            exception => logger.LogError(exception, "GameLoopService: refreshing a market where a ship is failed; the next round tries again."),
             cancellationToken);
 
         foreach (var gatherer in gatherers)
@@ -153,11 +194,11 @@ public sealed class GameLoopService(
             {
                 await services.GetRequiredService<IShipGoalExecutorService>().ExecuteAsync(shipSymbol, cancellationToken);
             },
-            exception => logger.LogError(exception, "GameLoopService: the goal step for ship {ShipSymbol} failed; the rest of the tick carries on.", shipSymbol),
+            exception => logger.LogError(exception, "GameLoopService: the goal step for ship {ShipSymbol} failed; the rest of the round carries on.", shipSymbol),
             cancellationToken);
 
     /// <summary>
-    /// Runs one step of the tick in its own scope and try/catch, so that a step that throws, or
+    /// Runs one step of a tick or a step round in its own scope and try/catch, so that a step that throws, or
     /// leaves its DbContext unusable, doesn't stop the steps after it. Everything logged during the
     /// step carries <paramref name="logContext"/>.
     /// </summary>
@@ -229,7 +270,7 @@ public sealed class GameLoopService(
                 services => RunContractAssignmentAsync(assignment, services, cancellationToken),
                 exception => logger.LogError(
                     exception,
-                    "GameLoopService: contract work for ship {ShipSymbol} on contract {ContractId} failed; the rest of the tick carries on.",
+                    "GameLoopService: contract work for ship {ShipSymbol} on contract {ContractId} failed; the rest of the round carries on.",
                     assignment.ShipSymbol,
                     assignment.ContractId),
                 cancellationToken);

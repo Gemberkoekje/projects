@@ -60,7 +60,8 @@ FLAGS = {
     "db_size": re.compile(r"^DbSize"),
     "already_at": re.compile(r"is already at .*nothing to do"),
     "wolverine_retry": re.compile(r"^Wolverine retry"),
-    "tick_step_failed": re.compile(r"failed; the rest of the tick carries on"),
+    # A plan's failure ends "the rest of the tick carries on"; a ship's step or contract work, "of the round" (slice 6.62).
+    "tick_step_failed": re.compile(r"failed; the rest of the (tick|round) carries on"),
 }
 
 # Every response from the game API; before slice 2.1 this was spacetraders_api_calls_total.
