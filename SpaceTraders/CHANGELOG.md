@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Plan – Changed (2026-11-13, B88)
+- B88 is fixed: on the cluster, since slice 6.63's deploy, a tick about every 20 s instead of 10 to 20 minutes, and the
+  idle traders' `ShipLeftIdle` gone. Slices 6.60 to 6.63 are marked merged and deployed, each with what was checked on the
+  cluster; 6.63 notes the 429s, which grew with the trades, as one to watch.
+
 ### Code – Added (2026-11-13, slice 6.63)
 - B88 (its tick), D148: the trade list. Once the home system's jump gate is built (`HomeGate`), a background service on the
   leader (`TradeListService`) builds a list of high-value trades every minute. It estimates every trade within the
