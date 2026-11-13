@@ -5,9 +5,12 @@ using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using Npgsql;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Exploring;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Trading;
@@ -31,7 +34,7 @@ namespace SpaceTraders.API.Tests.Bench;
 [Trait("Category", "Bench")]
 public sealed class TickBench(ITestOutputHelper output)
 {
-    private const string ConnectionStringVariable = "ConnectionStrings__DefaultConnection";
+    internal const string ConnectionStringVariable = "ConnectionStrings__DefaultConnection";
 
     private static readonly IReadOnlySet<string> NoneHeld = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -54,6 +57,7 @@ public sealed class TickBench(ITestOutputHelper output)
             factory.Services.GetRequiredService<IAgentDataScope>().Set(await AgentOfAsync(connectionString));
 
             var traders = await RouteWorkAsync(factory.Services);
+            await TradeListAsync(factory.Services);
             await PlanPassesAsync(factory.Services);
 
             traders.Should().BePositive("the copy holds a fleet that trades: an empty one measures nothing");
@@ -69,7 +73,7 @@ public sealed class TickBench(ITestOutputHelper output)
     /// bench writes to it. Seen on 2026-11-11: a first run reached for the user secrets' database on the cluster's Postgres,
     /// a second for appsettings.json's.
     /// </summary>
-    private static async Task ShouldUseOnlyAsync(IServiceProvider root, string connectionString)
+    internal static async Task ShouldUseOnlyAsync(IServiceProvider root, string connectionString)
     {
         await using var scope = root.CreateAsyncScope();
         var used = new NpgsqlConnectionStringBuilder(scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>().Database.GetConnectionString());
@@ -78,7 +82,7 @@ public sealed class TickBench(ITestOutputHelper output)
     }
 
     /// <summary>The agent the copy holds (<c>cached_agents</c> has one row an agent).</summary>
-    private static async Task<string> AgentOfAsync(string connectionString)
+    internal static async Task<string> AgentOfAsync(string connectionString)
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
@@ -141,6 +145,21 @@ public sealed class TickBench(ITestOutputHelper output)
         return traders.Count;
     }
 
+    /// <summary>
+    /// The trade list the background worker keeps once the home gate is built (slice 6.63, D148), built once before the plan
+    /// passes, which then work out their routes over it: the bench has no background services, nor a leader.
+    /// </summary>
+    private async Task TradeListAsync(IServiceProvider root)
+    {
+        var leader = Substitute.For<ILeaderElection>();
+        leader.IsLeader.Returns(true);
+        var store = root.GetRequiredService<TradeListStore>();
+        using var worker = new TradeListService(root.GetRequiredService<IServiceScopeFactory>(), leader, store, NullLogger<TradeListService>.Instance);
+        var build = Measure.Start();
+        await worker.BuildAsync(CancellationToken.None);
+        output.WriteLine(build.Stop().Line(Invariant($"Trade list: {store.Latest.Entries.Count:N0} trades")) + (store.Latest.IsNone ? "  (none: the home gate isn't built)" : string.Empty));
+    }
+
     /// <summary>Each plan's pass, in the game loop's order and each in its own scope, as <c>GameLoopService</c> runs them.</summary>
     private async Task PlanPassesAsync(IServiceProvider root)
     {
@@ -188,7 +207,7 @@ public sealed class TickBench(ITestOutputHelper output)
         _ => Task.CompletedTask,
     };
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadChains()
+    internal static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadChains()
     {
         var path = Environment.GetEnvironmentVariable("SPACETRADERS_BENCH_SUPPLY_CHAIN");
         Skip.If(string.IsNullOrWhiteSpace(path) || !File.Exists(path), "SPACETRADERS_BENCH_SUPPLY_CHAIN isn't a file: see tools/bench/README.md.");

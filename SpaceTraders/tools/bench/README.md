@@ -12,8 +12,13 @@ Two parts:
   stub port that only serves the chains) and no background service (no game loop). It times:
   - reading each trader's reach map (`ITradeContextReader.ReadReachAsync`), and on it every trader's
     `TradeRoutePlanner.Rank` and `Judge`, which write nothing;
+  - the trade list (slice 6.63, D148), built once as the background worker builds it, when the copy's home gate is built;
   - each plan's pass, in the game loop's order and each in its own scope, as `GameLoopService` runs them. These write to
-    the copy as they would to the cluster's database, so copy it again for a run that starts from the same world.
+    the copy as they would to the cluster's database, so copy it again for a run that starts from the same world. With a
+    trade list built, the trading plan and the role board work out their routes over it.
+- `TradeListBench` (same folder, slice 6.63) writes nothing. It ranks each trader's routes over every trade, then over trade
+  lists of several sizes. For each size it gives how often the trader's best route stays the same, how much of its rate the
+  list's pick loses, and how long ranking and judging take on maps read afresh.
 
 ## Run
 
@@ -30,6 +35,8 @@ SPACETRADERS_BENCH_DB="Host=127.0.0.1;Port=55433;Database=spacetraders;Username=
 SPACETRADERS_BENCH_SUPPLY_CHAIN="../../bench/supply-chain.json" \
 dotnet test tests/SpaceTraders.API.Tests --filter "FullyQualifiedName~TickBench" --logger "console;verbosity=detailed"
 ```
+
+`FullyQualifiedName~TradeListBench` runs the list bench instead; it writes nothing, so it needs no fresh copy.
 
 Without `SPACETRADERS_BENCH_DB` the bench is skipped, as it is in CI.
 

@@ -120,6 +120,7 @@ public static class DependencyInjection
         // sites as cached, fetched when due; and the supplies a site refused lately.
         services.AddScoped<IConstructionPlanService, ConstructionPlanService>();
         services.AddScoped<IConstructionSites, ConstructionSites>();
+        services.AddScoped<HomeGate>();
         services.AddSingleton<ConstructionSiteWatch>();
         services.AddSingleton<ConstructionRetries>();
 
@@ -137,6 +138,9 @@ public static class DependencyInjection
         // process, shared with the markets dashboard), and the watch that keeps prices fresh where ships are.
         services.AddSingleton<ISupplyChainCache, SupplyChainCache>();
         services.AddScoped<ITradeContextReader, TradeContextReader>();
+
+        // The trade list (slice 6.63, D148): built in the background once the home gate is built, read by every reach map.
+        services.AddSingleton<TradeListStore>();
         services.AddSingleton<MarketHistoryCache>();
         services.AddScoped<IMarketPredictions, MarketPredictions>();
         services.AddScoped<IPredictionConfidence, PredictionConfidence>();

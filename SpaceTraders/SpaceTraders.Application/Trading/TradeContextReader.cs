@@ -109,7 +109,8 @@ public sealed class TradeContextReader(
     IMarketPredictions predictions,
     IPredictionConfidence confidence,
     PurchaseNeeds purchaseNeeds,
-    IPlanRepository plans) : ITradeContextReader
+    IPlanRepository plans,
+    TradeListStore tradeLists) : ITradeContextReader
 {
     /// <summary>The setting that holds the profit per unit, after fuel, a trip must earn (D14).</summary>
     public const string MinProfitPerUnitSetting = "Trade.MinProfitPerUnit";
@@ -193,6 +194,9 @@ public sealed class TradeContextReader(
         var feedersFirst = await FeedersFirstAsync(now, cancellationToken);
         var map = new TradeMarketMap(reachWaypoints, reachMarkets, basics.Chains)
         {
+            // Slice 6.63 (D148): once the home gate is built, the routes are the trade list's while it is recent enough, where it
+            // covers the ship's system.
+            TradeList = await TradeListForAsync(systemSymbol, now, cancellationToken),
             ConstructionMaterials = home.Length > 0 ? await MaterialsAsync(home, cancellationToken) : new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             ConstructionSystemSymbol = home,
             ConstructionFirst = feedersFirst,
@@ -345,6 +349,20 @@ public sealed class TradeContextReader(
     /// <summary>Whether a market's prices are recent enough to decide by (D96): seen with prices within the age.</summary>
     private static bool IsFresh(MarketFreshnessRecord market, DateTimeOffset now, TimeSpan maxAge)
         => market.HasPrices && now - market.LastObservedAt <= maxAge;
+
+    /// <summary>
+    /// The trade list a reach map from <paramref name="systemSymbol"/> works out its routes over (slice 6.63, D148): the latest,
+    /// while it is at most <c>Trade.ListMaxAgeMinutes</c> old and was built from the system's markets; otherwise none, and every
+    /// route is worked out.
+    /// </summary>
+    private async Task<TradeList> TradeListForAsync(string systemSymbol, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var maxAge = await settings.GetAsync<int>(TradeListService.MaxAgeMinutesSetting, cancellationToken) is var minutes and > 0
+            ? minutes
+            : TradeListService.DefaultMaxAgeMinutes;
+        var list = tradeLists.FreshAt(now, TimeSpan.FromMinutes(maxAge));
+        return list.Covers(systemSymbol) ? list : TradeList.None;
+    }
 
     /// <summary>How old a market's prices may be (D96): <c>Trade.MaxPriceAgeMinutes</c>, else as it is seeded.</summary>
     private async Task<TimeSpan> MaxPriceAgeAsync(CancellationToken cancellationToken)
