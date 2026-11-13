@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Plan – Changed (2026-11-13, D148)
+- D148 as the user meant it: the split is by the home gate, not by system. Until the home system's jump gate is built,
+  routes are worked out exactly, with each market's fuel price, as now. Once it is built, slice 6.63 (renamed "the trade
+  list built in the background") builds a list of high-value trades across the known universe, with estimated amounts,
+  fuel at an average cost per unit of distance and each jump's antimatter at its gate's price; a free trader takes a close
+  one. The older decisions stay: D133's doubt over markets other players trade at, D131/D132's predictions, D79, D57.
+
 ### Code – Changed (2026-11-13, slice 6.62)
 - B88 (its tick), D147: the ships step in a loop of their own, beside the plans', so they keep flying and trading while a
   plan works; before, a ship stepped once a tick, after every plan's pass, and `ShipStuck` fired for ships that only
