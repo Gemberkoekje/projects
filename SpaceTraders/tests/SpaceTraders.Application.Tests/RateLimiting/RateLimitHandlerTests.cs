@@ -408,6 +408,26 @@ public sealed class RateLimitResponseHandlerTests
     }
 
     [Fact]
+    public async Task A429FromTheRateLimiter_WhoseResetIsAMomentAway_IsRetriedOverTheBackoff()
+    {
+        // B89, seen on the cluster on 2026-11-13 after slice 6.63's deploy: twice in 40 minutes (20:58:50Z and 21:04:06Z) a
+        // request gave up after five retries. Each 429 named a reset about 20 ms away, so the five retries went within a
+        // fraction of a second, with the requests the pause had held, while the server's budget stayed empty. A retry now
+        // waits at least the backoff too.
+        var refusedUntil = TimeProvider.System.GetUtcNow().AddSeconds(1);
+        TimeSpan[] backoff = [TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(200), TimeSpan.FromMilliseconds(400), TimeSpan.FromMilliseconds(800), TimeSpan.FromMilliseconds(1600)];
+
+        var (response, calls) = await SendAsync(
+            _ => TimeProvider.System.GetUtcNow() < refusedUntil
+                ? RateLimiter429(TimeProvider.System.GetUtcNow().AddMilliseconds(20))
+                : new HttpResponseMessage(HttpStatusCode.OK),
+            backoff);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "the retries outlast the second the limiter refuses");
+        calls.Should().BeLessThanOrEqualTo(RateLimitResponseHandler.MaxRetries);
+    }
+
+    [Fact]
     public async Task A429WithoutRateLimitHeaders_IsRetriedWithBackoffUntilItSucceeds()
     {
         var (response, calls) = await SendAsync(call => call <= 3
@@ -457,10 +477,13 @@ public sealed class RateLimitResponseHandlerTests
         return response;
     }
 
-    private async Task<(HttpResponseMessage Response, int Calls)> SendAsync(Func<int, HttpResponseMessage> respond)
+    private Task<(HttpResponseMessage Response, int Calls)> SendAsync(Func<int, HttpResponseMessage> respond)
+        => SendAsync(respond, ShortBackoff);
+
+    private async Task<(HttpResponseMessage Response, int Calls)> SendAsync(Func<int, HttpResponseMessage> respond, IReadOnlyList<TimeSpan> backoff)
     {
         var calls = 0;
-        using var handler = new RateLimitResponseHandler(_status, new RequestBudget(), _log.For<RateLimitResponseHandler>(), ShortBackoff)
+        using var handler = new RateLimitResponseHandler(_status, new RequestBudget(), _log.For<RateLimitResponseHandler>(), backoff)
         {
             InnerHandler = new CallbackMessageHandler(_ => respond(++calls)),
         };
@@ -511,6 +534,50 @@ public sealed class RateLimitPipelineTests
 
         arrivals.Single(arrival => arrival.Path.EndsWith("/orbit", StringComparison.Ordinal)).At
             .Should().BeOnOrAfter(reset, "the server's budget is empty until the reset the 429 named");
+    }
+
+    [Fact]
+    public async Task A429FromTheRateLimiter_HoldsTheOthersOnlyUntilItsReset_NotForItsOwnBackoff()
+    {
+        // B89: the refused request waits at least the backoff (a second at first); the requests after it wait only for the
+        // reset the 429 named, as in B59.
+        var budget = new RequestBudget();
+        var start = TimeProvider.System.GetUtcNow();
+        var arrivals = new ConcurrentQueue<(string Path, DateTimeOffset At)>();
+        var calls = 0;
+        using var handler = new RateLimitResponseHandler(new RateLimitStatus(), budget, NullLogger<RateLimitResponseHandler>.Instance)
+        {
+            InnerHandler = new RateLimitingHandler(budget, new RateLimitStatus(), Substitute.For<IAutomationMetrics>())
+            {
+                InnerHandler = new CallbackMessageHandler(request =>
+                {
+                    arrivals.Enqueue((request.RequestUri!.AbsolutePath, TimeProvider.System.GetUtcNow()));
+                    return Interlocked.Increment(ref calls) == 1
+                        ? RateLimiter429(TimeProvider.System.GetUtcNow().AddMilliseconds(20))
+                        : new HttpResponseMessage(HttpStatusCode.OK);
+                }),
+            },
+        };
+        using var invoker = new HttpMessageInvoker(handler);
+
+        var throttled = SendAsync(invoker, "/my/ships/SHIP-1/sell");
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
+        using (var next = await SendAsync(invoker, "/my/ships/SHIP-2/orbit"))
+        {
+            next.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        using (var retried = await throttled)
+        {
+            retried.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        var sells = arrivals.Where(arrival => arrival.Path.EndsWith("/sell", StringComparison.Ordinal)).Select(arrival => arrival.At).ToList();
+        sells.Should().HaveCount(2);
+        (sells[1] - sells[0]).Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(950), "the first retry waits the backoff's second");
+        arrivals.Single(arrival => arrival.Path.EndsWith("/orbit", StringComparison.Ordinal)).At
+            .Should().BeBefore(sells[1], "the others wait only for the reset, not for the refused request's backoff")
+            .And.BeBefore(start.AddMilliseconds(800));
     }
 
     private static HttpResponseMessage RateLimiter429(DateTimeOffset reset)
