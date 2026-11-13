@@ -75,7 +75,7 @@
   - D79's second step: learning the price steps per good and market from the bot's own trades. Until then a trip's
     batches are estimated with the measured medians (slice 6.16).
   - B88 (found on 2026-11-11): the trading plan's route checks over every predicted market. Their memory killed the pod
-    that morning (B86, B87), fixed in slice 6.59; the 15-minute tick they cause is open (slice 6.60, yours to choose).
+    that morning (B86, B87), fixed in slice 6.59; the 15-minute tick they cause is slices 6.60–6.63 (D146, D147).
 - **The cluster** (gembernodes):
   - Postgres is one Bitnami instance every app shares (`postgresql.flux-system`, LAN address 192.168.1.232). Its 32Gi
     volume sits on the QNAP NFS share that every PVC uses, and the NFS CSI driver most likely doesn't enforce the 32Gi,
@@ -260,6 +260,8 @@ get the next D-number.
 | D143 | Slice 6.55 (asked on 2026-11-09): the user's rules: "1. All trade ships should trade at all times. 2. If there is something to trade (or to construct) that is relevant to the gate, prioritize that first. 3. Any ship bought should be bought on the idea that buying the ship will finish the gate faster than without it. 4. The gate rules fall off as soon as the gate is finished, and normal profit rules apply." Rules 1, 2 and 4 hold; rule 3 doesn't: no purchase is weighed against the gate's finish. Earlier runs: a light hauler 278,652, about 37,000 an hour (paid back in 7.5 hours, run of 2026-11-01); drones under 800 an hour; probes and surveyors nothing (26 home probes, about 1M, before the first load in the run of 2026-11-08); FAB_MATS at F46 gave about 80 an hour before falling short, ADVANCED_CIRCUITRY at D41 about 35. Asked to design rule 3 from the data, then "build it, forecast first". | **A forecast, first only observed** (2026-11-09): when the gate will be finished, the slowest of money (what the units still needed cost at their cheapest seller, x1.25 for buying moving the price, less what a load may spend, over the fleet's trade earnings of the last 2 hours), supply (each material's units still needed over its sellers' pace: 2 trade volumes an hour, or what was bought of it an hour over the last 6 hours when that is more) and haul (the units over the builders' holds, a round trip every 15 minutes); made at most once a minute, kept in the construction plan's state, `spacetraders_gate_forecast_hours`. Next (not built): a ship is bought only when the forecast with it is sooner than without it. |
 | D144 | Slice 6.56 (asked on 2026-11-09): "prioritize feeder trips only when supply binds". The routes that feed the jump gate's chain go first (D89, D90, D128, `TradeMarketMap.ConstructionFirst`) once the gate can be built (D136) and only while the gate's forecast (D143) says supply finishes it last, or before its first forecast; while money or haul does, or every unit is on its way, they rank and pay as any other trip. That also holds for what the map's feed decides elsewhere: siphon targets that feed the gate (D141) and the shuttles' gate-first sales (D142). On 2026-11-09 13:30–15:30Z two of the four cargo ships ran feeder trips of −700 to +700 credits each, while one SHIP_PLATING trip made 91,000 and the forecast read money 14.65 hours, supply 10.23. |
 | D145 | Slice 6.57 (asked on 2026-11-09): "I'd like a trader to finish a trip once they started it, if the reason of changing the trip is these changing priorities." A trade trip chosen as a feeder of the jump gate's chain is marked (`TradeBetweenMarketsGoal.FeedsGate`); while the gate's forecast holds feeders back (D144, `TradeMarketMap.FeedersHeldBack`), it keeps the terms it started on: it still buys and sells at cost (D90), and isn't dropped or moved for earning under `Trade.MinProfitPerUnit`. Other reasons still end or move it as before: no longer possible, or selling for less than the cargo cost. A trip that started as a profit trip isn't changed by feeders going first again: its sale may become one at cost, as D90 always allowed. |
+| D146 | Slices 6.60–6.61 (asked on 2026-11-11, for B88's 15-minute tick): "Same decisions, faster [...] Because the only variables are where the ship is and how much it can carry, the rest of the data should be static, or am I missing something?" Within one pass the map is fixed: prices (predicted or seen), price steps, fuel and antimatter prices, gates, what feeds the gate. What a route takes from the ship is its place and fuel (the flight to the buy market), its tank and engine (the haul, when the buy market sells fuel), its free hold, its jump cooldown, and the credits on hand; in the trading plan the credits and the routes and buys already given out also change from one trader to the next. Between passes the probes change hundreds of markets, so the shared work is redone every pass. The route work is shared: per good and pair of markets once, per ship spec (tank, engine, hold: about six in the fleet) the haul, per ship only its flight to the buy market and its hold and credits. The decisions stay the same, checked against the current planner on the same maps. Measured first, on a copy of the day's world. |
+| D147 | Slices 6.62–6.63 (asked the same day): asynchronous both ways ("Both"), after the speed-up ("Speed-up first"). Ship steps get their own loop, so ships keep flying and trading while a plan works; a plan and a step never write one ship at the same time. The shared route table (D146) is rebuilt in the background, and the plans read the latest one instead of working it out: they decide on data up to one rebuild old, which was accepted. |
 
 ## Phases
 
@@ -373,8 +375,11 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.56 Feeder trips first only while supply binds (D144), built (below)
 - 6.57 A feeder trip keeps its terms when priorities change (D145), built (below)
 - 6.58 A restart survives a failing ship; trades within the market's unit limit (B86, B87), deployed (below)
-- 6.59 The trading pass keeps one judgement per good (B88, its memory), built (below)
-- 6.60 The tick back to seconds (B88, its time), planned (below)
+- 6.59 The trading pass keeps one judgement per good (B88, its memory), deployed (below)
+- 6.60 The tick measured on a copy of the day's world (B88, D146), built (below)
+- 6.61 The route work shared, the same decisions (B88, D146), planned (below)
+- 6.62 Ships don't wait for the plans (B88, D147), planned (below)
+- 6.63 The route table built in the background (B88, D147), planned (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -653,8 +658,9 @@ the gates of other systems (D68).
   - To understand this, start with `TradeInPartsAsync` in
     `SpaceTraders.Infrastructure.SpaceTradersAPI/Adapters/SpaceTradersPortAdapter.cs`, then `RecoverInItsOwnScopeAsync` in
     `SpaceTraders.API/Services/StartupRecoveryService.cs`.
-- **6.59 The trading pass keeps one judgement per good** (B88, its memory; asked on 2026-11-11: "Yes, start B88"): built on
-  branch `claude/spacetraders-b88-judgements`.
+- **6.59 The trading pass keeps one judgement per good** (B88, its memory; asked on 2026-11-11: "Yes, start B88"): merged as
+  projects#249 (`73e8ff0b`), deployed by gembernodes#160 on 2026-11-11 at 18:01Z. Checked there: live managed memory peaked at
+  304–390 MB per trading pass in the first 34 minutes (1,481 MB before), no restart.
   - `FurthestJudgements` (new, `Trading/`): each good's furthest judgement, kept as one trader's judgements after another come
     in, in `TradeRouteJudgement.FurthestFirst`'s order (the order `FurthestPerGood` picks by, now shared). That order has no
     ties, so the kept judgements are the ones `FurthestPerGood` picks from all of them, whatever order the traders come in.
@@ -662,14 +668,62 @@ the gates of other systems (D68).
     good's judgement and its `Why` sentence, made from the reach map right away, not the map. The state comes out the same.
   - Tests: `TradeRouteJudgementTests` (two new; the three of `FurthestPerGood` unchanged), and `TradingAutomationServiceTests`'
     not-traded tests unchanged.
-  - To check on the run: `dotnet_total_memory_bytes` no longer climbs through the trading pass (17:14–17:19Z: 462 to 1,481 MB
-    before); one trader's judgements still come and go within its check. The tick stays slow until 6.60.
+  - Checked on the run (above). One trader's judgements still come and go within its check. The tick stays slow.
   - To understand this, start with `FurthestJudgements.Add` in `Trading/FurthestJudgements.cs`, then the per-system loop of
     `TradingAutomationService.EnsureBootstrappedAsync`.
-- **6.60 The tick back to seconds** (B88, its time): planned, the way is yours to choose. The route checks run over every
-  fresh market, and since D132 every market seen with prices counts as fresh. Either:
-  - make the checks cheaper with the same decisions: a ship's sell markets only those that trade the good (now every market),
-    `AssignRoutesAsync` checking each trader once instead of once a round, flight plans worked out once per pass; measured on
-    a made-up map of the cluster's size first, the gain not known yet; or
-  - check fewer markets: the predicted ones only within a reach, or above a confidence weight (D133). That changes which trips
-    are found, which is strategy.
+- **6.60 The tick measured on a copy of the day's world** (B88, D146; asked on 2026-11-11: "Same decisions, faster"): built on
+  branch `claude/spacetraders-tick-measure`. One PR each for 6.60–6.63, in this order, with a stop after each.
+  - `tools/bench/copy_world.py` (new): the cluster's database into a local Postgres (`spacetraders-bench-pg`, loopback
+    55433), read-only on the cluster: the schema by `pg_dump`, the rows by `COPY` (the read-only login can't read the
+    sequences `pg_dump` wants), the sequences set from the rows. Never `stored_credentials`; the rows of `activity_logs`,
+    `startup_snapshots` and `api_endpoint_usages` left out. The production chains (public) saved beside it. 34 s.
+  - `TickBench` (new, `tests/SpaceTraders.API.Tests/Bench/`, category `Bench`, skipped without `SPACETRADERS_BENCH_DB`, so in
+    CI): the API host on the copy (`BenchApiFactory`), the game API stubbed, no background service (no game loop). Before
+    anything it checks that the `DbContext` connects to the copy: a first run reached for the user secrets' database on the
+    cluster's Postgres (it no longer exists, so nothing happened), a second for `appsettings.json`'s; the connection string
+    now goes in as an environment variable, in a non-Development environment. It sets the copy's agent, as agent
+    bootstrap would, then times each trader's reach map and `Rank` and `Judge` on it, and each plan's pass in the game loop's
+    order. `tools/bench/README.md` says how to run it.
+  - Measured on 2026-11-11 on this PC, two copies an hour apart (165 ships, 62 that trade in 14 systems; reach maps up to
+    1,025 markets, all fresh, up to 988 predicted):
+
+    | | Copy 1 | Copy 2 |
+    |---|---:|---:|
+    | 14 reach maps read | 6.1 s | 5.8 s |
+    | `Rank`, 62 traders | 428.5 s | 541.5 s |
+    | of which the first trader on each map | | 360.4 s (median 8.8 s, most 100.8 s) |
+    | of which the other 48 | | 181.1 s (median 0.2 s, most 100.1 s) |
+    | `Judge`, 62 traders, after `Rank` on the same maps | 147.3 s | 153.5 s (15.3 million judgements) |
+    | Roles plan | 414.6 s | 519.3 s |
+    | Trading plan | 141.2 s | 339.5 s |
+    | All eleven plans | 559.0 s | 861.7 s |
+
+    The other nine plans took under 3 s together. The cluster's tick was about 15 minutes at the time.
+  - Found: a map plans each flight once (`TradeMarketMap.Flights`, by start, end, fuel aboard and tank), so the first trader
+    on a map, and any later one with another tank, plans the hauls between its ~1,000 markets: up to 100 s. The role board
+    and the trading plan read a map per system each pass, 14 maps that overlap almost wholly, and plan the same hauls again
+    on each. With the flights planned, a trader's route loop still takes about 1.2 s on such a map.
+  - The explore plan warns or fails in the bench when it wants a system's waypoints: the stub port has none. Not the bot's.
+  - To understand this, start with `tools/bench/README.md`, then `TickBench.RouteWorkAsync`.
+- **6.61 The route work shared, the same decisions** (B88, D146): planned.
+  - First the hauls (6.60: two thirds of `Rank`'s time): a flight's stops, fuel and jumps depend on the waypoints, the gates
+    and which markets sell fuel, not on prices, so they are planned once per start, end, fuel and tank for every map and
+    pass, until the gates or the fuel markets change; the fuel and antimatter they cost is priced per pass. To check first:
+    whether a flight's choices (stops, flight modes, D84) weigh the fuel price; where they do, the hauls are shared per pass
+    across the maps instead of kept.
+  - Per pass, from the map: per good and pair of markets with a price gap, what the units fetch and cost unit by unit (D79's
+    steps), and the flags (feeds the gate, exchange, end product). Per ship, its flight to each buy market; then its routes
+    are sums and a hold and credit limit, not a fresh evaluation.
+  - A ship's sell markets for a good are only those that trade it (now every market is looked at). `AssignRoutesAsync` checks
+    each trader once and only re-checks what a handed-out route or the credits it spent change (now every trader every round).
+    The probe plan's `BestRateThrough` reads the same table.
+  - Tests: on the maps of the existing tests and on random ones, the new code gives the routes, judgements and rates the
+    current code gives, in the same order; the current code stays in the tests as the reference.
+  - To measure: 6.60's harness, before and after.
+- **6.62 Ships don't wait for the plans** (B88, D147): planned. Ship steps get their own loop beside the plans' (now one tick
+  runs the plans, then every ship's step). A plan that gives a ship a goal and the ship's step don't write the ship at once:
+  how (a lock per ship, or the plans hand goals to the step loop) is worked out in the slice. To check: ships step every few
+  seconds while a plan works.
+- **6.63 The route table built in the background** (B88, D147): planned. A worker rebuilds 6.61's table from the latest markets
+  and fleet, again and again; the plans read the latest table instead of working it out. The table says how old it is; a
+  plan reads none older than a limit (a setting, as the 30 minutes of `Trade.MaxPriceAgeMinutes`).
