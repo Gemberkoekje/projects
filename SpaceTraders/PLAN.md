@@ -262,6 +262,7 @@ get the next D-number.
 | D145 | Slice 6.57 (asked on 2026-11-09): "I'd like a trader to finish a trip once they started it, if the reason of changing the trip is these changing priorities." A trade trip chosen as a feeder of the jump gate's chain is marked (`TradeBetweenMarketsGoal.FeedsGate`); while the gate's forecast holds feeders back (D144, `TradeMarketMap.FeedersHeldBack`), it keeps the terms it started on: it still buys and sells at cost (D90), and isn't dropped or moved for earning under `Trade.MinProfitPerUnit`. Other reasons still end or move it as before: no longer possible, or selling for less than the cargo cost. A trip that started as a profit trip isn't changed by feeders going first again: its sale may become one at cost, as D90 always allowed. |
 | D146 | Slices 6.60–6.61 (asked on 2026-11-11, for B88's 15-minute tick): "Same decisions, faster [...] Because the only variables are where the ship is and how much it can carry, the rest of the data should be static, or am I missing something?" Within one pass the map is fixed: prices (predicted or seen), price steps, fuel and antimatter prices, gates, what feeds the gate. What a route takes from the ship is its place and fuel (the flight to the buy market), its tank and engine (the haul, when the buy market sells fuel), its free hold, its jump cooldown, and the credits on hand; in the trading plan the credits and the routes and buys already given out also change from one trader to the next. Between passes the probes change hundreds of markets, so the shared work is redone every pass. The route work is shared: per good and pair of markets once, per ship spec (tank, engine, hold: about six in the fleet) the haul, per ship only its flight to the buy market and its hold and credits. The decisions stay the same, checked against the current planner on the same maps. Measured first, on a copy of the day's world. |
 | D147 | Slices 6.62–6.63 (asked the same day): asynchronous both ways ("Both"), after the speed-up ("Speed-up first"). Ship steps get their own loop, so ships keep flying and trading while a plan works; a plan and a step never write one ship at the same time. The shared route table (D146) is rebuilt in the background, and the plans read the latest one instead of working it out: they decide on data up to one rebuild old, which was accepted. |
+| D148 | Slice 6.63, reshaped (asked on 2026-11-13, after 6.61's measures): "I feel like fuel costs are mostly negligible compared to trades", then "maybe we should separate trade in the home system and trade in the universe. In the system we have at most 30 waypoints, and fuel costs actually matter when the margins are small. In the wider universe, just slap an average fuel cost per unit of distance and you can just set up all trade routes generically and asynchronously and have a ship decide which one to take based on distance and profitability." Measured that day on the copy (70 traders in 18 systems): routes that stay in the ship's system, 1,913, lose a median 8.6% of their margin (sale less purchase) to fuel, and 44% of them more than a tenth; routes that leave it, 733,603, lose 0.9% (99th percentile 4.9%) to fuel but a median 49% to antimatter (24% on each trader's best route). Sharing the flights across maps changed no fuel cost and no trader's best route, but took only 18% off ranking: the time is each trader's own loop over buy market, good and sell market. So: a route that stays in the system the ship is in (read as that; the home system is one of them) is worked out exactly, per ship, as now. Every other route comes from one table for the known universe, rebuilt in the background (D147): per good and pair of markets what the units fetch and cost, batch by batch (D79), the haul's jumps with each gate's antimatter, and its fuel at an average cost per unit of distance. A ship adds only its way to the buy market, its hold, its credits, its speed and its jump cooldown, and picks by credits per hour. Choices across systems may differ from today's by the fuel estimate, about 1% of a margin; within the system they stay the same. |
 
 ## Phases
 
@@ -379,7 +380,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.60 The tick measured on a copy of the day's world (B88, D146), built (below)
 - 6.61 The route work shared, the same decisions (B88, D146), built (below)
 - 6.62 Ships don't wait for the plans (B88, D147), built (below)
-- 6.63 The route table built in the background (B88, D147), planned (below)
+- 6.63 The route table built in the background (B88, D147, D148), planned (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -743,9 +744,9 @@ the gates of other systems (D68).
 
     Reading the 18 maps took 76.1 s on the branch's run against 7.7 s on main's, with the same 0.9 GB allocated: the reads
     waited on the database, and this slice doesn't touch them. The explore plan fails in the bench as in 6.60 (no waypoints).
-  - Not built, for after 6.62 if the tick still needs it: per good and pair of markets, the unit prices and flags once a pass,
-    and per ship only its flight to the buy market; `AssignRoutesAsync` checking each trader once instead of every round.
-    A trader's own route loop is now most of the time: `Judge` takes 1.4 s a trader at the median.
+  - Not built: per good and pair of markets, the unit prices and flags once a pass, and per ship only its flight to the buy
+    market (now 6.63's table, D148); `AssignRoutesAsync` checking each trader once instead of every round. A trader's own
+    route loop is now most of the time: `Judge` takes 1.4 s a trader at the median.
   - To understand this, start with `TradeRoutePlanner.TryPlanFlight` and `TryEvaluateFrom`, then `RoutePlannerGoldenTests`.
 - **6.62 Ships don't wait for the plans** (B88, D147): built on branch `claude/spacetraders-step-loop`.
   - Two loops in `GameLoopService`, side by side, each 5 s after its last round. The plan loop's round is the tick: the
@@ -776,6 +777,25 @@ the gates of other systems (D68).
     show this; after the deploy, Loki should show ship lines all through the trading pass and no `ShipStuck` for ships
     that only wait.
   - To understand this, start with `GameLoopService`, then `StepGuardedShipGoalRepository` and `ShipGoalStepGuard`.
-- **6.63 The route table built in the background** (B88, D147): planned. A worker rebuilds 6.61's table from the latest markets
-  and fleet, again and again; the plans read the latest table instead of working it out. The table says how old it is; a
-  plan reads none older than a limit (a setting, as the 30 minutes of `Trade.MaxPriceAgeMinutes`).
+- **6.63 The route table built in the background** (B88, D147, D148): planned. Trade within the ship's system and trade
+  across the universe part ways.
+  - Within the system the ship is in (at most ~30 waypoints): its routes are worked out exactly, per ship, as now (6.61),
+    on that system's markets only. Fuel weighs there: a median 8.6% of a margin.
+  - Across systems, one table for every known market, rebuilt by a worker from the latest markets again and again; the
+    plans read the latest instead of working routes out. Per good and pair of markets (in one system, for the ships outside
+    it, or in two the gates join within `Trade.MaxHaulDistance`, D96): what the units fetch and cost in batches of each market's trade volume (D79), so
+    a hold of any size reads its sum; the haul's jumps and their antimatter at each gate's price (D63), which weighs a
+    median 49% of such a margin, so it is priced per gate, not averaged; its fuel at one average cost per unit of distance;
+    its time per unit of engine speed, with the jumps' cooldowns; and the flags (feeds the gate, exchange, end product,
+    construction, prediction weight).
+  - Per ship, when a plan asks: its way to each buy market (distance and jumps from where it is), then each route is a sum
+    and a hold and credit limit, ranked by credits per hour as now. A route bought within the ship's system but sold
+    elsewhere is a table route.
+  - The table says how old it is; a plan reads none older than a limit (a setting, as the 30 minutes of
+    `Trade.MaxPriceAgeMinutes`).
+  - To work out in the slice: a ship whose tank can't make a leg between refuels (today the flight plans stops; the
+    average fuel doesn't); whether `AssignRoutesAsync` reads the table once for all its rounds; how the role board and the
+    probe plan's `BestRateThrough` read it.
+  - Tests: within the system, `RoutePlannerGoldenTests`' fingerprint holds; across systems, on the copy, how often each
+    trader's best route differs from today's exact one, and by how many credits an hour. To measure: 6.60's bench, before
+    and after, and the cluster's tick.

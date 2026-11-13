@@ -18,6 +18,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   which no step of the ship runs.
 - Tools: the soak sampler's `tick_step_failed` flag matches "the rest of the round carries on" too.
 - Tests: `GameLoopServiceTests`, `StepGuardedShipGoalRepositoryTests`, `ShipGoalWritesTests`.
+- Plan: decision D148 reshapes slice 6.63. A route within the ship's system stays exact, per ship; every other route comes
+  from one table for the known universe, built in the background, with fuel at an average cost per unit of distance and
+  each jump's antimatter at its gate's price. Measured: fuel is 8.6% of a margin within a system, 0.9% across systems,
+  where antimatter is 49%.
 
 ### Code – Changed (2026-11-13, slice 6.61)
 - B88 (its tick), D146: the route work does less on each map, with the same decisions. The flights within a system are kept
