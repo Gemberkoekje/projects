@@ -1,6 +1,5 @@
 #pragma warning disable IDISP001, IDISP004
 
-using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -78,16 +77,108 @@ public sealed class GameLoopServiceTests : IDisposable
     [Fact]
     public async Task Tick_PutsTheTickAndThePlanOrShipOfEachStepInTheLogContext()
     {
-        // B12: nothing told which tick, plan or ship a line logged during a tick belonged to.
+        // B12: nothing told which tick, plan or ship a line logged during a tick belonged to. Since slice 6.62 the ships step
+        // in rounds of their own, which carry the round's number instead.
         SwitchOn("Automation.Enabled", "Automation.Plan.Scout.Enabled", "Automation.Plan.Contract.Enabled");
         var logger = Substitute.For<ILogger<GameLoopService>>();
 
         await TickAsync(logger);
 
         logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => context.ContainsKey("Tick")));
+        logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => context.ContainsKey("Round")));
         logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => Has(context, "Plan", AutomationPlan.Scout)));
         logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => Has(context, "ShipSymbol", "SPECTER-DEBUG-3")));
         logger.Received(1).BeginScope(Arg.Is<Dictionary<string, object>>(context => Has(context, "ContractId", "CONTRACT-1") && Has(context, "ShipSymbol", "SPECTER-DEBUG-5")));
+    }
+
+    [Fact]
+    public async Task APlanTick_BootstrapsThePlans_AndStepsNoShip()
+    {
+        // Slice 6.62 (D147): the ships step in their own loop, so a tick of the plans no longer waits for them, nor they for it.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Trading.Enabled", "Automation.Plan.Contract.Enabled");
+
+        await Sut().TickAsync(CancellationToken.None);
+
+        await _tradingPlan.Received(1).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _marketWatch.DidNotReceive().RefreshDueMarketAsync(Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AStepRound_StepsTheShipsAndTheContractWork_AndBootstrapsNoPlan_NorCountsAsATick()
+    {
+        // B79 counts ticks for the plans' words: a round of steps isn't one.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Trading.Enabled", "Automation.Plan.Contract.Enabled");
+        var now = TimeProvider.System.GetUtcNow();
+        _ticks.Begin(now.AddMinutes(-2));
+        _ticks.Begin(now.AddMinutes(-1));
+        var before = now.AddSeconds(-90);
+
+        await Sut().StepRoundAsync(CancellationToken.None);
+
+        await _goalExecutor.Received(1).ExecuteAsync("SPECTER-DEBUG-3", Arg.Any<CancellationToken>());
+        await _goalExecutor.Received(1).ExecuteAsync("SPECTER-DEBUG-5", Arg.Any<CancellationToken>());
+        await _bus.Received(1).InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+        await _marketWatch.Received(1).RefreshDueMarketAsync(Arg.Any<CancellationToken>());
+        await _tradingPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        _ticks.Counts(before, before.AddHours(1), TimeSpan.Zero).Should().BeTrue("no tick began");
+    }
+
+    [Fact]
+    public async Task Running_TheShipsKeepSteppingWhileAPlanWorks()
+    {
+        // Slice 6.62 (D147), asked on 2026-11-11: "can we maybe make it asynchronous?" Before, a plan's minutes of route work
+        // (B88) held every ship's step up until the plans were done.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Trading.Enabled");
+        var planWorking = new TaskCompletionSource();
+        var planDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _tradingPlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(async _ =>
+        {
+            planWorking.TrySetResult();
+            await planDone.Task;
+        });
+        var steps = 0;
+        var threeRounds = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _goalExecutor.ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (planWorking.Task.IsCompleted && Interlocked.Increment(ref steps) >= 6)
+            {
+                threeRounds.TrySetResult();
+            }
+
+            return Task.FromResult<GoalExecutionResult?>(null);
+        });
+        using var sut = Sut(TimeSpan.FromMilliseconds(10));
+
+        await sut.StartAsync(CancellationToken.None);
+        try
+        {
+            await threeRounds.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await _tradingPlan.Received(1).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            planDone.TrySetResult();
+            await sut.StopAsync(CancellationToken.None);
+        }
+
+        steps.Should().BeGreaterThanOrEqualTo(6, "both ships stepped at least three times while the trading plan worked");
+    }
+
+    [Fact]
+    public async Task AStepRound_PublishesTheApiComingBack_AndATickDoesNot()
+    {
+        // The step loop runs every few seconds, so a change of the API's availability is told within seconds, not after the
+        // plans' minutes.
+        _apiAvailability.ConsumeAvailableTransition().Returns(true, false);
+        using var sut = Sut();
+
+        await sut.TickAsync(CancellationToken.None);
+        await _bus.DidNotReceive().PublishAsync(Arg.Any<SpaceTraders.Domain.Events.ApiAvailableEvent>(), Arg.Any<DeliveryOptions>());
+
+        await sut.StepRoundAsync(CancellationToken.None);
+        await _bus.Received(1).PublishAsync(Arg.Any<SpaceTraders.Domain.Events.ApiAvailableEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -401,20 +492,27 @@ public sealed class GameLoopServiceTests : IDisposable
     private static bool Has(Dictionary<string, object> context, string key, object value)
         => context.TryGetValue(key, out var actual) && Equals(actual, value);
 
+    /// <summary>A tick of the plan loop, then a round of the step loop: what one tick did before slice 6.62.</summary>
     private async Task TickAsync(ILogger<GameLoopService>? logger = null)
+    {
+        using var sut = Sut(logger: logger);
+        await sut.TickAsync(CancellationToken.None);
+        await sut.StepRoundAsync(CancellationToken.None);
+    }
+
+    private GameLoopService Sut(TimeSpan? interval = null, ILogger<GameLoopService>? logger = null)
     {
         var leaderElection = Substitute.For<ILeaderElection>();
         leaderElection.IsLeader.Returns(true);
 
-        using var sut = new GameLoopService(
+        return new GameLoopService(
             _serviceScopeFactory,
             _apiAvailability,
             leaderElection,
             _ticks,
-            logger ?? NullLogger<GameLoopService>.Instance);
-
-        var tickMethod = typeof(GameLoopService)
-            .GetMethod("TickAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        await (Task)tickMethod.Invoke(sut, [CancellationToken.None])!;
+            logger ?? NullLogger<GameLoopService>.Instance)
+        {
+            Interval = interval ?? TimeSpan.FromSeconds(5),
+        };
     }
 }

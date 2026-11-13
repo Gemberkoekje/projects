@@ -166,6 +166,10 @@ public sealed class GoalStepCircuitBreakerTests
     {
         public bool TryEnter(string shipSymbol) => true;
 
+        public Task<bool> EnterAsync(string shipSymbol, TimeSpan timeout, CancellationToken cancellationToken) => Task.FromResult(true);
+
+        public bool IsHeldHere(string shipSymbol) => true;
+
         public void Exit(string shipSymbol)
         {
         }

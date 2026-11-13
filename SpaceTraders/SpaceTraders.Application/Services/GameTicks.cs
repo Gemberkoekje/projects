@@ -3,8 +3,9 @@ namespace SpaceTraders.Application.Services;
 /// <summary>
 /// When the game loop's ticks began (<see cref="Automation.GameLoopService"/>): every tick, a paused one or one with automation
 /// switched off too. What a plan says on its pass (<see cref="PurchaseNeeds"/>, <see cref="ShipyardCalls"/>) counts until its
-/// next pass, which comes a tick later, however long that tick takes (B79): a tick that runs the plans and the ships' goal
-/// steps takes minutes, while a paused one takes no time, so after a pause in which no plan ran the plans' words are old.
+/// next pass, which comes a tick later, however long that tick takes (B79): a tick that runs the plans takes minutes, while
+/// a paused one takes no time, so after a pause in which no plan ran the plans' words are old. The ships' goal steps run in a
+/// loop of their own (slice 6.62), whose rounds are no ticks.
 /// </summary>
 /// <remarks>In memory, a singleton. Thread-safe: a purchase through the control endpoint can come at any time.</remarks>
 public sealed class GameTicks

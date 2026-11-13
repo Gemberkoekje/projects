@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
@@ -98,6 +99,7 @@ public sealed class ExplorePlanService(
     IPurchaseOrder purchaseOrder,
     JumpRefusals refusals,
     WarpRefusals warpRefusals,
+    IShipGoalStepGuard stepGuard,
     ILogger<ExplorePlanService> logger) : IExplorePlanService
 {
     /// <summary>The type of an exploring ship's assignment.</summary>
@@ -1072,6 +1074,13 @@ public sealed class ExplorePlanService(
             return (true, state);
         }
 
+        // The orbit and the scan act on the ship, so not while a goal step of it runs beside the plan (slice 6.62, D147): it
+        // waits for a later pass, as for its cooldown.
+        if (!stepGuard.TryEnter(ship.Symbol))
+        {
+            return (true, state);
+        }
+
         ScanSystemsActionResult scan;
         try
         {
@@ -1086,6 +1095,10 @@ public sealed class ExplorePlanService(
         {
             logger.LogWarning(ex, "Explore plan: ship {ShipSymbol} couldn't scan for the systems around {SystemSymbol}; trying again in a few minutes.", ship.Symbol, here);
             return (false, Update(state, here, system => system with { ScanTriedAt = now }));
+        }
+        finally
+        {
+            stepGuard.Exit(ship.Symbol);
         }
 
         await ships.UpdateCooldownAsync(ship.Symbol, scan.CooldownExpiresAt ?? now.AddSeconds(scan.CooldownSeconds), ct);
