@@ -201,7 +201,7 @@ public static class TradeRoutePlanner
         var best = 0.0;
         foreach (var good in map.GoodsAt(waypointSymbol).Where(good => good.TradeVolume > 0))
         {
-            foreach (var other in map.MarketWaypoints.Where(other => !other.Equals(waypointSymbol, StringComparison.OrdinalIgnoreCase) && map.IsFresh(other)))
+            foreach (var other in map.MarketsTrading(good.Symbol).Where(other => !other.Equals(waypointSymbol, StringComparison.OrdinalIgnoreCase) && map.IsFresh(other)))
             {
                 if (!map.TryGetGood(other, good.Symbol, out var there) || there.TradeVolume <= 0)
                 {
@@ -413,11 +413,10 @@ public static class TradeRoutePlanner
         ArgumentNullException.ThrowIfNull(from);
         ArgumentNullException.ThrowIfNull(to);
 
-        var planned = map.Flights.GetOrAdd(
-            string.Create(CultureInfo.InvariantCulture, $"{from}>{to}|{fuelAtStart}|{fuelCapacity}"),
-            _ => map.SameSystem(from, to)
-                ? (TryPlanFlightWithin(map, from, to, fuelAtStart, fuelCapacity, out var within), within)
-                : (TryPlanFlightBetween(map, from, to, fuelAtStart, fuelCapacity, out var between), between));
+        var key = new FlightKey(from, to, fuelAtStart, fuelCapacity);
+        var planned = map.SameSystem(from, to)
+            ? Leg(map, key)
+            : map.Flights.GetOrAdd(key, static (flight, onMap) => (TryPlanFlightBetween(onMap, flight, out var between), between), map);
         flight = planned.Flight;
         return planned.Found;
     }
@@ -440,30 +439,40 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>
+    /// A flight within one system, planned once on the map and its copies (<see cref="TradeMarketMap.Legs"/>, B88): on its own, or
+    /// as the leg to the gate or on from the last gate of a flight to another system.
+    /// </summary>
+    private static (bool Found, TradeFlight Flight) Leg(TradeMarketMap map, FlightKey key)
+        => map.Legs.GetOrAdd(
+            key,
+            static (leg, onMap) => (TryPlanFlightWithin(onMap, leg.From, leg.To, leg.FuelAtStart, leg.FuelCapacity, out var within), within),
+            map);
+
+    /// <summary>
     /// A flight to another system (slice 6.29, D101): the flight to the gate of the system the ship is in, the jumps, and the
     /// flight from the last gate. A ship jumps from orbit, so it fills no tank at a gate it jumps from; where the gate it jumps to
     /// sells fuel, it fills its tank there before it flies on (<c>GoalFlight</c> docks for it when a full tank flies the leg
     /// differently).
     /// </summary>
-    private static bool TryPlanFlightBetween(
-        TradeMarketMap map,
-        string from,
-        string to,
-        int fuelAtStart,
-        int fuelCapacity,
-        out TradeFlight flight)
+    private static bool TryPlanFlightBetween(TradeMarketMap map, FlightKey key, out TradeFlight flight)
     {
+        var (from, to, fuelAtStart, fuelCapacity) = key;
         flight = new TradeFlight([], 0, fuelAtStart);
-        if (!map.Gates.TryFindWay(map.SystemOf(from), map.SystemOf(to), out var jumps)
-            || jumps.Count == 0
-            || !TryPlanFlightWithin(map, from, jumps[0].GateWaypointSymbol, fuelAtStart, fuelCapacity, out var toGate))
+        if (!map.Gates.TryFindWay(map.SystemOf(from), map.SystemOf(to), out var jumps) || jumps.Count == 0)
+        {
+            return false;
+        }
+
+        var (reachesGate, toGate) = Leg(map, new FlightKey(from, jumps[0].GateWaypointSymbol, fuelAtStart, fuelCapacity));
+        if (!reachesGate)
         {
             return false;
         }
 
         var lastGate = jumps[^1].DestinationGateWaypointSymbol;
         var fuelAtLastGate = map.SellsFuel(lastGate) ? fuelCapacity : toGate.FuelLeft;
-        if (!TryPlanFlightWithin(map, lastGate, to, fuelAtLastGate, fuelCapacity, out var fromGate))
+        var (reachesDestination, fromGate) = Leg(map, new FlightKey(lastGate, to, fuelAtLastGate, fuelCapacity));
+        if (!reachesDestination)
         {
             return false;
         }
@@ -880,7 +889,8 @@ public static class TradeRoutePlanner
 
             foreach (var good in goods)
             {
-                foreach (var sell in map.MarketWaypoints)
+                // B88: only the markets that list the good, in the same order; the others failed TryGetGood below.
+                foreach (var sell in map.MarketsTrading(good.Symbol))
                 {
                     if (sell.Equals(buy, StringComparison.OrdinalIgnoreCase)
                         || !map.IsFresh(sell)
@@ -1000,10 +1010,27 @@ public static class TradeRoutePlanner
         var units = 0;
         var cost = 0.0;
         var revenue = 0.0;
+
+        // B88: a price changes once a batch of each market's trade volume (D79), so it is worked out once a batch, not once a unit:
+        // the same figures, added up unit by unit as before. Both trade volumes are above 0 (checked at the top).
+        var buyBatch = -1;
+        var sellBatch = -1;
+        var buy = 0.0;
+        var sell = 0.0;
         while (units < free)
         {
-            var buy = PriceSteps.PurchasePriceOf(atBuy.PurchasePrice, units, atBuy.TradeVolume);
-            var sell = PriceSteps.SalePriceOf(atSell.SellPrice, units, atSell.TradeVolume);
+            if (units / atBuy.TradeVolume != buyBatch)
+            {
+                buyBatch = units / atBuy.TradeVolume;
+                buy = PriceSteps.PurchasePriceOf(atBuy.PurchasePrice, units, atBuy.TradeVolume);
+            }
+
+            if (units / atSell.TradeVolume != sellBatch)
+            {
+                sellBatch = units / atSell.TradeVolume;
+                sell = PriceSteps.SalePriceOf(atSell.SellPrice, units, atSell.TradeVolume);
+            }
+
             if (cost + buy > budget + Sliver)
             {
                 failed = units == 0 ? TradeRouteCheck.TooFewCredits : failed;

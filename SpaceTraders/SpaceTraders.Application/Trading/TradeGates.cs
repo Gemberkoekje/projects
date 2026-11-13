@@ -37,7 +37,7 @@ public sealed class TradeGates
     private readonly IReadOnlyDictionary<string, long> _antimatter;
     private readonly IReadOnlyDictionary<string, (int X, int Y)> _systems;
     private readonly long _averageAntimatter;
-    private readonly ConcurrentDictionary<string, Way> _ways = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<(string From, string To), Way> _ways = new(SystemPairIgnoringCase.Instance);
 
     /// <summary>Builds the ways between systems.</summary>
     /// <param name="network">The explore plan's gates, with the jumps refused lately (<see cref="IGateNetwork"/>).</param>
@@ -99,12 +99,27 @@ public sealed class TradeGates
         ArgumentNullException.ThrowIfNull(fromSystem);
         ArgumentNullException.ThrowIfNull(toSystem);
 
-        var way = _ways.GetOrAdd($"{fromSystem}>{toSystem}", _ =>
-            ExploreAtlas.TryFindJumps(_network, fromSystem, toSystem, _now, out var found) && found.Count <= MaxJumps
+        // A pair of systems as the key, not a string built for each of the many lookups of a pass (B88).
+        var way = _ways.GetOrAdd(
+            (fromSystem, toSystem),
+            static (pair, gates) => ExploreAtlas.TryFindJumps(gates._network, pair.From, pair.To, gates._now, out var found) && found.Count <= gates.MaxJumps
                 ? new Way(true, found)
-                : new Way(false, []));
+                : new Way(false, []),
+            this);
         jumps = way.Jumps;
         return way.Found;
+    }
+
+    /// <summary>Two systems, compared ignoring case as their symbols are.</summary>
+    private sealed class SystemPairIgnoringCase : IEqualityComparer<(string From, string To)>
+    {
+        public static SystemPairIgnoringCase Instance { get; } = new();
+
+        public bool Equals((string From, string To) x, (string From, string To) y)
+            => StringComparer.OrdinalIgnoreCase.Equals(x.From, y.From) && StringComparer.OrdinalIgnoreCase.Equals(x.To, y.To);
+
+        public int GetHashCode((string From, string To) obj)
+            => HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(obj.From), StringComparer.OrdinalIgnoreCase.GetHashCode(obj.To));
     }
 
     /// <summary>

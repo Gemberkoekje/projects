@@ -105,7 +105,7 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B85 | **No trade trip for 14 hours: D137 held the gate's next load back from every new trade** (seen on 2026-11-09, fixed in slice 6.54).<br>• From 2026-11-08 18:30Z, minutes before slice 6.50 went live, no `TradeStarted`: a new trade trip left what the gate's next load cost (`TradeContext.GateLoadCredits`, 128,000 to 361,000) while the credits stood at 65,000 to 123,000. Nothing was left to buy cargo with, the command ship stood idle from 03:51Z, and the gate got a FAB_MATS load every few hours from the B36 shuttle's ore sales.<br>• Asked on 2026-11-09: "trade should only leave a handful of credits to pay for fuel" (D24). Fix: cargo leaves `Trade.FuelReserveCredits` and the trips' holds (D57, D64), nothing else; `GateLoadCredits` is gone. A gate load still keeps only the floor, the fuel reserve and the trips' holds (D137's other half). |
 | B86 | **One ship's failing step stopped every restart** (seen on 2026-11-11, fixed in slice 6.58).<br>• An OOM kill at 07:19:03Z (B88) restarted the bot; from then on every start stopped the host about 12 seconds in. Startup recovery ran SPECTER-68's goal step, its sale was refused (B87), nothing caught the error, and the deferred startup failed: CrashLoopBackOff, 106 restarts by 16:28Z, the bot down from 07:19Z until the fix's deploy.<br>• The game loop steps each ship in its own scope and try/catch (`GameLoopService.RunStepAsync`); startup recovery had neither.<br>• Fix: each ship is recovered in its own scope and try/catch; a failure is logged as an Error and left to the game loop. | Loki: "Deferred startup initialization failed; stopping the host" 106 times from 07:19:19Z; `StartupRecoveryService.cs` | 6.58 |
 | B87 | **A trade batch above the market's unit limit was refused on every step** (seen on 2026-11-11, fixed in slice 6.58).<br>• From 05:46:46Z SPECTER-68 sold 64 LIQUID_NITROGEN at X1-ZZ33-E49, the trade volume that market showed at 05:46:43Z. The API refused: 4604, "has a limit of 60 units per transaction". The market is fetched again only after a trade, so its trade volume stayed 64 and the same sale was refused on every step for 93 minutes (`ShipStuck` at 06:18Z), then at every restart (B86).<br>• Every sale and purchase sizes its batch by the trade volume last seen (D79, D81): seven calls in six executors.<br>• Fix: the port trades a refused batch in parts of the limit the API names (`SpaceTradersPortAdapter.TradeInPartsAsync`); the market's refresh after the trade then brings its new trade volume. | `market_price_samples`: trade volume 103 (01:41Z), 70 (05:11Z), 64 (05:19Z and 05:46:43Z); Loki: four Wolverine retries at 05:46Z, then a failed goal step about every 10 minutes | 6.58 |
-| B88 | **The route checks over every predicted market: a 1.4 GB pass and a 15-minute tick** (found on 2026-11-11; the memory fixed in slice 6.59, the tick open).<br>• Not a leak. Live managed memory climbs for about 5 minutes, up to 1,481 MB at 17:19Z, and drops as the trading plan's pass ends; then again about 15 minutes later. Killed at 07:19:03Z (exit 137, `OOMKilled`), which started B86. The pass kept every free trader's judgement of every route with a price gap (`TradeRoutePlanner.Judge`, D76), and each system's reach map, until its end, for the one judgement per good its state says.<br>• Since slice 6.47 (D132) every market seen with prices is predicted for now, so it counts as fresh: about 1,100 markets instead of the ~135 seen within 30 minutes. `CheckRoutes` loops over every fresh buy market, its goods and every fresh sell market, and the role board and the trading plan run it per ship (and per round of `AssignRoutesAsync`); B84 measured it growing with the square of the fresh markets.<br>• The game loop runs it on one thread (1.03 cores, all the time): ticks per 3 hours went from 1,538 (7 s a tick, 2026-11-10 00:00Z) to 24 (7.5 minutes, 2026-11-11 03:00Z), as the known markets went from about 35 to 1,100. Now about 15 minutes; ships step once a tick, and few ship lines appear outside the minute after each trading pass. The run of 2026-10-25 ticked about once a minute at 797 ships, with 4,328 markets seen but ~135 fresh. | Prometheus: `dotnet_total_memory_bytes`, `system_runtime_dotnet_gc_collections`, `process_cpu_seconds_total`, `kube_pod_container_status_last_terminated_reason`; Loki: the `Tick` of each line, 2026-11-10 00:00Z to 2026-11-11 17:35Z | 6.59, 6.60 |
+| B88 | **The route checks over every predicted market: a 1.4 GB pass and a 15-minute tick** (found on 2026-11-11; the memory fixed in slice 6.59, the tick 2.6 times shorter in slice 6.61, still open).<br>• Not a leak. Live managed memory climbs for about 5 minutes, up to 1,481 MB at 17:19Z, and drops as the trading plan's pass ends; then again about 15 minutes later. Killed at 07:19:03Z (exit 137, `OOMKilled`), which started B86. The pass kept every free trader's judgement of every route with a price gap (`TradeRoutePlanner.Judge`, D76), and each system's reach map, until its end, for the one judgement per good its state says.<br>• Since slice 6.47 (D132) every market seen with prices is predicted for now, so it counts as fresh: about 1,100 markets instead of the ~135 seen within 30 minutes. `CheckRoutes` loops over every fresh buy market, its goods and every fresh sell market, and the role board and the trading plan run it per ship (and per round of `AssignRoutesAsync`); B84 measured it growing with the square of the fresh markets.<br>• The game loop runs it on one thread (1.03 cores, all the time): ticks per 3 hours went from 1,538 (7 s a tick, 2026-11-10 00:00Z) to 24 (7.5 minutes, 2026-11-11 03:00Z), as the known markets went from about 35 to 1,100. Now about 15 minutes; ships step once a tick, and few ship lines appear outside the minute after each trading pass. The run of 2026-10-25 ticked about once a minute at 797 ships, with 4,328 markets seen but ~135 fresh. | Prometheus: `dotnet_total_memory_bytes`, `system_runtime_dotnet_gc_collections`, `process_cpu_seconds_total`, `kube_pod_container_status_last_terminated_reason`; Loki: the `Tick` of each line, 2026-11-10 00:00Z to 2026-11-11 17:35Z | 6.59, 6.60, 6.61 |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
@@ -377,7 +377,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.58 A restart survives a failing ship; trades within the market's unit limit (B86, B87), deployed (below)
 - 6.59 The trading pass keeps one judgement per good (B88, its memory), deployed (below)
 - 6.60 The tick measured on a copy of the day's world (B88, D146), built (below)
-- 6.61 The route work shared, the same decisions (B88, D146), planned (below)
+- 6.61 The route work shared, the same decisions (B88, D146), built (below)
 - 6.62 Ships don't wait for the plans (B88, D147), planned (below)
 - 6.63 The route table built in the background (B88, D147), planned (below)
 
@@ -705,21 +705,48 @@ the gates of other systems (D68).
     on each. With the flights planned, a trader's route loop still takes about 1.2 s on such a map.
   - The explore plan warns or fails in the bench when it wants a system's waypoints: the stub port has none. Not the bot's.
   - To understand this, start with `tools/bench/README.md`, then `TickBench.RouteWorkAsync`.
-- **6.61 The route work shared, the same decisions** (B88, D146): planned.
-  - First the hauls (6.60: two thirds of `Rank`'s time): a flight's stops, fuel and jumps depend on the waypoints, the gates
-    and which markets sell fuel, not on prices, so they are planned once per start, end, fuel and tank for every map and
-    pass, until the gates or the fuel markets change; the fuel and antimatter they cost is priced per pass. To check first:
-    whether a flight's choices (stops, flight modes, D84) weigh the fuel price; where they do, the hauls are shared per pass
-    across the maps instead of kept.
-  - Per pass, from the map: per good and pair of markets with a price gap, what the units fetch and cost unit by unit (D79's
-    steps), and the flags (feeds the gate, exchange, end product). Per ship, its flight to each buy market; then its routes
-    are sums and a hold and credit limit, not a fresh evaluation.
-  - A ship's sell markets for a good are only those that trade it (now every market is looked at). `AssignRoutesAsync` checks
-    each trader once and only re-checks what a handed-out route or the credits it spent change (now every trader every round).
-    The probe plan's `BestRateThrough` reads the same table.
-  - Tests: on the maps of the existing tests and on random ones, the new code gives the routes, judgements and rates the
-    current code gives, in the same order; the current code stays in the tests as the reference.
-  - To measure: 6.60's harness, before and after.
+- **6.61 The route work shared, the same decisions** (B88, D146): built on branch `claude/spacetraders-shared-routes`, the
+  part that changes no decision: what one map worked out more than once is kept.
+  - Checked first: a flight's choices weigh the fuel price. Its stops are chosen with what the refuels cost (`RefuelCost`), at
+    each market's fuel price, or the map's average where a market sells none; the reach maps of one pass hold different
+    markets, so their averages differ, and the same flight can stop elsewhere on another map. So the hauls are not shared
+    across maps or passes: that waits for 6.63's one table a rebuild, which every plan reads.
+  - On a map:
+    - The flights within one system are kept (`TradeMarketMap.Legs`, by start, end, fuel aboard and tank), and a flight to
+      another system plans its leg to the gate and its leg on from the last gate through them: the many hauls through a gate
+      share them. The map's copies (`WithoutJumps`, `WithFeedersFirst`, `WithStaleMarkets`) share them too: a leg reads
+      neither the gates nor which markets are stale.
+    - Flights, legs and the ways between systems are looked up by a value (`FlightKey`, a pair of systems), not a string
+      built for each lookup, in dictionaries that are safe to share between threads (for 6.62 and 6.63).
+    - A good's sell markets are only the markets that trade it (`TradeMarketMap.MarketsTrading`, in the map's order, so the
+      routes come out in the same order); before, every market was looked at for every good. The probe plan's
+      `BestRateThrough` reads them too.
+    - A route's buy and sell prices are worked out once per batch of the trade volume (D79's steps), not once per unit.
+  - Tests: `RoutePlannerGoldenTests` fingerprints (SHA-256) what the planner gives on a seeded world: six systems joined by
+    seven gate links, stale and predicted markets, a factory that feeds the gate, and six ships (tanks from 80 to 4,000,
+    a full hold, a jump cooldown). It covers `Rank` and `Judge` at three credit levels and two minimum profits, with and
+    without held routes, `BestRateThrough` for every market, and flights for four tanks. The fingerprint was taken on main
+    before the change and holds after it.
+  - Measured with 6.60's bench on 2026-11-13, main and this branch on the same copy (178 ships, 70 that trade in 18 systems;
+    reach maps up to 1,253 markets, all fresh, up to 1,250 predicted), reset between the runs. The runs were 21 minutes apart,
+    so markets aged into predictions differently, and the branch's run found about 1% fewer routes:
+
+    | | main | 6.61 |
+    |---|---:|---:|
+    | `Rank`, 70 traders | 1,083.3 s (109 GB allocated) | 311.4 s (35 GB) |
+    | of which the first trader on each map | 726.3 s (median 14.1 s, most 192.7 s) | 180.0 s (median 9.2 s, most 24.4 s) |
+    | of which the other 52 | 357.0 s (median 0.4 s, most 184.1 s) | 131.5 s (median 0.02 s, most 13.9 s) |
+    | `Judge`, 70 traders (26.3 million judgements) | 305.8 s (49 GB) | 256.5 s (19 GB) |
+    | Roles plan | 1,005.8 s | 263.2 s |
+    | Trading plan | 615.9 s | 347.1 s |
+    | All eleven plans | 1,624.8 s (181 GB) | 616.1 s (69 GB) |
+
+    Reading the 18 maps took 76.1 s on the branch's run against 7.7 s on main's, with the same 0.9 GB allocated: the reads
+    waited on the database, and this slice doesn't touch them. The explore plan fails in the bench as in 6.60 (no waypoints).
+  - Not built, for after 6.62 if the tick still needs it: per good and pair of markets, the unit prices and flags once a pass,
+    and per ship only its flight to the buy market; `AssignRoutesAsync` checking each trader once instead of every round.
+    A trader's own route loop is now most of the time: `Judge` takes 1.4 s a trader at the median.
+  - To understand this, start with `TradeRoutePlanner.TryPlanFlight` and `TryEvaluateFrom`, then `RoutePlannerGoldenTests`.
 - **6.62 Ships don't wait for the plans** (B88, D147): planned. Ship steps get their own loop beside the plans' (now one tick
   runs the plans, then every ship's step). A plan that gives a ship a goal and the ship's step don't write the ship at once:
   how (a lock per ship, or the plans hand goals to the step loop) is worked out in the slice. To check: ships step every few
