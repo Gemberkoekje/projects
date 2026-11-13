@@ -2278,13 +2278,15 @@ Steps 2 to 4 follow the API guide (https://spacetraders.io/api-guide/rate-limits
    (default 3): calls in that time fail at once with `ApiPausedException`. The first call after
    the pause goes out as usual; a success marks the API available, another 502 pauses again.
 3. **`RateLimitResponseHandler`:** a 429 with `x-ratelimit-*` headers comes from the API's rate
-   limiter: it waits until `x-ratelimit-reset` (else `retry-after`, else 1 s; at most a minute)
-   and retries. A 429 without them comes from the cloud infrastructure: it backs off 1, 2, 4, 8
-   and 16 s. Either way it gives up after five retries. Every 429 is counted and logged at
+   limiter: it waits until `x-ratelimit-reset` (else `retry-after`, else 1 s; at most a minute),
+   but at least the backoff below (B89: the reset is often tens of milliseconds away, and five
+   retries that soon could all be refused), and retries. A 429 without them comes from the cloud
+   infrastructure: it backs off 1, 2, 4, 8 and 16 s. Either way it gives up after five retries. Every 429 is counted and logged at
    Warning with the limiter's headers (`x-ratelimit-*` and `retry-after`, "none" without them,
    B59), and the headers are recorded for `/status/rate-limit`. A 429 from the rate limiter also
-   holds every other request back until its reset (`RequestBudget.PauseUntil`, B59): the server's
-   budget is empty for them too, and they used to go out and draw 429s of their own.
+   holds every other request back until its reset (`RequestBudget.PauseUntil`, B59), not for the
+   refused request's backoff: the server's budget is empty for them too, and they used to go out
+   and draw 429s of their own.
 4. **`RateLimitingHandler`:** each request takes from `RequestBudget`, a singleton: 2 requests
    in any second and, once those are used, up to 30 more in any 60 seconds. It waits only when
    both are used. Each window is 100 ms longer (`JourneyMargin`, B59): a request that leaves a

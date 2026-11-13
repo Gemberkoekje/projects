@@ -11,13 +11,18 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 /// way it gives up after <see cref="MaxRetries"/> retries and returns the 429. Each 429 is logged with the limiter's
 /// headers (<see cref="RateLimitHeaders"/>, B59): what the server counted, to hold the local budget against. A 429 from
 /// the rate limiter holds every request back until its reset, not only the one it refused (<see cref="RequestBudget.PauseUntil"/>,
-/// B59): the requests after it went out at once and drew 429s of their own.
+/// B59): the requests after it went out at once and drew 429s of their own. The request it refused waits at least the
+/// backoff before its retry (B89): the reset it names is often some tens of milliseconds away, and five retries that soon
+/// went out with the requests the pause had held and could all be refused. The others are held only until the reset.
 /// </summary>
 public sealed class RateLimitResponseHandler : DelegatingHandler
 {
     public const int MaxRetries = 5;
 
-    /// <summary>The waits before each retry of a 429 without rate-limit headers.</summary>
+    /// <summary>
+    /// The waits before each retry of a 429 without rate-limit headers, and the least a request refused by the rate limiter
+    /// waits before each retry (B89).
+    /// </summary>
     public static readonly IReadOnlyList<TimeSpan> DefaultBackoff =
     [
         TimeSpan.FromSeconds(1),
@@ -118,12 +123,12 @@ public sealed class RateLimitResponseHandler : DelegatingHandler
             }
 
             var now = TimeProvider.System.GetUtcNow();
-            var wait = fromRateLimiter
-                ? RateLimiterWait(response, now)
-                : _backoff[Math.Min(retry, _backoff.Count - 1)];
+            var wait = _backoff[Math.Min(retry, _backoff.Count - 1)];
             if (fromRateLimiter)
             {
-                _budget.PauseUntil(now + wait);
+                var limiterWait = RateLimiterWait(response, now);
+                _budget.PauseUntil(now + limiterWait);
+                wait = limiterWait > wait ? limiterWait : wait;
             }
 
             _logger.LogWarning(

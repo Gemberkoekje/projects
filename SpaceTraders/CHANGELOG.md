@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-13, slice 6.64)
+- B89: a request the API's rate limiter refuses waits at least the backoff (1, 2, 4, 8, 16 s) before each retry, not only
+  until the reset the limiter names, often some tens of milliseconds away. Five retries that soon went out with the requests
+  the pause had held, while the server's budget was still empty; twice in the first 40 minutes after slice 6.63's deploy a
+  request gave up, and its Error set off the error-log mail. The other requests are still held only until the reset.
+- Tests: `RateLimitResponseHandlerTests`, `RateLimitPipelineTests`.
+
 ### Plan – Changed (2026-11-13, B88)
 - B88 is fixed: on the cluster, since slice 6.63's deploy, a tick about every 20 s instead of 10 to 20 minutes, and the
   idle traders' `ShipLeftIdle` gone. Slices 6.60 to 6.63 are marked merged and deployed, each with what was checked on the
