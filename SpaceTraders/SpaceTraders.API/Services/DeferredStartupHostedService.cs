@@ -81,6 +81,7 @@ public sealed class DeferredStartupHostedService(
             await StartServiceAsync<StartupRecoveryService>(cancellationToken);
             await StartServiceAsync<SettingsStartupLoggingService>(cancellationToken);
             await StartServiceAsync<GameLoopService>(cancellationToken);
+            await StartServiceAsync<SpaceTraders.Application.Trading.TradeListService>(cancellationToken);
             await StartServiceAsync<PrometheusMetricsService>(cancellationToken);
             await StartServiceAsync<PrometheusMarketMetricsService>(cancellationToken);
 

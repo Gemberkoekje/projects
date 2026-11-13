@@ -34,6 +34,7 @@ public sealed class TradeContextReaderTests
     private readonly PurchaseNeeds _purchaseNeeds = new();
     private readonly IMarketTradeRepository _trades = Substitute.For<IMarketTradeRepository>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
+    private readonly TradeListStore _tradeLists = new();
 
     public TradeContextReaderTests()
     {
@@ -47,6 +48,28 @@ public sealed class TradeContextReaderTests
             new ConstructionSiteModel("X1-FJ91-I64", false, [new ConstructionMaterialModel("FAB_MATS", 1_600, 340), new ConstructionMaterialModel("ADVANCED_CIRCUITRY", 400, 400)]),
             new ConstructionSiteModel("X1-KR90-AF5F", false, [new ConstructionMaterialModel("QUANTUM_STABILIZERS", 1, 0)]),
         ]);
+    }
+
+    [Theory]
+    [InlineData(10, System, true)]
+    [InlineData(45, System, false)]
+    [InlineData(10, "X1-AD37", false)]
+    public async Task TheReach_HandsTheTradeListToTheMap_WhileItIsRecent_AndCoversTheSystem(int minutesOld, string covered, bool handed)
+    {
+        // Slice 6.63 (D148): once the home gate is built the worker keeps a list, and the routes are its trades. One older than
+        // Trade.ListMaxAgeMinutes (30) is set aside; so is one not built from the ship's system's markets, which the gates don't
+        // join to home. Then every route is worked out, as before the gate.
+        ConstructionPlanOn(false);
+        _markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<MarketFreshnessRecord>());
+        var list = new TradeList(
+            TimeProvider.System.GetUtcNow().AddMinutes(-minutesOld),
+            [new TradeListEntry("IRON", "X1-FJ91-A1", "X1-FJ91-I64", 40, 4_000, 300, 0)],
+            [covered]);
+        _tradeLists.Set(list);
+
+        var map = (await Reader().ReadReachAsync(System, CancellationToken.None)).Map;
+
+        map.TradeList.Should().BeSameAs(handed ? list : TradeList.None);
     }
 
     [Fact]
@@ -332,5 +355,5 @@ public sealed class TradeContextReaderTests
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), Arg.Any<CancellationToken>()).Returns(on);
 
     private TradeContextReader Reader()
-        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()), _purchaseNeeds, _plans);
+        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()), _purchaseNeeds, _plans, _tradeLists);
 }

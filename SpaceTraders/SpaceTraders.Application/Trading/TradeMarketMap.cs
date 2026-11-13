@@ -87,6 +87,7 @@ public sealed class TradeMarketMap
         StaleMarkets = other.StaleMarkets;
         PredictionWeights = other.PredictionWeights;
         Legs = other.Legs;
+        TradeList = other.TradeList;
     }
 
     /// <summary>The systems' waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
@@ -111,6 +112,19 @@ public sealed class TradeMarketMap
 
     /// <summary>The waypoints that have a market with known prices.</summary>
     public IReadOnlyCollection<string> MarketWaypoints => _goods.Keys;
+
+    /// <summary>
+    /// The trades a ship's routes are worked out for once the home system's jump gate is built (PLAN.md slice 6.63, D148): only
+    /// those on the list, exactly as before, instead of every good between every pair of markets. <see cref="TradeList.None"/>
+    /// unless set, and then every route is: before the gate, and when no list is recent enough. Kept by the map's copies.
+    /// </summary>
+    public TradeList TradeList { get; init; } = TradeList.None;
+
+    /// <summary>
+    /// What a unit of <c>FUEL</c> costs on average at the markets that sell it, which <see cref="FuelPrice"/> falls back on; the
+    /// trade list prices its hauls' fuel by it (D148).
+    /// </summary>
+    public long AverageFuelPrice => _averageFuelPrice;
 
     /// <summary>
     /// The ways between the map's systems through their jump gates (slice 6.29, D96): <see cref="TradeGates.None"/> unless set,
@@ -185,11 +199,13 @@ public sealed class TradeMarketMap
 
     /// <summary>
     /// The same map without the ways between its systems (slice 6.29, D96): what a ship whose work is in its own system trades
-    /// by, a drone between its trips, say; and where a trip moves its sale to.
+    /// by, a drone between its trips, say; and where a trip moves its sale to. Without the trade list too (D148): within one
+    /// system, at most ~30 waypoints, every route is worked out, with each market's fuel price, and the list's trades of a
+    /// system are mostly ones that leave it.
     /// </summary>
     /// <returns>The map, every waypoint of another system out of reach.</returns>
     public TradeMarketMap WithoutJumps()
-        => ReferenceEquals(Gates, TradeGates.None) ? this : new TradeMarketMap(this);
+        => ReferenceEquals(Gates, TradeGates.None) && TradeList.IsNone ? this : new TradeMarketMap(this) { TradeList = TradeList.None };
 
     /// <summary>
     /// The same map with the routes that feed the jump gate's chain going first (D145): what a trip that started as one trades
@@ -198,6 +214,18 @@ public sealed class TradeMarketMap
     /// <returns>The map, feeders first.</returns>
     public TradeMarketMap WithFeedersFirst()
         => FeedersHeldBack ? new TradeMarketMap(this) { Gates = Gates, ConstructionFirst = true } : this;
+
+    /// <summary>
+    /// The same map with a trade list (PLAN.md slice 6.63, D148): a ship's routes are worked out only for the list's trades.
+    /// </summary>
+    /// <param name="list">The list; <see cref="TradeList.None"/> for every route.</param>
+    /// <returns>The map, with the list.</returns>
+    public TradeMarketMap WithTradeList(TradeList list)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+
+        return new TradeMarketMap(this) { Gates = Gates, FeedersHeldBack = FeedersHeldBack, TradeList = list };
+    }
 
     /// <summary>
     /// The same map with the markets whose prices are too old to decide by (<see cref="StaleMarkets"/>): what mining abroad reads

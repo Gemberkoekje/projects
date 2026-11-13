@@ -70,6 +70,13 @@ public sealed class DefaultSettingsSeedTests
         "Trade.MaxHaulDistance",
         "Trade.MaxPriceAgeMinutes",
 
+        // The trade list (slice 6.63, D148): TradeListService keeps each system's best trades and the best of all, rebuilt
+        // every so many seconds; TradeContextReader hands it to the maps while it is recent enough.
+        "Trade.ListPerSystem",
+        "Trade.ListSize",
+        "Trade.ListRebuildSeconds",
+        "Trade.ListMaxAgeMinutes",
+
         // How far predicted prices are trusted (slice 6.47, D133): PredictionConfidence, by the other agents' transactions at the
         // market, in its system and one jump out.
         "Prediction.MaxWeightPercent",

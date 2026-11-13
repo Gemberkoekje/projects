@@ -47,7 +47,7 @@ namespace SpaceTraders.Application.Trading;
 /// </remarks>
 public static class TradeRoutePlanner
 {
-    private const int FuelPerMarketUnit = 100;
+    internal const int FuelPerMarketUnit = 100;
 
     /// <summary>The API's flight modes this planner flies in (D84).</summary>
     public const string CruiseMode = "CRUISE";
@@ -873,9 +873,14 @@ public static class TradeRoutePlanner
         var here = ship.WaypointSymbol ?? string.Empty;
         var fuelAtStart = FuelAtDeparture(map, ship);
         var speed = FleetRoles.EngineSpeed(ship, TripTime.DefaultEngineSpeed);
-        foreach (var buy in map.MarketWaypoints.Where(map.IsFresh))
+
+        // Slice 6.63 (D148): once the home gate is built, only the trades on the list, each worked out as before.
+        var list = map.TradeList;
+        foreach (var buy in (list.IsNone ? map.MarketWaypoints : list.BuyMarkets).Where(map.IsFresh))
         {
-            var goods = map.GoodsAt(buy).Where(good => good.PurchasePrice > 0 && good.TradeVolume > 0).ToList();
+            var goods = map.GoodsAt(buy)
+                .Where(good => good.PurchasePrice > 0 && good.TradeVolume > 0 && (list.IsNone || list.HasGoodAt(buy, good.Symbol)))
+                .ToList();
             if (goods.Count == 0)
             {
                 continue;
@@ -889,8 +894,9 @@ public static class TradeRoutePlanner
 
             foreach (var good in goods)
             {
-                // B88: only the markets that list the good, in the same order; the others failed TryGetGood below.
-                foreach (var sell in map.MarketsTrading(good.Symbol))
+                // B88: only the markets that list the good, in the same order; the others failed TryGetGood below. With a trade
+                // list, only its sell markets for the good bought here.
+                foreach (var sell in list.IsNone ? map.MarketsTrading(good.Symbol) : list.SellsFor(buy, good.Symbol))
                 {
                     if (sell.Equals(buy, StringComparison.OrdinalIgnoreCase)
                         || !map.IsFresh(sell)
@@ -1107,7 +1113,7 @@ public static class TradeRoutePlanner
     /// Whether a unit's margin earns the minimum: something, and at least <paramref name="minProfitPerUnit"/> (D14); for a unit
     /// that feeds the jump gate's material, nothing lost on it (D90).
     /// </summary>
-    private static bool Earns(double margin, int minProfitPerUnit, bool feedsGate = false)
+    internal static bool Earns(double margin, int minProfitPerUnit, bool feedsGate = false)
         => feedsGate ? margin + Sliver >= 0 : margin > 0 && margin + Sliver >= Math.Max(0, minProfitPerUnit);
 
     /// <summary>
@@ -1222,7 +1228,7 @@ public static class TradeRoutePlanner
     }
 
     /// <summary>The fuel a CRUISE flight burns: the distance rounded, at least 1; none to stay put.</summary>
-    private static int CruiseFuel(string from, string to, double distance)
+    internal static int CruiseFuel(string from, string to, double distance)
         => from.Equals(to, StringComparison.OrdinalIgnoreCase)
             ? 0
             : Math.Max(1, (int)Math.Round(distance, MidpointRounding.AwayFromZero));

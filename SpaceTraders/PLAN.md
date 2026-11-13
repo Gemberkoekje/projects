@@ -105,7 +105,7 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B85 | **No trade trip for 14 hours: D137 held the gate's next load back from every new trade** (seen on 2026-11-09, fixed in slice 6.54).<br>• From 2026-11-08 18:30Z, minutes before slice 6.50 went live, no `TradeStarted`: a new trade trip left what the gate's next load cost (`TradeContext.GateLoadCredits`, 128,000 to 361,000) while the credits stood at 65,000 to 123,000. Nothing was left to buy cargo with, the command ship stood idle from 03:51Z, and the gate got a FAB_MATS load every few hours from the B36 shuttle's ore sales.<br>• Asked on 2026-11-09: "trade should only leave a handful of credits to pay for fuel" (D24). Fix: cargo leaves `Trade.FuelReserveCredits` and the trips' holds (D57, D64), nothing else; `GateLoadCredits` is gone. A gate load still keeps only the floor, the fuel reserve and the trips' holds (D137's other half). |
 | B86 | **One ship's failing step stopped every restart** (seen on 2026-11-11, fixed in slice 6.58).<br>• An OOM kill at 07:19:03Z (B88) restarted the bot; from then on every start stopped the host about 12 seconds in. Startup recovery ran SPECTER-68's goal step, its sale was refused (B87), nothing caught the error, and the deferred startup failed: CrashLoopBackOff, 106 restarts by 16:28Z, the bot down from 07:19Z until the fix's deploy.<br>• The game loop steps each ship in its own scope and try/catch (`GameLoopService.RunStepAsync`); startup recovery had neither.<br>• Fix: each ship is recovered in its own scope and try/catch; a failure is logged as an Error and left to the game loop. | Loki: "Deferred startup initialization failed; stopping the host" 106 times from 07:19:19Z; `StartupRecoveryService.cs` | 6.58 |
 | B87 | **A trade batch above the market's unit limit was refused on every step** (seen on 2026-11-11, fixed in slice 6.58).<br>• From 05:46:46Z SPECTER-68 sold 64 LIQUID_NITROGEN at X1-ZZ33-E49, the trade volume that market showed at 05:46:43Z. The API refused: 4604, "has a limit of 60 units per transaction". The market is fetched again only after a trade, so its trade volume stayed 64 and the same sale was refused on every step for 93 minutes (`ShipStuck` at 06:18Z), then at every restart (B86).<br>• Every sale and purchase sizes its batch by the trade volume last seen (D79, D81): seven calls in six executors.<br>• Fix: the port trades a refused batch in parts of the limit the API names (`SpaceTradersPortAdapter.TradeInPartsAsync`); the market's refresh after the trade then brings its new trade volume. | `market_price_samples`: trade volume 103 (01:41Z), 70 (05:11Z), 64 (05:19Z and 05:46:43Z); Loki: four Wolverine retries at 05:46Z, then a failed goal step about every 10 minutes | 6.58 |
-| B88 | **The route checks over every predicted market: a 1.4 GB pass and a 15-minute tick** (found on 2026-11-11; the memory fixed in slice 6.59, the tick 2.6 times shorter in slice 6.61, ships stepping beside the plans in slice 6.62, still open).<br>• Not a leak. Live managed memory climbs for about 5 minutes, up to 1,481 MB at 17:19Z, and drops as the trading plan's pass ends; then again about 15 minutes later. Killed at 07:19:03Z (exit 137, `OOMKilled`), which started B86. The pass kept every free trader's judgement of every route with a price gap (`TradeRoutePlanner.Judge`, D76), and each system's reach map, until its end, for the one judgement per good its state says.<br>• Since slice 6.47 (D132) every market seen with prices is predicted for now, so it counts as fresh: about 1,100 markets instead of the ~135 seen within 30 minutes. `CheckRoutes` loops over every fresh buy market, its goods and every fresh sell market, and the role board and the trading plan run it per ship (and per round of `AssignRoutesAsync`); B84 measured it growing with the square of the fresh markets.<br>• The game loop runs it on one thread (1.03 cores, all the time): ticks per 3 hours went from 1,538 (7 s a tick, 2026-11-10 00:00Z) to 24 (7.5 minutes, 2026-11-11 03:00Z), as the known markets went from about 35 to 1,100. Now about 15 minutes; ships step once a tick, and few ship lines appear outside the minute after each trading pass. The run of 2026-10-25 ticked about once a minute at 797 ships, with 4,328 markets seen but ~135 fresh. | Prometheus: `dotnet_total_memory_bytes`, `system_runtime_dotnet_gc_collections`, `process_cpu_seconds_total`, `kube_pod_container_status_last_terminated_reason`; Loki: the `Tick` of each line, 2026-11-10 00:00Z to 2026-11-11 17:35Z | 6.59, 6.60, 6.61, 6.62 |
+| B88 | **The route checks over every predicted market: a 1.4 GB pass and a 15-minute tick** (found on 2026-11-11; the memory fixed in slice 6.59, the tick 2.6 times shorter in slice 6.61, ships stepping beside the plans in slice 6.62, the plans 36 times faster with the trade list in slice 6.63, open until the cluster's tick is checked).<br>• Not a leak. Live managed memory climbs for about 5 minutes, up to 1,481 MB at 17:19Z, and drops as the trading plan's pass ends; then again about 15 minutes later. Killed at 07:19:03Z (exit 137, `OOMKilled`), which started B86. The pass kept every free trader's judgement of every route with a price gap (`TradeRoutePlanner.Judge`, D76), and each system's reach map, until its end, for the one judgement per good its state says.<br>• Since slice 6.47 (D132) every market seen with prices is predicted for now, so it counts as fresh: about 1,100 markets instead of the ~135 seen within 30 minutes. `CheckRoutes` loops over every fresh buy market, its goods and every fresh sell market, and the role board and the trading plan run it per ship (and per round of `AssignRoutesAsync`); B84 measured it growing with the square of the fresh markets.<br>• The game loop runs it on one thread (1.03 cores, all the time): ticks per 3 hours went from 1,538 (7 s a tick, 2026-11-10 00:00Z) to 24 (7.5 minutes, 2026-11-11 03:00Z), as the known markets went from about 35 to 1,100. Now about 15 minutes; ships step once a tick, and few ship lines appear outside the minute after each trading pass. The run of 2026-10-25 ticked about once a minute at 797 ships, with 4,328 markets seen but ~135 fresh. | Prometheus: `dotnet_total_memory_bytes`, `system_runtime_dotnet_gc_collections`, `process_cpu_seconds_total`, `kube_pod_container_status_last_terminated_reason`; Loki: the `Tick` of each line, 2026-11-10 00:00Z to 2026-11-11 17:35Z | 6.59, 6.60, 6.61, 6.62, 6.63 |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
@@ -380,7 +380,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.60 The tick measured on a copy of the day's world (B88, D146), built (below)
 - 6.61 The route work shared, the same decisions (B88, D146), built (below)
 - 6.62 Ships don't wait for the plans (B88, D147), built (below)
-- 6.63 The trade list built in the background (B88, D147, D148), planned (below)
+- 6.63 The trade list built in the background (B88, D147, D148), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -777,26 +777,68 @@ the gates of other systems (D68).
     show this; after the deploy, Loki should show ship lines all through the trading pass and no `ShipStuck` for ships
     that only wait.
   - To understand this, start with `GameLoopService`, then `StepGuardedShipGoalRepository` and `ShipGoalStepGuard`.
-- **6.63 The trade list built in the background** (B88, D147, D148): planned. Trading works in two phases, by whether the
-  home system's jump gate is built (its construction site complete).
-  - Before the gate: one system to trade in, and little cash. Routes are worked out exactly, per ship, with each market's
-    fuel price, as now (6.61): fuel weighs a median 8.6% of a margin within a system.
-  - Once the gate is built: a list of high-value trades across the known universe, rebuilt by a worker from the latest
-    markets again and again; the plans read the latest list instead of working routes out. Per trade: the good, the buy
-    and sell markets, the units it is set up for and what they should fetch and cost, in batches of each market's trade
-    volume (D79); the haul's jumps and their antimatter at each gate's price (D63), as antimatter weighs a median 49% of
-    a margin across systems; its fuel at one average cost per unit of distance; its time per unit of engine speed, with
-    the jumps' cooldowns; and the flags (feeds a construction, exchange, end product). What "high value" means, and how
-    many trades the list keeps, is worked out from the copy in the slice.
-  - A free trader takes a close high-value trade: of the list, the one that pays best an hour once its own way to the buy
-    market is counted, so a near trade wins unless a far one pays much more. A trade that brings fewer units or a lower
-    price than it was set up for is still a high-value trade; the trip's own checks at the markets stay.
-  - The older decisions stay: trades at markets other players trade at count for less (D133), as do predicted prices
-    (D131, D132); two of our traders aren't sent for the same goods (D79); one pot of credits (D57).
-  - The list says how old it is; a plan reads none older than a limit (a setting, as the 30 minutes of
-    `Trade.MaxPriceAgeMinutes`).
-  - To work out in the slice: a ship whose tank can't make a leg between refuels (today the flight plans stops; the
-    average fuel doesn't); whether `AssignRoutesAsync` reads the list once for all its rounds; how the role board and the
-    probe plan's `BestRateThrough` read it.
-  - Tests: before the gate, `RoutePlannerGoldenTests`' fingerprint holds; after it, on the copy, the credits an hour each
-    trader's pick earns against today's exact best. To measure: 6.60's bench, before and after, and the cluster's tick.
+- **6.63 The trade list built in the background** (B88, D147, D148): built on branch `claude/spacetraders-trade-list`.
+  - Before the home gate is built, nothing changes: no list, every route worked out with each market's fuel price;
+    `RoutePlannerGoldenTests`' fingerprint holds. `HomeGate` says when it is built: the home system's jump gate's
+    construction site complete, or, with none cached, the gate not under construction (as `ConstructionSites` reads it).
+  - Once it is built, `TradeListService` (a background service on the leader, beside the plan and step loops) builds the
+    list every `Trade.ListRebuildSeconds` (60):
+    - it reads the reach map of home and estimates every trade with a price gap for no ship in particular
+      (`TradeListBuilder.Estimate`): a hold of the fleet's largest, as far as each unit earns the minimum at the batch
+      prices (D79); the haul straight through the fewest gates, its fuel at the map's average price per unit of distance,
+      each jump's antimatter at its gate's price (D63), its time at the default engine speed. The rules a route keeps
+      stay: markets recent or predicted, no gate material bought in the gate's system (D128);
+    - it keeps the best `Trade.ListPerSystem` (25) bought in each system and the best `Trade.ListSize` (2,000) of all, by
+      what the haul earns an hour, halved for an end product or an exchange sale, times the markets' prediction weight
+      (D131–D133), as a ship's routes are ranked (`TradeListBuilder.Select`), into `TradeListStore`;
+    - after a reset the new agent's gate isn't built, and it drops the old agent's list; a build that finds no trade
+      keeps none.
+  - How a ship takes a close trade: the reader hands the latest list to every reach map while it is at most
+    `Trade.ListMaxAgeMinutes` (30) old and covers the ship's system (`TradeList.Covers`), and `Rank` and `Judge` look only
+    at its trades, each worked out exactly for the ship as before. Its flight to the buy market counts, so a near trade wins
+    unless a far one pays much more. The estimates only choose what is on the list. Every older decision that picks among
+    routes holds without a change: D133's and the predictions' weights, D79's units, D80's one buyer at a time, D57's pot,
+    the gate feeders' order, the exchange sales last. Working the listed trades out per ship costs about 5 s for 70 traders,
+    and using the estimates instead would have meant new code in the trading plan's rounds, the role board and the
+    judgements.
+  - The open points of the plan: a ship's tank counts as before, in its own flights; `AssignRoutesAsync` keeps its rounds,
+    each a cheap `Rank` now; the role board and the cargo-ship checks read the list through the reader; the probe plan's
+    `BestRateThrough` works on one system's map and doesn't use it. A map without jumps (`WithoutJumps`: traders that
+    don't cross systems, gatherers trading in their spare time) drops the list: within one system every route is worked
+    out, and a system's listed trades mostly leave it.
+  - Measured on the copy of 2026-11-13 (178 ships, 70 that trade, 37 with a route; 1,253 markets within reach of home).
+    The list: home's reach map read in 3.8 s, 369,669 trades estimated in 4.2 s. Each trader's best route over every trade
+    against over a list (`TradeListBench`, ranking and judging on maps read afresh):
+
+    | List | Trades | `Rank`, 70 traders | `Judge` | Same best route |
+    |---|---:|---:|---:|---:|
+    | every route | | 206.0 s | | |
+    | 10 a system | 894 | 4.6 s | 0.4 s | 35 of 37 |
+    | 25 a system | 2,181 | 3.9 s | 0.9 s | 36 of 37 |
+    | 50 a system | 4,159 | 6.4 s | 1.9 s | 36 of 37 |
+    | 100 a system | 8,009 | 10.9 s | 3.8 s | 36 of 37 |
+    | best 2,000 of all | 2,000 | 2.9 s | 1.0 s | 32 of 37 |
+    | best 5,000 of all | 5,000 | 5.6 s | 2.5 s | 33 of 37 |
+    | 25 a system and best 2,000 | 3,351 | 5.0 s | 1.6 s | 36 of 37 |
+
+    Where the best route changed, the list's pick earned as much an hour (median and 90th percentile loss 0%). The one
+    trader left without a route in every size is SPECTER-2C, a 15-unit hold whose only route of all paid 4 credits an
+    hour; it trades only when its own plan passes it over, on the map without jumps, which keeps every route. A list of
+    the best of all alone left SPECTER-66 and 67, in systems of two and three markets, without one: hence each system's
+    best. Then the tick bench, on a fresh copy, with the list built once before the plan passes:
+
+    | | 6.61 | 6.63 |
+    |---|---:|---:|
+    | Roles plan | 263.2 s | 9.2 s |
+    | Trading plan | 347.1 s | 5.1 s |
+    | All eleven plans | 616.1 s (69 GB allocated) | 17.0 s (5.6 GB) |
+    | The trade list (in the background) | | 3.9 s, 3,362 trades |
+
+  - Not covered: `Judge` judges only the list's trades, so the plan state's goods not traded (D76) name only listed goods.
+    A system more than twice `Trade.MaxHaulDistance` from home isn't on the list, and its ships keep every route; the
+    cluster's reach is 9999, so that is none today.
+  - Tests: `TradeListTests` (a ship's routes from the list are its routes of every route that the list holds, to the
+    credit; only listed trades are judged; without a list, or without jumps, every route; the estimates keep the route
+    rules and fill a hold batch by batch; the selection; the store's age; the home gate; the worker), and
+    `TradeContextReaderTests` (the list is handed to a map while recent and covering its system).
+  - To understand this, start with `TradeListService.BuildAsync`, then `TradeListBuilder` and `CheckRoutes`' first lines.

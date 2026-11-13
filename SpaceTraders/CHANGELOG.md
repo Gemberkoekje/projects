@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-13, slice 6.63)
+- B88 (its tick), D148: the trade list. Once the home system's jump gate is built (`HomeGate`), a background service on the
+  leader (`TradeListService`) builds a list of high-value trades every minute. It estimates every trade within the
+  trading plan's reach of home, with fuel at an average cost per unit of distance and each jump's antimatter at its gate's
+  price, and keeps each system's best 25 and the best 2,000 of all. The plans' reach maps carry the latest list while it is
+  at most 30 minutes old, and `Rank` and `Judge` work out only its trades, each exactly for the ship as before, so every
+  older rule that picks among routes holds. Before the gate, and on a map without jumps, every route is worked out as
+  before. Settings `Trade.ListPerSystem`, `Trade.ListSize`, `Trade.ListRebuildSeconds`, `Trade.ListMaxAgeMinutes`.
+- On a copy of the day's world (70 traders), one tick's plans took 17 s instead of 616 s and allocated 5.6 GB instead of
+  69 GB; 36 of 37 traders kept their best route, and the other's pick earned as much an hour.
+- Tools: `TradeListBench`, and `TickBench` builds the list before the plan passes.
+- Tests: `TradeListTests`, `TradeContextReaderTests`.
+
 ### Plan – Changed (2026-11-13, D148)
 - D148 as the user meant it: the split is by the home gate, not by system. Until the home system's jump gate is built,
   routes are worked out exactly, with each market's fuel price, as now. Once it is built, slice 6.63 (renamed "the trade

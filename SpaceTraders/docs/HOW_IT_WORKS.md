@@ -1403,6 +1403,26 @@ buy.
   SPECTER-8 set off to buy 15 EQUIPMENT (49,485) at K85, another trader spent about 121,000 before it got there, and
   the trip was dropped with nothing bought. A construction trip on its way to buy holds back its cargo the same way
   (slice 6.6, D64), and the traders leave it too.
+- **The trade list** (slice 6.63, D148, asked on 2026-11-13: "As soon as the gate is built, we'll soon have 1000s of markets
+  to trade with. Then quantity over quality starts to become more important"). Until the home system's jump gate is built
+  (`HomeGate`: its construction site complete, or, with none cached, the gate not under construction), every route is
+  worked out, with each market's fuel price. Once it is built, a background worker on the leader (`TradeListService`, beside
+  the plan and step loops) builds a list of high-value trades every `Trade.ListRebuildSeconds` (60):
+  - it reads the markets within the trading plan's reach of home, as a reach map, and estimates every trade with a price
+    gap for no ship in particular (`TradeListBuilder`). The units are a hold of the fleet's largest, as far as each earns the
+    minimum at the batch prices (D79). The haul goes straight from the buy market to the sell market through the fewest
+    gates. Its fuel is the map's average fuel price per unit of distance (fuel is 0.9% of a margin across systems), its
+    antimatter is each gate's price (49%), and its time is at the default engine speed;
+  - it keeps the best `Trade.ListPerSystem` (25) bought in each system, so a ship anywhere finds a close one, and the best
+    `Trade.ListSize` (2,000) of all. "Best" is what the haul earns an hour, halved for an end product or an exchange sale,
+    times the markets' prediction weight (D131–D133), as a ship's routes are ranked;
+  - the reader hands the latest list to every reach map while it is at most `Trade.ListMaxAgeMinutes` (30) old and was
+    built from the ship's system (`TradeList.Covers`; a system the gates don't join to home keeps every route). On such a
+    map `Rank` and `Judge` look only at the list's trades, each worked out exactly for the ship as before: its flight to
+    the buy market, its hold, its credits, the price steps, the rules below. So a trader takes a close high-value trade,
+    and every rule that chooses among routes still holds. The trading plan, the role board and the cargo-ship checks
+    read routes this way; the probe plan's `BestRateThrough` works on one system and doesn't use the list;
+  - after a reset the new agent's gate isn't built, and the worker drops the old agent's list.
 - **Each tick** every free trader gets a trip, from the cached prices:
   - one that holds cargo first sells it where it fetches the most after fuel, one good a trip, when that
     earns anything. Once no good aboard pays for its sale, the goods go overboard before the trader takes a

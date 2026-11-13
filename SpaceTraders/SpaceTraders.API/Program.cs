@@ -129,6 +129,7 @@ builder.Services.AddSingleton<DiscoverySnapshotService>();
 builder.Services.AddSingleton<StartupRecoveryService>();
 builder.Services.AddSingleton<SettingsStartupLoggingService>();
 builder.Services.AddSingleton<GameLoopService>();
+builder.Services.AddSingleton<SpaceTraders.Application.Trading.TradeListService>();
 builder.Services.AddSingleton<DataRetentionService>();
 builder.Services.AddSingleton<DatabaseSizeGuardService>();
 builder.Services.AddSingleton<ShipStateJournal>();
