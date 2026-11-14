@@ -149,6 +149,19 @@ public sealed class TradeListTests
         store.FreshAt(GeneratedWorld.Now, TimeSpan.FromMinutes(30)).Should().BeSameAs(handed ? list : TradeList.None);
     }
 
+    [Fact]
+    public void TheStore_IsReady_OnceTheWorkerKeptAList_OrNone()
+    {
+        // B91: until the worker's first round since the start, the role board and the trading plan wait; keeping none, as
+        // before the home gate, is a round too, and every route is worked out then (there are few markets).
+        var store = new TradeListStore();
+        store.IsReady.Should().BeFalse("the worker hasn't had its first round since the start");
+
+        store.Set(TradeList.None);
+
+        store.IsReady.Should().BeTrue();
+    }
+
     [Theory]
     [InlineData(true, false, true)]
     [InlineData(false, false, false)]
@@ -185,6 +198,7 @@ public sealed class TradeListTests
         var wait = await worker.BuildAsync(CancellationToken.None);
 
         wait.Should().Be(TimeSpan.FromSeconds(TradeListService.DefaultRebuildSeconds));
+        store.IsReady.Should().BeTrue("the plans that rank routes go on from here (B91)");
         store.Latest.IsNone.Should().BeFalse();
         store.Latest.Entries.Should().NotBeEmpty().And.OnlyContain(entry => entry.Units <= 490);
         store.Latest.Entries.Should().Contain(entry => entry.Units > 80, "the largest hold, 490, sets the units up");
