@@ -54,13 +54,14 @@ public sealed class TradeListBench(ITestOutputHelper output)
             var reader = services.GetRequiredService<ITradeContextReader>();
             var home = await services.GetRequiredService<IConstructionSites>().HomeSystemAsync(CancellationToken.None);
 
-            // The list, as the worker builds it: from the trading plan's reach of home, for the fleet's largest hold.
+            // The list, as the worker builds it: from the trading plan's reach of home, for the fleet's largest hold. The trades
+            // are listed once here, as every size below is chosen from them.
             var clock = Stopwatch.StartNew();
             var universe = await reader.ReadReachAsync(home, CancellationToken.None);
             var read = clock.Elapsed.TotalSeconds;
             clock.Restart();
             var hold = traders.Max(ship => ship.CargoCapacity);
-            var estimates = TradeListBuilder.Estimate(universe.Map, hold, TripTime.DefaultEngineSpeed, universe.MinProfitPerUnit);
+            var estimates = TradeListBuilder.Estimate(universe.Map, hold, TripTime.DefaultEngineSpeed, universe.MinProfitPerUnit).ToList();
             var estimated = clock.Elapsed.TotalSeconds;
             output.WriteLine(Invariant($"Universe from {home}: {universe.Map.MarketWaypoints.Count:N0} markets, read in {read:F1} s; {estimates.Count:N0} trades estimated for a hold of {hold} in {estimated:F1} s."));
 

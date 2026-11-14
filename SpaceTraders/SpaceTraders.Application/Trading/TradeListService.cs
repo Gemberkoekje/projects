@@ -111,13 +111,16 @@ public sealed class TradeListService(
         var context = await services.GetRequiredService<ITradeContextReader>().ReadReachAsync(home, cancellationToken);
         var read = clock.Elapsed;
 
-        var estimates = TradeListBuilder.Estimate(context.Map, hold, TripTime.DefaultEngineSpeed, context.MinProfitPerUnit);
+        // The trades are worked out as the selection reads them, and only the ones it keeps stay (slice 6.67, B91).
+        var perSystem = await SettingAsync(settings, PerSystemSetting, DefaultPerSystem, cancellationToken);
+        var size = await SettingAsync(settings, SizeSetting, DefaultSize, cancellationToken);
         var list = TradeListBuilder.Select(
-            estimates,
+            TradeListBuilder.Estimate(context.Map, hold, TripTime.DefaultEngineSpeed, context.MinProfitPerUnit),
             readAt,
-            await SettingAsync(settings, PerSystemSetting, DefaultPerSystem, cancellationToken),
-            await SettingAsync(settings, SizeSetting, DefaultSize, cancellationToken),
-            context.Map.Waypoints.Select(waypoint => waypoint.SystemSymbol));
+            perSystem,
+            size,
+            context.Map.Waypoints.Select(waypoint => waypoint.SystemSymbol),
+            out var estimated);
 
         // An empty list would leave every ship without a route: with no trade found (no hold, no fresh market), none is kept.
         store.Set(list.Entries.Count == 0 ? TradeList.None : list);
@@ -128,7 +131,7 @@ public sealed class TradeListService(
             level,
             "TradeListService: {Trades} high-value trades of {Estimated} estimated across {Markets} markets, for a hold of {Hold}; read in {ReadSeconds} s, built in {BuildSeconds} s.",
             list.Entries.Count,
-            estimates.Count,
+            estimated,
             context.Map.MarketWaypoints.Count,
             hold,
             Math.Round(read.TotalSeconds, 1),

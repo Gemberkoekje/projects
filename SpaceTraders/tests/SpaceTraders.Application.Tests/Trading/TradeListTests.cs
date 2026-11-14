@@ -136,6 +136,55 @@ public sealed class TradeListTests
     }
 
     [Theory]
+    [InlineData(3, 10)]
+    [InlineData(1, 0)]
+    [InlineData(0, 5)]
+    [InlineData(2, 1)]
+    [InlineData(25, 2_000)]
+    [InlineData(0, 0)]
+    public void TheList_IsWhatSortingEveryTradeThenPickingGave(int perSystem, int total)
+    {
+        // Slice 6.67 (B91): the list keeps the best of each system and of all as it reads the trades, instead of sorting all of
+        // them first (2.3 million on 2026-11-14); the trades kept and their order are the same.
+        var map = GeneratedWorld.Map();
+
+        var list = TradeListBuilder.Select(TradeListBuilder.Estimate(map, 490, TripTime.DefaultEngineSpeed, MinProfitPerUnit), GeneratedWorld.Now, perSystem, total, Systems());
+
+        list.Entries.Should().Equal(SortedThenPicked([.. TradeListBuilder.Estimate(map, 490, TripTime.DefaultEngineSpeed, MinProfitPerUnit)], perSystem, total));
+    }
+
+    [Fact]
+    public void TradesOfTheSameValue_AreKeptAndOrderedByTheirRouteKey()
+    {
+        TradeListEntry[] estimates =
+        [
+            Entry("X1-AA-1", "IRON", profit: 9_000),
+            Entry("X1-AA-1", "COPPER", profit: 9_000),
+            Entry("X1-AA-2", "GOLD", profit: 9_000),
+            Entry("X1-AA-2", "ALUMINUM", profit: 9_000),
+            Entry("X1-BB-1", "IRON", profit: 9_000),
+        ];
+
+        var list = TradeListBuilder.Select(estimates, GeneratedWorld.Now, perSystem: 2, total: 1, ["X1-AA", "X1-BB"]);
+
+        list.Entries.Select(entry => entry.TradeSymbol + "@" + entry.BuyWaypointSymbol)
+            .Should().Equal("COPPER@X1-AA-1", "IRON@X1-AA-1", "IRON@X1-BB-1");
+        list.Entries.Should().Equal(SortedThenPicked(estimates, perSystem: 2, total: 1));
+    }
+
+    [Fact]
+    public void TheSelection_ReadsTheTradesOnce_AndCountsThem()
+    {
+        // The worker hands it the estimate as it is worked out: read twice, every trade would be worked out twice.
+        var estimates = new ReadOnce([Entry("X1-AA-1", "IRON", profit: 9_000), Entry("X1-AA-1", "COPPER", profit: -10), Entry("X1-BB-1", "IRON", profit: 500)]);
+
+        var list = TradeListBuilder.Select(estimates, GeneratedWorld.Now, perSystem: 1, total: 0, ["X1-AA", "X1-BB"], out var estimated);
+
+        estimated.Should().Be(3, "the trade that would lose is looked at too");
+        list.Entries.Select(entry => entry.TradeSymbol + "@" + entry.BuyWaypointSymbol).Should().Equal("IRON@X1-AA-1", "IRON@X1-BB-1");
+    }
+
+    [Theory]
     [InlineData(29, true)]
     [InlineData(31, false)]
     public void TheStore_HandsOutAListWhileItIsRecentEnough(int minutesOld, bool handed)
@@ -207,6 +256,24 @@ public sealed class TradeListTests
 
     private static IEnumerable<string> Systems() => GeneratedWorld.Map().Waypoints.Select(waypoint => waypoint.SystemSymbol).Distinct(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The selection as slices 6.63 to 6.66 made it, kept as the reference: every trade that earns sorted by value and then by
+    /// route key, each system's best <paramref name="perSystem"/> and the best <paramref name="total"/> of all kept, in that order.
+    /// </summary>
+    private static List<TradeListEntry> SortedThenPicked(IReadOnlyList<TradeListEntry> estimates, int perSystem, int total)
+    {
+        var ordered = estimates
+            .Where(entry => entry.Profit > 0)
+            .OrderByDescending(entry => entry.Value)
+            .ThenBy(entry => TradeRoutePlanner.RouteKey(entry.TradeSymbol, entry.BuyWaypointSymbol, entry.SellWaypointSymbol), StringComparer.Ordinal)
+            .ToList();
+        var kept = new HashSet<TradeListEntry>(ordered
+            .GroupBy(entry => WaypointSymbols.SystemOf(entry.BuyWaypointSymbol), StringComparer.OrdinalIgnoreCase)
+            .SelectMany(bySystem => bySystem.Take(Math.Max(0, perSystem))));
+        kept.UnionWith(ordered.Take(Math.Max(0, total)));
+        return [.. ordered.Where(kept.Contains)];
+    }
+
     private static string Key(TradeListEntry entry) => TradeRoutePlanner.RouteKey(entry.TradeSymbol, entry.BuyWaypointSymbol, entry.SellWaypointSymbol);
 
     private static TradeListEntry Entry(string buy, string good, long profit)
@@ -263,5 +330,20 @@ public sealed class TradeListTests
             .AddSingleton(ships)
             .AddSingleton(reader)
             .BuildServiceProvider();
+    }
+
+    /// <summary>Trades that may be read once: a second read fails the test, as a second estimate would cost a second build.</summary>
+    /// <param name="entries">The trades.</param>
+    private sealed class ReadOnce(IEnumerable<TradeListEntry> entries) : IEnumerable<TradeListEntry>
+    {
+        private int _reads;
+
+        public IEnumerator<TradeListEntry> GetEnumerator()
+        {
+            Interlocked.Increment(ref _reads).Should().Be(1, "the selection reads the trades once");
+            return entries.GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

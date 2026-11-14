@@ -1415,7 +1415,8 @@ buy.
     antimatter is each gate's price (49%), and its time is at the default engine speed;
   - it keeps the best `Trade.ListPerSystem` (25) bought in each system, so a ship anywhere finds a close one, and the best
     `Trade.ListSize` (2,000) of all. "Best" is what the haul earns an hour, halved for an end product or an exchange sale,
-    times the markets' prediction weight (D131–D133), as a ship's routes are ranked;
+    times the markets' prediction weight (D131–D133), as a ship's routes are ranked. It keeps them as it works the
+    trades out, not every trade first (slice 6.67: 2.3 million on 2026-11-14);
   - the reader hands the latest list to every reach map while it is at most `Trade.ListMaxAgeMinutes` (30) old and was
     built from the ship's system (`TradeList.Covers`; a system the gates don't join to home keeps every route). On such a
     map `Rank` and `Judge` look only at the list's trades, each worked out exactly for the ship as before: its flight to

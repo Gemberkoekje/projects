@@ -19,6 +19,10 @@ Two parts:
 - `TradeListBench` (same folder, slice 6.63) writes nothing. It ranks each trader's routes over every trade, then over trade
   lists of several sizes. For each size it gives how often the trader's best route stays the same, how much of its rate the
   list's pick loses, and how long ranking and judging take on maps read afresh.
+- `TradeListBuildBench` (same folder, slice 6.67) writes nothing. It builds the trade list three times on one map read
+  from the copy: as the worker builds it, first on the map as read and then once the map holds the gates' ways, and as
+  slices 6.63 to 6.66 built it. For each it gives the time, the bytes allocated and the most the managed heap held; the
+  three lists must be the same.
 
 ## Run
 
@@ -36,7 +40,8 @@ SPACETRADERS_BENCH_SUPPLY_CHAIN="../../bench/supply-chain.json" \
 dotnet test tests/SpaceTraders.API.Tests --filter "FullyQualifiedName~TickBench" --logger "console;verbosity=detailed"
 ```
 
-`FullyQualifiedName~TradeListBench` runs the list bench instead; it writes nothing, so it needs no fresh copy.
+`FullyQualifiedName~TradeListBench` runs the list bench instead, and `FullyQualifiedName~TradeListBuildBench` the build's
+measure; neither writes, so they need no fresh copy.
 
 Without `SPACETRADERS_BENCH_DB` the bench is skipped, as it is in CI.
 
