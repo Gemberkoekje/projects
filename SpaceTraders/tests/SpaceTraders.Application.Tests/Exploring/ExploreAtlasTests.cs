@@ -205,6 +205,84 @@ public sealed class ExploreAtlasTests
         ExploreAtlas.TryFindJumps(state, "X1-A", "X1-B", Now.AddMinutes(51), out _).Should().BeTrue();
     }
 
+    [Fact]
+    public void AKeptJumpFinder_FindsEveryWayASearchOfItsOwnFinds()
+    {
+        // Slice 6.68 (B92): a finder builds the atlas once and keeps one search from each start system, so the ways from one
+        // system to many cost one search. ExploreAtlas.TryFindJumps builds an atlas and searches afresh for each way, as
+        // every way was found before; the kept finder's ways are those, ties among the fewest jumps and unknown systems too.
+        var refusals = new JumpRefusals();
+        refusals.Record("X1-B-G", Now.AddMinutes(-10));
+        foreach (var state in new[] { Network(), refusals.Apply(Network()), Lattice() })
+        {
+            var finder = new ExploreAtlas.JumpFinder(state, Now);
+            var systems = state.Systems.Select(system => system.SystemSymbol).Concat(["X1-Z", "x1-a", "x1-l00"]).ToList();
+
+            foreach (var from in systems)
+            {
+                foreach (var to in systems)
+                {
+                    var found = finder.TryFind(from, to, out var jumps);
+
+                    found.Should().Be(ExploreAtlas.TryFindJumps(state, from, to, Now, out var own), $"{from} to {to}");
+                    jumps.Should().Equal(own, $"{from} to {to}");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void AKeptJumpFinder_GivesTheSameWays_ToManyThreadsAtOnce()
+    {
+        // A trade map's gates are read by the plans' work in parallel; its finder is shared.
+        var state = Lattice();
+        var finder = new ExploreAtlas.JumpFinder(state, Now);
+        var pairs = state.Systems.SelectMany(from => state.Systems.Select(to => (From: from.SystemSymbol, To: to.SystemSymbol))).ToList();
+        var ways = new System.Collections.Concurrent.ConcurrentDictionary<(string From, string To), IReadOnlyList<GateJump>>();
+
+        Parallel.ForEach(pairs, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pair =>
+        {
+            ways[pair] = finder.TryFind(pair.From, pair.To, out var jumps) ? jumps : [];
+        });
+
+        foreach (var pair in pairs)
+        {
+            var own = ExploreAtlas.TryFindJumps(state, pair.From, pair.To, Now, out var jumps) ? jumps : [];
+            ways[pair].Should().Equal(own, $"{pair.From} to {pair.To}");
+        }
+    }
+
+    /// <summary>
+    /// A 6 by 6 grid of explored systems, X1-L00 to X1-L55, each joined to those beside it: most ways have many of the fewest
+    /// jumps, so the search's order picks one. X1-L22's gate is under construction and X1-L55 isn't explored.
+    /// </summary>
+    private static ExplorePlanState Lattice()
+    {
+        var systems = new List<KnownSystem>();
+        for (var row = 0; row < 6; row++)
+        {
+            for (var column = 0; column < 6; column++)
+            {
+                var connections = new[] { (Row: row - 1, Column: column), (Row: row + 1, Column: column), (Row: row, Column: column - 1), (Row: row, Column: column + 1) }
+                    .Where(cell => cell.Row is >= 0 and < 6 && cell.Column is >= 0 and < 6)
+                    .Select(cell => $"X1-L{cell.Row}{cell.Column}-G")
+                    .ToList();
+                systems.Add(Known($"X1-L{row}{column}", connections));
+            }
+        }
+
+        systems[14] = systems[14] with { Gate = GateState.UnderConstruction };
+        systems[35] = systems[35] with { ExploredAt = null };
+        return new ExplorePlanState
+        {
+            ShipSymbol = "SHIP-1",
+            HomeSystemSymbol = "X1-L00",
+            Status = ExploreStatus.Exploring,
+            UpdatedAt = Now,
+            Systems = systems,
+        };
+    }
+
     /// <summary>
     /// Home X1-A connects to X1-B and X1-C; X1-B to X1-D; X1-C to X1-E; X1-E to X1-D and X1-G, and to X1-F, whose gate is
     /// under construction. All explored but X1-F and X1-G.

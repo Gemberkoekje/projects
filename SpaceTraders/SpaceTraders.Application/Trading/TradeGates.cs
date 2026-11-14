@@ -10,7 +10,8 @@ namespace SpaceTraders.Application.Trading;
 /// the credits every jump must leave (D63). <see cref="None"/> has no ways: a map of one system.
 /// </summary>
 /// <remarks>
-/// Immutable once built, like the map it belongs to; the ways it finds are kept, as one pass asks for the same few many times.
+/// Immutable once built, like the map it belongs to; the ways it finds are kept, as one pass asks for the same few many times,
+/// and so is one search from each system they start from (<see cref="ExploreAtlas.JumpFinder"/>, B92).
 /// </remarks>
 public sealed class TradeGates
 {
@@ -32,7 +33,7 @@ public sealed class TradeGates
         UpdatedAt = DateTimeOffset.MinValue,
     };
 
-    private readonly ExplorePlanState _network;
+    private readonly ExploreAtlas.JumpFinder _jumps;
     private readonly DateTimeOffset _now;
     private readonly IReadOnlyDictionary<string, long> _antimatter;
     private readonly IReadOnlyDictionary<string, (int X, int Y)> _systems;
@@ -58,7 +59,7 @@ public sealed class TradeGates
         ArgumentNullException.ThrowIfNull(antimatterPrices);
         ArgumentNullException.ThrowIfNull(systemPositions);
 
-        _network = network;
+        _jumps = new ExploreAtlas.JumpFinder(network, now);
         _now = now;
         MaxJumps = Math.Max(0, maxJumps);
         _antimatter = antimatterPrices;
@@ -102,7 +103,7 @@ public sealed class TradeGates
         // A pair of systems as the key, not a string built for each of the many lookups of a pass (B88).
         var way = _ways.GetOrAdd(
             (fromSystem, toSystem),
-            static (pair, gates) => ExploreAtlas.TryFindJumps(gates._network, pair.From, pair.To, gates._now, out var found) && found.Count <= gates.MaxJumps
+            static (pair, gates) => gates._jumps.TryFind(pair.From, pair.To, out var found) && found.Count <= gates.MaxJumps
                 ? new Way(true, found)
                 : new Way(false, []),
             this);

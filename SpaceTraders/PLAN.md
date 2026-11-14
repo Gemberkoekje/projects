@@ -107,7 +107,7 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B89 | **A request the API's rate limiter refused gave up within half a second** (seen on 2026-11-13, fixed in slice 6.64).<br>• After slice 6.63's deploy the traders' requests tripled, and so did the rate limiter's 429s: 35 to 47 every 10 minutes against 12 or 13. Twice in the first 40 minutes a request gave up after five retries, SPECTER-B5's navigate at 20:58:50Z and SPECTER-B2's sell at 21:04:06Z, against four times in the week before. Each logged an Error (Wolverine's failed message, which its retry then carried out), and each Error set off the "SpaceTraders logged errors" mail.<br>• Each 429 named a reset about 20 ms away (`x-ratelimit-reset`, `retry-after` 0), and a 429 from the rate limiter was retried at its reset plus 50 ms: five retries within about 0.4 s. The pause that holds the other requests (B59) ended at the same moment, so each retry went out with them while the server's budget was still empty. The backoff of 1, 2, 4, 8 and 16 s applied only to 429s without the limiter's headers.<br>• Fix: the refused request waits the longer of the limiter's wait and the backoff; the other requests are still held only until the reset. | Loki: `RateLimitResponseHandler`'s "giving up after 5 retries" (`@i=35d11093`), 2026-11-06 to 2026-11-13, with the limiter's headers on each 429 | 6.64 |
 | B90 | **Two looks at one market stored the same transactions, and the second failed** (seen on 2026-11-13, fixed in slice 6.65).<br>• `IX_market_trades_unique` refused an insert (23505) once a day or so before slice 6.63; after it, at 12:28, 19:19 and 21:22Z on 2026-11-13 and 11 times between 22:57Z and 10:34Z the night after, up to four `MarketTradesListedEvent` messages at once. Each logged Errors and set off the "SpaceTraders logged errors" mail; Wolverine's retry then found the transactions stored, so none were lost.<br>• `MarketTradeRepository.RecordAsync` read which of a look's transactions were stored, then inserted the rest. Two ships looking at one market at the same moment, each look stored in a scope of its own, found the same new transactions, and the later insert failed: B61's race, on `market_trades`. With the fleet at 460 ships and a tick every 20 s, more ships look at more markets at once.<br>• Fix: one statement, `INSERT … ON CONFLICT DO NOTHING`, as `MarketRepository.UpsertAsync` does since B61. | Loki: `MarketTradesListedEvent` failures (`@i=f24941d0`) with `IX_market_trades_unique`, 2026-11-10 to 2026-11-14 | 6.65 |
 | B91 | **After a restart the role board and the trading plan worked out every route, and the pod ran out of memory** (seen on 2026-11-14, fixed in slices 6.66 and 6.67).<br>• Slice 6.65's deploy started at 13:22:36Z. The container was OOM-killed at its 2 GiB limit at about 13:24:57Z and at 13:29:27Z; the third start held, and the bot did no useful work until about 13:38Z. With the limit raised to 3 GiB (gembernodes#222) the first start was killed again, at 14:42:01Z; the second held, with a first tick of 12.8 minutes (14:43:56 to 14:56:43Z) and 2.7 GiB at its peak. In normal running the pod uses 0.85 to 1.7 GiB.<br>• The trade list (slice 6.63) is kept in memory only. After a start the worker builds it again, about 90 s at 3,100 markets, and until then `TradeContextReader` hands the maps no list: `Rank` and `Judge` work out every route (D148's fallback). That is B88's old pass at almost three times the markets (1,100 then, 3,100 now), for 482 ships, beside the worker's own build.<br>• The build has grown with the markets the explorers add: 504,975 trades estimated over 1,490 markets in 19 s on 2026-11-13, 2,135,991 over 3,106 in 83 s on 2026-11-14. `TradeListBuilder.Estimate` holds them all before `Select` keeps about 6,800, so the heap swings by up to a gigabyte a build.<br>• Fix: until the worker's first round since the start, the role board and the trading plan wait; the other plans and the ships' steps go on. Slice 6.67: the build keeps only the trades it picks, as it works them out. | `kubectl` `lastState` (`OOMKilled`, exit 137), cAdvisor's working set, `system_runtime_gc_heap_size`, Loki: `TradeListService` lines and `Tick` | 6.66, 6.67 |
-| B92 | **Every map read works out the jump routes between systems again, one search a pair** (found on 2026-11-14, by slice 6.67's bench; not fixed yet).<br>• `TradeGates.TryFindWay` keeps the ways it found on its map, and the reader makes a new `TradeGates` for each map it reads. Each way not found yet is `ExploreAtlas.TryFindJumps`, which builds the whole gate network (`Atlas`) and searches from the start system to every system, then keeps the one way.<br>• On a copy of the day's world (3,258 markets, 283 systems) one trade list build on a map read afresh allocated 23.6 GB and took 56 s, against 1.8 GB and 28 s on the same map once its ways were found. The worker reads a fresh map every build, and the plans read one for each system they work in, so much of the API pod's CPU (1.4 of its 2 cores, throttled in up to 18% of periods) and of its heap's swings is likely this.<br>• A fix that keeps every decision: one network and one search a start system for each map's gates, each way read from that search as now. | `TradeListBuildBench` (slice 6.67): "Streamed, map read afresh" against "Streamed" | not yet |
+| B92 | **Every map read works out the jump routes between systems again, one search a pair** (found on 2026-11-14, by slice 6.67's bench; fixed in slice 6.68).<br>• `TradeGates.TryFindWay` keeps the ways it found on its map, and the reader makes a new `TradeGates` for each map it reads. Each way not found yet is `ExploreAtlas.TryFindJumps`, which builds the whole gate network (`Atlas`) and searches from the start system to every system, then keeps the one way.<br>• On a copy of the day's world (3,258 markets, 283 systems) one trade list build on a map read afresh allocated 23.6 GB and took 56 s, against 1.8 GB and 28 s on the same map once its ways were found. The worker reads a fresh map every build, and the plans read one for each system they work in, so much of the API pod's CPU (1.4 of its 2 cores, throttled in up to 18% of periods) and of its heap's swings is likely this.<br>• Fix: each map's gates keep one network and one search a start system (`ExploreAtlas.JumpFinder`), each way read from that search as before: the same ways, and a build on a map read afresh allocated 1.9 GB in 33 s. Not changed: the probe plan's `CanJump` still searches once a way. | `TradeListBuildBench` (slice 6.67): "Streamed, map read afresh" against "Streamed" | 6.68 |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
@@ -386,7 +386,8 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.64 A request the rate limiter refuses waits at least the backoff (B89), deployed (below)
 - 6.65 Transactions two looks list at once are stored once (B90), deployed (below)
 - 6.66 The route plans wait for the first trade list after a restart (B91), deployed (below)
-- 6.67 The trade list keeps only what it picks (B91), built (below)
+- 6.67 The trade list keeps only what it picks (B91), deployed (below)
+- 6.68 One gate search a start system for each map (B92), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -923,8 +924,8 @@ the gates of other systems (D68).
     timeout, as after the two restarts before; Wolverine's retry carried it out.
   - To understand this, start with `GameLoopService.RunPlansAsync`, then `TradeListStore.IsReady` and
     `TradeListService.BuildAsync`.
-- **6.67 The trade list keeps only what it picks** (B91, its second part; asked on 2026-11-14: "Yes, build it"): built on
-  branch `claude/spacetraders-list-memory`.
+- **6.67 The trade list keeps only what it picks** (B91, its second part; asked on 2026-11-14: "Yes, build it"): merged as
+  projects#262 (`f05469b0`), deployed by gembernodes#224 on 2026-11-14 at 16:58Z.
   - `TradeListBuilder.Estimate` hands out the trades one at a time as it works them out, and keeps a buy market's hauls
     only while it works that market out. `Select` reads them once and keeps the best of each system and of all in small
     heaps as it goes (`Best`, `Ranking`): the same list, by value and then by route key, which it builds only when two
@@ -933,9 +934,32 @@ the gates of other systems (D68).
   - Measured on a copy of the day's world (`TradeListBuildBench`, 3,258 markets, 6,994 trades kept): the heap held 17 to
     62 MiB above its start during a build, against 263 to 564 MiB before. The time is the same (28 s; 56 s on a map read
     afresh), and so is the list, built both ways from the same map.
-  - Not changed: what a build on a map read afresh allocates, 23.6 GB, nearly all the gates' ways (B92).
+  - Not changed: what a build on a map read afresh allocates, 23.6 GB, nearly all the gates' ways (B92, slice 6.68).
   - Tests: `TradeListTests` (for six sizes the list is what sorting every trade and then picking gave, kept in the test as
     the reference; trades of the same value go by route key; the selection reads the trades once and counts them).
     `TradeListBuildBench` builds it both ways on one map of the copy: the same list, and each one's time, allocations
     and heap.
+  - Checked there, 16:58Z to 17:26Z on 2026-11-14: a clean start (no restart, no Error), the first list at 17:01:36Z
+    (7,090 of 2,492,936 trades over 3,347 markets, built in 89 s) and the first trade 17 s later. The GC heap over 22
+    minutes: 220 MB on average and 373 MB at most, never above 500 MB, against 330 MB and 673 MB (4 minutes above 500) in
+    the same span before. The pod's working set (1,273 MiB on average) and its CPU (1.55 cores, throttled in 25% of
+    periods) didn't drop: that was B92's.
   - To understand this, start with `TradeListBuilder.Select`, then `Estimate`.
+- **6.68 One gate search a start system for each map** (B92; asked on 2026-11-14: "Yes, fix it"): built on branch
+  `claude/spacetraders-b92-gate-searches`.
+  - `ExploreAtlas.JumpFinder` builds the atlas of the known systems once, at the first way asked for, and keeps one search
+    from each start system; a way is read from that search as `TryFindJumps` reads it. The search reaches every system and
+    doesn't depend on where the way goes, so the ways from one system to all the others cost one search, not one each
+    with an atlas of its own. Each map's `TradeGates` keeps a finder; `ExploreAtlas.TryFindJumps` uses one of its own for
+    each way, as before.
+  - Measured on the copy of the day's world (`TradeListBuildBench`, 3,258 markets): a trade list build on a map read
+    afresh allocated 1.9 GB in 33 s, against 23.6 GB in 56 s, as much as on a map whose ways were found already, with
+    the same list all three ways. The plans read a map for each system they work in, so their passes allocate less too;
+    that isn't measured on the copy (`TickBench` writes to it).
+  - Not changed: the probe plan's `CanJump` searches afresh for each way it asks (`ExploreAtlas.TryFindJumps`), and the
+    explore plan's own reads (`Next`, `HomeFrom`, `Reachable`) build an atlas a call, as they ask once a pass.
+  - Tests: `ExploreAtlasTests` (a kept finder finds every way a search of its own finds, in three networks: with unknown
+    systems and a lower-case symbol, with a refused gate, and a grid where most ways tie; the same from eight threads at
+    once). A finder whose searches were all kept under one key, so that the first start system's served the others,
+    fails both.
+  - To understand this, start with `ExploreAtlas.JumpFinder.TryFind`, then `TradeGates.TryFindWay`.
