@@ -37,6 +37,34 @@ public sealed class MarketTradeRepositoryTests : IntegrationTestBase
         counts.Should().ContainSingle().Which.Should().Be(new Application.Interfaces.Repositories.MarketTradeCount("X1-UK3", "X1-UK3-D45", 3) { Credits = 3 * 20 * 6_494L });
     }
 
+    /// <summary>
+    /// B90, on the cluster on 2026-11-13 and 2026-11-14: two ships looked at one market at the same moment, and each look's
+    /// transactions were stored in a scope of their own. Both read which were stored already, found the same new ones, and
+    /// inserted them: the second insert failed on IX_market_trades_unique (23505), 11 times overnight, each an Error and an
+    /// alert mail, until Wolverine's retry found them stored. Here the other look stores its transactions between this
+    /// one's read and its write.
+    /// </summary>
+    [SkippableFact]
+    public async Task RecordAsync_TransactionsAnotherLookStoredMeanwhile_AreStoredOnce()
+    {
+        await using var other = CreateFreshContext();
+        var otherLookStoresFirst = new BeforeInsertInterceptor(
+            "market_trades",
+            async () => await new MarketTradeRepository(other).RecordAsync(
+                "X1-UK3",
+                [Trade("X1-UK3-D45", "OTHER-3", At.AddMinutes(-5)), Trade("X1-UK3-D45", "RIVAL-1", At)]));
+        await using var db = CreateFreshContext(otherLookStoresFirst);
+
+        var added = await new MarketTradeRepository(db).RecordAsync(
+            "X1-UK3",
+            [Trade("X1-UK3-D45", "OTHER-3", At.AddMinutes(-10)), Trade("X1-UK3-D45", "OTHER-3", At.AddMinutes(-5)), Trade("X1-UK3-D45", "RIVAL-1", At)]);
+
+        otherLookStoresFirst.HasRun.Should().BeTrue("the other look stored its transactions first");
+        added.Should().Be(1, "only the one at 05:50 was new by the time this look wrote");
+        await using var fresh = CreateFreshContext();
+        (await new MarketTradeRepository(fresh).CountSinceAsync(At.AddHours(-1))).Should().ContainSingle().Which.Trades.Should().Be(3);
+    }
+
     private async Task<int> RecordAsync(IReadOnlyList<MarketTradeModel> trades)
     {
         await using var db = CreateFreshContext();

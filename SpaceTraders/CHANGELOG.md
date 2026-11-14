@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-14, slice 6.65)
+- B90: two looks at one market that stored the same transactions of other agents at once no longer fail. Each read what was
+  stored, then inserted the rest, and the later insert failed on `IX_market_trades_unique`: 11 times the night after slice
+  6.63, each an Error and an alert mail, until Wolverine's retry found them stored. They are now stored in one statement,
+  `INSERT … ON CONFLICT DO NOTHING`, as `MarketRepository` stores markets since B61.
+- Tests: `MarketTradeRepositoryTests`.
+
+### Plan – Changed (2026-11-14, B89)
+- Slice 6.64 is deployed and checked on the cluster: no request gave up overnight, of 2,660 the limiter refused. The API
+  pod's CPU, near its 2-core limit by morning with 460 ships, is noted as one to watch.
+
 ### Code – Fixed (2026-11-13, slice 6.64)
 - B89: a request the API's rate limiter refuses waits at least the backoff (1, 2, 4, 8, 16 s) before each retry, not only
   until the reset the limiter names, often some tens of milliseconds away. Five retries that soon went out with the requests
