@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Plan – Changed (2026-11-14, B92)
+- Slice 6.68 is deployed and checked on the cluster: against 6.67's last half hour the API pod used 1.28 cores instead of
+  1.46 and allocated 138 MiB/s instead of 429, a tick took about 53 s instead of 150, and the trade list was built in
+  49 s instead of 89 to 95.
+
 ### Code – Fixed (2026-11-14, slice 6.68)
 - B92: each trade map finds the jump ways between systems with one search a start system, kept, instead of building the
   gate network and searching afresh for every pair of systems. On a copy of the day's world a trade list build on a map

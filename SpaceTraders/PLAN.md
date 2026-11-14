@@ -387,7 +387,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.65 Transactions two looks list at once are stored once (B90), deployed (below)
 - 6.66 The route plans wait for the first trade list after a restart (B91), deployed (below)
 - 6.67 The trade list keeps only what it picks (B91), deployed (below)
-- 6.68 One gate search a start system for each map (B92), built (below)
+- 6.68 One gate search a start system for each map (B92), deployed (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -945,8 +945,8 @@ the gates of other systems (D68).
     the same span before. The pod's working set (1,273 MiB on average) and its CPU (1.55 cores, throttled in 25% of
     periods) didn't drop: that was B92's.
   - To understand this, start with `TradeListBuilder.Select`, then `Estimate`.
-- **6.68 One gate search a start system for each map** (B92; asked on 2026-11-14: "Yes, fix it"): built on branch
-  `claude/spacetraders-b92-gate-searches`.
+- **6.68 One gate search a start system for each map** (B92; asked on 2026-11-14: "Yes, fix it"): merged as
+  projects#263 (`1cb8f988`), deployed by gembernodes#225 on 2026-11-14 at 18:35Z.
   - `ExploreAtlas.JumpFinder` builds the atlas of the known systems once, at the first way asked for, and keeps one search
     from each start system; a way is read from that search as `TryFindJumps` reads it. The search reaches every system and
     doesn't depend on where the way goes, so the ways from one system to all the others cost one search, not one each
@@ -962,4 +962,10 @@ the gates of other systems (D68).
     systems and a lower-case symbol, with a refused gate, and a grid where most ways tie; the same from eight threads at
     once). A finder whose searches were all kept under one key, so that the first start system's served the others,
     fails both.
+  - Checked there, 18:35Z to 19:10Z on 2026-11-14: a clean start (no restart; the two Errors at 18:35:31Z were the old
+    pod's shutdown cancelling a navigate), the first list at 18:37:55Z (7,641 of 2,719,410 trades over 3,474 markets,
+    built in 49 s, against 89 to 95 s on 6.67 with fewer markets) and the first trade 6 s later. Over 30 minutes, against
+    6.67's last 30: the pod's CPU 1.28 cores against 1.46, throttled in 12% of periods against 20%; its working set 1,086
+    MiB on average and 1,194 at most, against 1,338 and 1,649; 138 MiB/s allocated against 429; and 34 ticks against 12,
+    about 53 s each against 150. The GC heap stayed the same, 250 MB on average.
   - To understand this, start with `ExploreAtlas.JumpFinder.TryFind`, then `TradeGates.TryFindWay`.
