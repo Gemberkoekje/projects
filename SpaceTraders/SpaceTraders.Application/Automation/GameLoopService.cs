@@ -9,6 +9,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Application.Automation;
@@ -19,7 +20,8 @@ namespace SpaceTraders.Application.Automation;
 /// then the ships' steps, so with the route work taking minutes (B88) a ship stepped once in 10 to 30 minutes.
 ///  - The plan loop, one tick a round: records that the tick began (<see cref="GameTicks"/>), a paused one too, which the
 ///    order ships are bought in judges the plans' words by (B79); with automation switched on (<see cref="AutomationSwitches"/>),
-///    bootstraps each plan that is switched on, in order.
+///    bootstraps each plan that is switched on, in order. The role board and the trading plan, which rank routes, wait for
+///    the trade list worker's first round since the start (<see cref="TradeListStore.IsReady"/>, B91).
 ///  - The step loop: with automation switched on, runs one goal step per ship, the contract plan's assignments, then refreshes
 ///    one market where a ship is when one is due (<see cref="IMarketWatchService"/>), and steps the gatherers last (D125);
 ///    then publishes ApiUnavailableEvent / ApiAvailableEvent on a change.
@@ -32,10 +34,12 @@ public sealed class GameLoopService(
     IApiAvailabilityState apiAvailability,
     ILeaderElection leaderElection,
     GameTicks ticks,
+    TradeListStore tradeLists,
     ILogger<GameLoopService> logger) : BackgroundService
 {
     private long _tick;
     private long _round;
+    private int _waitLogged;
 
     /// <summary>The pause after each loop's round: 5 seconds; shorter in tests.</summary>
     internal TimeSpan Interval { get; init; } = TimeSpan.FromSeconds(5);
@@ -136,16 +140,37 @@ public sealed class GameLoopService(
         // A plan that is switched off is not bootstrapped, so it doesn't buy anything either.
         foreach (var plan in Enum.GetValues<AutomationPlan>())
         {
-            if (await settings.IsPlanEnabledAsync(plan, cancellationToken))
+            if (!await settings.IsPlanEnabledAsync(plan, cancellationToken))
             {
-                await RunStepAsync(
-                    new Dictionary<string, object> { ["Plan"] = plan },
-                    services => BootstrapAsync(plan, services, cancellationToken),
-                    exception => logger.LogError(exception, "GameLoopService: bootstrapping the {Plan} plan failed; the rest of the tick carries on.", plan),
-                    cancellationToken);
+                continue;
             }
+
+            if (RanksRoutes(plan) && !tradeLists.IsReady)
+            {
+                // B91: after a restart the trade list is built again (about 90 s at 3,100 markets); until the worker's first
+                // round these plans would work out every route, and on 2026-11-14 three of five starts ran out of memory
+                // doing so. Ships keep stepping their goals meanwhile, and the other plans run.
+                if (Interlocked.Exchange(ref _waitLogged, 1) == 0)
+                {
+                    logger.LogInformation("GameLoopService: the role board and the trading plan wait for the first trade list since the start; the other plans run.");
+                }
+
+                continue;
+            }
+
+            await RunStepAsync(
+                new Dictionary<string, object> { ["Plan"] = plan },
+                services => BootstrapAsync(plan, services, cancellationToken),
+                exception => logger.LogError(exception, "GameLoopService: bootstrapping the {Plan} plan failed; the rest of the tick carries on.", plan),
+                cancellationToken);
         }
     }
+
+    /// <summary>
+    /// The plans that rank routes (<see cref="TradeRoutePlanner"/>): the role board, by what a ship would earn trading,
+    /// and the trading plan. Without a trade list they work out every route.
+    /// </summary>
+    private static bool RanksRoutes(AutomationPlan plan) => plan is AutomationPlan.Roles or AutomationPlan.Trading;
 
     private async Task RunStepsAsync(ISettingsRepository settings, CancellationToken cancellationToken)
     {

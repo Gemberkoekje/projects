@@ -1422,7 +1422,10 @@ buy.
     the buy market, its hold, its credits, the price steps, the rules below. So a trader takes a close high-value trade,
     and every rule that chooses among routes still holds. The trading plan, the role board and the cargo-ship checks
     read routes this way; the probe plan's `BestRateThrough` works on one system and doesn't use the list;
-  - after a reset the new agent's gate isn't built, and the worker drops the old agent's list.
+  - after a reset the new agent's gate isn't built, and the worker drops the old agent's list;
+  - after a restart the list is built again, about 90 s at 3,100 markets. Until the worker's first round the role board
+    and the trading plan wait (`TradeListStore.IsReady`, slice 6.66, B91): without a list they would work out every
+    route, which ran the pod out of memory. The other plans run, and the ships keep stepping.
 - **Each tick** every free trader gets a trip, from the cached prices:
   - one that holds cargo first sells it where it fetches the most after fuel, one good a trip, when that
     earns anything. Once no good aboard pays for its sale, the goods go overboard before the trader takes a

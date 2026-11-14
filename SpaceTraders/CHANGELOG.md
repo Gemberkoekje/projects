@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-14, slice 6.66)
+- B91: after a restart the role board and the trading plan wait for the trade list worker's first round. The list is kept in
+  memory only, and until it was built again (about 90 s at 3,100 markets) those plans worked out every route for 482 ships:
+  three of five starts on 2026-11-14 ran out of memory doing so, at 2 GiB and at 3 GiB. The other plans and the ships'
+  steps go on meanwhile.
+- Tests: `GameLoopServiceTests`, `TradeListTests`.
+
+### Plan – Changed (2026-11-14, B90)
+- Slice 6.65 is deployed and checked on the cluster: no market-trade insert failed in two hours, against six in the six
+  before. Its deploy's starts ran out of memory, B91; the API's memory limit went to 3 GiB (gembernodes#222).
+
 ### Code – Fixed (2026-11-14, slice 6.65)
 - B90: two looks at one market that stored the same transactions of other agents at once no longer fail. Each read what was
   stored, then inserted the rest, and the later insert failed on `IX_market_trades_unique`: 11 times the night after slice

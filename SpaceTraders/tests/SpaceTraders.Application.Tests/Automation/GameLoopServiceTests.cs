@@ -14,6 +14,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Trading;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -32,6 +33,7 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly IMiningAutomationService _miningPlan = Substitute.For<IMiningAutomationService>();
     private readonly ISiphonAutomationService _siphonPlan = Substitute.For<ISiphonAutomationService>();
     private readonly ITradingAutomationService _tradingPlan = Substitute.For<ITradingAutomationService>();
+    private readonly IRolePlanService _rolePlan = Substitute.For<IRolePlanService>();
     private readonly ISpareTimePlanService _spareTimePlan = Substitute.For<ISpareTimePlanService>();
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
@@ -40,9 +42,13 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly IMarketWatchService _marketWatch = Substitute.For<IMarketWatchService>();
     private readonly IApiAvailabilityState _apiAvailability = Substitute.For<IApiAvailabilityState>();
     private readonly GameTicks _ticks = new();
+    private readonly TradeListStore _tradeLists = new();
 
     public GameLoopServiceTests()
     {
+        // The trade list worker has had its first round (here: no list, as before the home gate), as in every tick after the
+        // first minutes since a start.
+        _tradeLists.Set(TradeList.None);
         _serviceProvider = new ServiceCollection()
             .AddSingleton(_bus)
             .AddSingleton(_settings)
@@ -53,6 +59,7 @@ public sealed class GameLoopServiceTests : IDisposable
             .AddSingleton(_miningPlan)
             .AddSingleton(_siphonPlan)
             .AddSingleton(_tradingPlan)
+            .AddSingleton(_rolePlan)
             .AddSingleton(_spareTimePlan)
             .AddSingleton(_assignments)
             .AddSingleton(_ships)
@@ -103,6 +110,32 @@ public sealed class GameLoopServiceTests : IDisposable
         await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _marketWatch.DidNotReceive().RefreshDueMarketAsync(Arg.Any<CancellationToken>());
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UntilTheTradeListWorkersFirstRound_TheRoleBoardAndTheTradingPlanWait_AndTheOtherPlansAndTheShipsDoNot()
+    {
+        // B91, on the cluster on 2026-11-14: the trade list lives in memory, so after a restart there was none until the worker
+        // built it again, about 90 s at 3,100 markets. Meanwhile the role board and the trading plan worked out every route for
+        // 482 ships, and three of five starts ran out of memory doing so.
+        var restarted = new TradeListStore();
+        SwitchOn("Automation.Enabled", "Automation.Plan.Roles.Enabled", "Automation.Plan.Trading.Enabled", "Automation.Plan.Contract.Enabled");
+        using var sut = Sut(tradeLists: restarted);
+
+        await sut.TickAsync(CancellationToken.None);
+        await sut.StepRoundAsync(CancellationToken.None);
+
+        await _rolePlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _tradingPlan.DidNotReceive().EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _contractPlan.Received(1).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _goalExecutor.Received(1).ExecuteAsync("SPECTER-DEBUG-3", Arg.Any<CancellationToken>());
+
+        restarted.Set(new TradeList(DateTimeOffset.UtcNow, [new TradeListEntry("IRON", "X1-PT96-H53", "X1-PT96-D42", 40, 9_000, 600, 0)], ["X1-PT96"]));
+        await sut.TickAsync(CancellationToken.None);
+
+        await _rolePlan.Received(1).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _tradingPlan.Received(1).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
+        await _contractPlan.Received(2).EnsureBootstrappedAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -500,7 +533,7 @@ public sealed class GameLoopServiceTests : IDisposable
         await sut.StepRoundAsync(CancellationToken.None);
     }
 
-    private GameLoopService Sut(TimeSpan? interval = null, ILogger<GameLoopService>? logger = null)
+    private GameLoopService Sut(TimeSpan? interval = null, ILogger<GameLoopService>? logger = null, TradeListStore? tradeLists = null)
     {
         var leaderElection = Substitute.For<ILeaderElection>();
         leaderElection.IsLeader.Returns(true);
@@ -510,6 +543,7 @@ public sealed class GameLoopServiceTests : IDisposable
             _apiAvailability,
             leaderElection,
             _ticks,
+            tradeLists ?? _tradeLists,
             logger ?? NullLogger<GameLoopService>.Instance)
         {
             Interval = interval ?? TimeSpan.FromSeconds(5),
