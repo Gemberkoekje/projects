@@ -21,24 +21,116 @@ public static class TradeListBuilder
     /// fuel price per unit of distance and each gate's antimatter (D63). The rules a route keeps stay: only markets recent or
     /// predicted (<see cref="TradeMarketMap.IsFresh"/>), and no gate material bought in the gate's system (D128).
     /// </summary>
+    /// <remarks>
+    /// One at a time, as they are worked out, and none kept here (slice 6.67, B91): on 2026-11-14 the 2.3 million trades of
+    /// 3,258 markets, held in a list before <see cref="Select(IEnumerable{TradeListEntry}, DateTimeOffset, int, int, IEnumerable{string})"/>
+    /// kept about 7,000, made each build's heap swing by half a gigabyte. Each enumeration works them out again; a caller that
+    /// wants them all lists them.
+    /// </remarks>
     /// <param name="map">The markets of the known universe.</param>
     /// <param name="hold">The units a trade is set up for: the fleet's largest hold.</param>
     /// <param name="speed">The engine speed its time is worked out at.</param>
     /// <param name="minProfitPerUnit">What each unit must earn (D14).</param>
-    /// <returns>The trades, in no particular order.</returns>
-    public static IReadOnlyList<TradeListEntry> Estimate(TradeMarketMap map, int hold, int speed, int minProfitPerUnit)
+    /// <returns>The trades, by buy market, in no particular order.</returns>
+    public static IEnumerable<TradeListEntry> Estimate(TradeMarketMap map, int hold, int speed, int minProfitPerUnit)
     {
         ArgumentNullException.ThrowIfNull(map);
 
-        var entries = new List<TradeListEntry>();
-        if (hold <= 0)
+        return hold <= 0 ? [] : Estimated(map, hold, speed, minProfitPerUnit);
+    }
+
+    /// <summary>
+    /// The high-value trades of <paramref name="estimates"/>, by <see cref="TradeListEntry.Value"/>: the best
+    /// <paramref name="perSystem"/> bought in each system, so a ship anywhere finds a close one (D148: "A ship can then take a
+    /// close high value trade to do"), and the best <paramref name="total"/> of all.
+    /// </summary>
+    /// <param name="estimates">The trades, as <see cref="Estimate"/> gives them.</param>
+    /// <param name="builtAt">When their markets were read.</param>
+    /// <param name="perSystem">How many to keep of each system's buy markets.</param>
+    /// <param name="total">How many to keep of all.</param>
+    /// <param name="systems">The systems whose markets were estimated (<see cref="TradeList.Covers"/>).</param>
+    /// <returns>The list, best first.</returns>
+    public static TradeList Select(IEnumerable<TradeListEntry> estimates, DateTimeOffset builtAt, int perSystem, int total, IEnumerable<string> systems)
+        => Select(estimates, builtAt, perSystem, total, systems, out _);
+
+    /// <summary>
+    /// The high-value trades of <paramref name="estimates"/>, as the overload without a count, and how many it looked at.
+    /// </summary>
+    /// <remarks>
+    /// It reads the trades once and keeps only the best of each system and of all as it goes (slice 6.67, B91), not every
+    /// trade sorted: the same list, best first by value and then by route key, as before.
+    /// </remarks>
+    /// <param name="estimates">The trades, as <see cref="Estimate"/> gives them.</param>
+    /// <param name="builtAt">When their markets were read.</param>
+    /// <param name="perSystem">How many to keep of each system's buy markets.</param>
+    /// <param name="total">How many to keep of all.</param>
+    /// <param name="systems">The systems whose markets were estimated (<see cref="TradeList.Covers"/>).</param>
+    /// <param name="estimated">How many trades it looked at.</param>
+    /// <returns>The list, best first.</returns>
+    public static TradeList Select(
+        IEnumerable<TradeListEntry> estimates,
+        DateTimeOffset builtAt,
+        int perSystem,
+        int total,
+        IEnumerable<string> systems,
+        out int estimated)
+    {
+        ArgumentNullException.ThrowIfNull(estimates);
+        ArgumentNullException.ThrowIfNull(systems);
+
+        var ofAll = new Best(Math.Max(0, total));
+        var bySystem = new Dictionary<string, Best>(StringComparer.OrdinalIgnoreCase);
+        var ofSystem = new Best(0);
+        var lastBuy = string.Empty;
+        var anyBuy = false;
+        estimated = 0;
+        foreach (var entry in estimates)
         {
-            return entries;
+            estimated++;
+            if (entry.Profit <= 0)
+            {
+                continue;
+            }
+
+            // The trades come by buy market, so its system is looked up once a market.
+            if (!anyBuy || !entry.BuyWaypointSymbol.Equals(lastBuy, StringComparison.Ordinal))
+            {
+                anyBuy = true;
+                lastBuy = entry.BuyWaypointSymbol;
+                var system = WaypointSymbols.SystemOf(lastBuy);
+                if (!bySystem.TryGetValue(system, out var best))
+                {
+                    best = new Best(Math.Max(0, perSystem));
+                    bySystem[system] = best;
+                }
+
+                ofSystem = best;
+            }
+
+            ofSystem.Offer(entry);
+            ofAll.Offer(entry);
         }
 
-        var hauls = new Dictionary<(string Buy, string Sell), Haul>();
+        var kept = new HashSet<TradeListEntry>(ReferenceEqualityComparer.Instance);
+        foreach (var best in bySystem.Values)
+        {
+            kept.UnionWith(best.Kept);
+        }
+
+        kept.UnionWith(ofAll.Kept);
+        var ordered = kept.ToList();
+        ordered.Sort(Ranking.Instance);
+        return new TradeList(builtAt, ordered, systems);
+    }
+
+    /// <summary>The trades, one at a time, with each buy market's hauls worked out once and dropped after it.</summary>
+    private static IEnumerable<TradeListEntry> Estimated(TradeMarketMap map, int hold, int speed, int minProfitPerUnit)
+    {
+        // A haul depends only on its two markets; the buy market is the outer loop, so its hauls are needed only while it is.
+        var hauls = new Dictionary<string, Haul>(StringComparer.Ordinal);
         foreach (var buy in map.MarketWaypoints.Where(map.IsFresh))
         {
+            hauls.Clear();
             foreach (var good in map.GoodsAt(buy).Where(good => good.PurchasePrice > 0 && good.TradeVolume > 0))
             {
                 if (map.IsConstructionMaterialAt(buy, good.Symbol))
@@ -64,10 +156,10 @@ public static class TradeListBuilder
                         continue;
                     }
 
-                    if (!hauls.TryGetValue((buy, sell), out var haul))
+                    if (!hauls.TryGetValue(sell, out var haul))
                     {
                         haul = HaulOf(map, buy, sell, speed);
-                        hauls[(buy, sell)] = haul;
+                        hauls[sell] = haul;
                     }
 
                     if (!haul.Found || !TryFill(good, atSell, hold, minProfitPerUnit, feedsGate, out var units, out var margin))
@@ -75,7 +167,7 @@ public static class TradeListBuilder
                         continue;
                     }
 
-                    entries.Add(new TradeListEntry(
+                    yield return new TradeListEntry(
                         good.Symbol,
                         buy,
                         sell,
@@ -86,40 +178,10 @@ public static class TradeListBuilder
                     {
                         PredictionWeight = map.PredictionWeightOf(buy) * map.PredictionWeightOf(sell),
                         FeedsProduction = !map.IsEndProduct(good.Symbol) && !map.Exchanges(sell, good.Symbol),
-                    });
+                    };
                 }
             }
         }
-
-        return entries;
-    }
-
-    /// <summary>
-    /// The high-value trades of <paramref name="estimates"/>, by <see cref="TradeListEntry.Value"/>: the best
-    /// <paramref name="perSystem"/> bought in each system, so a ship anywhere finds a close one (D148: "A ship can then take a
-    /// close high value trade to do"), and the best <paramref name="total"/> of all.
-    /// </summary>
-    /// <param name="estimates">The trades, as <see cref="Estimate"/> gives them.</param>
-    /// <param name="builtAt">When their markets were read.</param>
-    /// <param name="perSystem">How many to keep of each system's buy markets.</param>
-    /// <param name="total">How many to keep of all.</param>
-    /// <param name="systems">The systems whose markets were estimated (<see cref="TradeList.Covers"/>).</param>
-    /// <returns>The list, best first.</returns>
-    public static TradeList Select(IReadOnlyList<TradeListEntry> estimates, DateTimeOffset builtAt, int perSystem, int total, IEnumerable<string> systems)
-    {
-        ArgumentNullException.ThrowIfNull(estimates);
-        ArgumentNullException.ThrowIfNull(systems);
-
-        var ordered = estimates
-            .Where(entry => entry.Profit > 0)
-            .OrderByDescending(entry => entry.Value)
-            .ThenBy(entry => TradeRoutePlanner.RouteKey(entry.TradeSymbol, entry.BuyWaypointSymbol, entry.SellWaypointSymbol), StringComparer.Ordinal)
-            .ToList();
-        var kept = new HashSet<TradeListEntry>(ordered
-            .GroupBy(entry => WaypointSymbols.SystemOf(entry.BuyWaypointSymbol), StringComparer.OrdinalIgnoreCase)
-            .SelectMany(bySystem => bySystem.Take(Math.Max(0, perSystem))));
-        kept.UnionWith(ordered.Take(Math.Max(0, total)));
-        return new TradeList(builtAt, [.. ordered.Where(kept.Contains)], systems);
     }
 
     /// <summary>
@@ -228,5 +290,56 @@ public static class TradeListBuilder
     private sealed record Haul(bool Found, long FuelCost, long AntimatterCost, double Seconds, int Jumps)
     {
         public static Haul None { get; } = new(false, 0, 0, 0, 0);
+    }
+
+    /// <summary>
+    /// The order of the list (D148): by <see cref="TradeListEntry.Value"/>, highest first, then by route key, as a ship's routes
+    /// are ranked. The route key is built only when two values are the same.
+    /// </summary>
+    private sealed class Ranking : IComparer<TradeListEntry>
+    {
+        public static Ranking Instance { get; } = new();
+
+        public int Compare(TradeListEntry? x, TradeListEntry? y)
+        {
+            ArgumentNullException.ThrowIfNull(x);
+            ArgumentNullException.ThrowIfNull(y);
+
+            var byValue = y.Value.CompareTo(x.Value);
+            return byValue != 0
+                ? byValue
+                : string.CompareOrdinal(
+                    TradeRoutePlanner.RouteKey(x.TradeSymbol, x.BuyWaypointSymbol, x.SellWaypointSymbol),
+                    TradeRoutePlanner.RouteKey(y.TradeSymbol, y.BuyWaypointSymbol, y.SellWaypointSymbol));
+        }
+    }
+
+    /// <summary>The best few trades seen so far: a heap with the worst kept on top, so a trade below it costs one comparison.</summary>
+    /// <param name="size">How many it keeps.</param>
+    private sealed class Best(int size)
+    {
+        private readonly PriorityQueue<TradeListEntry, TradeListEntry> _heap = new(Comparer<TradeListEntry>.Create(static (kept, other) => Ranking.Instance.Compare(other, kept)));
+
+        /// <summary>The trades kept, in no particular order.</summary>
+        public IEnumerable<TradeListEntry> Kept => _heap.UnorderedItems.Select(item => item.Element);
+
+        /// <summary>Keeps the trade while there is room, or in place of the worst kept when it ranks above it.</summary>
+        /// <param name="entry">The trade.</param>
+        public void Offer(TradeListEntry entry)
+        {
+            if (size == 0)
+            {
+                return;
+            }
+
+            if (_heap.Count < size)
+            {
+                _heap.Enqueue(entry, entry);
+            }
+            else
+            {
+                _heap.EnqueueDequeue(entry, entry);
+            }
+        }
     }
 }

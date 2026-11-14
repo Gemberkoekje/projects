@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-14, slice 6.67)
+- B91, its second part: the trade list build keeps only the trades it picks. It listed all 2.3 million trades of the day's
+  world and then sorted them; now it keeps each system's best and the best of all as it works them out. On a copy of the
+  day's world the heap held 17 to 62 MiB during a build instead of 263 to 564 MiB; the list and the time are the same.
+- Tests: `TradeListTests`; bench: `TradeListBuildBench`.
+
+### Plan – Changed (2026-11-14, B91, B92)
+- Slice 6.66 is deployed and checked on the cluster: the first start after it held, at 1.7 GiB at most, where the three
+  before reached 2.7 GiB or ran out of memory.
+- B92 found: every map read works out the jump routes between systems again, one search a pair; one trade list build on a
+  map read afresh allocated 23.6 GB.
+
 ### Code – Fixed (2026-11-14, slice 6.66)
 - B91: after a restart the role board and the trading plan wait for the trade list worker's first round. The list is kept in
   memory only, and until it was built again (about 90 s at 3,100 markets) those plans worked out every route for 482 ships:
