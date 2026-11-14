@@ -1323,7 +1323,8 @@ buy.
   reach within twice `Trade.MaxHaulDistance` (5) jumps of each free trader's system (`TradeContextReader.ReadReachAsync`), one
   map with their waypoints and markets (`TradeMarketMap`; distances are measured within a system only), and the ways
   between them (`TradeGates`): the explore plan's gates, with the jumps refused lately (`IGateNetwork`), the fewest jumps
-  first (`ExploreAtlas.TryFindJumps`, D101).
+  first (`ExploreAtlas.TryFindJumps`, D101). Each map keeps one search from each system its ways start from
+  (`ExploreAtlas.JumpFinder`, slice 6.68, B92), not one a way.
   - **Reach**, read as: a route buys within `Trade.MaxHaulDistance` jumps of the ship's system and sells within that many of
     the buy market's. A flight to another system (`TradeRoutePlanner.TryPlanFlight`) flies to its system's gate as any
     flight does, jumps (no fuel; a ship jumps from orbit, so it fills no tank at the gate it leaves) and flies on from the

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace SpaceTraders.Application.Exploring;
 
 /// <summary>What the explore plan's next step for the command ship is.</summary>
@@ -449,40 +451,12 @@ public static class ExploreAtlas
     /// <param name="now">The time to judge the gates by.</param>
     /// <param name="jumps">The jumps, in order; none when the ship is in that system already.</param>
     /// <returns>False when no way through usable gates is known.</returns>
+    /// <remarks>
+    /// Each call builds the atlas and searches from <paramref name="fromSystem"/> afresh. To find many ways on one state and
+    /// moment, keep a <see cref="JumpFinder"/>: it builds the atlas once and searches once from each start system (B92).
+    /// </remarks>
     public static bool TryFindJumps(ExplorePlanState state, string fromSystem, string toSystem, DateTimeOffset now, out IReadOnlyList<GateJump> jumps)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        ArgumentNullException.ThrowIfNull(fromSystem);
-        ArgumentNullException.ThrowIfNull(toSystem);
-
-        jumps = [];
-        if (fromSystem.Equals(toSystem, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var atlas = new Atlas(state, now);
-        if (!atlas.BySystem.ContainsKey(fromSystem))
-        {
-            return false;
-        }
-
-        var (parents, _) = atlas.Search(fromSystem);
-        if (!parents.ContainsKey(toSystem))
-        {
-            return false;
-        }
-
-        var way = new List<GateJump>();
-        for (var system = atlas.BySystem[toSystem].SystemSymbol; !system.Equals(fromSystem, StringComparison.OrdinalIgnoreCase); system = parents[system])
-        {
-            way.Add(new GateJump(atlas.BySystem[parents[system]].GateWaypointSymbol, atlas.BySystem[system].GateWaypointSymbol));
-        }
-
-        way.Reverse();
-        jumps = way;
-        return true;
-    }
+        => new JumpFinder(state, now).TryFind(fromSystem, toSystem, out jumps);
 
     /// <summary>The first step of a way between systems (slice 6.31), towards <paramref name="target"/>: a jump or a warp.</summary>
     private static ExploreStep Along(SystemWay way, string target, ExploreStepKind kind)
@@ -526,6 +500,72 @@ public static class ExploreAtlas
             TargetSystemSymbol = targetSystem,
             Jumps = jumps + 1,
         };
+    }
+
+    /// <summary>
+    /// The ways between systems by jumps on one state at one moment, as <see cref="TryFindJumps(ExplorePlanState, string, string, DateTimeOffset, out IReadOnlyList{GateJump})"/>
+    /// finds them, with the atlas built once and one search kept for each start system (PLAN.md slice 6.68, B92). That search
+    /// reaches every system, so the ways from one system to all the others cost one search instead of one each: on a copy of
+    /// the day's world on 2026-11-14 a trade list build on a map read afresh allocated 23.6 GB, nearly all atlases and
+    /// searches for one way each.
+    /// </summary>
+    /// <remarks>Safe for many threads: the atlas is built once, and the searches are kept in a concurrent dictionary.</remarks>
+    public sealed class JumpFinder
+    {
+        /// <summary>A start system the atlas doesn't know: no search, no ways.</summary>
+        private static readonly Dictionary<string, string> Unknown = new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly Lazy<Atlas> _atlas;
+        private readonly ConcurrentDictionary<string, Dictionary<string, string>> _searches = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Keeps what the ways are found on; the atlas is built at the first way asked for between two systems.</summary>
+        /// <param name="state">What the plan knows, with the refusals of the other ships' jumps (<see cref="JumpRefusals"/>).</param>
+        /// <param name="now">The time to judge the gates by.</param>
+        public JumpFinder(ExplorePlanState state, DateTimeOffset now)
+        {
+            ArgumentNullException.ThrowIfNull(state);
+
+            _atlas = new Lazy<Atlas>(() => new Atlas(state, now));
+        }
+
+        /// <summary>The way from one system to another by jumps, as <see cref="ExploreAtlas.TryFindJumps(ExplorePlanState, string, string, DateTimeOffset, out IReadOnlyList{GateJump})"/>.</summary>
+        /// <param name="fromSystem">The system the ship is in.</param>
+        /// <param name="toSystem">The system it is going to.</param>
+        /// <param name="jumps">The jumps, in order; none when the ship is in that system already.</param>
+        /// <returns>False when no way through usable gates is known.</returns>
+        public bool TryFind(string fromSystem, string toSystem, out IReadOnlyList<GateJump> jumps)
+        {
+            ArgumentNullException.ThrowIfNull(fromSystem);
+            ArgumentNullException.ThrowIfNull(toSystem);
+
+            jumps = [];
+            if (fromSystem.Equals(toSystem, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var atlas = _atlas.Value;
+
+            // The search from a system doesn't depend on where the way goes, so one serves every way from it.
+            var parents = _searches.GetOrAdd(
+                fromSystem,
+                static (from, known) => known.BySystem.ContainsKey(from) ? known.Search(from).Parents : Unknown,
+                atlas);
+            if (!parents.ContainsKey(toSystem))
+            {
+                return false;
+            }
+
+            var way = new List<GateJump>();
+            for (var system = atlas.BySystem[toSystem].SystemSymbol; !system.Equals(fromSystem, StringComparison.OrdinalIgnoreCase); system = parents[system])
+            {
+                way.Add(new GateJump(atlas.BySystem[parents[system]].GateWaypointSymbol, atlas.BySystem[system].GateWaypointSymbol));
+            }
+
+            way.Reverse();
+            jumps = way;
+            return true;
+        }
     }
 
     /// <summary>The known systems, by system and by gate, as of one moment.</summary>

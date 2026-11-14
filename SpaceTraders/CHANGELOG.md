@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-14, slice 6.68)
+- B92: each trade map finds the jump ways between systems with one search a start system, kept, instead of building the
+  gate network and searching afresh for every pair of systems. On a copy of the day's world a trade list build on a map
+  read afresh allocated 1.9 GB in 33 s instead of 23.6 GB in 56 s; the ways and the list are the same.
+- Tests: `ExploreAtlasTests`.
+
+### Plan – Changed (2026-11-14, B91)
+- Slice 6.67 is deployed and checked on the cluster: the GC heap peaked at 373 MB in its first 22 minutes, against 673 MB
+  in the same span before.
+
 ### Code – Fixed (2026-11-14, slice 6.67)
 - B91, its second part: the trade list build keeps only the trades it picks. It listed all 2.3 million trades of the day's
   world and then sorted them; now it keeps each system's best and the best of all as it works them out. On a copy of the
