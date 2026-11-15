@@ -2622,7 +2622,7 @@ bot's own state: at start, then every minute.
 | `RepeatingError` | log statement | The same error repeats at most N times in 10 minutes | One statement (its class and message template) logs more than N warnings or errors in 10 minutes, since startup. Journal lines don't count: other rules watch what they report | `Health.Errors.MaxRepeatsIn10Minutes` (5) |
 | `CreditsUnchanged` | agent | Credits change at least once a day while the fleet works (D13) | Ships have had work at every evaluation for N hours, and the credits didn't change in that time (no credit sample, B7) | `Health.Credits.MaxHoursUnchanged` (24) |
 | `ApiUnauthorized` | `api` | No 401 or reset errors | The API answered a call with 401 in the last hour, since startup. A reset stops the host (slice 1.8), so this is a token the server rejects for another reason | — |
-| `ApiThrottled` | `api` | At most N 429s an hour | More than N 429s in the last hour, retries included, by source. None are expected (slice 1.10) | `Health.Api.Max429sPerHour` (10) |
+| `ApiThrottled` | `api` | At most one 429 an hour for every N ships (D149) | More 429s in the last hour, retries included, by source, than the fleet's ships divided by N, rounded down: none below N ships. A large fleet keeps the budget nearly full, and the API's limiter refuses some requests however closely the client keeps to it (B59) | `Health.Api.ShipsPer429PerHour` (10) |
 | `DbSizeSoftLimit`, `DbSizeHardLimit` | `database` | The database stays under its limits (D8) | The size guard's own checks, every 5 minutes; see [Database size guard](#database-size-guard) | `Database.*` |
 
 **Work** is a goal, or a contract assignment, of a plan that is on (`ShipStuck`,

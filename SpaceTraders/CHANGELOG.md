@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-15, slice 6.69)
+- D149: `ApiThrottled` allows one 429 an hour for every `Health.Api.ShipsPer429PerHour` (10) ships, rounded down, instead
+  of a fixed 10: none below 10 ships, 50 at 500. At about 600 ships the night before, 6 to 37 an hour, all retried, kept
+  raising and clearing the fixed limit's anomaly.
+- The seed removes `Health.Api.Max429sPerHour`, which nothing reads any more, from the agent that runs and from the next
+  runs' values.
+- Tests: `ApiRuleTests`, `DefaultSettingsSeedTests`.
+
 ### Plan – Changed (2026-11-14, B92)
 - Slice 6.68 is deployed and checked on the cluster: against 6.67's last half hour the API pod used 1.28 cores instead of
   1.46 and allocated 138 MiB/s instead of 429, a tick took about 53 s instead of 150, and the trade list was built in
