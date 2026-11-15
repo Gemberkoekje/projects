@@ -57,6 +57,10 @@ public static class DependencyInjection
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
         services.AddScoped<IShipPurchaseService, ShipPurchaseService>();
 
+        // Whether a ship earns its price back before the server resets (slice 6.70, D150), and when that is.
+        services.AddScoped<ServerReset>();
+        services.AddScoped<ShipPayback>();
+
         // When the game loop's ticks began, which the calls and the needs below are judged by (B79).
         services.AddSingleton<GameTicks>();
 

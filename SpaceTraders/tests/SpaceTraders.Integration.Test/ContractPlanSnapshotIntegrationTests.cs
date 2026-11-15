@@ -155,6 +155,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
                 ActualCost = 64_200,
             });
 
+        using var paybackCache = new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
         var sut = new ContractPlanService(
             plans,
             contracts,
@@ -169,7 +170,21 @@ public sealed class ContractPlanSnapshotIntegrationTests
             Substitute.For<IShipGoalRepository>(),
             Substitute.For<ISettingsRepository>(),
             Substitute.For<IPlanRepository>(),
-            new PurchaseOrder(new PurchaseNeeds(), new ShipyardCalls(), Substitute.For<IBudgetPolicy>(), Substitute.For<ISettingsRepository>(), Substitute.For<ILedgerRepository>(), NullLogger<PurchaseOrder>.Instance),
+            new PurchaseOrder(
+                new PurchaseNeeds(),
+                new ShipyardCalls(),
+                Substitute.For<IBudgetPolicy>(),
+                Substitute.For<ISettingsRepository>(),
+                Substitute.For<ILedgerRepository>(),
+                new ShipPayback(
+                    new ServerReset(Substitute.For<ISettingsRepository>()),
+                    Substitute.For<ILedgerRepository>(),
+                    Substitute.For<IShipRepository>(),
+                    Substitute.For<IPlanRepository>(),
+                    Substitute.For<ISettingsRepository>(),
+                    paybackCache,
+                    NullLogger<ShipPayback>.Instance),
+                NullLogger<PurchaseOrder>.Instance),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);

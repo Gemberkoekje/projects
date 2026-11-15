@@ -66,6 +66,7 @@ public sealed class PurchaseShipHandlerTests
             new PurchaseNeeds(),
             new ShipNameBook(Substitute.For<IActiveReset>()),
             bus,
+            new Services.PaybackFixture().Payback(),
             NullLogger<PurchaseShipHandler>.Instance);
 
         await sut.Handle(new PurchaseShipCommand("SHIP_MINING_DRONE", "X1-AB-SY1"), CancellationToken.None);

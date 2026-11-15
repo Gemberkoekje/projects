@@ -266,6 +266,9 @@ get the next D-number.
 | D147 | Slices 6.62–6.63 (asked the same day): asynchronous both ways ("Both"), after the speed-up ("Speed-up first"). Ship steps get their own loop, so ships keep flying and trading while a plan works; a plan and a step never write one ship at the same time. The shared route table (D146) is rebuilt in the background, and the plans read the latest one instead of working it out: they decide on data up to one rebuild old, which was accepted. |
 | D148 | Slice 6.63, reshaped (asked on 2026-11-13, after 6.61's measures): "I feel like fuel costs are mostly negligible compared to trades", then "maybe we should separate trade in the home system and trade in the universe", which the user made precise the same morning: "When the gate isn't built yet, we only have 1 system to trade in, and we're kind of strapped for cash. So in that situation, it makes sense to keep actual fuel prices in mind when deciding a trade. As soon as the gate is built, we'll soon have 1000s of markets to trade with. Then quantity over quality starts to become more important: Have a pre-set (asynchronously generated) list of high value trades. It's fine if they don't give exactly the amount they're set up for, they'll still be high value trades. A ship can then take a close high value trade to do. Be aware this doesn't supercede older decisions. Trades should still devaluate faster if there's a higher chance another trader might've picked it up in front of us." Measured that day on the copy (70 traders in 18 systems): routes within one system, 1,913, lose a median 8.6% of their margin (sale less purchase) to fuel, and 44% of them more than a tenth; routes across systems, 733,603, lose 0.9% (99th percentile 4.9%) to fuel but a median 49% to antimatter (24% on each trader's best route). Sharing the flights across maps changed no fuel cost and no trader's best route, but took only 18% off ranking: the time is each trader's own loop over buy market, good and sell market. So: until the home system's jump gate is built, routes are worked out exactly, per ship, with each market's fuel price, as now. From then on, a list of high-value trades across the known universe is built in the background (D147), its amounts and earnings estimates (fuel at an average cost per unit of distance, each jump's antimatter at its gate's price), and a free ship takes a close one. The older decisions stay: a trade at markets other players trade at counts for less (D133), as do predicted prices (D131, D132); two of our traders aren't sent for the same goods (D79); the traders share one pot of credits (D57). |
 | D149 | Slice 6.69 (asked on 2026-11-15, after a night of `ApiThrottled` mails): "The alarm should be based on the amount of ships that are in the simulation. At 10 ships, any 429 is something to be noticed, while at the 500 or so ships we have now the rate limit alarm limit should be at 50. So maybe amount of ships divided by 10?" | `ApiThrottled` allows one 429 an hour for every `Health.Api.ShipsPer429PerHour` (10) ships the bot has, rounded down: none below 10 ships, one from 10 to 19, 50 at 500. `Health.Api.Max429sPerHour` is removed, from the agent that runs too. |
+| D150 | Slices 6.70–6.72 (asked on 2026-11-15): "We set up the 'is it worth it' thing for the gate. I'd like to have a similar thing for the end of the cycle. So: Does a ship earn it's own price back before the end of the week? For traders, that's relatively easy. For scouts and probes, that's harder. Because we need scouts and probes to map more of the universe and get the best deals. But putting a probe up 10 minutes before the server resets does not give any value at all. [...] I'd like to do the same for trades. We know exactly how long each trade needs, so don't pick a trade that runs beyond the reset time." Scrapping every ship a minute before the reset is for later ("an extreme measure I don't want to start with"). In the 14 hours before the reset of 2026-11-15 13:00Z the bot bought 26 bulk freighters for 105M, about its credits then (109M); a bulk freighter earned about 200,000 an hour, so one paid its 3.9M back in about 20 hours. | **Purchases first, then probes, then trades** ("Purchases first (Recommended)", 2026-11-15). A ship that earns is bought only if its type earns its price back from an hour after the purchase until the reset ("Own type's record (Recommended)"): what the ships of its type (`ShipNames.TypeOf`) earned an hour over the last 24 hours, net of cargo, fuel and antimatter; the role board's estimate for the drones, whose ore the shuttle sells, and for a type the fleet doesn't have. A need that won't pay back is no need, so it holds back nothing after it in the order. With no reset known, or nothing known of the type, the purchase goes as before. |
+| D151 | Slice 6.71 (asked with D150): how to judge the ships that earn nothing themselves, whose value is the trades their market data makes. | **The market's promise pays it back** ("Market promise pays back (Recommended)", 2026-11-15): a probe or interceptor is bought only if the promise of the best market without a probe in the system it is bought for (D134, D135: what better prices there could earn an hour) covers its price from its arrival until the reset. A surveyor by the same rule, with the mining it serves for its promise; that detail is settled when 6.71 is built. |
+| D152 | Slice 6.72 (asked with D150): how much slack a trade trip's estimated end gets before the reset. | **5 minutes** ("5 minutes", 2026-11-15; 15 was recommended): a trip starts only if its estimated time (`TradeRoute.Seconds`: the flight to the buy market, the haul, a stop at each landing) ends at least 5 minutes before the reset; a setting. |
 
 ## Phases
 
@@ -390,6 +393,9 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.67 The trade list keeps only what it picks (B91), deployed (below)
 - 6.68 One gate search a start system for each map (B92), deployed (below)
 - 6.69 The 429 alarm's limit grows with the fleet (D149), built (below)
+- 6.70 A ship bought earns its price back before the reset (D150), built (below)
+- 6.71 Probes only where their market pays them back (D151), to build (below)
+- 6.72 No trade trip across the reset (D152), to build (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -986,3 +992,35 @@ the gates of other systems (D68).
   - Tests: `ApiRuleTests` (the limit at 627, 500, 19, 10, 9 and 0 ships, one 429 more raises it; the setting; a 429 more
     than an hour old; no 429, no fleet loaded), `DefaultSettingsSeedTests` (the old key and its next-run value removed).
   - To understand this, start with `ApiThrottledRule.EvaluateAsync`.
+- **6.70 A ship bought earns its price back before the reset** (D150; asked on 2026-11-15): built on branch
+  `claude/spacetraders-end-of-cycle-plan`.
+  - Startup stores the next reset it reads from the server's status in `Runtime.Reset.Next`, which the dashboard read and
+    nothing wrote; `ServerReset` reads it, and no reset or one that has passed means no end-of-run rule.
+  - `ShipPayback` judges a purchase: a ship pays back when what its type earns an hour, from `Purchase.PaybackLeadHours`
+    (1) after the purchase until the reset, covers its price. A type's record is what its ships (`ShipNames.TypeOf`)
+    earned in the last 24 hours, net of cargo, fuel, antimatter and repairs (not ship, module or gate purchases), over
+    the hours they were owned in it (`ILedgerRepository.GetNetByShipAsync`, kept 5 minutes), once those come to 24
+    ship-hours. The drones (mining, siphon, ore hound) and a type with a shorter record take the role board's estimate
+    for their role (mining, siphoning, else trading): the average of its estimates of the ships of the type, else of every
+    ship. Probes, interceptors and surveyors aren't judged until 6.71; nor is a type nothing is known of.
+  - `PurchaseOrder` treats a need whose ship won't pay back as no need, so it holds back nothing after it, and tells it at
+    Information once an hour for each plan and type. `ShipPurchaseService` judges again with the price the shipyard asks
+    (`ShipPurchaseFailure.WontPayBack`), also for a purchase asked by command.
+  - On the run of 2026-11-08, by the ledger: a bulk freighter's record was about 190,000 to 210,000 an hour from 19:20Z
+    on 2026-11-14 on, about 20 hours for its 3.9M with the first hour, so none of the 26 bought from 19:20Z (17.7 hours
+    before the reset) to 07:14Z, 105M, would have been; a light hauler's (325,000) paid back in 6 to 11 hours.
+  - Not changed: the purchases are judged all week, so a type whose last day earned nothing isn't bought at any time; a
+    reset the server puts off is read at the next start.
+  - Tests: `ShipPaybackTests` (the freighter of 2026-11-15, the first hours, no reset, the ships left to 6.71, a drone by
+    the board, a short record by the board, nothing known, a type that earned nothing, a record's hours, the records kept,
+    the telling), `PurchaseOrderTests` (a freighter that won't pay back lets the probe after it go),
+    `ShipPurchaseServiceTests` (no purchase, `WontPayBack`), `AgentBootstrapServiceTests` (the reset stored),
+    `ShipGoalHistoryRepositoryTests` (the ledger's net by ship, on PostgreSQL), `DefaultSettingsSeedTests`.
+  - To understand this, start with `ShipPayback.JudgeAsync`, then `PurchaseOrder.DecideAsync`.
+- **6.71 Probes only where their market pays them back** (D151): to build. The probe plan's purchase (`BuyProbeAsync`)
+  knows the system it buys for; the promise of its best market without a probe (`ProbePromiseCache`), times the hours
+  from the probe's arrival to the reset, must cover the price. A market never seen has no promise (D134 puts it first):
+  it counts as the system's best promise.
+- **6.72 No trade trip across the reset** (D152): to build. A route whose `Seconds` would end later than 5 minutes
+  before the reset (`Trade.ResetSlackMinutes`) isn't given out: in the trading plan, the role board and the trade list's
+  reader.

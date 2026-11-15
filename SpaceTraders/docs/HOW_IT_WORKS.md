@@ -1559,13 +1559,14 @@ last, gives it something to do then; your decisions are D34–D37.
 - **`ShipPurchaseService`:**
   1. It needs the ship type's price cached for that shipyard. Early in a reset, no ship has
      visited a shipyard yet, so purchases fail with "price unknown".
-  2. It asks `BudgetPolicy`.
+  2. It refuses a ship that wouldn't earn its price back before the server resets (`WontPayBack`, slice 6.70, D150,
+     below), and asks `BudgetPolicy`.
   3. It refuses a ship the shipyard's cached listing has SCARCE (`Scarce`, D121, below), and calls for no ship there.
   4. It needs one of our ships at the shipyard, not in flight: the API sells a ship only there (D30).
      Without one it makes no API call; it records a call at the shipyard (`ShipyardCalls`, in memory,
      open until the plan's next pass, a tick later, or 2 minutes after the last attempt if that is later, B79), which the probe plan answers with its nearest free
      probe, and the plan's next attempt buys. A purchase closes the call.
-  5. With a ship there, it fetches the shipyard again and asks `BudgetPolicy` again with the price
+  5. With a ship there, it fetches the shipyard again and judges the payback and asks `BudgetPolicy` again with the price
      the shipyard asks now (a cached price can be hours old, and every purchase moves it); when the
      fetch fails it uses the cached price. It refuses a ship the shipyard, fetched again, lists at SCARCE (`Scarce`).
   6. It buys the ship and saves the new credits and the ship, with its mounts, modules, frame and engine as the
@@ -1578,7 +1579,19 @@ last, gives it something to do then; your decisions are D34–D37.
   8. It tells the name book the fleet, the new ship in it, and its `ShipPurchased` line says the name the
      bot gives the ship: "the bot calls it PICKAXE-3" (slice 2.14, see [Names](#names-shipnames-slice-214)).
   - A purchase that doesn't happen says why (`ShipPurchaseFailure`): `PriceUnknown`, `OverBudget`,
-    `NoShipAtShipyard` or `Scarce`.
+    `NoShipAtShipyard`, `Scarce` or `WontPayBack`.
+- **Only a ship that pays back before the reset** (`ShipPayback`, slice 6.70, D150, asked on 2026-11-15: "Does a ship
+  earn it's own price back before the end of the week?"): a reset ends the run with its ships and credits, so a ship is
+  bought only if what its type earns an hour, from `Purchase.PaybackLeadHours` (1) after the purchase until the reset,
+  covers its price. The reset is the one startup read from the server's status (`Runtime.Reset.Next`, `ServerReset`);
+  with none, or one that has passed, nothing is judged. A type's earnings are its record: what its ships
+  (`ShipNames.TypeOf`) earned in the last 24 hours, net of cargo, fuel, antimatter and repairs, over the hours they were
+  owned in it, once those come to 24 ship-hours (worked out at most every 5 minutes). The drones, whose ore the shuttle
+  sells, and a type with a shorter record take the role board's estimate for their role (mining, siphoning, else
+  trading): the average of its estimates of the ships of the type, else of every ship. Probes, interceptors and
+  surveyors earn nothing themselves and aren't judged yet (slice 6.71, D151), nor is a type nothing is known of. The
+  order ships are bought in treats a need that won't pay back as no need (below), and the purchase judges again with the
+  price the shipyard asks.
 - **No ship at SCARCE** (slice 6.37, D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the
   supply is SCARCE", then "Every purchase"): no plan buys a ship where the shipyard has it SCARCE (`ScarceShips`). Each plan
   leaves a shipyard whose cached listing says SCARCE alone when it chooses where to buy (the contract's drone, the survey
@@ -1668,7 +1681,10 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   in which no plan ran (a 502 pauses them for 3 minutes, while the ticks go on every 5 seconds), the probe plan waits a
   tick; a plan that fails before it says holds the purchases after it. The
   construction plan, which runs after the mining plan, holds back the gate's miners until it has said what it needs
-  (D92): its load could be one it may buy now.
+  (D92): its load could be one it may buy now. A need for a ship that wouldn't earn its price back before the server
+  resets is no need (slice 6.70, D150, `ShipPayback`, see [Purchasing](#purchasing)): it holds back nothing after it, and
+  logs "Ship purchase: the Trading plan's SHIP_BULK_FREIGHTER for ... wouldn't earn its price back before the reset" at
+  Information once an hour for each plan and type.
 - **What it means:** the credits pile up for the purchase first in the order, while everything after it
   waits: the probes fly on, the drones and traders work, only their purchases wait. The order says who
   may buy; the credit reserve stays the purchase's own check (`BudgetPolicy`). The tick still runs the
@@ -2237,9 +2253,10 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 - **Read without changing what the bot does:**
   - the run's strategy label: `FleetExpansion.PreferredShipType`, `Automation.MiningShipPercentage`.
 - **Status flags, not settings to tune** (moving them out of the settings is a separate cleanup):
-  - Read by the endpoints but never written: `Runtime.Reset.Next`, `Runtime.Alert.ApiUnavailable`,
+  - Read by the endpoints but never written: `Runtime.Alert.ApiUnavailable`,
     `CacheDivergence`, `ContractDeadlinesApproaching`, `ResetUpcoming`.
-  - Written by bootstrap: `Runtime.Alert.TokenResetMismatch`.
+  - Written by bootstrap: `Runtime.Alert.TokenResetMismatch`, and `Runtime.Reset.Next`, which the purchases are judged
+    by (slice 6.70, D150) and the endpoints show.
   - Written but never read: `Runtime.TokenResetMismatchDetected`, `Runtime.AutomationPausedByReset`,
     `Runtime.Alert.AutomationDisabled`.
   - Read by nothing: `Runtime.Reset.Warning`, `Runtime.ApiUnavailable`,

@@ -119,6 +119,31 @@ public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvi
                 summary.EntryCount);
     }
 
+    /// <inheritdoc />
+    public Task<IReadOnlyDictionary<string, long>> GetNetByShipAsync(
+        DateTimeOffset from,
+        IReadOnlyCollection<LedgerCategory> categories,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(categories);
+        return NetByShipAsync(from, [.. categories], cancellationToken);
+    }
+
+    private async Task<IReadOnlyDictionary<string, long>> NetByShipAsync(
+        DateTimeOffset from,
+        List<LedgerCategory> wanted,
+        CancellationToken cancellationToken)
+    {
+        var rows = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(e => e.OccurredAt >= from && wanted.Contains(e.Category))
+            .GroupBy(e => e.ShipSymbol)
+            .Select(g => new { Ship = g.Key, Net = g.Sum(e => e.Amount) })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(row => row.Ship, row => row.Net, StringComparer.OrdinalIgnoreCase);
+    }
+
     public async Task<int> GetDistinctShipCountAsync(Guid runId, CancellationToken cancellationToken = default)
     {
         return await db.LedgerEntries

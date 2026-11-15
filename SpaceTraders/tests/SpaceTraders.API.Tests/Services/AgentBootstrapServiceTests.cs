@@ -182,6 +182,10 @@ public sealed class AgentBootstrapServiceTests
 
         metrics.Received(1).NextServerReset(new DateTimeOffset(2026, 10, 04, 16, 00, 00, TimeSpan.Zero));
         agentAtThatMoment.Should().Be("MATCHING-AGENT@2026-09-27", "the gauge carries the agent's reset date, as every metric does (slice 2.13)");
+
+        // Slice 6.70 (D150): the purchases are judged by it, and the dashboard shows it.
+        await provider.GetRequiredService<ISettingsRepository>().Received(1)
+            .SetAsync("Runtime.Reset.Next", "2026-10-04T16:00:00.0000000+00:00", Arg.Any<CancellationToken>());
     }
 
     [Fact]
