@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-15, slice 6.72)
+- D152: a trade trip starts only if its estimated time ends at least `Trade.ResetSlackMinutes` (5) before the server's
+  next reset. The trading plan doesn't give a longer trip out, and the role board's trading estimates count only the trips
+  that fit. The trading plan's goods not traded say `ends_after_the_reset`. A trip already on its way carries on.
+- Tests: `TradeRoutePlannerTests`, `TradeRouteJudgementTests`, `TradeContextReaderTests`, `TripTimeTests`,
+  `DefaultSettingsSeedTests`.
+
+### Plan – Changed (2026-11-15, slice 6.73)
+- Slice 6.73 is deployed; its first start logged no warnings or errors. The proof is the reset of 2026-11-22.
+
 ### Code – Fixed (2026-11-15, slice 6.73)
 - B93: the server's reset no longer logs errors or restarts the pod again and again. The 503 the server answers while it
   resets counts as the reset and stops the host at once; bootstrap waits for the server, asking every 30 seconds, where

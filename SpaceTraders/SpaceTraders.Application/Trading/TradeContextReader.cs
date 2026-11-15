@@ -1,3 +1,4 @@
+using System.Globalization;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.Exploring;
@@ -110,7 +111,8 @@ public sealed class TradeContextReader(
     IPredictionConfidence confidence,
     PurchaseNeeds purchaseNeeds,
     IPlanRepository plans,
-    TradeListStore tradeLists) : ITradeContextReader
+    TradeListStore tradeLists,
+    ServerReset serverReset) : ITradeContextReader
 {
     /// <summary>The setting that holds the profit per unit, after fuel, a trip must earn (D14).</summary>
     public const string MinProfitPerUnitSetting = "Trade.MinProfitPerUnit";
@@ -136,6 +138,15 @@ public sealed class TradeContextReader(
 
     /// <summary>The prices' age when <see cref="MaxPriceAgeMinutesSetting"/> gives none, as it is seeded.</summary>
     public const int DefaultMaxPriceAgeMinutes = 30;
+
+    /// <summary>
+    /// The setting that holds how many minutes before the server's next reset a trade trip must end (PLAN.md slice 6.72, D152):
+    /// a longer trip doesn't start (<see cref="TradeMarketMap.TripSecondsLeft"/>).
+    /// </summary>
+    public const string ResetSlackMinutesSetting = "Trade.ResetSlackMinutes";
+
+    /// <summary>The minutes when <see cref="ResetSlackMinutesSetting"/> gives none, as it is seeded.</summary>
+    public const int DefaultResetSlackMinutes = 5;
 
     private const string AntimatterSymbol = "ANTIMATTER";
 
@@ -197,6 +208,7 @@ public sealed class TradeContextReader(
             // Slice 6.63 (D148): once the home gate is built, the routes are the trade list's while it is recent enough, where it
             // covers the ship's system.
             TradeList = await TradeListForAsync(systemSymbol, now, cancellationToken),
+            TripSecondsLeft = basics.TripSecondsLeft,
             ConstructionMaterials = home.Length > 0 ? await MaterialsAsync(home, cancellationToken) : new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             ConstructionSystemSymbol = home,
             ConstructionFirst = feedersFirst,
@@ -266,6 +278,7 @@ public sealed class TradeContextReader(
                 ConstructionFirst = feedersFirst,
                 FeedersHeldBack = GateCanBeBuilt(at) && !feedersFirst,
                 PredictionWeights = predicted,
+                TripSecondsLeft = basics.TripSecondsLeft,
             },
             basics.Credits,
             basics.MinProfitPerUnit,
@@ -377,19 +390,37 @@ public sealed class TradeContextReader(
             .GroupBy(entry => entry.WaypointSymbol, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First().Price, StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The production chains, the credits, the headquarters' system, the minimum profit and the fuel reserve.</summary>
+    /// <summary>
+    /// The production chains, the credits, the headquarters' system, the minimum profit, the fuel reserve, and how long a trip
+    /// may take before the server's reset (D152).
+    /// </summary>
     private async Task<Basics> ReadBasicsAsync(CancellationToken cancellationToken)
     {
-        var chains = await supplyChain.GetAsync(port, TimeProvider.System.GetUtcNow(), cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
+        var chains = await supplyChain.GetAsync(port, now, cancellationToken);
         var agent = await agents.GetAsync(cancellationToken);
         var minProfitPerUnit = await settings.GetAsync<int>(MinProfitPerUnitSetting, cancellationToken);
         var fuelReserve = await settings.GetAsync<long>(FuelReserveCreditsSetting, cancellationToken);
+        var reset = await serverReset.NextAfterAsync(now, cancellationToken);
+        var tripSecondsLeft = reset == DateTimeOffset.MaxValue
+            ? double.PositiveInfinity
+            : TripTime.SecondsLeftBefore(reset, now, await ResetSlackMinutesAsync(cancellationToken));
         return new Basics(
             chains,
             BusinessSystems.Of(agent).FirstOrDefault() ?? string.Empty,
             agent?.Credits ?? 0,
             Math.Max(0, minProfitPerUnit),
-            Math.Max(0, fuelReserve));
+            Math.Max(0, fuelReserve),
+            tripSecondsLeft);
+    }
+
+    /// <summary><c>Trade.ResetSlackMinutes</c>, at least 0; <see cref="DefaultResetSlackMinutes"/> when it holds no number.</summary>
+    private async Task<int> ResetSlackMinutesAsync(CancellationToken cancellationToken)
+    {
+        var stored = await settings.GetRawAsync(ResetSlackMinutesSetting, cancellationToken);
+        return int.TryParse(stored, NumberStyles.Integer, CultureInfo.InvariantCulture, out var minutes)
+            ? Math.Max(0, minutes)
+            : DefaultResetSlackMinutes;
     }
 
     /// <summary>
@@ -417,5 +448,6 @@ public sealed class TradeContextReader(
         string HomeSystemSymbol,
         long Credits,
         int MinProfitPerUnit,
-        long FuelReserve);
+        long FuelReserve,
+        double TripSecondsLeft);
 }

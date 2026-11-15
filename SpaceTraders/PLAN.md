@@ -396,8 +396,8 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.69 The 429 alarm's limit grows with the fleet (D149), deployed (below)
 - 6.70 A ship bought earns its price back before the reset (D150), deployed (below)
 - 6.71 Probes only where their market pays them back (D151), deployed (below)
-- 6.72 No trade trip across the reset (D152), to build (below)
-- 6.73 A reset without errors (B93), built (below)
+- 6.72 No trade trip across the reset (D152), built (below)
+- 6.73 A reset without errors (B93), deployed (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -1051,11 +1051,27 @@ the gates of other systems (D68).
     reset, 0.7 hours off. Promises run high, as D135 counts a tenth of what other agents trade at the market, so in
     practice a probe is refused only within `Purchase.PaybackLeadHours` of the reset.
   - To understand this, start with `ProbeWorth.Of`, then the probe plan's `BuyProbeAsync`.
-- **6.72 No trade trip across the reset** (D152): to build. A route whose `Seconds` would end later than 5 minutes
-  before the reset (`Trade.ResetSlackMinutes`) isn't given out: in the trading plan, the role board and the trade list's
-  reader.
+- **6.72 No trade trip across the reset** (D152; asked on 2026-11-15 with D150): built on branch
+  `claude/spacetraders-6-72`.
+  - `TradeContextReader` reads the next reset (`ServerReset`, D150) and `Trade.ResetSlackMinutes` (5) with the rest of a
+    trade decision's basics, and sets on both its maps how long a trip may take from then (`TradeMarketMap.TripSecondsLeft`,
+    `TripTime.SecondsLeftBefore`), which the map's copies keep. With no reset known, or one that has passed, there is no
+    limit.
+  - `TradeRoutePlanner` checks it last, once a route is found lucrative: a route whose `Seconds` (the flight to the buy
+    market, the haul and a stop at each landing, D95) is longer isn't one of the ship's (`TradeRouteCheck.EndsAfterReset`).
+    `Rank` and `Judge` share the check, so the trading plan doesn't give such a trip out, and the role board's trading
+    estimates (`RoleEstimator`) count only the trips that fit. The trading plan's goods not traded say
+    `ends_after_the_reset`, and the sentence gives the trip's minutes and the minutes left. Such a judgement ranks just below
+    a lucrative one, so a good that another trader can still carry in time waits for it.
+  - Not changed: a trip already on its way isn't judged again, as the trade executor's check at the buy market
+    (`TryEvaluate`) doesn't read the limit; the trade list is built as before, its trades worked out exactly per ship; the
+    other goals (mining, the ore shuttle, the gate's loads) don't read it.
+  - Tests: `TradeRoutePlannerTests` (the longest trip left out a second short of its time and kept at its time, none once
+    the slack has begun), `TradeRouteJudgementTests` (the sentence; a trip that can start ranks first),
+    `TradeContextReaderTests` (both maps, the slack set and not, no reset), `TripTimeTests`, `DefaultSettingsSeedTests`.
+  - To understand this, start with `TradeRoutePlanner.LastCheck`, then `TradeContextReader.ReadBasicsAsync`.
 - **6.73 A reset without errors** (B93; asked on 2026-11-15: "The pod gave a lot of errors around the reset time. Can
-  we smooth that out?"): built on branch `claude/spacetraders-quiet-reset`.
+  we smooth that out?"): merged as projects#268 (`1968536b`), deployed by gembernodes#230 on 2026-11-15 at 16:08Z.
   - The 503 the server answers while it resets ("The universe is being reset",
     `SpaceTradersApiException.IsResetInProgress`) counts as the reset, as an old token's 401 does: the first stops the
     host (`ServerResetMonitor`), 20 seconds sooner than on 2026-11-15. `ResetDetected` is a warning: a reset comes every
@@ -1084,5 +1100,8 @@ the gates of other systems (D68).
     another 503 doesn't), `ServerResetLogFilterTests`, `DeferredStartupHostedServiceTests` (a step the reset cuts short
     stops the host with a warning), `HostLoggingTests` (the host leaves a reset's line out, and the health checks'
     warnings).
+  - Checked there, 16:08Z to 16:11Z on 2026-11-15: the new pod started in 5 seconds, with no restart, and no Warning, Error
+    or Fatal line was logged from 16:05Z on, the old pod's stop included. The proof is the next reset, 2026-11-22 13:00Z:
+    one `ResetDetected` warning, one warning while bootstrap waits, and no Error or Fatal line.
   - To understand this, start with `ServerResetMonitor`, then `AgentBootstrapService.WaitForServerStatusAsync` and
     `ServerResetLogFilter`.

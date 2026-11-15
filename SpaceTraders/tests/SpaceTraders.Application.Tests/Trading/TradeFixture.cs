@@ -92,6 +92,14 @@ internal static class TradeFixture
     public static TradeMarketMap Map(params MarketSnapshot[] markets)
         => new(Waypoints, markets.Length == 0 ? [K85Market(), D41Market(), A1Market()] : markets, MadeFrom);
 
+    /// <summary>
+    /// <see cref="Map"/>'s three markets, read <paramref name="tripSecondsLeft"/> before the server's reset less its slack (PLAN.md
+    /// slice 6.72, D152). From K85 the MEDICINE trip, through D41 to A1, takes about 14 minutes: 185 and 95 at the drones' speed
+    /// of 9, and a stop at each market; from D41 about 5.
+    /// </summary>
+    public static TradeMarketMap MapBeforeTheReset(double tripSecondsLeft)
+        => new(Waypoints, [K85Market(), D41Market(), A1Market()], MadeFrom) { TripSecondsLeft = tripSecondsLeft };
+
     public static TradeContext Context(TradeMarketMap map, long credits = 250_000, int minProfitPerUnit = 200, long fuelReserve = 0)
         => new(map, credits, minProfitPerUnit, fuelReserve);
 

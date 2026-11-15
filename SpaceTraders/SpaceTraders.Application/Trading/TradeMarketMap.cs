@@ -88,6 +88,7 @@ public sealed class TradeMarketMap
         PredictionWeights = other.PredictionWeights;
         Legs = other.Legs;
         TradeList = other.TradeList;
+        TripSecondsLeft = other.TripSecondsLeft;
     }
 
     /// <summary>The systems' waypoints, with their types and traits (what an asteroid yields, slice 6.4).</summary>
@@ -119,6 +120,15 @@ public sealed class TradeMarketMap
     /// unless set, and then every route is: before the gate, and when no list is recent enough. Kept by the map's copies.
     /// </summary>
     public TradeList TradeList { get; init; } = TradeList.None;
+
+    /// <summary>
+    /// The most seconds a trip may take (PLAN.md slice 6.72, D152): from when the map was read until <c>Trade.ResetSlackMinutes</c>
+    /// before the server's next reset (<see cref="TripTime.SecondsLeftBefore"/>). A route whose <see cref="TradeRoute.Seconds"/>
+    /// is longer isn't one of a ship's (<see cref="TradeRouteCheck.EndsAfterReset"/>): its cargo would be lost to the reset.
+    /// Below 0 once that time has come, and no trip starts. Infinity when no reset is known, and unless set. Kept by the map's
+    /// copies.
+    /// </summary>
+    public double TripSecondsLeft { get; init; } = double.PositiveInfinity;
 
     /// <summary>
     /// What a unit of <c>FUEL</c> costs on average at the markets that sell it, which <see cref="FuelPrice"/> falls back on; the

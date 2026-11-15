@@ -124,6 +124,31 @@ public sealed class TradeRouteJudgementTests
     }
 
     [Fact]
+    public void Why_ATripThatWouldEndAfterTheReset_GivesItsTime_AndTheTimeLeft()
+    {
+        // Slice 6.72 (D152): 10 minutes left before the reset, less its slack; the MEDICINE trip from K85 takes about 14.
+        var map = MapBeforeTheReset(600);
+        var medicine = Of(TradeRoutePlanner.Judge(map, CommandShip(), 250_000, 200, NoneHeld), "MEDICINE");
+
+        medicine.Check.Should().Be(TradeRouteCheck.EndsAfterReset);
+        medicine.Why(map).Should().Be("SHIP-1: the trip takes about 14 minutes; a trip must end within 10, ahead of the server's reset (D152).");
+    }
+
+    [Fact]
+    public void FurthestPerGood_PutsATripThatCanStart_BeforeOneThatWouldEndAfterTheReset()
+    {
+        // D152's check runs last, after a trip is found lucrative: SHIP-1's MEDICINE trip from K85 is too long for the 10
+        // minutes left, SHIP-5's from D41 isn't. The good waits for SHIP-5's trip, not for the reset.
+        var map = MapBeforeTheReset(600);
+        var judged = TradeRoutePlanner.Judge(map, CommandShip(), 250_000, 200, NoneHeld)
+            .Concat(TradeRoutePlanner.Judge(map, CommandShip(D41, symbol: "SHIP-5"), 250_000, 200, NoneHeld));
+
+        var medicine = TradeRouteJudgement.FurthestPerGood(judged).Single(judgement => judgement.Route.TradeSymbol == "MEDICINE");
+
+        (medicine.Ship.Symbol, medicine.Check).Should().Be(("SHIP-5", TradeRouteCheck.Lucrative));
+    }
+
+    [Fact]
     public void FurthestPerGood_IsTheRouteAndShipThatPassedTheMostChecks()
     {
         // SHIP-1, whose hold is full, has no room for SHIP_PARTS; SHIP-5's empty hold has, but its first unit earns 279,

@@ -39,6 +39,13 @@ public enum TradeRouteCheck
     /// trip buys it there (PLAN.md slice 6.45, D128).
     /// </summary>
     GateMaterial = 7,
+
+    /// <summary>
+    /// The trip would pass every other check, but it takes longer than the time left before the server's reset, less
+    /// <c>Trade.ResetSlackMinutes</c> (<see cref="TradeMarketMap.TripSecondsLeft"/>, PLAN.md slice 6.72, D152): its cargo would
+    /// be lost to the reset. The last check.
+    /// </summary>
+    EndsAfterReset = 8,
 }
 
 /// <summary>
@@ -97,7 +104,7 @@ public sealed record TradeRouteJudgement
         return [.. judgements
             .GroupBy(judgement => judgement.Route.TradeSymbol, StringComparer.OrdinalIgnoreCase)
             .Select(good => good.Order(FurthestFirst).First())
-            .OrderByDescending(judgement => judgement.Check)
+            .OrderByDescending(judgement => Progress(judgement.Check))
             .ThenBy(judgement => judgement.Route.TradeSymbol, StringComparer.Ordinal)];
     }
 
@@ -107,7 +114,7 @@ public sealed record TradeRouteJudgement
     /// </summary>
     public static IComparer<TradeRouteJudgement> FurthestFirst { get; } = Comparer<TradeRouteJudgement>.Create(static (x, y) =>
     {
-        var byCheck = y.Check.CompareTo(x.Check);
+        var byCheck = Progress(y.Check).CompareTo(Progress(x.Check));
         if (byCheck != 0)
         {
             return byCheck;
@@ -122,6 +129,13 @@ public sealed record TradeRouteJudgement
         var byShip = string.CompareOrdinal(x.Ship.Symbol, y.Ship.Symbol);
         return byShip != 0 ? byShip : string.CompareOrdinal(x.Route.Key, y.Route.Key);
     });
+
+    /// <summary>
+    /// How far through the checks a route got, for <see cref="FurthestFirst"/>: its check's place in <see cref="TradeRouteCheck"/>,
+    /// but a trip that fails only the reset's check (D152) comes just below a lucrative one, as that check runs last.
+    /// </summary>
+    private static double Progress(TradeRouteCheck check)
+        => check == TradeRouteCheck.EndsAfterReset ? (double)TradeRouteCheck.Lucrative - 0.5 : (double)check;
 
     /// <summary>
     /// Why the route isn't one of the ship's, in a sentence, with the figures of the check it failed; for a lucrative route,
@@ -146,6 +160,9 @@ public sealed record TradeRouteJudgement
                 $"{ship}: can't fly on from {buy} to {sell} with {FuelAtBuyMarket(map):N0} fuel aboard, refuelling at markets on the way ({Ship.FuelCapacity:N0}-unit tank)."),
             TradeRouteCheck.NoRoom => NoRoom(),
             TradeRouteCheck.GateMaterial => $"{ship}: the jump gate still needs {Route.TradeSymbol}, so no trader buys it at {buy} (D128).",
+            TradeRouteCheck.EndsAfterReset => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{ship}: the trip takes about {TripTime.Minutes(Route.Seconds):N0} minutes; a trip must end within {Math.Floor(Math.Max(0, map.TripSecondsLeft) / 60):N0}, ahead of the server's reset (D152)."),
             TradeRouteCheck.TooFewCredits => string.Create(
                 CultureInfo.InvariantCulture,
                 $"{ship}: a unit at {Route.BuyPrice:N0} and {Route.FuelCost:N0} for the trip's fuel cost {Route.BuyPrice + Route.FuelCost:N0}; {Credits:N0} credits are free for cargo."),
