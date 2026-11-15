@@ -36,6 +36,33 @@ public sealed class SpaceTradersApiException : Exception
         StatusCode == HttpStatusCode.Unauthorized
         && Message.Contains("Token reset_date does not match the server", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// True when the call failed because the server is being reset right now (503, "The universe is
+    /// being reset"). It answers so for some minutes before the new universe opens: on 2026-11-15
+    /// from 13:00:22Z for six minutes or so, before the first 401 of <see cref="IsServerReset"/> (B93).
+    /// </summary>
+    public bool IsResetInProgress =>
+        StatusCode == HttpStatusCode.ServiceUnavailable
+        && Message.Contains("The universe is being reset", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether <paramref name="exception"/>, or one it holds, is a call that failed because of the
+    /// server's reset: <see cref="IsServerReset"/> or <see cref="IsResetInProgress"/> (B93).
+    /// </summary>
+    /// <param name="exception">The exception, with its inner exceptions.</param>
+    /// <returns>True when the reset is what failed the call.</returns>
+    public static bool CameFromTheReset(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        return exception switch
+        {
+            SpaceTradersApiException api => api.IsServerReset || api.IsResetInProgress,
+            AggregateException aggregate => aggregate.InnerExceptions.Any(CameFromTheReset),
+            _ => exception.InnerException is { } inner && CameFromTheReset(inner),
+        };
+    }
+
     internal static async Task<SpaceTradersApiException> CreateAsync(
         HttpResponseMessage response,
         string endpoint,

@@ -21,6 +21,8 @@ using SpaceTraders.Infrastructure.Persistence.Scoping;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Exceptions;
+using Wolverine.ErrorHandling;
 
 const string PathBase = "/spacetraders/api";
 
@@ -74,6 +76,9 @@ builder.Host.UseSerilog(
         }
 
         cfg.WriteTo.Sink(new ErrorLogSink(services.GetRequiredService<ErrorLog>()));
+
+        // The calls the server's reset fails: one ResetDetected warning tells it (B93).
+        cfg.Filter.ByExcluding(ServerResetLogFilter.Excludes);
         cfg.ReadFrom.Configuration(ctx.Configuration);
         cfg.Enrich.FromLogContext();
         cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
@@ -90,8 +95,13 @@ builder.Host.UseSerilog(
 // sync and startup recovery pick the ships up again, and arrivals wait in scheduled_ship_events.
 // EF Core registers the DbContext's options through a factory, so Wolverine 6's generated handler
 // code can't construct the DbContext itself; resolving it from the scope is the intended way.
+// A message the server's reset failed isn't tried again: the host stops for the reset (B93).
 builder.Services
-    .AddApplication(opts => opts.CodeGeneration.AlwaysUseServiceLocationFor<SpaceTradersDbContext>())
+    .AddApplication(opts =>
+    {
+        opts.CodeGeneration.AlwaysUseServiceLocationFor<SpaceTradersDbContext>();
+        opts.OnException(SpaceTradersApiException.CameFromTheReset).Discard();
+    })
     .AddPersistence(builder.Configuration)
     .AddSpaceTradersApi(options =>
     {

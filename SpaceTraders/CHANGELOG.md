@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-15, slice 6.73)
+- B93: the server's reset no longer logs errors or restarts the pod again and again. The 503 the server answers while it
+  resets counts as the reset and stops the host at once; bootstrap waits for the server, asking every 30 seconds, where
+  each start failed; the calls the reset fails are left out of the log and not tried again; `ResetDetected` is a warning;
+  the event scheduler starts after bootstrap and doesn't log a stop as an error; the health checks' Degraded warnings,
+  every 10 seconds of every start, are gone. On 2026-11-15 the reset logged 70 Error and Fatal lines and restarted the pod
+  six times.
+- Tests: `AgentBootstrapServiceTests`, `ServerResetMonitorTests`, `ServerResetLogFilterTests`,
+  `DeferredStartupHostedServiceTests`, `HostLoggingTests`.
+
+### Plan – Changed (2026-11-15, slices 6.69, 6.71)
+- Slices 6.69 and 6.71 are deployed; 6.71 refused an interceptor three minutes after its start, 0.7 hours before the
+  reset.
+
 ### Code – Added (2026-11-15, slice 6.71)
 - D151: a probe or interceptor is bought only if the market it would watch pays its price back before the server resets:
   the best promise (D134, D135) of the system's markets no probe watches, from an hour after the purchase until the reset.

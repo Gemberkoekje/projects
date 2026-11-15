@@ -381,7 +381,8 @@ public sealed class SpaceTradersApiClient(
         if (!response.IsSuccessStatusCode)
         {
             var exception = await SpaceTradersApiException.CreateAsync(response, endpoint, cancellationToken);
-            if (exception.IsServerReset)
+            // The 503 the server answers while it resets is the reset too, some seconds before the 401 (B93).
+            if (exception.IsServerReset || exception.IsResetInProgress)
             {
                 await _serverResetMonitor.ReportAsync(exception.Message, cancellationToken);
             }

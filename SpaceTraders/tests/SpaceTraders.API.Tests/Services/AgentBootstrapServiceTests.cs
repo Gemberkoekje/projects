@@ -4,6 +4,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -186,6 +187,85 @@ public sealed class AgentBootstrapServiceTests
         // Slice 6.70 (D150): the purchases are judged by it, and the dashboard shows it.
         await provider.GetRequiredService<ISettingsRepository>().Received(1)
             .SetAsync("Runtime.Reset.Next", "2026-10-04T16:00:00.0000000+00:00", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartAsync_WhileTheServerResets_WaitsForIt_WithOneWarning()
+    {
+        // B93: on 2026-11-15 the server answered 503 for some minutes after 13:00:22Z, and five starts
+        // in a row failed on it, each with a Fatal line, before the sixth found the server back.
+        var apiClient = Substitute.For<ISpaceTradersApiClient>();
+        var answers = 0;
+        apiClient.GetStatusAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => ++answers <= 2 ? throw ResetInProgress() : Task.FromResult(ServerStatusOf("2026-09-27")));
+        var log = new LogLines<AgentBootstrapService>();
+
+        using var provider = await BuildMatchingTokenProvider(apiClient, log);
+        var service = provider.GetRequiredService<AgentBootstrapService>();
+        service.ServerWaitInterval = TimeSpan.FromMilliseconds(1);
+
+        await service.StartAsync(CancellationToken.None);
+
+        await apiClient.Received(3).GetStatusAsync(Arg.Any<CancellationToken>());
+        provider.GetRequiredService<IAgentTokenProvider>().Token.Should().Be("matching-token");
+        log.At(LogLevel.Warning).Should().ContainSingle()
+            .Which.Should().Contain("doesn't answer").And.Contain("The universe is being reset");
+        log.At(LogLevel.Information).Should().Contain(line => line.Contains("answers again", StringComparison.Ordinal) && line.Contains("3 attempts", StringComparison.Ordinal));
+        log.At(LogLevel.Error).Concat(log.At(LogLevel.Critical)).Should().BeEmpty("the \"SpaceTraders logged errors\" mail counts those");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task StartAsync_WaitsForAnyServerError(HttpStatusCode status)
+    {
+        var apiClient = Substitute.For<ISpaceTradersApiClient>();
+        var answers = 0;
+        apiClient.GetStatusAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => ++answers == 1
+                ? throw new SpaceTradersApiException($"failed with status code {(int)status}.", status, string.Empty, null)
+                : Task.FromResult(ServerStatusOf("2026-09-27")));
+
+        using var provider = await BuildMatchingTokenProvider(apiClient, new LogLines<AgentBootstrapService>());
+        var service = provider.GetRequiredService<AgentBootstrapService>();
+        service.ServerWaitInterval = TimeSpan.FromMilliseconds(1);
+
+        await service.StartAsync(CancellationToken.None);
+
+        await apiClient.Received(2).GetStatusAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartAsync_DoesNotWait_WhenTheServerRefusesTheCall()
+    {
+        var apiClient = Substitute.For<ISpaceTradersApiClient>();
+        apiClient.GetStatusAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<ServerStatus>>(_ => throw new SpaceTradersApiException("failed with status code 400.", HttpStatusCode.BadRequest, string.Empty, null));
+
+        using var provider = await BuildMatchingTokenProvider(apiClient, new LogLines<AgentBootstrapService>());
+        var service = provider.GetRequiredService<AgentBootstrapService>();
+        service.ServerWaitInterval = TimeSpan.FromMilliseconds(1);
+
+        var start = async () => await service.StartAsync(CancellationToken.None);
+
+        await start.Should().ThrowAsync<SpaceTradersApiException>();
+        await apiClient.Received(1).GetStatusAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StartAsync_StopsWaiting_WhenTheHostStops()
+    {
+        var apiClient = Substitute.For<ISpaceTradersApiClient>();
+        apiClient.GetStatusAsync(Arg.Any<CancellationToken>()).Returns<Task<ServerStatus>>(_ => throw ResetInProgress());
+
+        using var provider = await BuildMatchingTokenProvider(apiClient, new LogLines<AgentBootstrapService>());
+        var service = provider.GetRequiredService<AgentBootstrapService>();
+        service.ServerWaitInterval = TimeSpan.FromMilliseconds(5);
+        using var stopping = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        var start = async () => await service.StartAsync(stopping.Token);
+
+        await start.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -563,13 +643,44 @@ public sealed class AgentBootstrapServiceTests
 
     private static void StubServerResetDate(ISpaceTradersApiClient apiClient)
         => apiClient.GetStatusAsync(Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new ServerStatus
+            .Returns(Task.FromResult(ServerStatusOf("2026-09-27")));
+
+    private static ServerStatus ServerStatusOf(string resetDate) => new()
+    {
+        Status = "SpaceTraders is currently online",
+        Version = "v2.3.0",
+        ResetDate = resetDate,
+        Description = "SpaceTraders",
+    };
+
+    /// <summary>What the server answered on 2026-11-15 from 13:00:22Z (B93).</summary>
+    private static SpaceTradersApiException ResetInProgress() => new(
+        "SpaceTraders API request to '' failed with status code 503: The universe is being reset. Please check back in a few minutes.",
+        HttpStatusCode.ServiceUnavailable,
+        string.Empty,
+        null);
+
+    /// <summary>A provider whose active token belongs to the configured agent, logging to <paramref name="log"/>.</summary>
+    private static Task<ServiceProvider> BuildMatchingTokenProvider(ISpaceTradersApiClient apiClient, LogLines<AgentBootstrapService> log)
+    {
+        apiClient.GetMyAgentAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new Agent { Symbol = "MATCHING-AGENT", StartingFaction = "COSMIC" }));
+
+        return BuildProvider(
+            databaseName: Guid.NewGuid().ToString("N"),
+            initialAgentId: null,
+            configureDb: db => SeedActiveTokenCredential(db, "MATCHING-AGENT@2026-09-27", "matching-token"),
+            configureServices: services =>
             {
-                Status = "SpaceTraders is currently online",
-                Version = "v2.3.0",
-                ResetDate = "2026-09-27",
-                Description = "SpaceTraders",
-            }));
+                services.AddSingleton<IAgentTokenProvider>(new AgentTokenProvider());
+                services.AddSingleton(apiClient);
+                services.AddSingleton(Substitute.For<ISettingsRepository>());
+                services.AddSingleton(Substitute.For<IMessageBus>());
+                services.AddSingleton<ILogger<AgentBootstrapService>>(log);
+                services.AddSingleton<IOptions<SpaceTradersBootstrapOptions>>(
+                    Options.Create(new SpaceTradersBootstrapOptions { AgentName = "MATCHING-AGENT", AgentFaction = "COSMIC" }));
+            });
+    }
 
     private static async Task SeedActiveTokenCredential(SpaceTradersDbContext db, string agentId, string token)
     {

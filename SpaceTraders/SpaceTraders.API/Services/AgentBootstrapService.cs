@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SpaceTraders.API.Configuration;
@@ -13,6 +14,8 @@ using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Exceptions;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Accounts;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Status;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 using Wolverine;
 
 namespace SpaceTraders.API.Services;
@@ -22,6 +25,12 @@ namespace SpaceTraders.API.Services;
 /// or registering a new agent when none is available. Then it deletes the rows of every other
 /// agent, such as the one from before a server reset (<see cref="AgentDataCleanup"/>).
 /// </summary>
+/// <remarks>
+/// First it waits for the server: while it resets it answers 503 for some minutes, and a start
+/// that failed on that stopped the host, five times in a row on 2026-11-15, each a Fatal line and a
+/// longer back-off before the next (B93). It asks again every <see cref="ServerWaitInterval"/>,
+/// with one warning for the wait; Kubernetes' startup probe gives a start ten minutes.
+/// </remarks>
 public sealed class AgentBootstrapService(
     IServiceScopeFactory serviceScopeFactory,
     IAgentTokenProvider agentTokenProvider,
@@ -37,6 +46,9 @@ public sealed class AgentBootstrapService(
     private readonly IAgentDataScope _agentDataScope = agentDataScope;
     private readonly SpaceTradersBootstrapOptions _options = options.Value;
     private readonly ILogger<AgentBootstrapService> _logger = logger;
+
+    /// <summary>How long startup waits before it asks a server that didn't answer again (B93).</summary>
+    internal TimeSpan ServerWaitInterval { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -188,8 +200,7 @@ public sealed class AgentBootstrapService(
 
     private async Task<(string ResetDate, DateTimeOffset? NextReset)> GetServerResetDateAsync(CancellationToken cancellationToken)
     {
-        await using var scope = _serviceScopeFactory.CreateAsyncScope();
-        var status = await scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>().GetStatusAsync(cancellationToken);
+        var status = await WaitForServerStatusAsync(cancellationToken);
 
         DateTimeOffset? nextReset = DateTimeOffset.TryParse(status.ServerResets?.Next, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var next)
             ? next
@@ -199,6 +210,66 @@ public sealed class AgentBootstrapService(
             ? throw new InvalidOperationException("The SpaceTraders server status has no reset date.")
             : (status.ResetDate, nextReset);
     }
+
+    /// <summary>
+    /// The server's status, asked again every <see cref="ServerWaitInterval"/> while the server
+    /// doesn't answer (<see cref="IsServerAway"/>), with one warning for the wait (B93).
+    /// </summary>
+    private async Task<ServerStatus> WaitForServerStatusAsync(CancellationToken cancellationToken)
+    {
+        var since = TimeProvider.System.GetUtcNow();
+        var attempts = 0;
+        while (true)
+        {
+            attempts++;
+            string awayBecause;
+            try
+            {
+                await using var scope = _serviceScopeFactory.CreateAsyncScope();
+                var status = await scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>().GetStatusAsync(cancellationToken);
+                if (attempts > 1)
+                {
+                    _logger.LogInformation(
+                        "The SpaceTraders server answers again, after {Minutes:F1} minutes and {Attempts} attempts; startup goes on.",
+                        (TimeProvider.System.GetUtcNow() - since).TotalMinutes,
+                        attempts);
+                }
+
+                return status;
+            }
+            catch (Exception exception) when (IsServerAway(exception, cancellationToken))
+            {
+                // Its message only: the exception says no more, and a reset's would be left out of the log.
+                awayBecause = exception.Message;
+            }
+
+            if (attempts == 1)
+            {
+                _logger.LogWarning(
+                    "The SpaceTraders server doesn't answer ({Detail}); startup asks again every {Seconds} seconds until it does.",
+                    awayBecause,
+                    ServerWaitInterval.TotalSeconds);
+            }
+            else
+            {
+                _logger.LogDebug("The SpaceTraders server still doesn't answer ({Detail}), attempt {Attempt}.", awayBecause, attempts);
+            }
+
+            await Task.Delay(ServerWaitInterval, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="exception"/> says the server is away for now: a 5xx answer (503 while
+    /// it resets, 502 from its DDoS protection), a pause after a 502, no connection, or a timeout.
+    /// </summary>
+    private static bool IsServerAway(Exception exception, CancellationToken cancellationToken) => exception switch
+    {
+        SpaceTradersApiException api => (int)api.StatusCode >= 500,
+        ApiPausedException or HttpRequestException => true,
+        TaskCanceledException => !cancellationToken.IsCancellationRequested,
+        _ => false,
+    };
 
     private async Task<string?> FindAgentIdAsync(string token, CancellationToken cancellationToken)
     {
