@@ -1352,6 +1352,14 @@ buy.
     The market watch keeps the markets where our ships are fresh, abroad too, where the probes sit (slice 6.28). Only a ship
     at a market refreshes it, so a market no ship passes stays dark: no route, so no ship. Home's probes come before the jump
     gate's loads for that reason (slice 6.44, D127).
+  - **No trip across the reset** (slice 6.72, D152, asked on 2026-11-15: "We know exactly how long each trade needs, so
+    don't pick a trade that runs beyond the reset time."): a route whose estimated time (`TradeRoute.Seconds`: the flight to
+    the buy market, the haul and a stop at each landing) would end later than `Trade.ResetSlackMinutes` (5) before the
+    server's next reset (`ServerReset`, D150) isn't one of a ship's routes. `TradeContextReader` sets the time left on the map
+    (`TradeMarketMap.TripSecondsLeft`), and `TradeRoutePlanner` checks it last, once a route is found lucrative
+    (`TradeRouteCheck.EndsAfterReset`). It holds for the trading plan and the role board's trading estimates alike, so in the
+    last hours a trader's estimate falls with the trips that still fit. A trip already on its way isn't judged again; with
+    no reset known, every trip may start.
   - **Predicted prices** (slice 6.46, D131, asked on 2026-11-08: "Can we make a dead reckoning prediction rule for any
     markets without active ships or probes so that our command ship goes there to trade eventually? ... But only do this for
     the home system."; chosen "Any trader, fresh first", then: "a predicted 1000 profit should rank lower than a certain 1000
@@ -1494,7 +1502,8 @@ buy.
   way to buy at that market (D80) is left out, as a held route is. The state's `NotTraded` keeps, for each such good that no
   trader's route carries, the check its route failed for the free trader that got furthest with it (then the largest price
   gap), in a sentence with the figures (`TradeRouteJudgement.Why`): `buy_market_out_of_reach`, `sell_market_out_of_reach`,
-  `no_room`, `too_few_credits`, `not_lucrative`, `waiting` for a lucrative one among the 20 waiting routes kept ("It waits
+  `no_room`, `too_few_credits`, `not_lucrative`, `ends_after_the_reset` (D152),
+  `waiting` for a lucrative one among the 20 waiting routes kept ("It waits
   for a free trader"), or `below_the_listed_routes` for a lucrative one beyond them. Routes reach across systems (slice
   6.29): a market whose prices are too old is judged on no route, and a good counts as traded, or waiting, wherever its route
   buys it. B66: a good whose route waited had no
@@ -2240,6 +2249,7 @@ removed from it in slice 2.6 (B18, D10); `DefaultSettingsSeedTests` pins the lis
 | `Trade.FuelReserveCredits` (5000) | Credits a cargo purchase must leave, so ships can always buy fuel: below them only fuel is bought (D24) |
 | `Trade.MaxHaulDistance` (5) | The trade reach, in jumps (D96): a trade route buys within that many jumps of the trader's system and sells within that many of the buy market's, through built gates (slice 6.29); the probes of the explored systems within it of home are bought at the probe tier, those of the systems beyond it after the drones and cargo ships that take turns (slice 6.28, D97); 0 or less means 5. The market views' queries over the never-written `trade_opportunities` read it too |
 | `Trade.MaxPriceAgeMinutes` (30) | How old, in minutes, a market's prices may be for a trade route to buy or sell there at the prices seen, at home too (slice 6.29, D96); 0 or less means 30. Older prices still say where fuel is sold, and since slices 6.46 and 6.47 a market seen with prices is predicted after that (D131, D132) |
+| `Trade.ResetSlackMinutes` (5) | Minutes before the server's next reset a trade trip must end by its estimated time; a longer trip doesn't start (slice 6.72, D152). Below 0 means 0; no number means 5 |
 | `Prediction.MaxWeightPercent` (90) | How far a route trusts a market's predicted prices where no other agent trades: it ranks at that much of its rate (slice 6.47, D133) |
 | `Prediction.MinWeightPercent` (10) | The least a route trusts a market's predicted prices, however much other agents trade around it (D133) |
 | `Prediction.HalvingTrades` (10) | Other agents' transactions in a day, weighed by where they were, that halve the trust in a market's predicted prices (D133) |

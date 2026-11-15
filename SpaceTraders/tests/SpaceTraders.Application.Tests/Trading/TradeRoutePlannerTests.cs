@@ -83,6 +83,25 @@ public sealed class TradeRoutePlannerTests
     }
 
     [Fact]
+    public void Rank_LeavesOutATripThatWouldEndAfterTheReset()
+    {
+        // Slice 6.72 (D152), asked on 2026-11-15: "We know exactly how long each trade needs, so don't pick a trade that runs
+        // beyond the reset time." From K85 the MEDICINE trip is the longest; a second less than it takes, and it doesn't start.
+        // A trip that ends just at the slack before the reset still does.
+        var all = TradeRoutePlanner.Rank(MapBeforeTheReset(double.PositiveInfinity), CommandShip(), 250_000, 200, NoneHeld);
+        var medicine = all.Single(route => route.TradeSymbol == "MEDICINE");
+        var shorter = all.Where(route => route.Seconds < medicine.Seconds).Select(route => route.Key).ToList();
+        shorter.Should().NotBeEmpty();
+
+        TradeRoutePlanner.Rank(MapBeforeTheReset(medicine.Seconds - 1), CommandShip(), 250_000, 200, NoneHeld)
+            .Select(route => route.Key).Should().Equal(shorter);
+        TradeRoutePlanner.Rank(MapBeforeTheReset(medicine.Seconds), CommandShip(), 250_000, 200, NoneHeld)
+            .Select(route => route.Key).Should().Equal(all.Select(route => route.Key));
+        TradeRoutePlanner.Rank(MapBeforeTheReset(-60), CommandShip(), 250_000, 200, NoneHeld)
+            .Should().BeEmpty("the slack before the reset has begun");
+    }
+
+    [Fact]
     public void Profit_CountsTheFuelToGetToTheBuyMarketToBeginWith()
     {
         // Your note of 2026-10-02. P and Q sell the same good at the same price, each 100 from R,

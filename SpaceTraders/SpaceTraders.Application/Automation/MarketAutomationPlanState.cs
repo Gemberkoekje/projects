@@ -160,8 +160,8 @@ public sealed record TradingAutomationGoodNotTradedState
 
     /// <summary>
     /// The check that failed: buy_market_out_of_reach, sell_market_out_of_reach, not_full_hold (D56, D74), too_few_credits
-    /// (D56) or not_lucrative (D14); below_the_listed_routes when the route was lucrative, but the state keeps only the best
-    /// waiting routes.
+    /// (D56), not_lucrative (D14) or ends_after_the_reset (D152); below_the_listed_routes when the route was lucrative, but
+    /// the state keeps only the best waiting routes.
     /// </summary>
     public required string Reason { get; init; }
 

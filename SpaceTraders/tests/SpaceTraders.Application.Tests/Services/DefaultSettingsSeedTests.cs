@@ -47,6 +47,9 @@ public sealed class DefaultSettingsSeedTests
         // ShipPayback: a ship bought earns nothing in its first hours (slice 6.70, D150).
         "Purchase.PaybackLeadHours",
 
+        // TradeContextReader: a trade trip ends this long before the server's reset (slice 6.72, D152).
+        "Trade.ResetSlackMinutes",
+
         // BudgetPolicy (with the credit reserve's growth, D51), MiningAutomationService (with the jump gate's miners, D92),
         // DataRetention, WebhookAlertNotifier.
         "FleetExpansion.MinCreditReserve",

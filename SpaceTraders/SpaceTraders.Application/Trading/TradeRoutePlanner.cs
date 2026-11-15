@@ -94,7 +94,8 @@ public static class TradeRoutePlanner
     /// The lucrative routes for a ship, best first: those that feed the jump gate's materials (D89,
     /// <see cref="TradeRoute.ConstructionMaterial"/>), those to a market that exchanges the good last (D91), and otherwise by
     /// what they earn an hour, an end product's counted at half (<see cref="RankingRate"/>, D82, D85, D95). Routes in
-    /// <paramref name="heldRouteKeys"/> belong to other traders and are left out: two traders never share a route.
+    /// <paramref name="heldRouteKeys"/> belong to other traders and are left out: two traders never share a route. So is a trip
+    /// that wouldn't end in time for the server's reset (<see cref="TradeMarketMap.TripSecondsLeft"/>, D152).
     /// </summary>
     /// <param name="map">The ship's system.</param>
     /// <param name="ship">The ship, where it is now.</param>
@@ -918,7 +919,7 @@ public static class TradeRoutePlanner
                     }
                     else if (TryEvaluateFrom(map, ship, good.Symbol, buy, sell, credits, minProfitPerUnit, approach, speed, out route, out check))
                     {
-                        check = route.IsWorthIt(minProfitPerUnit) ? TradeRouteCheck.Lucrative : TradeRouteCheck.NotLucrative;
+                        check = LastCheck(map, route, minProfitPerUnit);
                         if (check == TradeRouteCheck.Lucrative)
                         {
                             routes.Add(route);
@@ -929,6 +930,20 @@ public static class TradeRoutePlanner
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// The checks of a route that can be flown and traded: it must earn the minimum (D14), then end in time for the server's
+    /// reset (PLAN.md slice 6.72, D152): within <see cref="TradeMarketMap.TripSecondsLeft"/>.
+    /// </summary>
+    private static TradeRouteCheck LastCheck(TradeMarketMap map, TradeRoute route, int minProfitPerUnit)
+    {
+        if (!route.IsWorthIt(minProfitPerUnit))
+        {
+            return TradeRouteCheck.NotLucrative;
+        }
+
+        return route.Seconds > map.TripSecondsLeft ? TradeRouteCheck.EndsAfterReset : TradeRouteCheck.Lucrative;
     }
 
     /// <summary>

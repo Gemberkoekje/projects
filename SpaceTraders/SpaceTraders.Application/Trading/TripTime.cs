@@ -95,6 +95,20 @@ public static class TripTime
     /// <returns>The minutes.</returns>
     public static double Minutes(double seconds) => Math.Max(1, Math.Round(seconds / 60));
 
+    /// <summary>
+    /// How long a trip may take from <paramref name="now"/> (PLAN.md slice 6.72, D152): it must end <paramref name="slackMinutes"/>
+    /// before the server's next reset, as the reset takes the ship and its cargo; asked on 2026-11-15, "We know exactly how
+    /// long each trade needs, so don't pick a trade that runs beyond the reset time."
+    /// </summary>
+    /// <param name="reset">The next reset; <see cref="DateTimeOffset.MaxValue"/> for none known.</param>
+    /// <param name="now">The time to judge by.</param>
+    /// <param name="slackMinutes">The minutes before the reset a trip must end by; below 0 counts as 0.</param>
+    /// <returns>The seconds, below 0 once that time has come; infinity with no reset known.</returns>
+    public static double SecondsLeftBefore(DateTimeOffset reset, DateTimeOffset now, int slackMinutes)
+        => reset == DateTimeOffset.MaxValue
+            ? double.PositiveInfinity
+            : (reset - now).TotalSeconds - (Math.Max(0, slackMinutes) * 60.0);
+
     /// <summary>A flight's seconds in CRUISE: 15, and the distance, rounded and at least 1, times 25 over the engine's speed.</summary>
     private static double FlightSeconds(double distance, int speed)
         => SecondsPerFlight + (Math.Max(1, Math.Round(distance)) * CruiseMultiplier / Math.Max(1, speed));

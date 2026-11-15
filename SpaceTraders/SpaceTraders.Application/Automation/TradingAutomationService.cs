@@ -1198,6 +1198,7 @@ public sealed class TradingAutomationService(
         TradeRouteCheck.NoRoom => "no_room",
         TradeRouteCheck.TooFewCredits => "too_few_credits",
         TradeRouteCheck.NotLucrative => "not_lucrative",
+        TradeRouteCheck.EndsAfterReset => "ends_after_the_reset",
         _ => "below_the_listed_routes",
     };
 

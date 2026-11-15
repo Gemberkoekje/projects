@@ -1,3 +1,4 @@
+using System.Globalization;
 using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
@@ -351,9 +352,34 @@ public sealed class TradeContextReaderTests
         (await Reader().ReadReachAsync(System, CancellationToken.None)).Map.ConstructionFirst.Should().Be(first);
     }
 
+    [Theory]
+    [InlineData("15", 105)]
+    [InlineData("", 115)]
+    public async Task TheMaps_HoldTheTimeATripMayTake_UntilTheSlackBeforeTheReset(string slackMinutes, int minutesLeft)
+    {
+        // Slice 6.72 (D152): the reset two hours away, and Trade.ResetSlackMinutes 15, or none and so 5.
+        ConstructionPlanOn(false);
+        _markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<MarketFreshnessRecord>());
+        _settings.GetRawAsync(ServerReset.Setting, Arg.Any<CancellationToken>())
+            .Returns(TimeProvider.System.GetUtcNow().AddHours(2).ToString("O", CultureInfo.InvariantCulture));
+        _settings.GetRawAsync(TradeContextReader.ResetSlackMinutesSetting, Arg.Any<CancellationToken>()).Returns(slackMinutes);
+
+        (await Reader().ReadAsync(System, CancellationToken.None)).Map.TripSecondsLeft.Should().BeApproximately(minutesLeft * 60, 5);
+        (await Reader().ReadReachAsync(System, CancellationToken.None)).Map.TripSecondsLeft.Should().BeApproximately(minutesLeft * 60, 5);
+    }
+
+    [Fact]
+    public async Task WithNoResetKnown_AnyTripMayStart()
+    {
+        ConstructionPlanOn(false);
+        _markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<MarketFreshnessRecord>());
+
+        (await Reader().ReadReachAsync(System, CancellationToken.None)).Map.TripSecondsLeft.Should().Be(double.PositiveInfinity);
+    }
+
     private void ConstructionPlanOn(bool on)
         => _settings.GetAsync<bool>(AutomationSwitches.PlanEnabledSetting(AutomationPlan.Construction), Arg.Any<CancellationToken>()).Returns(on);
 
     private TradeContextReader Reader()
-        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()), _purchaseNeeds, _plans, _tradeLists);
+        => new(_markets, _waypoints, _agents, _settings, _chains, _sites, _port, _gates, _systems, new MarketPredictions(_samples, _history), new PredictionConfidence(_trades, _settings, new MarketTradeCountCache()), _purchaseNeeds, _plans, _tradeLists, new ServerReset(_settings));
 }
