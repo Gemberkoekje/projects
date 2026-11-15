@@ -42,7 +42,9 @@ health monitor every minute ─► health rules ─► anomalies (metric + journ
 - **Serilog:** writes to the console only. Production uses compact JSON with the rendered message
   (CLEF: `@t`, `@m`, `@i`, and `@l` for levels above Information); other environments use plain
   text. Levels come from the `Serilog` section of `appsettings*.json`: Information by default,
-  Warning for ASP.NET Core, EF Core, Wolverine, JasperFx and `System.Net.Http`. Every line carries
+  Warning for ASP.NET Core, EF Core, Wolverine, JasperFx and `System.Net.Http`, Error for the health checks (whose
+  Degraded startup probe logged a warning every 10 seconds of every start, B93). A line whose exception came from
+  the server's reset is left out (`ServerResetLogFilter`, B93). Every line carries
   `Application=SpaceTraders.API`, and, once agent bootstrap has picked the agent, `ResetDate` (slice
   2.13, see [Logging and metrics](#11-logging-and-metrics)); a line about a ship also carries its `ShipName` (slice 2.14). The host logs through its own logger and leaves Serilog's static
   `Log.Logger` alone, so test hosts running side by side don't share one (B41).
@@ -89,9 +91,9 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | # | Step | Runs | Notes |
 |---|---|---|---|
 | 1 | Database initialisation | once | Skipped in `Testing`; see [Data](#6-data) |
-| 2 | `ShipEventScheduler` | keeps running | Arrival timers. Skipped in `Testing` |
-| 3 | `DataRetentionService` | at start, then daily | Prunes every table by its policy; see [Retention](#retention) |
-| 4 | `AgentBootstrapService` | once | Picks or registers the agent, deletes other agents' rows |
+| 2 | `DataRetentionService` | at start, then daily | Prunes every table by its policy; see [Retention](#retention) |
+| 3 | `AgentBootstrapService` | once | Waits for the server, picks or registers the agent, deletes other agents' rows |
+| 4 | `ShipEventScheduler` | keeps running | Arrival timers, once the agent is known (B93). Skipped in `Testing` |
 | 5 | `DatabaseSizeGuardService` | at start, then every 5 min | See [Database size guard](#database-size-guard) |
 | 6 | `RunLifecycleService` | every 60 s | Opens or resumes a run |
 | 7 | `LeaderElectionService` | every 10 s | Lease `game-loop`, 30 s |
@@ -105,13 +107,15 @@ The chain starts after the HTTP server is up (`ApplicationStarted`) and awaits e
 | 15 | `PrometheusMarketMetricsService` | every minute | Exports the cached markets and shipyards, and once the game's production chains (`GET market/supply-chain`, through `SupplyChainCache`, which the trading plan shares: one call per start, retried hourly after a failure) |
 | 16 | `HealthMonitorService` | at start, then every minute | Evaluates the health rules; see [Health rules](#12-health-rules) |
 
-One try/catch wraps the chain. Steps 5, 9, 10, 12 and 16 catch their own errors. A throw in steps 1, 4, 6,
+One try/catch wraps the chain. Steps 5, 9, 10, 12 and 16 catch their own errors. A throw in steps 1, 3, 6,
 8 or 11 ends the chain: startup is marked failed (`/health/startup` turns Unhealthy) and the host
-stops. The process exits with code 1, so Kubernetes restarts it with back-off. Pruning starts
+stops; a throw the server's reset caused logs a warning, and the next start waits for the server (B93). The process exits with code 1, so Kubernetes restarts it with back-off. Pruning starts
 before any of those, so a pod that keeps failing during startup still prunes at every start.
 
 **Agent bootstrap** (`AgentBootstrapService`):
-- First it reads the server's reset date (`GET /`).
+- First it reads the server's reset date (`GET /`). While that fails with a 5xx (503 while the server resets, 502
+  from its DDoS protection), the pause after a 502, no connection or a timeout, it asks again every 30 seconds, with
+  one warning for the wait (B93); Kubernetes' startup probe gives a start ten minutes.
 - Candidate tokens, in order:
   1. the active stored token;
   2. the configured `SpaceTraders:AgentToken`;
@@ -2346,9 +2350,12 @@ Steps 2 to 4 follow the API guide (https://spacetraders.io/api-guide/rate-limits
   tick does no work during the pause.
 - **Alerts:** `WebhookAlertNotifier` posts alerts to `Alerts.WebhookUrl` and ignores errors.
 - **Server reset:** every failed call goes through one place in `SpaceTradersApiClient`. A 401
-  with "Token reset_date does not match the server" goes to `ServerResetMonitor`, which switches
-  `Automation.Enabled` off, logs `ResetDetected` at Critical and stops the host. It ignores
-  reports until startup has completed: agent bootstrap tries old tokens on purpose.
+  with "Token reset_date does not match the server", or the 503 the server answers while it resets
+  ("The universe is being reset", B93), goes to `ServerResetMonitor`, which switches
+  `Automation.Enabled` off, logs `ResetDetected` at Warning and stops the host. It ignores
+  reports until startup has completed: agent bootstrap tries old tokens on purpose. Until the host
+  has stopped, the messages in flight fail on the reset: Wolverine doesn't try them again, and
+  `ServerResetLogFilter` leaves every line whose exception came from the reset out of the log.
 - **Jumps** (slice 6.11): `POST my/ships/{ship}/jump` sends the destination gate's `waypointSymbol`, as API v2.3.0
   asks (B60: it sent the destination's `systemSymbol`; nothing jumped before slice 6.11). A client error from the jump (a 4xx other than
   401 and 429) comes back as `JumpRefusedException`, so the jump executor can tell a refused jump from an outage.
@@ -2492,7 +2499,7 @@ The seven pages in `src/Future` are not routed.
   | `ShipBlocked` | The circuit breaker (Warning); `GoalJumps`, for a jump the API refused (`jump_refused`, Warning, slices 6.11, 6.28) | `ShipSymbol`, `GoalKind`, `Reason`; a refused jump has `WaypointSymbol` and `Destination` instead of `GoalKind` |
   | `SettingChanged` | `SettingsRepository`; agent bootstrap, for a setting it gives its new default (D69) | `Setting`, `OldValue`, `NewValue` |
   | `NextRunSettingChanged` | `SettingsRepository`, for a value chosen for the next runs (D69) | `Setting`, `OldValue`, `NewValue`; `(default)` where none is chosen |
-  | `ResetDetected` | `ServerResetMonitor` (Critical) | `Detail` |
+  | `ResetDetected` | `ServerResetMonitor` (Warning, B93) | `Detail` |
   | `ApiUnavailable`, `ApiAvailable` | The tick | `PausedUntil` |
   | `AnomalyRaised` | The health monitor (Warning) and the size guard | `Rule`, `Subject`; the monitor's also `Details` |
   | `AnomalyCleared` | The health monitor and the size guard | `Rule`, `Subject`; the monitor's also `ActiveMinutes` |

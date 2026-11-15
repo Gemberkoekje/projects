@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Health;
 using SpaceTraders.Infrastructure.Persistence;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Exceptions;
 
 namespace SpaceTraders.API.Services;
 
@@ -57,16 +58,24 @@ public sealed class DeferredStartupHostedService(
 
         try
         {
-            if (!hostEnvironment.IsEnvironment("Testing"))
+            var testing = hostEnvironment.IsEnvironment("Testing");
+            if (!testing)
             {
                 await InitializeDatabaseAsync(cancellationToken);
-                await StartServiceAsync<ShipEventScheduler>(cancellationToken);
             }
 
             // Pruning only needs the database: started first, a later step that fails can't keep it
             // from running.
             await StartServiceAsync<DataRetentionService>(cancellationToken);
             await StartServiceAsync<AgentBootstrapService>(cancellationToken);
+
+            // Once the agent is known (B93): before, the arrivals and cooldowns stored for the ships
+            // fired while bootstrap waited for the server or tried old tokens, and each one a failed
+            // start cut short logged an error.
+            if (!testing)
+            {
+                await StartServiceAsync<ShipEventScheduler>(cancellationToken);
+            }
 
             // Needs the agent: its limits are settings, and over the hard limit it switches the
             // agent's automation off.
@@ -96,6 +105,10 @@ public sealed class DeferredStartupHostedService(
             startupState.MarkFailed(new OperationCanceledException("Deferred startup initialization was canceled."));
             logger.LogInformation(exception, "Deferred startup initialization canceled.");
         }
+        catch (Exception exception) when (SpaceTradersApiException.CameFromTheReset(exception))
+        {
+            StopForTheReset(exception);
+        }
         catch (Exception exception)
         {
             // Without the later services (the tick among them) the pod would only look healthy.
@@ -104,6 +117,20 @@ public sealed class DeferredStartupHostedService(
             logger.LogCritical(exception, "Deferred startup initialization failed; stopping the host.");
             applicationLifetime.StopApplication();
         }
+    }
+
+    /// <summary>
+    /// The server began its reset after bootstrap found it: stops the host, and the next start waits
+    /// for the server (B93). A warning with the exception's message, as the log leaves a reset's
+    /// exception out (<see cref="ServerResetLogFilter"/>).
+    /// </summary>
+    private void StopForTheReset(Exception exception)
+    {
+        startupState.MarkFailed(exception);
+        logger.LogWarning(
+            "Deferred startup was cut short by the server's reset ({Detail}); stopping the host, and the next start waits for the server.",
+            exception.Message);
+        applicationLifetime.StopApplication();
     }
 
     private async Task StartServiceAsync<TService>(CancellationToken cancellationToken)

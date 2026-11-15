@@ -3,6 +3,7 @@ using System.Text;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -20,6 +21,9 @@ public sealed class ServerResetMonitorTests : IDisposable
 {
     private const string ResetError =
         """{"error":{"message":"Failed to parse token. Token reset_date does not match the server. Server resets happen on a weekly to bi-weekly frequency during alpha. After a reset, you should re-register your agent. Expected: 2026-10-05, Actual: 2026-09-21","code":401,"data":{"expected":"2026-10-05","actual":"2026-09-21"}}}""";
+
+    private const string ResetInProgressError =
+        """{"error":{"message":"The universe is being reset. Please check back in a few minutes.","code":503}}""";
 
     private readonly IHostApplicationLifetime _lifetime = Substitute.For<IHostApplicationLifetime>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
@@ -54,6 +58,21 @@ public sealed class ServerResetMonitorTests : IDisposable
     }
 
     [Fact]
+    public async Task TheResetsOwn503_StopsTheHost_WithAWarning()
+    {
+        // B93: the server answered this for 20 seconds before the first 401, on 2026-11-15 from 13:00:22Z.
+        _startupState.MarkCompleted();
+        var log = new LogLines<ServerResetMonitor>();
+
+        await CallTheApiAsync(HttpStatusCode.ServiceUnavailable, ResetInProgressError, CreateMonitor(log));
+
+        await _settings.Received(1).SetAsync("Automation.Enabled", "false", Arg.Any<CancellationToken>());
+        _lifetime.Received(1).StopApplication();
+        log.At(LogLevel.Warning).Should().ContainSingle().Which.Should().StartWith("ResetDetected");
+        log.At(LogLevel.Critical).Should().BeEmpty("a reset comes every week or two, and the \"SpaceTraders logged errors\" mail counts Fatal lines");
+    }
+
+    [Fact]
     public async Task ManyResetErrors_StopTheHostOnce()
     {
         _startupState.MarkCompleted();
@@ -84,12 +103,15 @@ public sealed class ServerResetMonitorTests : IDisposable
 
         await CallTheApiAsync(HttpStatusCode.Unauthorized, """{"error":{"message":"Missing authorization header.","code":401}}""");
         await CallTheApiAsync(HttpStatusCode.BadRequest, """{"error":{"message":"Ship is not docked.","code":4214}}""");
+        await CallTheApiAsync(HttpStatusCode.ServiceUnavailable, """{"error":{"message":"Service unavailable.","code":503}}""");
 
         _lifetime.DidNotReceive().StopApplication();
     }
 
-    private ServerResetMonitor CreateMonitor() =>
-        new(_startupState, _lifetime, _services.GetRequiredService<IServiceScopeFactory>(), NullLogger<ServerResetMonitor>.Instance);
+    private ServerResetMonitor CreateMonitor() => CreateMonitor(NullLogger<ServerResetMonitor>.Instance);
+
+    private ServerResetMonitor CreateMonitor(ILogger<ServerResetMonitor> logger) =>
+        new(_startupState, _lifetime, _services.GetRequiredService<IServiceScopeFactory>(), logger);
 
     /// <summary>Calls the real API client against a fake server that answers with <paramref name="body"/>.</summary>
     private async Task CallTheApiAsync(HttpStatusCode status, string body, ServerResetMonitor? monitor = null)

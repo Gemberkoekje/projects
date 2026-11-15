@@ -201,6 +201,12 @@ public sealed class ShipEventScheduler(
 
         foreach (var entry in due)
         {
+            // Stopping: the rest wait in the table for the next start (B93).
+            if (ct.IsCancellationRequested)
+            {
+                break;
+            }
+
             await FireAndDeleteAsync(entry, ct);
         }
     }
@@ -230,6 +236,14 @@ public sealed class ShipEventScheduler(
                 await bus.PublishAsync(new ShipCooldownExpiredEvent(entry.ShipSymbol, entry.GoalId, now));
                 logger.LogInformation("ShipEventScheduler: fired ShipCooldownExpiredEvent for {ShipSymbol} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
             }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The host stops: not an error, and the row stays for the next start unless its delete went through (B93).
+            logger.LogDebug(
+                "ShipEventScheduler: stopping before firing the event for {ShipSymbol} / goal {Goal}.",
+                entry.ShipSymbol,
+                entry.GoalId);
         }
         catch (Exception ex)
         {

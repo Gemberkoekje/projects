@@ -7,12 +7,21 @@ namespace SpaceTraders.API.Services;
 
 /// <summary>
 /// Stops the host when the SpaceTraders server is reset during a run (B6). Kubernetes restarts the
-/// pod, and agent bootstrap then registers a new agent with the account token. Before that it
-/// switches automation off, so nothing else is tried with the old token while the host stops.
+/// pod, and agent bootstrap then waits for the server and registers a new agent with the account
+/// token. Before that it switches automation off, so nothing else is tried with the old token while
+/// the host stops.
 /// </summary>
 /// <remarks>
+/// <para>
+/// The first sign is the 503 the server answers while it resets, else the 401 of an old token
+/// (B93). The reset comes every week or two and is handled, so its line is a warning, not one that
+/// sets off the "SpaceTraders logged errors" mail; the calls it fails are left out of the log
+/// (<c>ServerResetLogFilter</c>).
+/// </para>
+/// <para>
 /// Reports during startup are ignored: agent bootstrap tries old tokens on purpose and expects
 /// this error, and any other startup step that fails stops the host anyway.
+/// </para>
 /// </remarks>
 public sealed class ServerResetMonitor(
     StartupInitializationState startupState,
@@ -30,7 +39,7 @@ public sealed class ServerResetMonitor(
             return;
         }
 
-        logger.LogCritical(
+        logger.LogWarning(
             "{EventKind:l}: the SpaceTraders server was reset ({Detail}). Switching automation off and stopping the host; after the restart a new agent is registered.",
             JournalEvents.ResetDetected,
             detail);

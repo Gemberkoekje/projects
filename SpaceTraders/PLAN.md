@@ -108,6 +108,7 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B90 | **Two looks at one market stored the same transactions, and the second failed** (seen on 2026-11-13, fixed in slice 6.65).<br>• `IX_market_trades_unique` refused an insert (23505) once a day or so before slice 6.63; after it, at 12:28, 19:19 and 21:22Z on 2026-11-13 and 11 times between 22:57Z and 10:34Z the night after, up to four `MarketTradesListedEvent` messages at once. Each logged Errors and set off the "SpaceTraders logged errors" mail; Wolverine's retry then found the transactions stored, so none were lost.<br>• `MarketTradeRepository.RecordAsync` read which of a look's transactions were stored, then inserted the rest. Two ships looking at one market at the same moment, each look stored in a scope of its own, found the same new transactions, and the later insert failed: B61's race, on `market_trades`. With the fleet at 460 ships and a tick every 20 s, more ships look at more markets at once.<br>• Fix: one statement, `INSERT … ON CONFLICT DO NOTHING`, as `MarketRepository.UpsertAsync` does since B61. | Loki: `MarketTradesListedEvent` failures (`@i=f24941d0`) with `IX_market_trades_unique`, 2026-11-10 to 2026-11-14 | 6.65 |
 | B91 | **After a restart the role board and the trading plan worked out every route, and the pod ran out of memory** (seen on 2026-11-14, fixed in slices 6.66 and 6.67).<br>• Slice 6.65's deploy started at 13:22:36Z. The container was OOM-killed at its 2 GiB limit at about 13:24:57Z and at 13:29:27Z; the third start held, and the bot did no useful work until about 13:38Z. With the limit raised to 3 GiB (gembernodes#222) the first start was killed again, at 14:42:01Z; the second held, with a first tick of 12.8 minutes (14:43:56 to 14:56:43Z) and 2.7 GiB at its peak. In normal running the pod uses 0.85 to 1.7 GiB.<br>• The trade list (slice 6.63) is kept in memory only. After a start the worker builds it again, about 90 s at 3,100 markets, and until then `TradeContextReader` hands the maps no list: `Rank` and `Judge` work out every route (D148's fallback). That is B88's old pass at almost three times the markets (1,100 then, 3,100 now), for 482 ships, beside the worker's own build.<br>• The build has grown with the markets the explorers add: 504,975 trades estimated over 1,490 markets in 19 s on 2026-11-13, 2,135,991 over 3,106 in 83 s on 2026-11-14. `TradeListBuilder.Estimate` holds them all before `Select` keeps about 6,800, so the heap swings by up to a gigabyte a build.<br>• Fix: until the worker's first round since the start, the role board and the trading plan wait; the other plans and the ships' steps go on. Slice 6.67: the build keeps only the trades it picks, as it works them out. | `kubectl` `lastState` (`OOMKilled`, exit 137), cAdvisor's working set, `system_runtime_gc_heap_size`, Loki: `TradeListService` lines and `Tick` | 6.66, 6.67 |
 | B92 | **Every map read works out the jump routes between systems again, one search a pair** (found on 2026-11-14, by slice 6.67's bench; fixed in slice 6.68).<br>• `TradeGates.TryFindWay` keeps the ways it found on its map, and the reader makes a new `TradeGates` for each map it reads. Each way not found yet is `ExploreAtlas.TryFindJumps`, which builds the whole gate network (`Atlas`) and searches from the start system to every system, then keeps the one way.<br>• On a copy of the day's world (3,258 markets, 283 systems) one trade list build on a map read afresh allocated 23.6 GB and took 56 s, against 1.8 GB and 28 s on the same map once its ways were found. The worker reads a fresh map every build, and the plans read one for each system they work in, so much of the API pod's CPU (1.4 of its 2 cores, throttled in up to 18% of periods) and of its heap's swings is likely this.<br>• Fix: each map's gates keep one network and one search a start system (`ExploreAtlas.JumpFinder`), each way read from that search as before: the same ways, and a build on a map read afresh allocated 1.9 GB in 33 s. Not changed: the probe plan's `CanJump` still searches once a way. | `TradeListBuildBench` (slice 6.67): "Streamed, map read afresh" against "Streamed" | 6.68 |
+| B93 | **The server's reset logged 70 error lines and restarted the pod six times** (seen on 2026-11-15, fixed in slice 6.73).<br>• At 13:00:22Z the server began to answer every call with 503, "The universe is being reset". Only an old token's 401 counted as the reset (B6), and the first came at 13:00:42Z: in those 20 seconds the messages in flight failed on the 503 and Wolverine tried each again, 31 Errors and 29 Warnings. `ResetDetected` then logged at Critical.<br>• Each start after it failed on the same 503 when bootstrap read the server's status: five Fatal lines between 13:00:47 and 13:03:39Z, and Kubernetes' back-off grew with each, so the sixth start, at 13:06:38Z, may have come minutes after the server was back. The reset of 2026-11-08 went the same way: six restarts, back at 13:06:42Z. A failed start stops the host on purpose (B23), so an idle pod doesn't look healthy. The event scheduler started before bootstrap, so in every start cut short it had fired the old agent's due arrivals, and each one the stop cancelled logged an error: 32 between 13:01:28 and 13:03:41Z.<br>• Every start also logs a warning for each startup probe while startup runs ("Deferred startup initialization is still running", Degraded): 15 after the reset. Each Error and Fatal line counts for the "SpaceTraders logged errors" mail. | Loki: the Warning, Error and Fatal lines from 12:30Z on 2026-11-15 by statement; `kubectl` events (BackOff ×14, 6 restarts) | 6.73 |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
@@ -392,10 +393,11 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.66 The route plans wait for the first trade list after a restart (B91), deployed (below)
 - 6.67 The trade list keeps only what it picks (B91), deployed (below)
 - 6.68 One gate search a start system for each map (B92), deployed (below)
-- 6.69 The 429 alarm's limit grows with the fleet (D149), built (below)
+- 6.69 The 429 alarm's limit grows with the fleet (D149), deployed (below)
 - 6.70 A ship bought earns its price back before the reset (D150), deployed (below)
-- 6.71 Probes only where their market pays them back (D151), built (below)
+- 6.71 Probes only where their market pays them back (D151), deployed (below)
 - 6.72 No trade trip across the reset (D152), to build (below)
+- 6.73 A reset without errors (B93), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -977,8 +979,8 @@ the gates of other systems (D68).
     MiB on average and 1,194 at most, against 1,338 and 1,649; 138 MiB/s allocated against 429; and 34 ticks against 12,
     about 53 s each against 150. The GC heap stayed the same, 250 MB on average.
   - To understand this, start with `ExploreAtlas.JumpFinder.TryFind`, then `TradeGates.TryFindWay`.
-- **6.69 The 429 alarm's limit grows with the fleet** (D149; asked on 2026-11-15): built on branch
-  `claude/spacetraders-429-limit-per-ship`.
+- **6.69 The 429 alarm's limit grows with the fleet** (D149; asked on 2026-11-15): merged as projects#265
+  (`c0366c3a`), deployed by gembernodes#226 on 2026-11-15 at 09:35Z.
   - Found the night before: the API's rate limiter answered 6 to 37 requests an hour with 429 (172 from 19:00Z to
     08:30Z), all retried and none given up, around `ApiThrottled`'s fixed limit of 10, so the anomaly was raised and
     cleared 18 times between 21:47Z and 07:33Z and Grafana mailed each one that held for 15 minutes. The fleet had about
@@ -1021,8 +1023,8 @@ the gates of other systems (D68).
       994 an hour by the role board, 246 hours against 3 left, where the old code had bought two at 08:51Z and 08:58Z.
       The probe plan's interceptors still went, judged from 6.71 on.
   - To understand this, start with `ShipPayback.JudgeAsync`, then `PurchaseOrder.DecideAsync`.
-- **6.71 Probes only where their market pays them back** (D151; asked on 2026-11-15): built on branch
-  `claude/spacetraders-probe-payback`.
+- **6.71 Probes only where their market pays them back** (D151; asked on 2026-11-15): merged as projects#267
+  (`93539262`), deployed by gembernodes#228 on 2026-11-15 at 12:17Z.
   - The probe plan judges each system it would buy a probe for, in its order, by `ShipPayback.JudgeWorthAsync`: one more
       probe there (`ProbeWorth`) is worth the best promise of the markets no probe is at or on its way to
       (`ProbePromiseCache`, D134, D135). A market never seen counts as the system's best seen market, and in a system
@@ -1044,7 +1046,43 @@ the gates of other systems (D68).
       here and anywhere, none), `ProbeDeploymentPlanServiceTests` (H51's 10,000 an hour: no probe 2 hours before the
       reset, one 20 hours before), `SurveyPlanServiceTests` (a drone's 1,000 an hour: no surveyor 2 hours before, one 50
       hours before). A probe plan that judges by nothing known fails the first.
+  - Checked there, 12:17Z to 12:21Z on 2026-11-15, 40 minutes before the reset: at 12:20:19Z the probe plan's
+    interceptor (54,614) was refused. Its market promised 1,831,715 an hour, but its first hour on its way ran past the
+    reset, 0.7 hours off. Promises run high, as D135 counts a tenth of what other agents trade at the market, so in
+    practice a probe is refused only within `Purchase.PaybackLeadHours` of the reset.
   - To understand this, start with `ProbeWorth.Of`, then the probe plan's `BuyProbeAsync`.
 - **6.72 No trade trip across the reset** (D152): to build. A route whose `Seconds` would end later than 5 minutes
   before the reset (`Trade.ResetSlackMinutes`) isn't given out: in the trading plan, the role board and the trade list's
   reader.
+- **6.73 A reset without errors** (B93; asked on 2026-11-15: "The pod gave a lot of errors around the reset time. Can
+  we smooth that out?"): built on branch `claude/spacetraders-quiet-reset`.
+  - The 503 the server answers while it resets ("The universe is being reset",
+    `SpaceTradersApiException.IsResetInProgress`) counts as the reset, as an old token's 401 does: the first stops the
+    host (`ServerResetMonitor`), 20 seconds sooner than on 2026-11-15. `ResetDetected` is a warning: a reset comes every
+    week or two and is handled.
+  - Bootstrap waits for the server: while its status call fails with a 5xx, the pause after a 502, no connection or a
+    timeout, it asks again every 30 seconds (`AgentBootstrapService.ServerWaitInterval`), with one warning for the wait
+    and a line when the server answers. Kubernetes' startup probe gives a start ten minutes (60 times 10 s), so a longer
+    outage restarts the pod once every ten minutes, not with a growing back-off.
+  - A line whose exception came from the reset (`SpaceTradersApiException.CameFromTheReset`, inner and aggregate
+    exceptions too) is left out of the log, and of the `RepeatingError` rule's sink with it (`ServerResetLogFilter`);
+    Wolverine doesn't try such a message again, as the host stops for the reset. A startup step the reset cuts short
+    logs a warning with its message.
+  - The event scheduler starts after bootstrap, so no arrival fires while bootstrap waits for the server or tries old
+    tokens, and a stop while it fires is no error: what it didn't fire stays in `scheduled_ship_events` for the next
+    start.
+  - The health checks log only Unhealthy, at Error: the startup probe's Degraded, every 10 seconds of every start, no
+    longer logs a warning (`Microsoft.Extensions.Diagnostics.HealthChecks` at Error in `appsettings.json`).
+  - Not changed: the old agent's scheduled events still fire after the new agent is registered, as stale wake-ups the
+    arrival handler ignores (Debug). The one other Error after the reset, a `DELETE FROM scheduled_ship_events` that
+    took 32 seconds at 13:11:25Z before EF Core's retry got through, came while Postgres was busy after bootstrap
+    deleted the old agent's 1.05M price samples (13:06:46 to 13:07:45Z; its readiness probe failed at 13:07:40Z, the
+    Kubernetes API timed out for it at 13:08:27Z, and the vacuum of `market_price_samples` ended at 13:14:11Z). Seen
+    once, left.
+  - Tests: `AgentBootstrapServiceTests` (waits through two 503s with one warning and no error, through a 502 and a 500;
+    a 400 doesn't wait; a stop ends the wait), `ServerResetMonitorTests` (the reset's 503 stops the host with a warning;
+    another 503 doesn't), `ServerResetLogFilterTests`, `DeferredStartupHostedServiceTests` (a step the reset cuts short
+    stops the host with a warning), `HostLoggingTests` (the host leaves a reset's line out, and the health checks'
+    warnings).
+  - To understand this, start with `ServerResetMonitor`, then `AgentBootstrapService.WaitForServerStatusAsync` and
+    `ServerResetLogFilter`.

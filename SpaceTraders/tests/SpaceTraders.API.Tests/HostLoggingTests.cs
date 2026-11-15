@@ -1,8 +1,10 @@
+using System.Net;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Health;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Exceptions;
 
 namespace SpaceTraders.API.Tests;
 
@@ -30,5 +32,42 @@ public sealed class HostLoggingTests
 
         host.Services.GetRequiredService<ErrorLog>().Since(DateTimeOffset.MinValue)
             .Should().ContainSingle(statement => statement.Statement.Contains("a warning for the first host", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ALineWhoseExceptionCameFromTheServersReset_IsLeftOut_OthersStay()
+    {
+        // B93: one ResetDetected warning tells the reset; the calls it failed are left out (ServerResetLogFilter).
+        await using var host = new SpaceTradersApiFactory();
+        var logger = host.Services.GetRequiredService<ILogger<GameLoopService>>();
+
+        logger.LogError(
+            new SpaceTradersApiException(
+                "SpaceTraders API request to 'my/ships/SPECTER-1F9/sell' failed with status code 503: The universe is being reset. Please check back in a few minutes.",
+                HttpStatusCode.ServiceUnavailable,
+                "my/ships/SPECTER-1F9/sell",
+                null),
+            "HostLoggingTests: a sale the reset failed.");
+        logger.LogError(new InvalidOperationException("Something else."), "HostLoggingTests: another failure.");
+
+        host.Services.GetRequiredService<ErrorLog>().Since(DateTimeOffset.MinValue)
+            .Should().ContainSingle(statement => statement.Statement.Contains("HostLoggingTests", StringComparison.Ordinal))
+            .Which.Statement.Should().Contain("another failure");
+    }
+
+    [Fact]
+    public async Task TheHealthChecksWarnings_AreLeftOut()
+    {
+        // B93: the startup probe's "still running" (Degraded) logged a warning every 10 seconds of every start.
+        await using var host = new SpaceTradersApiFactory();
+        var logger = host.Services.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Microsoft.Extensions.Diagnostics.HealthChecks.DefaultHealthCheckService");
+
+        logger.LogWarning("HostLoggingTests: Health check \"startup\" with status Degraded.");
+        logger.LogError("HostLoggingTests: Health check \"postgresql\" with status Unhealthy.");
+
+        host.Services.GetRequiredService<ErrorLog>().Since(DateTimeOffset.MinValue)
+            .Should().ContainSingle(statement => statement.Statement.Contains("HostLoggingTests", StringComparison.Ordinal))
+            .Which.Statement.Should().Contain("Unhealthy");
     }
 }
