@@ -36,6 +36,18 @@ public sealed class ProbePromiseCache
         _systems[systemSymbol] = (now, promises);
         return promises;
     }
+
+    /// <summary>
+    /// The promises above 0 of the markets of every other system reckoned in this process, however long ago: what a
+    /// market never seen counts as in a system with none seen (slice 6.71, D151, <see cref="ProbeWorth"/>).
+    /// </summary>
+    /// <param name="systemSymbol">The system to leave out.</param>
+    /// <returns>The promises.</returns>
+    public IReadOnlyList<double> Elsewhere(string systemSymbol)
+        => [.. _systems
+            .Where(entry => !entry.Key.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(entry => entry.Value.Promises.Values)
+            .Where(promise => promise > 0)];
 }
 
 /// <summary>

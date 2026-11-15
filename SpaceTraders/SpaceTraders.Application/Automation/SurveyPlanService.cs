@@ -67,6 +67,7 @@ public sealed class SurveyPlanService(
     IShipPurchaseService shipPurchases,
     IPurchaseOrder purchaseOrder,
     IAgentRepository agents,
+    ShipPayback payback,
     ILogger<SurveyPlanService> logger) : ISurveyPlanService
 {
     /// <summary>The ship the plan buys to survey (D47): a drone frame with a surveyor, and no hold.</summary>
@@ -279,6 +280,25 @@ public sealed class SurveyPlanService(
         CancellationToken cancellationToken)
     {
         var need = board.RolesOn ? await SurveyorNeedAsync(fleet, drones, cancellationToken) : PurchaseNeed.None;
+
+        // Slice 6.71 (D151): a surveyor that won't earn its price back before the reset, as one drone of its system,
+        // isn't needed.
+        if (need.Tier != PurchaseTier.None)
+        {
+            var system = WaypointSymbols.SystemOf(need.ShipyardWaypointSymbol);
+            var verdict = await payback.JudgeWorthAsync(
+                need.ShipType,
+                need.Price,
+                token => payback.DroneWorthAsync(system, token),
+                TimeProvider.System.GetUtcNow(),
+                cancellationToken);
+            if (!verdict.PaysBack)
+            {
+                payback.Tell(AutomationPlan.Survey, verdict);
+                need = PurchaseNeed.None;
+            }
+        }
+
         if (!await purchaseOrder.ReportAsync(AutomationPlan.Survey, need, cancellationToken))
         {
             return;

@@ -56,6 +56,7 @@ public sealed class ProbeDeploymentPlanServiceTests
     private readonly IGateNetwork _gates = Substitute.For<IGateNetwork>();
     private readonly ITradeContextReader _tradeContexts = Substitute.For<ITradeContextReader>();
     private readonly IMarketTradeRepository _marketTrades = Substitute.For<IMarketTradeRepository>();
+    private readonly PaybackFixture _payback = new();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private readonly DateTimeOffset _now = TimeProvider.System.GetUtcNow();
@@ -141,6 +142,40 @@ public sealed class ProbeDeploymentPlanServiceTests
         await RunAsync();
 
         _activeGoals["SPECTER-2"].Should().BeOfType<DeployProbeGoal>().Which.TargetWaypointSymbol.Should().Be(H51);
+    }
+
+    [Theory]
+    [InlineData(2, false)]
+    [InlineData(20, true)]
+    public async Task AProbe_IsBoughtOnlyWhileItsMarketsPromisePaysItBackBeforeTheReset(double hoursLeft, bool bought)
+    {
+        // Slice 6.71 (D151), asked on 2026-11-15: "putting a probe up 10 minutes before the server resets does not give
+        // any value at all". H51, which no probe watches, promises 10,000 an hour (the other agents' 100,000, D135): an
+        // 81,645 probe takes 9.2 hours with its first, so it isn't bought 2 hours before the reset, nor needed, and is
+        // 20 hours before.
+        PaybackFixture.ResetFromNow(_payback.Settings, hoursLeft);
+        _tradeContexts.ReadTradeAsync(SystemSymbol, Arg.Any<CancellationToken>()).Returns(new TradeContext(
+            new TradeMarketMap(
+                DefaultWaypoints(),
+                [.. new[] { A1, A2, H51, H52, XB5C, J58 }.Select(market => new MarketSnapshot(market, SystemSymbol, [new TradeGoodSnapshot("FUEL", "EXCHANGE", 72, 68, 180, "MODERATE")], [], [], ["FUEL"]))],
+                new Dictionary<string, IReadOnlyList<string>>()),
+            0,
+            0));
+        _marketTrades.CountSinceAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([new MarketTradeCount(SystemSymbol, H51, 40) { Credits = 2_400_000 }]);
+
+        await RunAsync();
+
+        if (bought)
+        {
+            await _purchases.Received(1).TryPurchaseAsync("SHIP_PROBE", A2, Arg.Any<CancellationToken>());
+            return;
+        }
+
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _order.Of(AutomationPlan.ProbeDeployment).Should().Be(PurchaseNeed.None);
+        _state!.Purchase.Should().Be(ProbePurchaseStatus.WontPayBack);
+        _payback.Log.Kept.Should().ContainSingle(line => line.StartsWith("Ship purchase: the ProbeDeployment plan's SHIP_PROBE for 81645 wouldn't earn its price back", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -788,6 +823,7 @@ public sealed class ProbeDeploymentPlanServiceTests
                 _log.For<ProbeDeploymentPlanService>(),
                 _tradeContexts,
                 new ProbePromiseCache(),
-                _marketTrades)
+                _marketTrades,
+                _payback.Payback())
             .EnsureBootstrappedAsync();
 }

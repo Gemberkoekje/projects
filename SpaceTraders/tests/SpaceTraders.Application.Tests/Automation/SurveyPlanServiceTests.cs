@@ -40,6 +40,7 @@ public sealed class SurveyPlanServiceTests
     private readonly IShipPurchaseService _purchases = Substitute.For<IShipPurchaseService>();
     private readonly OpenPurchaseOrder _order = new();
     private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
+    private readonly PaybackFixture _payback = new();
     private readonly LogRecorder _log = new();
     private readonly Dictionary<string, ShipGoal> _activeGoals = new(StringComparer.OrdinalIgnoreCase);
     private SurveyPlanState? _state;
@@ -85,6 +86,46 @@ public sealed class SurveyPlanServiceTests
 
         _order.Of(AutomationPlan.Survey).Should().Be(new PurchaseNeed(PurchaseTier.Surveyor, "SHIP_SURVEYOR", H52, 33_905));
         await _purchases.Received(1).TryPurchaseAsync("SHIP_SURVEYOR", H52, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(2, false)]
+    [InlineData(50, true)]
+    public async Task ASurveyor_IsBoughtOnlyWhileOneDronesMiningPaysItBackBeforeTheReset(double hoursLeft, bool bought)
+    {
+        // Slice 6.71 (D151): "As much as one drone". The board expects 1,000 an hour of the system's drone: a 33,905
+        // surveyor takes 34.9 hours with its first.
+        RoleBoardTestSupport.RolesAre(_settings, _plans, ("SHIP-1", FleetRole.Survey), ("SHIP-3", FleetRole.Mine));
+        _plans.GetAsync<RolePlanState>(PlanTypes.Roles, Arg.Any<CancellationToken>()).Returns(new RolePlanState
+        {
+            EvaluatedAt = DateTimeOffset.UtcNow,
+            Ships =
+            [
+                new RoleShipState { ShipSymbol = "SHIP-1", Role = FleetRole.Survey, Reason = "test", Since = DateTimeOffset.UtcNow },
+                new RoleShipState
+                {
+                    ShipSymbol = "SHIP-3",
+                    Role = FleetRole.Mine,
+                    Reason = "test",
+                    Since = DateTimeOffset.UtcNow,
+                    Estimates = [new RoleEstimateState { Role = FleetRole.Mine, CreditsPerHour = 1_000 }],
+                },
+            ],
+        });
+        PaybackFixture.ResetFromNow(_settings, hoursLeft);
+        Fleet(CommandShip(), Drone());
+
+        await RunAsync();
+
+        if (bought)
+        {
+            await _purchases.Received(1).TryPurchaseAsync("SHIP_SURVEYOR", H52, Arg.Any<CancellationToken>());
+            return;
+        }
+
+        _order.Of(AutomationPlan.Survey).Should().Be(PurchaseNeed.None);
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!, default);
+        _payback.Log.Kept.Should().ContainSingle(line => line.StartsWith("Ship purchase: the Survey plan's SHIP_SURVEYOR for 33905 wouldn't earn its price back", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -701,6 +742,7 @@ public sealed class SurveyPlanServiceTests
                 _purchases,
                 _order,
                 _agents,
+                _payback.Payback(_settings, _ships, _plans),
                 _log.For<SurveyPlanService>())
             .EnsureBootstrappedAsync();
 }
