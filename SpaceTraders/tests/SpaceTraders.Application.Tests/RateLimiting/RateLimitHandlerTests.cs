@@ -542,7 +542,6 @@ public sealed class RateLimitPipelineTests
         // B89: the refused request waits at least the backoff (a second at first); the requests after it wait only for the
         // reset the 429 named, as in B59.
         var budget = new RequestBudget();
-        var start = TimeProvider.System.GetUtcNow();
         var arrivals = new ConcurrentQueue<(string Path, DateTimeOffset At)>();
         var calls = 0;
         using var handler = new RateLimitResponseHandler(new RateLimitStatus(), budget, NullLogger<RateLimitResponseHandler>.Instance)
@@ -577,7 +576,9 @@ public sealed class RateLimitPipelineTests
         (sells[1] - sells[0]).Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(950), "the first retry waits the backoff's second");
         arrivals.Single(arrival => arrival.Path.EndsWith("/orbit", StringComparison.Ordinal)).At
             .Should().BeBefore(sells[1], "the others wait only for the reset, not for the refused request's backoff")
-            .And.BeBefore(start.AddMilliseconds(800));
+            .And.BeBefore(
+                sells[0].AddMilliseconds(800),
+                "measured from the refusal, not the test's start: on a busy CI runner the orbit once arrived 932 ms after the start");
     }
 
     private static HttpResponseMessage RateLimiter429(DateTimeOffset reset)

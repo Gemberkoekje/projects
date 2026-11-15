@@ -237,10 +237,11 @@ public sealed class ShipEventScheduler(
                 logger.LogInformation("ShipEventScheduler: fired ShipCooldownExpiredEvent for {ShipSymbol} / goal {Goal}.", entry.ShipSymbol, entry.GoalId);
             }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException stopped) when (ct.IsCancellationRequested)
         {
             // The host stops: not an error, and the row stays for the next start unless its delete went through (B93).
             logger.LogDebug(
+                stopped,
                 "ShipEventScheduler: stopping before firing the event for {ShipSymbol} / goal {Goal}.",
                 entry.ShipSymbol,
                 entry.GoalId);
