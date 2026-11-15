@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-15, slice 6.71)
+- D151: a probe or interceptor is bought only if the market it would watch pays its price back before the server resets:
+  the best promise (D134, D135) of the system's markets no probe watches, from an hour after the purchase until the reset.
+  A market never seen counts as the system's best seen market, else the average of those elsewhere. A surveyor counts as
+  one drone of its system by the role board's mining estimate. One that won't pay back isn't needed.
+- Tests: `ProbeWorthTests`, `ShipPaybackTests`, `ProbeDeploymentPlanServiceTests`, `SurveyPlanServiceTests`.
+
+### Plan – Changed (2026-11-15, D150, D151)
+- Slice 6.70 is deployed and checked on the cluster: the reset stored, and an ore hound refused three hours before it.
+- D151's details settled: a market never seen counts as the system's best seen market, else the average elsewhere; a
+  surveyor as one drone of its system.
+
 ### Code – Added (2026-11-15, slice 6.70)
 - D150: a ship is bought only if it earns its price back before the server resets: what its type earns an hour, from an
   hour after the purchase (`Purchase.PaybackLeadHours`) until the reset, must cover its price. A type's earnings are what

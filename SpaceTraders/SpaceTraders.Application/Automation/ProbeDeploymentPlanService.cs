@@ -74,8 +74,15 @@ public sealed class ProbeDeploymentPlanService(
     ILogger<ProbeDeploymentPlanService> logger,
     ITradeContextReader tradeContexts,
     ProbePromiseCache promiseCache,
-    IMarketTradeRepository marketTrades) : IProbeDeploymentPlanService
+    IMarketTradeRepository marketTrades,
+    ShipPayback payback) : IProbeDeploymentPlanService
 {
+    /// <summary>
+    /// How many systems' probes a pass judges by whether they pay back before the reset (slice 6.71, D151): each
+    /// reckons the system's promises, which costs a map read when they aren't cached.
+    /// </summary>
+    internal const int MaxJudgedPerPass = 3;
+
     /// <summary>
     /// The ship a market's promise is reckoned for (slice 6.47, D134): a light hauler's hold and tank, so the markets compare
     /// alike whatever is in the fleet.
@@ -348,6 +355,15 @@ public sealed class ProbeDeploymentPlanService(
                 StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// What one more probe in the system is worth an hour (slice 6.71, D151, <see cref="ProbeWorth"/>).
+    /// </summary>
+    private async Task<ShipWorth> WorthAsync(Pass pass, ServedSystem system, CancellationToken cancellationToken)
+    {
+        var promises = await promiseCache.GetOrReadAsync(system.Symbol, pass.Now, token => PromisesAsync(system.Symbol, token), cancellationToken);
+        return ProbeWorth.Of(system.Markets, system.Probes, promises, promiseCache.Elsewhere(system.Symbol));
+    }
+
     private static ProbeSnapshot Snapshot(Pass pass, ServedSystem system) => Snapshot(pass, system, NoPromises);
 
     private static ProbeSnapshot Snapshot(Pass pass, ServedSystem system, IReadOnlyDictionary<string, double> promises) => new()
@@ -509,11 +525,35 @@ public sealed class ProbeDeploymentPlanService(
 
         var scarce = false;
         (ProbeSource Source, ShipyardKind For)? waiting = null;
+        var refused = new List<ProbePurchase>();
         foreach (var want in wants)
         {
             var source = Source(pass, offers, want.System, ref scarce);
             if (source is { Waits: false })
             {
+                if (refused.Count == MaxJudgedPerPass)
+                {
+                    break;
+                }
+
+                // Slice 6.71 (D151): a probe whose market won't pay its price back before the reset isn't bought, nor
+                // needed.
+                var verdict = await payback.JudgeWorthAsync(
+                    source.Offer.ShipType,
+                    source.Offer.Price,
+                    token => WorthAsync(pass, want.System, token),
+                    pass.Now,
+                    cancellationToken);
+                if (!verdict.PaysBack)
+                {
+                    payback.Tell(AutomationPlan.ProbeDeployment, verdict);
+                    refused.Add(new ProbePurchase(ProbePurchaseStatus.WontPayBack, want.System.Symbol, source.Offer.Shipyard, source.Offer.Price, source.Antimatter, want.For)
+                    {
+                        ShipType = source.Offer.ShipType,
+                    });
+                    continue;
+                }
+
                 // A probe for another system, whose shipyard sells this one's for least, is still bought for this one's sake.
                 var tier = want.Tier == PurchaseTier.FarProbes && source.For.InTradeReach ? PurchaseTier.Probes : want.Tier;
                 return await BuyAsync(pass, source.For, source.Offer, source.Antimatter, tier, want.For, cancellationToken);
@@ -528,6 +568,11 @@ public sealed class ProbeDeploymentPlanService(
             {
                 ShipType = wait.Offer.ShipType,
             };
+        }
+
+        if (refused.Count > 0)
+        {
+            return refused[0];
         }
 
         return new ProbePurchase(

@@ -168,4 +168,10 @@ public enum ProbePurchaseStatus
     /// it is bought there once that probe is.
     /// </summary>
     WaitingForAProbeToArrive = 8,
+
+    /// <summary>
+    /// The next probe wouldn't earn its price back before the server resets by the promise of the market it would watch
+    /// (slice 6.71, D151): none is bought, nor needed.
+    /// </summary>
+    WontPayBack = 9,
 }

@@ -23,8 +23,9 @@ namespace SpaceTraders.Application.Services;
 ///   come to <see cref="MinShipHours"/>. For a drone, whose ore the shuttle sells, and for a type with a shorter record, it is
 ///   the role board's estimate for the role the ship is bought for (<see cref="RoleOf"/>): the average of the board's
 ///   estimates of the ships of its type, else of every ship with one.</item>
-///   <item>Probes, interceptors and surveyors earn nothing themselves; slice 6.71 judges them (D151), and until then they
-///   aren't judged.</item>
+///   <item>Probes, interceptors and surveyors earn nothing themselves: their plans judge them by what they serve
+///   (<see cref="JudgeWorthAsync"/>, slice 6.71, D151), a probe by the promise of the market it would watch
+///   (<see cref="Probes.ProbeWorth"/>), a surveyor as one drone of its system (<see cref="DroneWorthAsync"/>).</item>
 ///   <item>With no reset known (<see cref="ServerReset"/>), or nothing known of what the type earns, a purchase isn't judged.</item>
 /// </list>
 /// </summary>
@@ -55,6 +56,12 @@ public sealed class ShipPayback(
 
     /// <summary>A type's earnings are the role board's estimate.</summary>
     public const string FromBoard = "role board";
+
+    /// <summary>A surveyor's worth: what one drone of its system mines (D151).</summary>
+    public const string FromDrone = "drone's mining";
+
+    /// <summary>A ship with no worth known, which can't reach its work before the reset (D151).</summary>
+    public const string FromArrival = "arrival";
 
     /// <summary>How far back a type's record reaches.</summary>
     public static readonly TimeSpan Window = TimeSpan.FromHours(24);
@@ -127,7 +134,7 @@ public sealed class ShipPayback(
 
         if (InfoShips.Contains(type))
         {
-            return ShipPaybackVerdict.NotJudged(type, price, "a ship that earns nothing itself, judged by slice 6.71 (D151)");
+            return ShipPaybackVerdict.NotJudged(type, price, "a ship that earns nothing itself, judged by its plan (D151)");
         }
 
         var (perHour, basis) = await EarningsAsync(type, now, cancellationToken);
@@ -152,6 +159,66 @@ public sealed class ShipPayback(
     }
 
     /// <summary>
+    /// Judges a ship that earns nothing itself by what it serves an hour (slice 6.71, D151): a probe by the promise of
+    /// the market it would watch, a surveyor as one drone of its system. It pays back when that, from
+    /// <c>Purchase.PaybackLeadHours</c> after the purchase until the reset, covers its price. With nothing known of
+    /// what it would serve, it only has to reach its work before the reset. The worth is read only when a reset is
+    /// known.
+    /// </summary>
+    /// <param name="shipType">The ship's type, such as <c>SHIP_INTERCEPTOR</c>.</param>
+    /// <param name="price">What it costs.</param>
+    /// <param name="worth">Reads what it would serve an hour.</param>
+    /// <param name="now">The time of the purchase.</param>
+    /// <param name="cancellationToken">Stops the reads.</param>
+    /// <returns>The verdict; one that isn't judged pays back.</returns>
+    public Task<ShipPaybackVerdict> JudgeWorthAsync(
+        string shipType,
+        long price,
+        Func<CancellationToken, Task<ShipWorth>> worth,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(shipType);
+        ArgumentNullException.ThrowIfNull(worth);
+        return JudgeWorthOfTypeAsync(shipType.ToUpperInvariant(), price, worth, now, cancellationToken);
+    }
+
+    /// <summary>
+    /// What one drone of the system earns an hour by the role board's mining estimate (slice 6.71, D151: "As much as one
+    /// drone"): the average of its estimates of the ships it has mining in the system, else of every ship it has mining.
+    /// </summary>
+    /// <param name="systemSymbol">The system.</param>
+    /// <param name="cancellationToken">Stops the reads.</param>
+    /// <returns>The worth; unknown when the board has no ship mining.</returns>
+    public Task<ShipWorth> DroneWorthAsync(string systemSymbol, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(systemSymbol);
+        return DroneWorthInAsync(systemSymbol, cancellationToken);
+    }
+
+    private async Task<ShipWorth> DroneWorthInAsync(string systemSymbol, CancellationToken cancellationToken)
+    {
+        var board = await plans.GetAsync<RolePlanState>(PlanTypes.Roles, cancellationToken);
+        if (board is null)
+        {
+            return ShipWorth.Unknown;
+        }
+
+        var systems = (await ships.GetAllAsync(cancellationToken))
+            .ToDictionary(ship => ship.Symbol, ship => ship.SystemSymbol ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+        var miners = board.Ships
+            .Where(ship => ship.Role == FleetRole.Mine)
+            .SelectMany(ship => ship.Estimates
+                .Where(estimate => estimate.Role == FleetRole.Mine)
+                .Take(1)
+                .Select(estimate => (System: systems.GetValueOrDefault(ship.ShipSymbol, string.Empty), estimate.CreditsPerHour)))
+            .ToList();
+        var here = miners.Where(miner => miner.System.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)).ToList();
+        var chosen = here.Count > 0 ? here : miners;
+        return chosen.Count > 0 ? ShipWorth.Of(chosen.Average(miner => (double)miner.CreditsPerHour), FromDrone) : ShipWorth.Unknown;
+    }
+
+    /// <summary>
     /// Tells that a plan's need won't pay back: at Information the first time in <see cref="TellEvery"/> for the plan and the
     /// type, at Debug otherwise, as a plan says its need at every pass.
     /// </summary>
@@ -165,7 +232,7 @@ public sealed class ShipPayback(
         cache.Set(key, true, TellEvery);
         logger.Log(
             level,
-            "Ship purchase: the {Plan} plan's {ShipType} for {Price} wouldn't earn its price back before the reset at {Reset}: {CreditsPerHour} an hour by its {Basis}, {PaybackHours} hours with the first {LeadHours}, {HoursLeft} left (D150).",
+            "Ship purchase: the {Plan} plan's {ShipType} for {Price} wouldn't earn its price back before the reset at {Reset}: {CreditsPerHour} an hour by its {Basis}, {PaybackHours} hours with the first {LeadHours}, {HoursLeft} left ({Decision}).",
             plan,
             verdict.ShipType,
             verdict.Price,
@@ -174,7 +241,43 @@ public sealed class ShipPayback(
             verdict.Basis,
             Math.Round(verdict.PaybackHours, 1),
             verdict.LeadHours,
-            Math.Round(verdict.HoursLeft, 1));
+            Math.Round(verdict.HoursLeft, 1),
+            verdict.Decision);
+    }
+
+    private async Task<ShipPaybackVerdict> JudgeWorthOfTypeAsync(
+        string type,
+        long price,
+        Func<CancellationToken, Task<ShipWorth>> worth,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var reset = await serverReset.NextAfterAsync(now, cancellationToken);
+        if (reset == DateTimeOffset.MaxValue)
+        {
+            return ShipPaybackVerdict.NotJudged(type, price, "no reset known");
+        }
+
+        var lead = await LeadHoursAsync(cancellationToken);
+        var hoursLeft = (reset - now).TotalHours;
+        var serves = await worth(cancellationToken);
+        if (!serves.Known && hoursLeft > lead)
+        {
+            return ShipPaybackVerdict.NotJudged(type, price, "nothing known of what it would serve, and it reaches its work before the reset");
+        }
+
+        return new ShipPaybackVerdict
+        {
+            PaysBack = serves.Known && serves.PerHour > 0 && serves.PerHour * (hoursLeft - lead) >= price,
+            ShipType = type,
+            Price = price,
+            CreditsPerHour = serves.Known ? serves.PerHour : 0,
+            HoursLeft = hoursLeft,
+            LeadHours = lead,
+            Basis = serves.Known ? serves.Basis : FromArrival,
+            Reset = reset,
+            Decision = "D151",
+        };
     }
 
     /// <summary>What a ship of the type earns an hour, and by what: its type's record, else the role board's estimate.</summary>
@@ -329,6 +432,11 @@ public sealed record ShipPaybackVerdict
     /// <summary>The reset it was judged against; <see cref="DateTimeOffset.MaxValue"/> when none is known.</summary>
     public DateTimeOffset Reset { get; init; } = DateTimeOffset.MaxValue;
 
+    /// <summary>
+    /// The decision it was judged by: D150 for a ship that earns, D151 for one judged by what it serves.
+    /// </summary>
+    public string Decision { get; init; } = "D150";
+
     /// <summary>Whether it was judged.</summary>
     public bool Judged => Basis.Length > 0;
 
@@ -345,9 +453,38 @@ public sealed record ShipPaybackVerdict
 
     /// <inheritdoc />
     public override string ToString()
-        => Judged
-            ? string.Create(
+        => (Judged, Basis) switch
+        {
+            (false, _) => $"a {ShipType} isn't judged: {NotJudgedBecause}",
+            (true, ShipPayback.FromArrival) => string.Create(
                 CultureInfo.InvariantCulture,
-                $"a {ShipType} for {Price} earns {CreditsPerHour:F0} an hour by its {Basis}: {PaybackHours:F1} hours with the first {LeadHours}, {HoursLeft:F1} left before the reset at {Reset:u} (D150)")
-            : $"a {ShipType} isn't judged: {NotJudgedBecause}";
+                $"a {ShipType} for {Price} can't reach its work before the reset at {Reset:u}: {HoursLeft:F1} hours left, its first {LeadHours} on its way ({Decision})"),
+            _ => string.Create(
+                CultureInfo.InvariantCulture,
+                $"a {ShipType} for {Price} earns {CreditsPerHour:F0} an hour by its {Basis}: {PaybackHours:F1} hours with the first {LeadHours}, {HoursLeft:F1} left before the reset at {Reset:u} ({Decision})"),
+        };
+}
+
+/// <summary>
+/// What a ship that earns nothing itself serves an hour (<see cref="ShipPayback.JudgeWorthAsync"/>, D151).
+/// </summary>
+public sealed record ShipWorth
+{
+    /// <summary>Nothing is known of it.</summary>
+    public static readonly ShipWorth Unknown = new() { Known = false };
+
+    /// <summary>Whether it is known.</summary>
+    public required bool Known { get; init; }
+
+    /// <summary>What it serves an hour.</summary>
+    public double PerHour { get; init; }
+
+    /// <summary>What that is: <see cref="Probes.ProbeWorth.Basis"/>, <see cref="ShipPayback.FromDrone"/>.</summary>
+    public string Basis { get; init; } = string.Empty;
+
+    /// <summary>A known worth.</summary>
+    /// <param name="perHour">What it serves an hour.</param>
+    /// <param name="basis">What that is.</param>
+    /// <returns>The worth.</returns>
+    public static ShipWorth Of(double perHour, string basis) => new() { Known = true, PerHour = perHour, Basis = basis };
 }

@@ -1589,7 +1589,13 @@ last, gives it something to do then; your decisions are D34–D37.
   owned in it, once those come to 24 ship-hours (worked out at most every 5 minutes). The drones, whose ore the shuttle
   sells, and a type with a shorter record take the role board's estimate for their role (mining, siphoning, else
   trading): the average of its estimates of the ships of the type, else of every ship. Probes, interceptors and
-  surveyors earn nothing themselves and aren't judged yet (slice 6.71, D151), nor is a type nothing is known of. The
+  surveyors earn nothing themselves: their plans judge them by what they serve (slice 6.71, D151,
+  `ShipPayback.JudgeWorthAsync`). One more probe in a system is worth the best promise of its markets no probe is at or
+  on its way to (`ProbeWorth`, D134, D135); a market never seen counts as the system's best seen market, else the average
+  of the markets elsewhere that promise anything; with nothing known, the probe only has to reach its work before the
+  reset. The probe plan judges at most 3 systems a pass, in its order, and needs no probe that won't pay back
+  (`WontPayBack`). A surveyor counts as one drone of its system by the role board's mining estimate. Nor is a type
+  nothing is known of judged. The
   order ships are bought in treats a need that won't pay back as no need (below), and the purchase judges again with the
   price the shipyard asks.
 - **No ship at SCARCE** (slice 6.37, D121, asked on 2026-10-09: "As with the other ships, do not buy INTERCEPTORS if the

@@ -79,7 +79,7 @@ public sealed class ShipPaybackTests
     [InlineData("SHIP_PROBE")]
     [InlineData("SHIP_INTERCEPTOR")]
     [InlineData("ship_surveyor")]
-    public async Task TheShipsThatEarnNothingThemselves_AreLeftToSlice671(string shipType)
+    public async Task TheShipsThatEarnNothingThemselves_AreLeftToTheirPlans(string shipType)
     {
         _fixture.ResetIn(hours: 0.5);
 
@@ -126,6 +126,91 @@ public sealed class ShipPaybackTests
         verdict.Basis.Should().Be(ShipPayback.FromBoard);
         verdict.CreditsPerHour.Should().Be(150_000);
         verdict.PaysBack.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(2, false)]
+    [InlineData(20, true)]
+    public async Task AProbe_PaysBack_WhenItsMarketsPromiseCoversItsPriceFromItsArrival(double hoursLeft, bool paysBack)
+    {
+        // Slice 6.71 (D151): a market that promises 10,000 an hour pays an 81,645 probe back in 9.2 hours with the
+        // first.
+        _fixture.ResetIn(hoursLeft);
+
+        var verdict = await _fixture.Payback().JudgeWorthAsync(
+            "SHIP_PROBE",
+            81_645,
+            _ => Task.FromResult(ShipWorth.Of(10_000, "market promise")),
+            PaybackFixture.Now,
+            CancellationToken.None);
+
+        verdict.PaysBack.Should().Be(paysBack);
+        verdict.Decision.Should().Be("D151");
+        verdict.ToString().Should().StartWith("a SHIP_PROBE for 81645 earns 10000 an hour by its market promise: 9.2 hours with the first 1, ");
+    }
+
+    [Theory]
+    [InlineData(1.5, true)]
+    [InlineData(0.5, false)]
+    public async Task AProbeWhoseWorthIsUnknown_OnlyHasToReachItsWorkBeforeTheReset(double hoursLeft, bool paysBack)
+    {
+        _fixture.ResetIn(hoursLeft);
+
+        var verdict = await _fixture.Payback().JudgeWorthAsync("SHIP_INTERCEPTOR", 46_663, _ => Task.FromResult(ShipWorth.Unknown), PaybackFixture.Now, CancellationToken.None);
+
+        verdict.PaysBack.Should().Be(paysBack);
+        if (!paysBack)
+        {
+            verdict.ToString().Should().Be("a SHIP_INTERCEPTOR for 46663 can't reach its work before the reset at 2026-11-15 07:30:00Z: 0.5 hours left, its first 1 on its way (D151)");
+        }
+    }
+
+    [Fact]
+    public async Task WithNoResetKnown_AProbesWorthIsNotEvenRead()
+    {
+        var read = false;
+
+        var verdict = await _fixture.Payback().JudgeWorthAsync(
+            "SHIP_PROBE",
+            81_645,
+            _ =>
+            {
+                read = true;
+                return Task.FromResult(ShipWorth.Unknown);
+            },
+            PaybackFixture.Now,
+            CancellationToken.None);
+
+        verdict.PaysBack.Should().BeTrue();
+        read.Should().BeFalse("the promises cost a map read");
+    }
+
+    [Fact]
+    public async Task ASurveyorsWorth_IsWhatOneDroneOfItsSystemMines_ElseOneDroneAnywhere()
+    {
+        // Slice 6.71 (D151): "As much as one drone".
+        _fixture.Have(
+            PaybackFixture.Owned("DRONE-1", "SHIP_MINING_DRONE", net: 0),
+            PaybackFixture.Owned("DRONE-2", "SHIP_MINING_DRONE", net: 0),
+            (PaybackFixture.Ship("DRONE-3", "SHIP_MINING_DRONE") with { SystemSymbol = "X1-CD" }, 0, DateTimeOffset.MinValue),
+            PaybackFixture.Owned("HAULER-1", "SHIP_LIGHT_HAULER", net: 0));
+        _fixture.Board(
+            ("DRONE-1", FleetRole.Mine, 1_000),
+            ("DRONE-2", FleetRole.Mine, 3_000),
+            ("DRONE-3", FleetRole.Mine, 8_000),
+            ("HAULER-1", FleetRole.Trade, 90_000));
+        var payback = _fixture.Payback();
+
+        (await payback.DroneWorthAsync("X1-AB", CancellationToken.None)).Should().Be(ShipWorth.Of(2_000, ShipPayback.FromDrone));
+        (await payback.DroneWorthAsync("X1-EF", CancellationToken.None)).Should().Be(ShipWorth.Of(4_000, ShipPayback.FromDrone));
+    }
+
+    [Fact]
+    public async Task WithNoDroneOnTheBoard_ASurveyorsWorthIsUnknown()
+    {
+        _fixture.Board(("HAULER-1", FleetRole.Trade, 90_000));
+
+        (await _fixture.Payback().DroneWorthAsync("X1-AB", CancellationToken.None)).Known.Should().BeFalse();
     }
 
     [Fact]
@@ -279,4 +364,15 @@ internal sealed class PaybackFixture
         });
 
     public ShipPayback Payback() => new(new ServerReset(Settings), Ledger, Ships, Plans, Settings, Cache, Log.For<ShipPayback>());
+
+    /// <summary>A payback check on a test's own settings, fleet and role board.</summary>
+    public ShipPayback Payback(ISettingsRepository settings, IShipRepository ships, IPlanRepository plans)
+        => new(new ServerReset(settings), Ledger, ships, plans, settings, Cache, Log.For<ShipPayback>());
+
+    /// <summary>
+    /// The next reset, <paramref name="hours"/> from the clock's now, as a plan that reads the clock judges by it.
+    /// </summary>
+    public static void ResetFromNow(ISettingsRepository settings, double hours)
+        => settings.GetRawAsync(ServerReset.Setting, Arg.Any<CancellationToken>())
+            .Returns(DateTimeOffset.UtcNow.AddHours(hours).ToString("O", System.Globalization.CultureInfo.InvariantCulture));
 }
