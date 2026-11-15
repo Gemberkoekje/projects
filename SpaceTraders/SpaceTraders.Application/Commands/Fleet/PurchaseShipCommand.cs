@@ -40,8 +40,9 @@ public sealed class PurchaseShipHandler(
         PurchaseNeeds purchases,
         IShipNameBook names,
         IMessageBus bus,
+        ShipPayback payback,
         ILogger<PurchaseShipHandler> logger)
-        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, calls, purchases, names, bus, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), logger)
+        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, calls, purchases, names, bus, payback, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), logger)
     {
     }
 

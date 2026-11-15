@@ -7,7 +7,8 @@ public interface IShipPurchaseService
     /// <summary>
     /// Buys the ship at the shipyard, within the credit reserve, where one of our ships is (D30). Nothing is bought where the
     /// shipyard has the ship SCARCE, by its supply as fetched just before the purchase (D121, which D97 and D112 began);
-    /// <see cref="ShipPurchaseFailure.Scarce"/> then.
+    /// <see cref="ShipPurchaseFailure.Scarce"/> then. Nor is a ship that wouldn't earn its price back before the server
+    /// resets (slice 6.70, D150): <see cref="ShipPurchaseFailure.WontPayBack"/>.
     /// </summary>
     /// <param name="shipType">The ship, such as <c>SHIP_LIGHT_HAULER</c>.</param>
     /// <param name="shipyardWaypoint">The shipyard.</param>
@@ -58,4 +59,9 @@ public enum ShipPurchaseFailure
     /// for the largest hold D112, before it).
     /// </summary>
     Scarce = 5,
+
+    /// <summary>
+    /// The ship wouldn't earn its price back before the server resets (slice 6.70, D150, <see cref="ShipPayback"/>).
+    /// </summary>
+    WontPayBack = 6,
 }

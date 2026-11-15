@@ -7,6 +7,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-15, slice 6.70)
+- D150: a ship is bought only if it earns its price back before the server resets: what its type earns an hour, from an
+  hour after the purchase (`Purchase.PaybackLeadHours`) until the reset, must cover its price. A type's earnings are what
+  its ships earned net in the last 24 hours, or the role board's estimate for the drones and a type with less than a day's
+  record. A need that won't pay back is no need in the order ships are bought in. Probes, interceptors and surveyors are
+  judged in slice 6.71. On the run of 2026-11-08 none of the 26 bulk freighters bought in the 18 hours before the reset,
+  105M, would have been.
+- Startup stores the next reset in `Runtime.Reset.Next`, which the dashboard shows.
+- Tests: `ShipPaybackTests`, `PurchaseOrderTests`, `ShipPurchaseServiceTests`, `AgentBootstrapServiceTests`,
+  `ShipGoalHistoryRepositoryTests`.
+
+### Plan – Changed (2026-11-15, D150–D152)
+- The end of the run: slices 6.70 (purchases that pay back before the reset), 6.71 (probes by their market's promise) and
+  6.72 (no trade trip across the reset, 5 minutes' slack).
+
 ### Code – Changed (2026-11-15, slice 6.69)
 - D149: `ApiThrottled` allows one 429 an hour for every `Health.Api.ShipsPer429PerHour` (10) ships, rounded down, instead
   of a fixed 10: none below 10 ships, 50 at 500. At about 600 ships the night before, 6 to 37 an hour, all retried, kept

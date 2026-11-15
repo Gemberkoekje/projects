@@ -29,6 +29,7 @@ public sealed class PurchaseOrderTests
     private readonly IBudgetPolicy _budget = Substitute.For<IBudgetPolicy>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly ILedgerRepository _ledger = Substitute.For<ILedgerRepository>();
+    private readonly PaybackFixture _payback = new();
     private readonly LogRecorder _log = new();
 
     public PurchaseOrderTests()
@@ -64,6 +65,23 @@ public sealed class PurchaseOrderTests
         (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeFalse();
 
         _needs.Report(AutomationPlan.Trading, PurchaseNeed.None, DateTimeOffset.UtcNow);
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ACargoShipThatWontPayBackBeforeTheReset_IsNoNeed_AndHoldsBackNothingAfterIt()
+    {
+        // Slice 6.70 (D150): with two hours left, a bulk freighter that earns 100,000 an hour can't earn its 2.9M back,
+        // so the probe after it in the order goes.
+        EveryoneSays(PurchaseNeed.None);
+        _payback.Settings.GetRawAsync(ServerReset.Setting, Arg.Any<CancellationToken>())
+            .Returns(DateTimeOffset.UtcNow.AddHours(2).ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        _payback.Board(("MULE-1", SpaceTraders.Application.Roles.FleetRole.Trade, 100_000));
+
+        (await MayBuyAsync(AutomationPlan.Trading, Freighter())).Should().BeFalse();
+        _needs.Reported()[AutomationPlan.Trading].Need.Should().Be(PurchaseNeed.None);
+        _payback.Log.Kept.Should().ContainSingle(line => line.StartsWith("Ship purchase: the Trading plan's SHIP_BULK_FREIGHTER for 2900000 wouldn't earn its price back", StringComparison.Ordinal));
 
         (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
     }
@@ -760,5 +778,5 @@ public sealed class PurchaseOrderTests
             Math.Max(0, credits - reserve)));
 
     private Task<bool> MayBuyAsync(AutomationPlan plan, PurchaseNeed need)
-        => new PurchaseOrder(_needs, _calls, _budget, _settings, _ledger, _log.For<PurchaseOrder>()).ReportAsync(plan, need, CancellationToken.None);
+        => new PurchaseOrder(_needs, _calls, _budget, _settings, _ledger, _payback.Payback(), _log.For<PurchaseOrder>()).ReportAsync(plan, need, CancellationToken.None);
 }

@@ -35,6 +35,7 @@ public sealed class ShipPurchaseService(
     PurchaseNeeds purchases,
     IShipNameBook names,
     IMessageBus bus,
+    ShipPayback payback,
     ILogger<ShipPurchaseService> logger) : IShipPurchaseService
 {
     /// <inheritdoc />
@@ -60,6 +61,13 @@ public sealed class ShipPurchaseService(
         if (ScarceShips.IsScarce(ShipOf(cached, shipType)?.Supply))
         {
             return Failed(ShipPurchaseFailure.Scarce, $"{shipType} is {ScarceShips.Supply} at {shipyardWaypoint} (D121).", estimatedCost);
+        }
+
+        // Slice 6.70 (D150): a ship that won't earn its price back before the reset isn't bought.
+        var verdict = await payback.JudgeAsync(shipType, estimatedCost, TimeProvider.System.GetUtcNow(), cancellationToken);
+        if (!verdict.PaysBack)
+        {
+            return Failed(ShipPurchaseFailure.WontPayBack, verdict.ToString(), estimatedCost);
         }
 
         // Slice 6.36 (D118): a purchase the order let go before purchases that wait for one of our ships keeps their prices too.
@@ -98,6 +106,12 @@ public sealed class ShipPurchaseService(
         if (quotedCost != estimatedCost)
         {
             estimatedCost = quotedCost;
+            verdict = await payback.JudgeAsync(shipType, quotedCost, TimeProvider.System.GetUtcNow(), cancellationToken);
+            if (!verdict.PaysBack)
+            {
+                return Failed(ShipPurchaseFailure.WontPayBack, verdict.ToString(), quotedCost);
+            }
+
             decision = await budget.EvaluateAsync(quotedCost + held, cancellationToken);
             if (!decision.CanAfford)
             {

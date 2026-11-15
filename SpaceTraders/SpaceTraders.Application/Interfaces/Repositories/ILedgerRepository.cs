@@ -42,6 +42,19 @@ public interface ILedgerRepository
         DateTimeOffset to,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// What each ship earned net since <paramref name="from"/> in the given categories: the sum of their amounts, by ship
+    /// symbol. A ship with no such entry is left out.
+    /// </summary>
+    /// <param name="from">The window's start.</param>
+    /// <param name="categories">The categories to count.</param>
+    /// <param name="cancellationToken">Stops the query.</param>
+    /// <returns>Each ship's net, by symbol.</returns>
+    Task<IReadOnlyDictionary<string, long>> GetNetByShipAsync(
+        DateTimeOffset from,
+        IReadOnlyCollection<LedgerCategory> categories,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Returns the number of distinct ship symbols that have ledger entries for the given run.</summary>
     Task<int> GetDistinctShipCountAsync(Guid runId, CancellationToken cancellationToken = default);
 }

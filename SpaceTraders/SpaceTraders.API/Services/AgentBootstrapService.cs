@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using SpaceTraders.API.Configuration;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
@@ -49,10 +50,14 @@ public sealed class AgentBootstrapService(
             await RegisterNewAgentAsync(resetDate, cancellationToken);
         }
 
-        // Once the agent is known, so the gauge carries its reset date as every metric does (slice 2.13).
+        // Once the agent is known, so the gauge carries its reset date as every metric does (slice 2.13), and the
+        // setting is the agent's: the purchases are judged by it (slice 6.70, D150), and the dashboard shows it.
         if (nextReset is { } next)
         {
             metrics.NextServerReset(next);
+            await using var scope = _serviceScopeFactory.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<ISettingsRepository>()
+                .SetAsync(ServerReset.Setting, next.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), cancellationToken);
         }
 
         await DeleteOtherAgentsAsync(cancellationToken);

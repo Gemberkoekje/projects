@@ -43,6 +43,8 @@ namespace SpaceTraders.Application.Services;
 /// Since slice 6.36 (D118) a need whose purchase waits only for one of our ships to reach its shipyard (D30) lets the needs
 /// after it go first, each as long as the credits after it leave the waiting ones' prices and the credit reserve, which the
 /// purchase keeps too (<see cref="PurchaseNeeds.HeldFor"/>); one that waits for credits still holds them back.
+/// Since slice 6.70 (D150) a need for a ship that won't earn its price back before the server resets is no need
+/// (<see cref="ShipPayback"/>).
 /// </summary>
 public interface IPurchaseOrder
 {
@@ -61,6 +63,7 @@ public sealed class PurchaseOrder(
     IBudgetPolicy budget,
     ISettingsRepository settings,
     ILedgerRepository ledger,
+    ShipPayback payback,
     ILogger<PurchaseOrder> logger) : IPurchaseOrder
 {
     /// <summary>The plans that buy ships, each with the earliest place in the order its need can take.</summary>
@@ -284,6 +287,19 @@ public sealed class PurchaseOrder(
     private async Task<bool> DecideAsync(AutomationPlan plan, PurchaseNeed need, CancellationToken cancellationToken)
     {
         var now = TimeProvider.System.GetUtcNow();
+
+        // Slice 6.70 (D150), asked on 2026-11-15: "Does a ship earn it's own price back before the end of the week?" A
+        // ship that won't is no need, so it holds back nothing after it in the order.
+        if (need.Tier != PurchaseTier.None && need.ShipType.Length > 0 && need.Price > 0)
+        {
+            var verdict = await payback.JudgeAsync(need.ShipType, need.Price, now, cancellationToken);
+            if (!verdict.PaysBack)
+            {
+                payback.Tell(plan, verdict);
+                need = PurchaseNeed.None;
+            }
+        }
+
         needs.Report(plan, need, now);
         if (need.Tier == PurchaseTier.None)
         {

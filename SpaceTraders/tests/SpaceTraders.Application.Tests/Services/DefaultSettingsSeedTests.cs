@@ -44,6 +44,9 @@ public sealed class DefaultSettingsSeedTests
         "Health.Credits.MaxHoursUnchanged",
         "Health.Api.ShipsPer429PerHour",
 
+        // ShipPayback: a ship bought earns nothing in its first hours (slice 6.70, D150).
+        "Purchase.PaybackLeadHours",
+
         // BudgetPolicy (with the credit reserve's growth, D51), MiningAutomationService (with the jump gate's miners, D92),
         // DataRetention, WebhookAlertNotifier.
         "FleetExpansion.MinCreditReserve",

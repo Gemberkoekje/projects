@@ -190,6 +190,29 @@ public sealed class ShipGoalHistoryRepositoryTests : IntegrationTestBase
         summary.EntryCount.Should().Be(3);
     }
 
+    [SkippableFact]
+    public async Task GetNetByShipAsync_SumsEachShipsAmounts_InTheCategoriesAsked_SinceTheStart()
+    {
+        // Slice 6.70 (D150): a type's record is what its ships earned net, not what was bought for them.
+        var ledger = new LedgerRepository(Db, new StubActiveRunIdProvider());
+        await ledger.AppendAsync("SHIP-N1", SpaceTraders.Domain.Enums.LedgerCategory.TradeSell, 500, cancellationToken: CancellationToken.None);
+        await ledger.AppendAsync("SHIP-N1", SpaceTraders.Domain.Enums.LedgerCategory.TradeBuy, -200, cancellationToken: CancellationToken.None);
+        await ledger.AppendAsync("SHIP-N1", SpaceTraders.Domain.Enums.LedgerCategory.ShipPurchase, -9_000, cancellationToken: CancellationToken.None);
+        await ledger.AppendAsync("SHIP-N2", SpaceTraders.Domain.Enums.LedgerCategory.FuelPurchase, -40, cancellationToken: CancellationToken.None);
+        SpaceTraders.Domain.Enums.LedgerCategory[] earnings =
+        [
+            SpaceTraders.Domain.Enums.LedgerCategory.TradeSell,
+            SpaceTraders.Domain.Enums.LedgerCategory.TradeBuy,
+            SpaceTraders.Domain.Enums.LedgerCategory.FuelPurchase,
+        ];
+
+        var net = await ledger.GetNetByShipAsync(DateTimeOffset.UtcNow.AddMinutes(-1), earnings, CancellationToken.None);
+        var later = await ledger.GetNetByShipAsync(DateTimeOffset.UtcNow.AddMinutes(1), earnings, CancellationToken.None);
+
+        net.Should().BeEquivalentTo(new Dictionary<string, long> { ["SHIP-N1"] = 300, ["SHIP-N2"] = -40 });
+        later.Should().BeEmpty();
+    }
+
     private sealed class StubActiveRunIdProvider : SpaceTraders.Application.Interfaces.IActiveRunIdProvider
     {
         public Guid? ActiveRunId => null;

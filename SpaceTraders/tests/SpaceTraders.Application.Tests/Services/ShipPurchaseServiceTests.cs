@@ -27,6 +27,7 @@ public sealed class ShipPurchaseServiceTests
     private readonly PurchaseNeeds _purchases = new();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly IActiveReset _reset = Substitute.For<IActiveReset>();
+    private readonly PaybackFixture _payback = new();
     private readonly LogRecorder _log = new();
     private readonly ShipNameBook _names;
 
@@ -46,6 +47,23 @@ public sealed class ShipPurchaseServiceTests
                 new CargoModel(0, 15, []),
                 12_000));
         ShipsAt(Shipyard);
+    }
+
+    [Fact]
+    public async Task TryPurchaseAsync_BuysNoShip_ThatWontEarnItsPriceBackBeforeTheReset()
+    {
+        // Slice 6.70 (D150): two hours before the reset, a drone the board expects 1,000 an hour of earns 1,000 of its
+        // 12,000.
+        _payback.Settings.GetRawAsync(ServerReset.Setting, Arg.Any<CancellationToken>())
+            .Returns(DateTimeOffset.UtcNow.AddHours(2).ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        _payback.Board(("DIGGER-1", SpaceTraders.Application.Roles.FleetRole.Mine, 1_000));
+
+        var result = await Service().TryPurchaseAsync("SHIP_MINING_DRONE", Shipyard);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Failure.Should().Be(ShipPurchaseFailure.WontPayBack);
+        result.FailureReason.Should().StartWith("a SHIP_MINING_DRONE for 12000 earns 1000 an hour by its role board: 13.0 hours with the first 1, ");
+        await _port.DidNotReceiveWithAnyArgs().PurchaseShipAsync(default!, default!, default);
     }
 
     [Fact]
@@ -324,6 +342,7 @@ public sealed class ShipPurchaseServiceTests
         _purchases,
         _names,
         _bus,
+        _payback.Payback(),
         _log.For<ShipPurchaseService>());
 }
 
