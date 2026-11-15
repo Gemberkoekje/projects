@@ -66,7 +66,7 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Health.Ship.MaxIdleMinutes",              Value = "10",                  Type = "int",     Description = "Minutes a ship may stay without a goal or assignment while a plan has work for it (ShipLeftIdle)" },
         new AgentSetting { Key = "Health.Errors.MaxRepeatsIn10Minutes",     Value = "5",                   Type = "int",     Description = "Times one log statement may log a warning or error in 10 minutes (RepeatingError)" },
         new AgentSetting { Key = "Health.Credits.MaxHoursUnchanged",        Value = "24",                  Type = "int",     Description = "Hours the credits may stay the same while the fleet has work (CreditsUnchanged)" },
-        new AgentSetting { Key = "Health.Api.Max429sPerHour",               Value = "10",                  Type = "int",     Description = "429 answers from the SpaceTraders API allowed in an hour (ApiThrottled)" },
+        new AgentSetting { Key = "Health.Api.ShipsPer429PerHour",           Value = "10",                  Type = "int",     Description = "Ships for each 429 answer from the SpaceTraders API allowed in an hour: the limit is the fleet's ships divided by this, rounded down, so a fleet of fewer ships is allowed none (ApiThrottled, D149)" },
         new AgentSetting { Key = "ActivityLog.RetentionDays",             Value = "30",                  Type = "int",     Description = "Days to retain activity log entries" },
         new AgentSetting { Key = "Alerts.WebhookUrl",                     Value = "",                    Type = "string",  Description = "Slack/webhook URL for operator alerts (empty = disabled)" },
         new AgentSetting { Key = "Automation.MiningShipPercentage",              Value = "0.25",                Type = "decimal", Description = "Fraction of mining-capable ships assigned to resource extraction roles" },
@@ -92,6 +92,13 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Runtime.Alert.ContractDeadlinesApproaching",    Value = "false",               Type = "bool",    Description = "Dashboard alert: contract deadlines within 6 hours" },
         new AgentSetting { Key = "Runtime.Alert.ResetUpcoming",                   Value = "false",               Type = "bool",    Description = "Dashboard alert: server reset is approaching" },
     ];
+
+    /// <summary>
+    /// Settings nothing reads any more, which an agent seeded by an older version still has. The seed removes them, and
+    /// any value chosen for them for the next runs, so the settings page shows only settings that work (D10):
+    /// <c>Health.Api.Max429sPerHour</c> gave way to <c>Health.Api.ShipsPer429PerHour</c> (D149).
+    /// </summary>
+    private static readonly string[] Retired = ["Health.Api.Max429sPerHour"];
 
     private static readonly Dictionary<string, string> Descriptions = Defaults.ToDictionary(setting => setting.Key, setting => setting.Description, StringComparer.Ordinal);
 
@@ -135,6 +142,7 @@ public static class DefaultSettingsSeed
     /// Seeds the settings the agent doesn't have yet: each with the value chosen for the next runs, else with its
     /// default. A setting that still follows its default gets the default as this version has it, so a default that
     /// changes reaches the agent that runs (D69); the status flags and the settings someone set keep their values.
+    /// The settings nothing reads any more are removed (D10).
     /// </summary>
     public static Task SeedAsync(SpaceTradersDbContext db, CancellationToken cancellationToken = default)
         => SeedAsync(db, NullLogger.Instance, cancellationToken);
@@ -182,6 +190,18 @@ public static class DefaultSettingsSeed
             }
         }
 
+        foreach (var key in Retired)
+        {
+            if (stored.TryGetValue(key, out var retired))
+            {
+                db.Settings.Remove(retired);
+            }
+        }
+
+        var retiredForNextRuns = await db.NextRunSettings
+            .Where(setting => Retired.Contains(setting.Key))
+            .ToListAsync(cancellationToken);
+        db.NextRunSettings.RemoveRange(retiredForNextRuns);
         await db.SaveChangesAsync(cancellationToken);
 
         foreach (var (key, oldValue, newValue) in changed)

@@ -42,7 +42,7 @@ public sealed class DefaultSettingsSeedTests
         "Health.Ship.MaxIdleMinutes",
         "Health.Errors.MaxRepeatsIn10Minutes",
         "Health.Credits.MaxHoursUnchanged",
-        "Health.Api.Max429sPerHour",
+        "Health.Api.ShipsPer429PerHour",
 
         // BudgetPolicy (with the credit reserve's growth, D51), MiningAutomationService (with the jump gate's miners, D92),
         // DataRetention, WebhookAlertNotifier.
@@ -209,6 +209,26 @@ public sealed class DefaultSettingsSeedTests
         await using var next = TestDbContextFactory.Create(databaseName, "APPLICATION-TEST@2026-10-11");
         await DefaultSettingsSeed.SeedAsync(next);
         (await next.Settings.AsNoTracking().SingleAsync(s => s.Key == "Automation.MiningShipPercentage")).Value.Should().Be("0.5");
+    }
+
+    [Fact]
+    public async Task SeedAsync_RemovesASettingNothingReadsAnyMore_AndTheValueChosenForItForTheNextRuns()
+    {
+        // D149: the 429 limit is one for every Health.Api.ShipsPer429PerHour ships now; the agent that runs still had the
+        // old key, which the settings page would show as if it worked (D10).
+        await using var db = TestDbContextFactory.Create();
+        db.Settings.Add(Stored("Health.Api.Max429sPerHour", "10", followsDefault: true));
+        db.NextRunSettings.Add(new NextRunSetting { Key = "Health.Api.Max429sPerHour", Value = "20" });
+        db.NextRunSettings.Add(new NextRunSetting { Key = "Automation.MiningShipPercentage", Value = "0.5" });
+        await db.SaveChangesAsync();
+
+        await DefaultSettingsSeed.SeedAsync(db);
+
+        (await db.Settings.AsNoTracking().AnyAsync(s => s.Key == "Health.Api.Max429sPerHour")).Should().BeFalse();
+        (await db.Settings.AsNoTracking().SingleAsync(s => s.Key == "Health.Api.ShipsPer429PerHour"))
+            .Value.Should().Be("10");
+        (await db.NextRunSettings.AsNoTracking().Select(s => s.Key).ToListAsync())
+            .Should().Equal("Automation.MiningShipPercentage");
     }
 
     private static AgentSetting Stored(string key, string value, bool followsDefault) => new()

@@ -184,13 +184,14 @@ public sealed class CreditsUnchangedRuleTests
     }
 }
 
-/// <summary>Phase 3.2: no 401 or reset errors, and at most N 429s an hour.</summary>
+/// <summary>Phase 3.2: no 401 or reset errors, and at most one 429 an hour for every N ships (D149).</summary>
 public sealed class ApiRuleTests
 {
     private static readonly DateTimeOffset Start = RuleHarness.Start;
 
     private readonly ApiResponseLog _responses = new();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
+    private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly RuleHarness _harness = new();
 
     [Fact]
@@ -227,9 +228,10 @@ public sealed class ApiRuleTests
     }
 
     [Fact]
-    public async Task MoreThanTen429sInAnHour_IsAnAnomaly()
+    public async Task MoreThanOne429AnHourForEveryTenShips_IsAnAnomaly()
     {
-        var rule = new ApiThrottledRule(_responses, _settings);
+        HaveShips(100);
+        var rule = new ApiThrottledRule(_responses, _ships, _settings);
         for (var index = 0; index < 11; index++)
         {
             _responses.RecordThrottled("my/agent", index < 8 ? "rate_limiter" : "infrastructure", Start.AddMinutes(index));
@@ -239,13 +241,37 @@ public sealed class ApiRuleTests
 
         violations.Should().ContainSingle().Which.Should().Be(new HealthViolation(
             "api",
-            "the SpaceTraders API answered 429 Too Many Requests 11 times in the last hour, 8 from its rate limiter and 3 from its infrastructure; limit 10 (Health.Api.Max429sPerHour)"));
+            "the SpaceTraders API answered 429 Too Many Requests 11 times in the last hour, 8 from its rate limiter and 3 from its infrastructure; limit 10, one for every 10 of the 100 ships (Health.Api.ShipsPer429PerHour)"));
+    }
+
+    [Theory]
+    [InlineData(627, 62)]
+    [InlineData(500, 50)]
+    [InlineData(19, 1)]
+    [InlineData(10, 1)]
+    [InlineData(9, 0)]
+    [InlineData(0, 0)]
+    public async Task TheLimit_IsTheShipsDividedByTen_RoundedDown(int ships, int limit)
+    {
+        // D149: at 500 ships 50 are allowed; below ten ships, none.
+        HaveShips(ships);
+        var rule = new ApiThrottledRule(_responses, _ships, _settings);
+        for (var index = 0; index < limit; index++)
+        {
+            _responses.RecordThrottled("my/agent", "rate_limiter", Start);
+        }
+
+        (await _harness.EvaluateAsync(rule, Start.AddMinutes(1))).Should().BeEmpty();
+
+        _responses.RecordThrottled("my/agent", "rate_limiter", Start);
+        (await _harness.EvaluateAsync(rule, Start.AddMinutes(2))).Should().ContainSingle();
     }
 
     [Fact]
-    public async Task Ten429sInAnHour_IsWithinTheLimit()
+    public async Task A429MoreThanAnHourOld_IsNotCounted()
     {
-        var rule = new ApiThrottledRule(_responses, _settings);
+        HaveShips(100);
+        var rule = new ApiThrottledRule(_responses, _ships, _settings);
         for (var index = 0; index < 11; index++)
         {
             _responses.RecordThrottled("my/agent", "infrastructure", Start.AddMinutes(index * 6));
@@ -256,13 +282,33 @@ public sealed class ApiRuleTests
     }
 
     [Fact]
-    public async Task The429Limit_IsASetting()
+    public async Task TheShipsFor429_AreASetting()
     {
-        _settings.GetAsync<int>(ApiThrottledRule.Setting, Arg.Any<CancellationToken>()).Returns(1);
-        var rule = new ApiThrottledRule(_responses, _settings);
+        _settings.GetAsync<int>(ApiThrottledRule.Setting, Arg.Any<CancellationToken>()).Returns(50);
+        HaveShips(100);
+        var rule = new ApiThrottledRule(_responses, _ships, _settings);
         _responses.RecordThrottled("my/agent", "rate_limiter", Start);
         _responses.RecordThrottled("my/agent", "rate_limiter", Start);
 
-        (await _harness.EvaluateAsync(rule, Start.AddMinutes(1))).Should().ContainSingle();
+        (await _harness.EvaluateAsync(rule, Start.AddMinutes(1))).Should().BeEmpty();
+
+        _responses.RecordThrottled("my/agent", "rate_limiter", Start);
+        (await _harness.EvaluateAsync(rule, Start.AddMinutes(2))).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task WithNo429_TheFleetIsNotLoaded()
+    {
+        var rule = new ApiThrottledRule(_responses, _ships, _settings);
+
+        (await _harness.EvaluateAsync(rule, Start)).Should().BeEmpty();
+
+        await _ships.DidNotReceive().GetAllAsync(Arg.Any<CancellationToken>());
+    }
+
+    private void HaveShips(int count)
+    {
+        ShipModel[] fleet = [.. Enumerable.Range(0, count).Select(index => FleetFixture.Drone($"SHIP-{index}", Start))];
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(fleet);
     }
 }
