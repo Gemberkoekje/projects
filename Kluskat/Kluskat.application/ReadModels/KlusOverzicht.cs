@@ -48,14 +48,6 @@ public sealed record KlusOverzicht
     /// <returns><see langword="true"/> from <see cref="VolgendeKeer"/> on.</returns>
     public bool IsAanDeBeurt(DateTime nu) => nu >= VolgendeKeer;
 
-    /// <summary>
-    /// How far behind schedule the klus is, relative to its own interval: 1.0 is exactly due, 2.0 a
-    /// whole interval late. A weekly klus three days late outranks a yearly klus three days late.
-    /// </summary>
-    /// <param name="nu">The current moment (UTC).</param>
-    /// <returns>The elapsed time since the last completion, in intervals.</returns>
-    public double Achterstand(DateTime nu) => (nu - LaatstGedaan).TotalDays / IntervalDagen;
-
     /// <summary>Projects a klus onto its read model.</summary>
     /// <param name="klus">The klus.</param>
     /// <returns>The document to store.</returns>

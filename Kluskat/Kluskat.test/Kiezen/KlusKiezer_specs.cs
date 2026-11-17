@@ -5,16 +5,30 @@ namespace Kluskat.test.Kiezen;
 public sealed class KlusKiezer_specs
 {
     [Test]
-    public void picks_the_klus_most_behind_relative_to_its_interval()
+    public void picks_the_klus_that_has_been_due_longest()
     {
-        // A weekly klus three days late is further behind than a yearly klus thirty days late.
+        // A yearly klus thirty days late has waited longer than a weekly klus three days late.
         var wekelijks = Overzicht("Stofzuigen", dagen: 7, dagenGeleden: 10);
         var jaarlijks = Overzicht("Gordijnen", dagen: 365, dagenGeleden: 395);
 
-        var keuze = KlusKiezer.Kies([jaarlijks, wekelijks], new Sessie(), Nu, vooruit: false);
+        var keuze = KlusKiezer.Kies([wekelijks, jaarlijks], new Sessie(), Nu, vooruit: false);
 
         keuze.Uitkomst.Should().Be(KeuzeUitkomst.Klus);
-        keuze.Klus.Should().Be(wekelijks, because: "10/7 intervals behind beats 395/365");
+        keuze.Klus.Should().Be(jaarlijks, because: "due 30 days ago beats due 3 days ago, whatever the interval");
+    }
+
+    [Test]
+    public void a_weekly_klus_does_not_come_round_again_before_a_waiting_fortnightly_one()
+    {
+        // The live case of 2026-11-17: kitchen vacuuming (done 19 days ago) came back while the WC,
+        // due for 19 days, had never been offered. Relative to its interval the vacuuming was further
+        // behind (2.7 against 2.4 intervals), but the WC has waited longer.
+        var stofzuigen = Overzicht("Stofzuigen", dagen: 7, dagenGeleden: 19);
+        var wc = Overzicht("WC schoonmaken", dagen: 14, dagenGeleden: 33);
+
+        var keuze = KlusKiezer.Kies([stofzuigen, wc], new Sessie(), Nu, vooruit: false);
+
+        keuze.Klus.Should().Be(wc);
     }
 
     [Test]
