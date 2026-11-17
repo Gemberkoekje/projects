@@ -5,7 +5,7 @@ how many chores are waiting. A pixel cat cheers you on, levels up and collects h
 
 _To understand this, read this file first, then [NOTES.md](NOTES.md) for what was built and what is next._
 
-Status: design agreed 2026-10-28; chore list approved ("I'll tell you when a chore doesn't work and we refine"). Phases 1 and 2 built.
+Status: design agreed 2026-10-28; chore list approved ("I'll tell you when a chore doesn't work and we refine"). Phases 1 and 2 built. Task order changed to "longest due first" on 2026-11-17 (§3).
 
 ## 1. Decisions so far
 
@@ -13,7 +13,7 @@ Status: design agreed 2026-10-28; chore list approved ("I'll tell you when a cho
 |---|---|
 | Users | Just me. One password, remembered on the device for a year. |
 | Language | Dutch UI. |
-| Task order | Most behind schedule: highest `(now − lastDone) ÷ interval` among due chores. |
+| Task order | Longest due first: the due chore whose due date lies furthest back, whatever its interval (until 2026-11-17: most behind relative to its interval, see §3). |
 | Skips | A skipped chore goes to the back of the queue. Skips wear off 3 hours after your last tap, so this morning's skip is first again tonight. |
 | Big chores | Split into micro-steps (section 7) **and** each chore gets a size: S ≈ 5 min, M ≈ 15 min, L ≈ 30+ min. |
 | Editing | A small "Beheer" page in the app, behind the same password. |
@@ -23,8 +23,9 @@ Status: design agreed 2026-10-28; chore list approved ("I'll tell you when a cho
 | Theme | Cat companion. |
 
 For scale: the sheet adds up to about 20 chores a week (≈ 3 a day) to stay fully on schedule.
-Doing fewer is fine: the "most behind" order stretches every chore out evenly, and nothing
-piles up visibly.
+Doing fewer is fine: "anything I do is more than the nothing I did before". The intervals are
+wishes, not deadlines; the order makes sure every chore still takes its turn, and nothing piles
+up visibly.
 
 ## 2. Screens
 
@@ -64,8 +65,19 @@ cat's wardrobe (pick an accessory). Totals count only what you did.
 1. A chore is **due** when `now ≥ lastDone + interval`.
 2. Remove chores skipped in the current skip window. With a "Geen tijd" cap active, also remove
    chores at or above the capped size.
-3. Pick the highest `(now − lastDone) ÷ interval`. Ties go to the smaller size, then the
-   oldest `lastDone`.
+3. Pick the earliest due date, `lastDone + interval`: the chore that has waited longest, in
+   plain days. Ties go to the smaller size, then the oldest `lastDone`. "Toch iets doen?" uses the
+   same order over chores not due yet, so it offers the one due soonest.
+
+   _Changed 2026-11-17._ The first rule picked the highest `(now − lastDone) ÷ interval`. In the
+   first three weeks of real use (11 chores, about 4 a week against the ~20 the list asks) that
+   gave every slot to the ten weekly chores: kitchen vacuuming came round twice while the WC and
+   the bathroom were never offered. Relative to its interval a weekly chore falls behind twice as
+   fast as a fortnightly one, so at that pace the projection was vacuuming every ~35 days, the WC
+   every ~68 and the shower every ~138. The user: "As long as I'm reminded to do things, things
+   will be better than when I don't do them." Longest due first gives roughly 67 / 72 / 85 days at
+   the same pace, and at a full pace both rules keep close to the intervals. The interval now only
+   decides how soon a chore joins the queue again.
 4. Skip window: skips and the size cap are cleared when 3 hours pass with no tap.
 5. **Gedaan** sets `lastDone = now`. Completing early via "Toch iets doen?" works the same.
 

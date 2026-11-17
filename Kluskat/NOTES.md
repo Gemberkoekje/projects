@@ -134,3 +134,60 @@ gembernodes `apps/kluskat/deployment.yaml`.
 - Old local `Voltooiing` docs (from before phase 2) lack the new fields; they read as 0/false.
   Production has no data yet, so no migration was needed.
 - Positional public records trip Qowaiv `QW0016`; use `required` init properties.
+
+## Phase 3 — longest due first (2026-11-17)
+
+_Start with `Kluskat.application/Kiezen/KlusKiezer.cs` (`Volgorde`) and DESIGN.md §3, which keeps
+the reasoning and the numbers._
+
+### Why
+
+The user: kitchen vacuuming came round again while the toilet and the bathroom had never been
+offered. The live log (11 completions in 19 days, no skips) replayed through the old rule showed
+every pick was its correct first choice: the code matched the design. The design was the problem.
+"Most behind relative to the interval" makes a weekly chore fall behind twice as fast as a
+fortnightly one, and at ~4 chores a week against the ~20 the list asks, the ten weekly chores took
+every slot. The user doesn't mind missing intervals ("anything I do is more than the nothing I did
+before"), only being reminded of everything.
+
+### What changed
+
+- The picker orders by **earliest due date** (`VolgendeKeer`), i.e. longest due in plain days.
+  Ties as before: smaller, then done longest ago, then name. "Toch iets doen?" gets the chore due
+  soonest.
+- `KlusOverzicht.Achterstand` is gone (nothing else used it).
+- Specs: the first picker spec flipped (a yearly chore 30 days late now beats a weekly one 3 days
+  late), plus the live case as its own spec. 80 specs.
+- No data change: the order is computed on every request, so the deployed list re-sorts itself.
+
+### Projection (steady state at 4 a week, from the live state)
+
+| | old rule | longest due first |
+|---|---|---|
+| Keuken stofzuigen | ~35 days | ~67 days |
+| WC schoonmaken | ~68 days | ~72 days |
+| Douche schoonmaken | ~138 days | ~85 days |
+
+At 14 a week both rules stay close to the intervals (10/21/41 against 12/19/33 days). The live
+queue right after the change starts with waterkoker, koelkast leeghalen, **WC schoonmaken**,
+afzuigkap, kattenbak; the bathroom sink is 14th.
+
+### Gotchas
+
+- The live database is **`KlusKat`** (capitalised) on the CloudNativePG cluster, pod `postgres-1`
+  in namespace `postgresql`; `flux-system/postgresql` is an ExternalName to it. Read it without a
+  password: `kubectl -n postgresql exec postgres-1 -c postgres -- env
+  PGOPTIONS="-c default_transaction_read_only=on" psql -d KlusKat` (from Git Bash, prefix
+  `MSYS_NO_PATHCONV=1`).
+- The staggered start leaves fake `LaatstGedaan` dates (a 14-day chore due on day 0 "was done"
+  14 days before). Chores due on the same day tie on the date and fall to the smaller size, then
+  to the older fake date, so the yearly and 84-day chores due on day 0 sort before the WC.
+
+### File map
+
+| Where | What |
+|---|---|
+| `Kluskat.application/Kiezen/KlusKiezer.cs` | `Volgorde`: earliest due first; the remarks say why |
+| `Kluskat.application/ReadModels/KlusOverzicht.cs` | `Achterstand` removed |
+| `Kluskat.test/Kiezen/KlusKiezer_specs.cs` | flipped first spec + the live case |
+| `DESIGN.md` §1, §3 | the new rule, the old one, and the reason |

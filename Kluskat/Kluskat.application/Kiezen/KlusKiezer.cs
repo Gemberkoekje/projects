@@ -5,8 +5,16 @@ namespace Kluskat.application.Kiezen;
 /// set is unit-tested without a database.
 /// </summary>
 /// <remarks>
+/// <para>
+/// The longest-waiting klus goes first: the one whose due moment lies furthest in the past, in
+/// plain days and whatever its interval. The interval only decides how soon a klus joins the queue
+/// again. Done less often than the list asks, every klus still takes its turn; a weekly klus does
+/// not come round three times before a fortnightly one comes round once.
+/// </para>
+/// <para>
 /// The order is deterministic on purpose. A skipped klus is not punished or reshuffled; it is only
-/// hidden for the skip window, and when that wears off it is simply the most-behind klus again.
+/// hidden for the skip window, and when that wears off it is simply the longest-waiting klus again.
+/// </para>
 /// </remarks>
 public static class KlusKiezer
 {
@@ -32,7 +40,7 @@ public static class KlusKiezer
         {
             // Getting ahead: the klus closest to due. Everything beschikbaar is a candidate, so this
             // also picks up a due klus that appeared since the screen said "niks te doen".
-            var eerstvolgende = Volgorde(beschikbaar, nu);
+            var eerstvolgende = Volgorde(beschikbaar);
             return eerstvolgende.Count == 0
                 ? new Keuze { Uitkomst = KeuzeUitkomst.NiksTeDoen, KleinGehouden = kleinGehouden }
                 : new Keuze
@@ -44,7 +52,7 @@ public static class KlusKiezer
                 };
         }
 
-        var aanDeBeurt = Volgorde(beschikbaar.Where(k => k.IsAanDeBeurt(nu)), nu);
+        var aanDeBeurt = Volgorde(beschikbaar.Where(k => k.IsAanDeBeurt(nu)));
 
         if (aanDeBeurt.Count > 0)
         {
@@ -58,10 +66,13 @@ public static class KlusKiezer
         };
     }
 
-    /// <summary>Most behind first; ties go to the smaller klus, then the one waiting longest.</summary>
-    private static List<KlusOverzicht> Volgorde(IEnumerable<KlusOverzicht> klussen, DateTime nu)
+    /// <summary>
+    /// Earliest due moment first (for klussen not due yet: the one due soonest); ties go to the
+    /// smaller klus, then the one done longest ago.
+    /// </summary>
+    private static List<KlusOverzicht> Volgorde(IEnumerable<KlusOverzicht> klussen)
         => [.. klussen
-            .OrderByDescending(k => k.Achterstand(nu))
+            .OrderBy(k => k.VolgendeKeer)
             .ThenBy(k => k.Grootte)
             .ThenBy(k => k.LaatstGedaan)
             .ThenBy(k => k.Naam, StringComparer.Ordinal)];
