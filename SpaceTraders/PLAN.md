@@ -270,6 +270,7 @@ get the next D-number.
 | D150 | Slices 6.70–6.72 (asked on 2026-11-15): "We set up the 'is it worth it' thing for the gate. I'd like to have a similar thing for the end of the cycle. So: Does a ship earn it's own price back before the end of the week? For traders, that's relatively easy. For scouts and probes, that's harder. Because we need scouts and probes to map more of the universe and get the best deals. But putting a probe up 10 minutes before the server resets does not give any value at all. [...] I'd like to do the same for trades. We know exactly how long each trade needs, so don't pick a trade that runs beyond the reset time." Scrapping every ship a minute before the reset is for later ("an extreme measure I don't want to start with"). In the 14 hours before the reset of 2026-11-15 13:00Z the bot bought 26 bulk freighters for 105M, about its credits then (109M); a bulk freighter earned about 200,000 an hour, so one paid its 3.9M back in about 20 hours. | **Purchases first, then probes, then trades** ("Purchases first (Recommended)", 2026-11-15). A ship that earns is bought only if its type earns its price back from an hour after the purchase until the reset ("Own type's record (Recommended)"): what the ships of its type (`ShipNames.TypeOf`) earned an hour over the last 24 hours, net of cargo, fuel and antimatter; the role board's estimate for the drones, whose ore the shuttle sells, and for a type the fleet doesn't have. A need that won't pay back is no need, so it holds back nothing after it in the order. With no reset known, or nothing known of the type, the purchase goes as before. |
 | D151 | Slice 6.71 (asked with D150): how to judge the ships that earn nothing themselves, whose value is the trades their market data makes. | **The market's promise pays it back** ("Market promise pays back (Recommended)", 2026-11-15): a probe or interceptor is bought only if the promise of the best market without a probe in the system it is bought for (D134, D135: what better prices there could earn an hour) covers its price from its arrival until the reset. A market never seen counts as the system's best seen market, else the average of the markets elsewhere that promise anything ("System's best, else average (Recommended)", 2026-11-15); with nothing known, the probe only has to reach its work before the reset. A surveyor counts as earning what one drone of its system mines by the role board's estimate ("As much as one drone (Recommended)", 2026-11-15). |
 | D152 | Slice 6.72 (asked with D150): how much slack a trade trip's estimated end gets before the reset. | **5 minutes** ("5 minutes", 2026-11-15; 15 was recommended): a trip starts only if its estimated time (`TradeRoute.Seconds`: the flight to the buy market, the haul, a stop at each landing) ends at least 5 minutes before the reset; a setting. |
+| D153 | Slice 6.74 (asked on 2026-11-18, hour 69 of the run of 2026-11-15, the first whose home gate was built within 24 hours: 21.6): "I'd like to stop buying any mining equipment as soon as the gate is finished." Then: "Purchases should be blocked after the home gate is built, not before." Before the gate D130, D92 and D138 already held the drones to the gate's chain; afterwards they were bought "as before", and by hour 68 the run had bought 14 mining drones abroad (D122). | **No mining equipment once the home gate is built** (2026-11-18): once the home jump gate is built (`HomeGate`, D148), a need of the plans that buy mining equipment is no need: the contract's miner (D23), the surveyors (D47, D55), the mining plan's drones and ore hounds, at home and abroad (D28, D48, D92, D120, D122), and the collection points' shuttles (D83, D142), and the siphon plan's drones and shuttles. So it holds back nothing after it in the order (D43). Before the gate is built nothing changes. Read as: "mining equipment" is what those plans buy; the trading plan's light shuttles are cargo ships and stay; the bot buys no mounts, so there are none to stop; the miners already bought keep working. Amends D28, D48, D83, D122 and D130. |
 
 ## Phases
 
@@ -398,6 +399,7 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.71 Probes only where their market pays them back (D151), deployed (below)
 - 6.72 No trade trip across the reset (D152), built (below)
 - 6.73 A reset without errors (B93), deployed (below)
+- 6.74 No mining equipment once the home gate is built (D153), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -1105,3 +1107,21 @@ the gates of other systems (D68).
     one `ResetDetected` warning, one warning while bootstrap waits, and no Error or Fatal line.
   - To understand this, start with `ServerResetMonitor`, then `AgentBootstrapService.WaitForServerStatusAsync` and
     `ServerResetLogFilter`.
+- **6.74 No mining equipment once the home gate is built** (D153; asked on 2026-11-18: "I'd like to stop buying any mining
+  equipment as soon as the gate is finished.", then "Purchases should be blocked after the home gate is built, not before."):
+  built on branch `claude/spacetraders-no-mining-after-gate`.
+  - `PurchaseOrder` decides first, before D150's payback: a need of a plan in `PurchaseOrder.MiningPlans` (Contract, Survey,
+    Mining, Siphon) is no need once `HomeGate.IsBuiltAsync` says the home jump gate is built: its construction site, as last
+    fetched, is complete, or, with none cached, the waypoint cache doesn't list the gate as under construction. Like a ship
+    that won't pay back, it holds back nothing after it in the order. The first refusal of each plan since the start logs at
+    Information ("Ship purchase: the Mining plan's SHIP_MINING_DRONE isn't bought: the home jump gate is built, and no
+    mining equipment is bought after it (D153)."), the rest at Debug (`PurchaseNeeds.FirstAfterTheGate`).
+  - One check in the order rather than one in each plan: every one of those plans asks the order before it buys, the
+    contract's miner included (`ContractPlanService.BuyMinerAsync`).
+  - Not changed: before the gate is built everything buys as before (D92's gate miners, D130, D138); the trading plan's
+    light shuttles; the miners already bought, which keep mining; the role board, which can still give a drone or ore hound
+    the mining role. The bot installs no mounts (`InstallMountAsync` has no caller), so there are none to stop.
+  - Tests: `PurchaseOrderTests` (after the gate: the contract's drone, a surveyor, a drone, a collection point's shuttle, an
+    ore hound abroad and a siphon drone refused, logged once, and a probe after them goes; before it: each still bought, the
+    gate's miner too; the trading plan's light shuttle after it). Without the check the six refusals fail.
+  - To understand this, start with `PurchaseOrder.DecideAsync`, then `HomeGate.IsBuiltAsync`.

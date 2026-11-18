@@ -1704,6 +1704,13 @@ save up for cargo ships, then a mix based on if the minerals aren't going above 
   resets is no need (slice 6.70, D150, `ShipPayback`, see [Purchasing](#purchasing)): it holds back nothing after it, and
   logs "Ship purchase: the Trading plan's SHIP_BULK_FREIGHTER for ... wouldn't earn its price back before the reset" at
   Information once an hour for each plan and type.
+  Once the home jump gate is built (`HomeGate`), a need of a plan that buys mining equipment (`PurchaseOrder.MiningPlans`:
+  the contract, survey, mining and siphon plans, with their drones, ore hounds, surveyors and collection points' shuttles)
+  is no need either (slice 6.74, D153, asked on 2026-11-18: "I'd like to stop buying any mining equipment as soon as the
+  gate is finished."); before that nothing changes. It is checked before the payback, holds back nothing after it, and
+  logs "Ship purchase: the Mining plan's SHIP_MINING_DRONE isn't bought: the home jump gate is built, and no mining
+  equipment is bought after it (D153)." at Information the first time for each plan since the start. The trading plan's
+  light shuttles are cargo ships and stay; the miners already bought keep working.
 - **What it means:** the credits pile up for the purchase first in the order, while everything after it
   waits: the probes fly on, the drones and traders work, only their purchases wait. The order says who
   may buy; the credit reserve stays the purchase's own check (`BudgetPolicy`). The tick still runs the

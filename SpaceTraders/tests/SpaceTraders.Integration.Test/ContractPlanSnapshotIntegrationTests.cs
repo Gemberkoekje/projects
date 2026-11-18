@@ -9,6 +9,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
@@ -184,6 +185,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
                     Substitute.For<ISettingsRepository>(),
                     paybackCache,
                     NullLogger<ShipPayback>.Instance),
+                new HomeGate(Substitute.For<IConstructionSites>(), Substitute.For<IWaypointRepository>(), Substitute.For<IConstructionRepository>()),
                 NullLogger<PurchaseOrder>.Instance),
             NullLogger<ContractPlanService>.Instance);
 
