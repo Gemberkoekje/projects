@@ -1,8 +1,10 @@
 using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 
@@ -19,6 +21,8 @@ public sealed class PurchaseOrderTests
     private const string List = "SHIP_LIGHT_SHUTTLE,SHIP_LIGHT_HAULER,SHIP_LIGHT_HAULER";
     private const string FreighterShipyard = "X1-HB56-C18D";
     private const string ProbeShipyard = "X1-HF61-B13X";
+    private const string HomeSystem = "X1-DC53";
+    private const string HomeGateWaypoint = "X1-DC53-I55";
 
     /// <summary>When the ledger's purchases were made: before anything this process buys during a test.</summary>
     private static readonly DateTimeOffset Start = DateTimeOffset.UtcNow.AddDays(-1);
@@ -31,9 +35,21 @@ public sealed class PurchaseOrderTests
     private readonly ILedgerRepository _ledger = Substitute.For<ILedgerRepository>();
     private readonly PaybackFixture _payback = new();
     private readonly LogRecorder _log = new();
+    private readonly IConstructionRepository _constructions = Substitute.For<IConstructionRepository>();
+    private readonly HomeGate _homeGate;
 
     public PurchaseOrderTests()
     {
+        var sites = Substitute.For<IConstructionSites>();
+        sites.HomeSystemAsync(Arg.Any<CancellationToken>()).Returns(HomeSystem);
+        var waypoints = Substitute.For<IWaypointRepository>();
+        waypoints.GetBySystemAsync(HomeSystem, Arg.Any<CancellationToken>()).Returns(
+        [
+            new WaypointCacheModel(HomeGateWaypoint, HomeSystem, "JUMP_GATE", 10, 10, false, false, DateTimeOffset.UnixEpoch, IsUnderConstruction: true),
+        ]);
+        _homeGate = new HomeGate(sites, waypoints, _constructions);
+        HomeGateBuilt(false);
+
         _needs = new PurchaseNeeds(_ticks);
         _calls = new ShipyardCalls(_ticks);
         foreach (var plan in PurchaseOrder.BuyingPlans.Keys)
@@ -84,6 +100,56 @@ public sealed class PurchaseOrderTests
         _payback.Log.Kept.Should().ContainSingle(line => line.StartsWith("Ship purchase: the Trading plan's SHIP_BULK_FREIGHTER for 2900000 wouldn't earn its price back", StringComparison.Ordinal));
 
         (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(AutomationPlan.Contract, PurchaseTier.Contract, "SHIP_MINING_DRONE")]
+    [InlineData(AutomationPlan.Survey, PurchaseTier.Surveyor, "SHIP_SURVEYOR")]
+    [InlineData(AutomationPlan.Mining, PurchaseTier.Coverage, "SHIP_MINING_DRONE")]
+    [InlineData(AutomationPlan.Mining, PurchaseTier.Coverage, "SHIP_LIGHT_SHUTTLE")]
+    [InlineData(AutomationPlan.Mining, PurchaseTier.MiningAbroad, "SHIP_ORE_HOUND")]
+    [InlineData(AutomationPlan.Siphon, PurchaseTier.Coverage, "SHIP_SIPHON_DRONE")]
+    public async Task OnceTheHomeGateIsBuilt_NoMiningEquipmentIsBought_AndItHoldsBackNothingAfterIt(AutomationPlan plan, PurchaseTier tier, string shipType)
+    {
+        // Slice 6.74 (D153), asked on 2026-11-18: "I'd like to stop buying any mining equipment as soon as the gate is
+        // finished." Then: "Purchases should be blocked after the home gate is built, not before."
+        EveryoneSays(PurchaseNeed.None);
+        HomeGateBuilt(true);
+
+        (await MayBuyAsync(plan, Need(tier, shipType))).Should().BeFalse();
+        _needs.Reported()[plan].Need.Should().Be(PurchaseNeed.None);
+        _log.Kept.Should().ContainSingle(line => line.StartsWith($"Ship purchase: the {plan} plan's {shipType} isn't bought: the home jump gate is built", StringComparison.Ordinal));
+
+        (await MayBuyAsync(AutomationPlan.ProbeDeployment, Need(PurchaseTier.Probes, "SHIP_PROBE"))).Should().BeTrue();
+
+        (await MayBuyAsync(plan, Need(tier, shipType))).Should().BeFalse();
+        _log.Kept.Should().ContainSingle(line => line.Contains("isn't bought: the home jump gate is built", StringComparison.Ordinal), "the refusal is news once a plan");
+    }
+
+    [Theory]
+    [InlineData(AutomationPlan.Contract, PurchaseTier.Contract, "SHIP_MINING_DRONE")]
+    [InlineData(AutomationPlan.Survey, PurchaseTier.Surveyor, "SHIP_SURVEYOR")]
+    [InlineData(AutomationPlan.Mining, PurchaseTier.Construction, "SHIP_MINING_DRONE")]
+    [InlineData(AutomationPlan.Siphon, PurchaseTier.Coverage, "SHIP_SIPHON_DRONE")]
+    public async Task WhileTheHomeGateIsNotBuilt_TheMiningPlansStillBuy(AutomationPlan plan, PurchaseTier tier, string shipType)
+    {
+        // D153 blocks after the home gate is built, not before: the gate's miners (D92) and the rest buy as before.
+        EveryoneSays(PurchaseNeed.None);
+        HomeGateBuilt(false);
+
+        (await MayBuyAsync(plan, Need(tier, shipType))).Should().BeTrue();
+        _log.Kept.Should().NotContain(line => line.Contains("home jump gate is built", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task OnceTheHomeGateIsBuilt_TheTradingPlansLightShuttle_IsStillBought()
+    {
+        // D153 is about the plans that buy mining equipment: a light shuttle is mining equipment only when the mining or
+        // siphon plan buys it for a collection point (D83), not when the trading plan buys it to trade.
+        EveryoneSays(PurchaseNeed.None);
+        HomeGateBuilt(true);
+
+        (await MayBuyAsync(AutomationPlan.Trading, Need(PurchaseTier.CargoShips, "SHIP_LIGHT_SHUTTLE"))).Should().BeTrue();
     }
 
     [Fact]
@@ -777,6 +843,10 @@ public sealed class PurchaseOrderTests
             reserve,
             Math.Max(0, credits - reserve)));
 
+    /// <summary>Whether the home jump gate's construction site, as last fetched, is complete.</summary>
+    private void HomeGateBuilt(bool built)
+        => _constructions.FindAsync(HomeGateWaypoint, Arg.Any<CancellationToken>()).Returns(new ConstructionSiteModel(HomeGateWaypoint, built, []));
+
     private Task<bool> MayBuyAsync(AutomationPlan plan, PurchaseNeed need)
-        => new PurchaseOrder(_needs, _calls, _budget, _settings, _ledger, _payback.Payback(), _log.For<PurchaseOrder>()).ReportAsync(plan, need, CancellationToken.None);
+        => new PurchaseOrder(_needs, _calls, _budget, _settings, _ledger, _payback.Payback(), _homeGate, _log.For<PurchaseOrder>()).ReportAsync(plan, need, CancellationToken.None);
 }

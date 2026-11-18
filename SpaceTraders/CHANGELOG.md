@@ -7,6 +7,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-18, slice 6.74)
+- D153: once the home jump gate is built, the bot buys no more mining equipment: no mining drone, ore hound, siphon
+  drone, surveyor or collection-point shuttle, at home or abroad. The purchase order refuses those plans' needs, so they
+  hold back nothing after them, and logs the first refusal of each plan. Before the gate is built nothing changes; the
+  trading plan's light shuttles and the miners already bought stay.
+- Tests: `PurchaseOrderTests`.
+
 ### Code – Added (2026-11-15, slice 6.72)
 - D152: a trade trip starts only if its estimated time ends at least `Trade.ResetSlackMinutes` (5) before the server's
   next reset. The trading plan doesn't give a longer trip out, and the role board's trading estimates count only the trips

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Construction;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Domain.Enums;
@@ -45,6 +46,8 @@ namespace SpaceTraders.Application.Services;
 /// purchase keeps too (<see cref="PurchaseNeeds.HeldFor"/>); one that waits for credits still holds them back.
 /// Since slice 6.70 (D150) a need for a ship that won't earn its price back before the server resets is no need
 /// (<see cref="ShipPayback"/>).
+/// Since slice 6.74 (D153) a need of a plan that buys mining equipment (<see cref="PurchaseOrder.MiningPlans"/>) is no need
+/// once the home jump gate is built (<see cref="HomeGate"/>).
 /// </summary>
 public interface IPurchaseOrder
 {
@@ -64,8 +67,22 @@ public sealed class PurchaseOrder(
     ISettingsRepository settings,
     ILedgerRepository ledger,
     ShipPayback payback,
+    HomeGate homeGate,
     ILogger<PurchaseOrder> logger) : IPurchaseOrder
 {
+    /// <summary>
+    /// The plans whose ships are mining equipment (slice 6.74, D153): the contract's miner (D23), the surveyors (D47), the
+    /// mining plan's drones, ore hounds and collection points' shuttles (D28, D83, D120, D122) and the siphon plan's drones
+    /// and shuttles. Once the home jump gate is built, none of them buys a ship.
+    /// </summary>
+    internal static readonly IReadOnlySet<AutomationPlan> MiningPlans = new HashSet<AutomationPlan>
+    {
+        AutomationPlan.Contract,
+        AutomationPlan.Survey,
+        AutomationPlan.Mining,
+        AutomationPlan.Siphon,
+    };
+
     /// <summary>The plans that buy ships, each with the earliest place in the order its need can take.</summary>
     internal static readonly IReadOnlyDictionary<AutomationPlan, PurchaseTier> BuyingPlans = new Dictionary<AutomationPlan, PurchaseTier>
     {
@@ -288,6 +305,18 @@ public sealed class PurchaseOrder(
     {
         var now = TimeProvider.System.GetUtcNow();
 
+        // Slice 6.74 (D153), asked on 2026-11-18: "I'd like to stop buying any mining equipment as soon as the gate is
+        // finished." Once the home jump gate is built, a mining plan's need is no need, so it holds back nothing after it.
+        if (need.Tier != PurchaseTier.None && MiningPlans.Contains(plan) && await homeGate.IsBuiltAsync(cancellationToken))
+        {
+            logger.Log(
+                needs.FirstAfterTheGate(plan) ? LogLevel.Information : LogLevel.Debug,
+                "Ship purchase: the {Plan} plan's {ShipType} isn't bought: the home jump gate is built, and no mining equipment is bought after it (D153).",
+                plan,
+                need.ShipType);
+            need = PurchaseNeed.None;
+        }
+
         // Slice 6.70 (D150), asked on 2026-11-15: "Does a ship earn it's own price back before the end of the week?" A
         // ship that won't is no need, so it holds back nothing after it in the order.
         if (need.Tier != PurchaseTier.None && need.ShipType.Length > 0 && need.Price > 0)
@@ -405,6 +434,7 @@ public sealed class PurchaseNeeds
     private readonly Lock _gate = new();
     private readonly Dictionary<AutomationPlan, ReportedNeed> _needs = [];
     private readonly Dictionary<string, PurchaseRecord> _purchases = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<AutomationPlan> _refusedAfterTheGate = [];
     private bool _seeded;
 
     /// <summary>Creates the needs, judged by the game loop's ticks.</summary>
@@ -449,6 +479,20 @@ public sealed class PurchaseNeeds
         lock (_gate)
         {
             _needs[plan] = new ReportedNeed(need, at);
+        }
+    }
+
+    /// <summary>
+    /// Records that the order refused a plan's mining equipment because the home jump gate is built (slice 6.74, D153), and
+    /// says whether this is the first time since the start, so the refusal is logged once at Information.
+    /// </summary>
+    /// <param name="plan">The plan.</param>
+    /// <returns>True the first time for the plan since the start.</returns>
+    public bool FirstAfterTheGate(AutomationPlan plan)
+    {
+        lock (_gate)
+        {
+            return _refusedAfterTheGate.Add(plan);
         }
     }
 
