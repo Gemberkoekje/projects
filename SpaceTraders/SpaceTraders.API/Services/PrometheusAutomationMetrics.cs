@@ -79,6 +79,11 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
     private readonly RunGauge _exploreSystemsLeft;
     private readonly RunGauge _otherAgentTrades;
     private readonly RunGauge _exploreExplorersWanted;
+    private readonly RunGauge _planTickSeconds;
+    private readonly RunGauge _planTickEnded;
+    private readonly RunGauge _planPassSeconds;
+    private readonly RunGauge _stepRoundSeconds;
+    private readonly RunGauge _tradeListBuildSeconds;
 
     private readonly Lock _lock = new();
     private readonly SampledGauge _systemInfo;
@@ -491,6 +496,22 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
         _exploreExplorersWanted = UntilSet(
             "spacetraders_explore_explorers_wanted",
             "The explorers the explore plan wants (D102): one for every Explore.SystemsPerExplorer systems left to explore, or part of that, at most Explore.MaxExplorers.");
+        _planTickSeconds = UntilSet(
+            "spacetraders_plan_tick_seconds",
+            "How long the last plan tick took, in seconds (slice 6.75, B94): every plan that is switched on, one after the other. The plans give the ships their work, so while a tick runs long, ships wait for it.");
+        _planTickEnded = UntilSet(
+            "spacetraders_plan_tick_ended_timestamp_seconds",
+            "When the last plan tick ended (Unix time, slice 6.75): time() minus this is how long the tick that runs now has taken so far, plus the 5-second pause.");
+        _planPassSeconds = Labelled(
+            "spacetraders_plan_pass_seconds",
+            "How long each plan's last pass took, in seconds (slice 6.75, B94): which plan takes a tick's time.",
+            "plan");
+        _stepRoundSeconds = UntilSet(
+            "spacetraders_step_round_seconds",
+            "How long the last round of the step loop took, in seconds (slice 6.75, B94): one goal step for every ship, the contract's work and a market's refresh.");
+        _tradeListBuildSeconds = UntilSet(
+            "spacetraders_trade_list_build_seconds",
+            "How long the trade list's last build took, its read of the markets included, in seconds (slice 6.75, B94). The worker builds it again Trade.ListRebuildSeconds after each build.");
 
         // Counters reach Prometheus at 0 first, so increase() and rate() see their first increment (B43).
         ZeroFirstCounter ZeroFirst(string name, string help, params string[] labelNames)
@@ -609,6 +630,22 @@ public sealed class PrometheusAutomationMetrics : IAutomationMetrics
 
     /// <inheritdoc />
     public void ReservedCredits(long credits) => _creditReserve.Set(credits);
+
+    /// <inheritdoc />
+    public void PlanTick(TimeSpan duration, DateTimeOffset endedAt)
+    {
+        _planTickSeconds.Set(duration.TotalSeconds);
+        _planTickEnded.Set(endedAt.ToUnixTimeSeconds());
+    }
+
+    /// <inheritdoc />
+    public void PlanPass(string plan, TimeSpan duration) => _planPassSeconds.WithLabels(plan).Set(duration.TotalSeconds);
+
+    /// <inheritdoc />
+    public void StepRound(TimeSpan duration) => _stepRoundSeconds.Set(duration.TotalSeconds);
+
+    /// <inheritdoc />
+    public void TradeListBuilt(TimeSpan duration) => _tradeListBuildSeconds.Set(duration.TotalSeconds);
 
     /// <inheritdoc />
     public void Exploring(int systemsLeft, int explorersWanted)

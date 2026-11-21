@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -27,7 +28,8 @@ namespace SpaceTraders.Application.Automation;
 ///    then publishes ApiUnavailableEvent / ApiAvailableEvent on a change.
 /// Both skip their work when this instance is not the leader (<see cref="ILeaderElection"/>), and while API calls are paused
 /// after a 502. A plan and a ship's step never write the ship's goal at once: a plan's write waits for the step
-/// (<see cref="StepGuardedShipGoalRepository"/>).
+/// (<see cref="StepGuardedShipGoalRepository"/>). The leader records how long each tick, each plan's pass and each step round
+/// took (<see cref="IAutomationMetrics.PlanTick"/>, slice 6.75, B94).
 /// </summary>
 public sealed class GameLoopService(
     IServiceScopeFactory serviceScopeFactory,
@@ -35,6 +37,7 @@ public sealed class GameLoopService(
     ILeaderElection leaderElection,
     GameTicks ticks,
     TradeListStore tradeLists,
+    IAutomationMetrics metrics,
     ILogger<GameLoopService> logger) : BackgroundService
 {
     private long _tick;
@@ -81,6 +84,7 @@ public sealed class GameLoopService(
 
         // Every line logged during the tick carries its number; each plan adds its name.
         using var tickContext = logger.BeginScope(new Dictionary<string, object> { ["Tick"] = Interlocked.Increment(ref _tick) });
+        var clock = Stopwatch.StartNew();
 
         // Every tick, a paused one too: what a plan said counts until its next pass, a tick later (B79), and after a pause
         // of many short ticks the plans say again before anything is bought.
@@ -100,6 +104,9 @@ public sealed class GameLoopService(
         {
             logger.LogDebug("GameLoopService: automation is switched off; no plans this tick.");
         }
+
+        // Slice 6.75 (B94): a paused tick too, which is short.
+        metrics.PlanTick(clock.Elapsed, TimeProvider.System.GetUtcNow());
     }
 
     /// <summary>One round of the step loop.</summary>
@@ -113,6 +120,7 @@ public sealed class GameLoopService(
 
         // Every line logged during the round carries its number; each step adds its ship.
         using var roundContext = logger.BeginScope(new Dictionary<string, object> { ["Round"] = Interlocked.Increment(ref _round) });
+        var clock = Stopwatch.StartNew();
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var settings = services.GetRequiredService<ISettingsRepository>();
@@ -133,6 +141,7 @@ public sealed class GameLoopService(
         }
 
         await PublishApiAvailabilityEventsAsync(services.GetRequiredService<Wolverine.IMessageBus>(), cancellationToken);
+        metrics.StepRound(clock.Elapsed);
     }
 
     private async Task RunPlansAsync(ISettingsRepository settings, CancellationToken cancellationToken)
@@ -158,11 +167,13 @@ public sealed class GameLoopService(
                 continue;
             }
 
+            var pass = Stopwatch.StartNew();
             await RunStepAsync(
                 new Dictionary<string, object> { ["Plan"] = plan },
                 services => BootstrapAsync(plan, services, cancellationToken),
                 exception => logger.LogError(exception, "GameLoopService: bootstrapping the {Plan} plan failed; the rest of the tick carries on.", plan),
                 cancellationToken);
+            metrics.PlanPass(plan.ToString(), pass.Elapsed);
         }
     }
 

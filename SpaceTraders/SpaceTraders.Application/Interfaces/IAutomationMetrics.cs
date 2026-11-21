@@ -127,6 +127,37 @@ public interface IAutomationMetrics
     void Credits(long credits);
 
     /// <summary>
+    /// Records a plan tick that ended (PLAN.md slice 6.75, B94): how long it took (<c>spacetraders_plan_tick_seconds</c>) and
+    /// when it ended (<c>spacetraders_plan_tick_ended_timestamp_seconds</c>). A tick runs every plan that is switched on, one
+    /// after the other; the plans give the ships their work, so while a tick runs long, ships wait for it.
+    /// </summary>
+    /// <param name="duration">How long the tick took.</param>
+    /// <param name="endedAt">When it ended.</param>
+    void PlanTick(TimeSpan duration, DateTimeOffset endedAt);
+
+    /// <summary>
+    /// Records how long a plan's last pass took (<c>spacetraders_plan_pass_seconds{plan}</c>, slice 6.75, B94): which plan
+    /// takes a tick's time.
+    /// </summary>
+    /// <param name="plan">The plan, such as <c>Roles</c>.</param>
+    /// <param name="duration">How long its pass took.</param>
+    void PlanPass(string plan, TimeSpan duration);
+
+    /// <summary>
+    /// Records how long the last round of the step loop took (<c>spacetraders_step_round_seconds</c>, slice 6.75, B94): one goal
+    /// step for every ship, the contract's work and a market's refresh.
+    /// </summary>
+    /// <param name="duration">How long the round took.</param>
+    void StepRound(TimeSpan duration);
+
+    /// <summary>
+    /// Records how long the trade list's last build took, its read included (<c>spacetraders_trade_list_build_seconds</c>,
+    /// slice 6.75, B94).
+    /// </summary>
+    /// <param name="duration">How long the build took.</param>
+    void TradeListBuilt(TimeSpan duration);
+
+    /// <summary>
     /// Records the credits a ship purchase must leave (<c>spacetraders_credit_reserve</c>, D51): the floor, and the credits
     /// per unit the ships that trade can carry. A purchase waits until the credits are its price above this.
     /// </summary>

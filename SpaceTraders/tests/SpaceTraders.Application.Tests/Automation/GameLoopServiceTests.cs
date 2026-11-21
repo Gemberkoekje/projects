@@ -41,6 +41,7 @@ public sealed class GameLoopServiceTests : IDisposable
     private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
     private readonly IMarketWatchService _marketWatch = Substitute.For<IMarketWatchService>();
     private readonly IApiAvailabilityState _apiAvailability = Substitute.For<IApiAvailabilityState>();
+    private readonly IAutomationMetrics _metrics = Substitute.For<IAutomationMetrics>();
     private readonly GameTicks _ticks = new();
     private readonly TradeListStore _tradeLists = new();
 
@@ -110,6 +111,57 @@ public sealed class GameLoopServiceTests : IDisposable
         await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _marketWatch.DidNotReceive().RefreshDueMarketAsync(Arg.Any<CancellationToken>());
         await _bus.DidNotReceive().InvokeAsync(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task APlanTick_RecordsHowLongItTookAndWhenItEnded_AndHowLongEachPlansPassTook()
+    {
+        // Slice 6.75 (B94): on 2026-11-21 a plan tick took about 14 minutes, against about 11 s on 2026-11-16, and nothing
+        // measured it. The ticks were counted from the Tick numbers in Loki, and the plan that took the time was read from the
+        // gaps between the plans' lines.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Roles.Enabled", "Automation.Plan.Trading.Enabled");
+        _rolePlan.EnsureBootstrappedAsync(Arg.Any<CancellationToken>()).Returns(_ => Task.Delay(TimeSpan.FromMilliseconds(200)));
+        var before = TimeProvider.System.GetUtcNow();
+
+        await Sut().TickAsync(CancellationToken.None);
+
+        _metrics.Received(1).PlanPass("Roles", Arg.Is<TimeSpan>(took => took >= TimeSpan.FromMilliseconds(150)));
+        _metrics.Received(1).PlanPass("Trading", Arg.Any<TimeSpan>());
+        _metrics.Received(1).PlanTick(Arg.Is<TimeSpan>(took => took >= TimeSpan.FromMilliseconds(150)), Arg.Is<DateTimeOffset>(at => at >= before));
+        _metrics.DidNotReceive().StepRound(Arg.Any<TimeSpan>());
+    }
+
+    [Fact]
+    public async Task AStepRound_RecordsHowLongItTook_AndNoTick()
+    {
+        // Slice 6.75 (B94): the step loop beside the plan loop, measured the same way.
+        SwitchOn("Automation.Enabled");
+        _goalExecutor.ExecuteAsync("SPECTER-DEBUG-3", Arg.Any<CancellationToken>()).Returns(async _ =>
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(200));
+            return (GoalExecutionResult?)null;
+        });
+
+        await Sut().StepRoundAsync(CancellationToken.None);
+
+        _metrics.Received(1).StepRound(Arg.Is<TimeSpan>(took => took >= TimeSpan.FromMilliseconds(150)));
+        _metrics.DidNotReceive().PlanTick(Arg.Any<TimeSpan>(), Arg.Any<DateTimeOffset>());
+        _metrics.DidNotReceive().PlanPass(Arg.Any<string>(), Arg.Any<TimeSpan>());
+    }
+
+    [Fact]
+    public async Task AnInstanceThatIsNotTheLeader_RecordsNoTickAndNoStepRound()
+    {
+        // Only the leader runs the loops; another instance's empty rounds would read as fast ticks.
+        SwitchOn("Automation.Enabled", "Automation.Plan.Trading.Enabled");
+        using var sut = Sut(leader: false);
+
+        await sut.TickAsync(CancellationToken.None);
+        await sut.StepRoundAsync(CancellationToken.None);
+
+        _metrics.DidNotReceive().PlanTick(Arg.Any<TimeSpan>(), Arg.Any<DateTimeOffset>());
+        _metrics.DidNotReceive().PlanPass(Arg.Any<string>(), Arg.Any<TimeSpan>());
+        _metrics.DidNotReceive().StepRound(Arg.Any<TimeSpan>());
     }
 
     [Fact]
@@ -533,10 +585,10 @@ public sealed class GameLoopServiceTests : IDisposable
         await sut.StepRoundAsync(CancellationToken.None);
     }
 
-    private GameLoopService Sut(TimeSpan? interval = null, ILogger<GameLoopService>? logger = null, TradeListStore? tradeLists = null)
+    private GameLoopService Sut(TimeSpan? interval = null, ILogger<GameLoopService>? logger = null, TradeListStore? tradeLists = null, bool leader = true)
     {
         var leaderElection = Substitute.For<ILeaderElection>();
-        leaderElection.IsLeader.Returns(true);
+        leaderElection.IsLeader.Returns(leader);
 
         return new GameLoopService(
             _serviceScopeFactory,
@@ -544,6 +596,7 @@ public sealed class GameLoopServiceTests : IDisposable
             leaderElection,
             _ticks,
             tradeLists ?? _tradeLists,
+            _metrics,
             logger ?? NullLogger<GameLoopService>.Instance)
         {
             Interval = interval ?? TimeSpan.FromSeconds(5),

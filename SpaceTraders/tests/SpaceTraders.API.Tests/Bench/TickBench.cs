@@ -154,7 +154,7 @@ public sealed class TickBench(ITestOutputHelper output)
         var leader = Substitute.For<ILeaderElection>();
         leader.IsLeader.Returns(true);
         var store = root.GetRequiredService<TradeListStore>();
-        using var worker = new TradeListService(root.GetRequiredService<IServiceScopeFactory>(), leader, store, NullLogger<TradeListService>.Instance);
+        using var worker = new TradeListService(root.GetRequiredService<IServiceScopeFactory>(), leader, store, Substitute.For<IAutomationMetrics>(), NullLogger<TradeListService>.Instance);
         var build = Measure.Start();
         await worker.BuildAsync(CancellationToken.None);
         output.WriteLine(build.Stop().Line(Invariant($"Trade list: {store.Latest.Entries.Count:N0} trades")) + (store.Latest.IsNone ? "  (none: the home gate isn't built)" : string.Empty));
