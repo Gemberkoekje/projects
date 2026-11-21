@@ -20,11 +20,13 @@ namespace SpaceTraders.Application.Trading;
 /// <param name="scopes">A scope a round, for the reads.</param>
 /// <param name="leaderElection">Only the leader builds.</param>
 /// <param name="store">Where the list goes.</param>
+/// <param name="metrics">Where each build's time goes (slice 6.75, B94).</param>
 /// <param name="logger">Where each list is logged.</param>
 public sealed class TradeListService(
     IServiceScopeFactory scopes,
     ILeaderElection leaderElection,
     TradeListStore store,
+    IAutomationMetrics metrics,
     ILogger<TradeListService> logger) : BackgroundService
 {
     /// <summary>The setting for how many trades the list keeps of each system's buy markets: a close one for a ship anywhere.</summary>
@@ -124,6 +126,7 @@ public sealed class TradeListService(
 
         // An empty list would leave every ship without a route: with no trade found (no hold, no fresh market), none is kept.
         store.Set(list.Entries.Count == 0 ? TradeList.None : list);
+        metrics.TradeListBuilt(clock.Elapsed);
 
         var level = readAt - _loggedAt >= LoggedEvery ? LogLevel.Information : LogLevel.Debug;
         _loggedAt = level == LogLevel.Information ? readAt : _loggedAt;

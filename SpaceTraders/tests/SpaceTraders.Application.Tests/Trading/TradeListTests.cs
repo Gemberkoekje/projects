@@ -230,11 +230,13 @@ public sealed class TradeListTests
         var store = new TradeListStore();
         store.Set(new TradeList(DateTimeOffset.UtcNow, [Entry("X1-AA-1", "IRON", profit: 9_000)], ["X1-AA"]));
         using var services = Services(gateBuilt: false, out _);
+        var metrics = Substitute.For<IAutomationMetrics>();
 
-        using var worker = new TradeListService(services.GetRequiredService<IServiceScopeFactory>(), Leader(), store, NullLogger<TradeListService>.Instance);
+        using var worker = new TradeListService(services.GetRequiredService<IServiceScopeFactory>(), Leader(), store, metrics, NullLogger<TradeListService>.Instance);
         await worker.BuildAsync(CancellationToken.None);
 
         store.Latest.Should().BeSameAs(TradeList.None);
+        metrics.DidNotReceive().TradeListBuilt(Arg.Any<TimeSpan>());
     }
 
     [Fact]
@@ -242,10 +244,13 @@ public sealed class TradeListTests
     {
         var store = new TradeListStore();
         using var services = Services(gateBuilt: true, out var reader);
+        var metrics = Substitute.For<IAutomationMetrics>();
 
-        using var worker = new TradeListService(services.GetRequiredService<IServiceScopeFactory>(), Leader(), store, NullLogger<TradeListService>.Instance);
+        using var worker = new TradeListService(services.GetRequiredService<IServiceScopeFactory>(), Leader(), store, metrics, NullLogger<TradeListService>.Instance);
         var wait = await worker.BuildAsync(CancellationToken.None);
 
+        // Slice 6.75 (B94): on 2026-11-21 a build took 268 s over 6,841 markets, every 60 s, and only the hourly log line said so.
+        metrics.Received(1).TradeListBuilt(Arg.Is<TimeSpan>(took => took > TimeSpan.Zero));
         wait.Should().Be(TimeSpan.FromSeconds(TradeListService.DefaultRebuildSeconds));
         store.IsReady.Should().BeTrue("the plans that rank routes go on from here (B91)");
         store.Latest.IsNone.Should().BeFalse();

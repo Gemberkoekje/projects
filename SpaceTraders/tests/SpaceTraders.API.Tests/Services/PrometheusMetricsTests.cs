@@ -977,7 +977,28 @@ public sealed class PrometheusAutomationMetricsTests
         { "spacetraders_server_next_reset_timestamp_seconds", metrics => metrics.NextServerReset(DateTimeOffset.FromUnixTimeSeconds(1_791_118_800)), "spacetraders_server_next_reset_timestamp_seconds{reset_date=\"2026-09-27\"} 1791118800\n" },
         { "spacetraders_explore_systems_left", metrics => metrics.Exploring(16, 2), "spacetraders_explore_systems_left{reset_date=\"2026-09-27\"} 16\n" },
         { "spacetraders_explore_explorers_wanted", metrics => metrics.Exploring(16, 2), "spacetraders_explore_explorers_wanted{reset_date=\"2026-09-27\"} 2\n" },
+        { "spacetraders_plan_tick_seconds", metrics => metrics.PlanTick(TimeSpan.FromSeconds(842.5), DateTimeOffset.FromUnixTimeSeconds(1_795_286_417)), "spacetraders_plan_tick_seconds{reset_date=\"2026-09-27\"} 842.5\n" },
+        { "spacetraders_plan_tick_ended_timestamp_seconds", metrics => metrics.PlanTick(TimeSpan.FromSeconds(842.5), DateTimeOffset.FromUnixTimeSeconds(1_795_286_417)), "spacetraders_plan_tick_ended_timestamp_seconds{reset_date=\"2026-09-27\"} 1795286417\n" },
+        { "spacetraders_step_round_seconds", metrics => metrics.StepRound(TimeSpan.FromSeconds(3.25)), "spacetraders_step_round_seconds{reset_date=\"2026-09-27\"} 3.25\n" },
+        { "spacetraders_trade_list_build_seconds", metrics => metrics.TradeListBuilt(TimeSpan.FromSeconds(271.25)), "spacetraders_trade_list_build_seconds{reset_date=\"2026-09-27\"} 271.25\n" },
     };
+
+    /// <summary>
+    /// Slice 6.75 (B94): which plan takes a tick's time. On 2026-11-21 it had to be read from the gaps between the plans' log
+    /// lines: about 8.5 of a tick's 14 minutes went by between the explore plan's line and the probe plan's.
+    /// </summary>
+    [Fact]
+    public async Task EachPlansPass_IsOneSeriesPerPlan_WithHowLongItsLastPassTook()
+    {
+        _metrics.PlanPass("Roles", TimeSpan.FromSeconds(512));
+        _metrics.PlanPass("Trading", TimeSpan.FromSeconds(170.5));
+        _metrics.PlanPass("Roles", TimeSpan.FromSeconds(498));
+
+        var text = await ExportAsync();
+
+        text.Should().Contain("spacetraders_plan_pass_seconds{reset_date=\"2026-09-27\",plan=\"Roles\"} 498\n");
+        text.Should().Contain("spacetraders_plan_pass_seconds{reset_date=\"2026-09-27\",plan=\"Trading\"} 170.5\n");
+    }
 
     /// <summary>
     /// B52: a gauge without labels was published at 0 from the start, before the bot knew its value, and Prometheus's

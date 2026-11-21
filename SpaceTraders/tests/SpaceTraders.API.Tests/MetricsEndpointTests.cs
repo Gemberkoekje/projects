@@ -91,6 +91,11 @@ public sealed class MetricsEndpointTests
         "spacetraders_ship_role_credits_per_hour",
         "spacetraders_purchase_need_credits",
         "spacetraders_credit_reserve",
+        "spacetraders_plan_tick_seconds",
+        "spacetraders_plan_tick_ended_timestamp_seconds",
+        "spacetraders_plan_pass_seconds",
+        "spacetraders_step_round_seconds",
+        "spacetraders_trade_list_build_seconds",
     ];
 
     [Fact]

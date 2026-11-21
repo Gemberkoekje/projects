@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Added (2026-11-21, slice 6.75)
+- B94: the bot measures its loops. `spacetraders_plan_tick_seconds` and `spacetraders_plan_tick_ended_timestamp_seconds`
+  say how long the last plan tick took and when it ended, `spacetraders_plan_pass_seconds{plan}` how long each plan's last
+  pass took, `spacetraders_step_round_seconds` the step loop's last round, and `spacetraders_trade_list_build_seconds` the
+  trade list's last build. On 2026-11-21 a tick took about 14 minutes and nothing measured it.
+- Tests: `GameLoopServiceTests`, `TradeListTests`, `PrometheusAutomationMetricsTests`, `MetricsEndpointTests`.
+
+### Plan – Changed (2026-11-21)
+- B94 and D154: the plan tick slowed from about 11 s to about 14 minutes as the explorers found markets, and the alert mails
+  came from it. Slices 6.75 (measure the loops), 6.76 (find what takes the time, on a copy of the day's world) and 6.77 (cut
+  it) are planned. Slices 6.72 and 6.74 are recorded as deployed.
+
 ### Code – Added (2026-11-18, slice 6.74)
 - D153: once the home jump gate is built, the bot buys no more mining equipment: no mining drone, ore hound, siphon
   drone, surveyor or collection-point shuttle, at home or abroad. The purchase order refuses those plans' needs, so they
