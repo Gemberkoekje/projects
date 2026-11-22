@@ -187,6 +187,30 @@ public sealed class DatabaseInitializerTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task InitializeAsync_ReplacesThePriceSamplesMarketIndex_InADatabaseFromBeforeIt_AsTheModelWouldCreateIt()
+    {
+        // B96: the cluster's market_price_samples has the (agent, market, good, time) index; the model now has the covering
+        // (agent, market, time) one in its place, which only AddedSchema can bring to a database whose tables exist.
+        await using (var first = CreateContext())
+        {
+            await SpaceTradersDatabaseInitializer.InitializeAsync(first);
+        }
+
+        var asTheModelCreatesThem = await IndexesAsync("market_price_samples");
+        await ExecuteAsync(
+            """
+            DROP INDEX "IX_market_price_samples_AgentId_WaypointSymbol_ObservedAt";
+            CREATE INDEX "IX_market_price_samples_AgentId_WaypointSymbol_GoodSymbol_Obse~" ON market_price_samples ("AgentId", "WaypointSymbol", "GoodSymbol", "ObservedAt");
+            """);
+
+        await using var db = CreateContext();
+        await SpaceTradersDatabaseInitializer.InitializeAsync(db);
+
+        asTheModelCreatesThem.Should().Contain(index => index.Contains("INCLUDE", StringComparison.Ordinal));
+        (await IndexesAsync("market_price_samples")).Should().Equal(asTheModelCreatesThem);
+    }
+
+    [SkippableFact]
     public async Task InitializeAsync_D69_KeepsWhatWasSetBeforeIt_AndSwitchesOnThePlansThatWereOff()
     {
         // The agent the reset of 2026-10-04 13:00Z registered has most plans off (D9's defaults). Before the deploy you

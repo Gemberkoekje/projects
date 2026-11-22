@@ -379,7 +379,14 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.Supply).HasMaxLength(50);
             entity.Property(x => x.Activity).HasMaxLength(50);
             entity.HasIndex(x => new { x.AgentId, x.GoodSymbol, x.ObservedAt });
-            entity.HasIndex(x => new { x.AgentId, x.WaypointSymbol, x.GoodSymbol, x.ObservedAt });
+
+            // B96: a market's samples are read from this index alone, in time order, without a page of the table: the
+            // dead reckoning's read of 8 days took 29.7 s from a cold cache on 2026-11-22, one table page a row. It replaced
+            // the (agent, market, good, time) index; SpaceTradersDatabaseInitializer.AddedSchema makes the same swap on the
+            // cluster's database, so the two have to stay alike, the order of the included columns too.
+            entity.HasIndex(x => new { x.AgentId, x.WaypointSymbol, x.ObservedAt })
+                .HasDatabaseName("IX_market_price_samples_AgentId_WaypointSymbol_ObservedAt")
+                .IncludeProperties(x => new { x.Id, x.GoodSymbol, x.PurchasePrice, x.SellPrice, x.Supply, x.Activity, x.TradeVolume });
             entity.HasQueryFilter(x => x.AgentId == AgentId);
         });
 

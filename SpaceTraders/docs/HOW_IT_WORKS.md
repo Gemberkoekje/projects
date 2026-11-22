@@ -2107,8 +2107,10 @@ happens instead (B7, fixed).
   that is safe to repeat (`AddedSchema`): `cached_surveys."Extractions"` (slice 6.4),
   `agent_settings."FollowsDefault"` and `next_run_settings` (D69), in one transaction with the
   one-off judging of the settings stored before D69 (see
-  [How settings work](#how-settings-work)). `DatabaseInitializerTests` checks each against what the
-  model creates.
+  [How settings work](#how-settings-work)), `market_trades` (D133), and the covering index of
+  `market_price_samples` on (`AgentId`, `WaypointSymbol`, `ObservedAt`) in place of the four-column one (B96). An index
+  is changed the same way: created if missing, the old one dropped if there. `DatabaseInitializerTests` checks each
+  against what the model creates.
 - Wolverine stores nothing in the database.
 
 ### Agent scoping
@@ -2175,7 +2177,7 @@ other app (D8):
 | `runs` | Run summaries | Run lifecycle | 365 days, every agent's |
 | `run_credit_highlights` | Start/end credits per run | Run lifecycle | 365 days |
 | `startup_snapshots` | One full JSON snapshot per start and per discovery, with why (`Reason`) and what was new (`Discovered`) | Startup snapshot, discovery snapshots (slice 2.15) | the agent's first and the last 10 |
-| `market_price_samples` | Price history | `MarketPriceSampleHandler`, one row per good on every market refresh | 7 days raw, first per hour to 90 days |
+| `market_price_samples` | Price history | `MarketPriceSampleHandler`, one row per good on every market refresh; a market's samples are read from its covering index alone (B96) | 7 days raw, first per hour to 90 days |
 | `agent_credits_samples` | Credits over time | `AgentCreditsSampleHandler`, on every credit change | 7 days raw, first per hour to 90 days |
 | `ship_task_records` | Task timeline | Nothing | 30 days |
 | `ship_goal_history` | Ended goals | Nothing | 30 days |
