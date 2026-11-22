@@ -141,6 +141,7 @@ public sealed class AlreadyAtDestinationLoopTests
             [new CountingExecutor(executor, () => _steps++)],
             _goals,
             _ships,
+            Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IScoutAllMarketplacesPlanService>(),
             settings,
             Substitute.For<IGoalStepCircuitBreaker>(),

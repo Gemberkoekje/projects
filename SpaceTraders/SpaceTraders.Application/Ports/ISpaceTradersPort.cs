@@ -36,7 +36,8 @@ public interface ISpaceTradersPort
     /// <summary>
     /// Sells the units at the market the ship is docked at. When the market takes fewer a transaction than asked, they are sold
     /// in parts of what it takes, one transaction each (B87); the result has the last part's credits and cargo and what the
-    /// parts fetched together.
+    /// parts fetched together. A refusal because the ship holds fewer units than asked is a
+    /// <see cref="CargoRefusedException"/> (B95).
     /// </summary>
     Task<TradeActionResult> SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
 

@@ -1837,6 +1837,11 @@ scout and probe plans don't read the roles.
   remembers each ship's last trip (`LastTrips`, in memory) for the `CircuitBreakerTripped` rule,
   because mining, siphon and trading replace a blocked goal at once.
 - **Counts** every step it runs in `spacetraders_goal_steps_total{kind}`.
+- **A sale refused for cargo the ship doesn't hold** (B95): the API adapter raises `CargoRefusedException` when the API
+  refuses a sale because the ship's cargo "does not contain" the units, which is what a sale the API carried out but whose
+  answer was lost leaves behind (on 2026-11-21 Wolverine's 60-second limit cancelled one in flight). Whichever goal sold,
+  the step reads the ship's cargo from the API ([API] `GET my/ships/{ship}/cargo`), stores it, logs a warning and ends as
+  Progressing; the next step sells what the ship holds. Before, the same sale was sent again on every step.
 - **On Completed,** only a scout goal triggers anything: advancing the scout plan. No status,
   event or history row is written for any outcome.
 - **Called by:**

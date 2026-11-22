@@ -14,6 +14,7 @@ namespace SpaceTraders.Application.Tests.Goals;
 public sealed class ShipGoalExecutorServiceTests
 {
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
+    private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly IShipGoalExecutor _executor = Substitute.For<IShipGoalExecutor>();
     private readonly IScoutAllMarketplacesPlanService _scoutPlanService = Substitute.For<IScoutAllMarketplacesPlanService>();
@@ -48,6 +49,7 @@ public sealed class ShipGoalExecutorServiceTests
             [_executor],
             _goals,
             _ships,
+            _port,
             _scoutPlanService,
             _settings,
             _circuitBreaker,
@@ -314,6 +316,7 @@ public sealed class ShipGoalExecutorServiceTests
             [_executor],
             _goals,
             _ships,
+            _port,
             scoutPlanService,
             _settings,
             new GoalStepCircuitBreaker(),
@@ -597,5 +600,61 @@ public sealed class ShipGoalExecutorServiceTests
             tradeGoal,
             Arg.Any<ShipGoalContext>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AStepTheApiRefusesForCargoTheShipNoLongerHolds_ReadsTheCargoAgain_AndEndsTheStep()
+    {
+        // B95, seen from 2026-11-21 23:11Z: Wolverine's 60-second limit cancelled SPECTER-1F4's tenth sale of 45 AMMUNITION
+        // while the API carried it out. The bot counted 85 aboard, the API 40, and every step for 11 hours sent the same sale
+        // of 45 again, failing (236 error lines in the night). The step reads the ship's cargo from the API instead, so the
+        // next one sells the 40 the ship holds.
+        var trade = new TradeBetweenMarketsGoal
+        {
+            TradeSymbol = "AMMUNITION",
+            BuyWaypointSymbol = "X1-VU4-DD7E",
+            SellWaypointSymbol = "X1-V44-CA1C",
+            CargoBought = true,
+            Units = 490,
+        };
+        var held = new CargoModel(40, 490, [new CargoItemModel("AMMUNITION", 40)]);
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(trade);
+        _executor.CanExecute(trade).Returns(true);
+        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), trade, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns<GoalExecutionResult>(_ => throw new CargoRefusedException(
+                "SHIP-1",
+                "AMMUNITION",
+                45,
+                "Failed to update ship cargo. Ship SHIP-1 cargo does not contain 45 unit(s) of AMMUNITION. Ship has 40 unit(s) of AMMUNITION.",
+                new InvalidOperationException("the API's 400")));
+        _port.GetShipCargoAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(held);
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result!.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _ships.Received(1).UpdateCargoAsync("SHIP-1", held, Arg.Any<CancellationToken>());
+        _log.Entries.Should().ContainSingle(entry => entry.Level == Microsoft.Extensions.Logging.LogLevel.Warning
+            && entry.Message.Contains("SHIP-1")
+            && entry.Message.Contains("45 AMMUNITION")
+            && entry.Message.Contains("holds 40"));
+        _log.Entries.Should().NotContain(entry => entry.Level >= Microsoft.Extensions.Logging.LogLevel.Error);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AnyOtherFailureOfAStep_StaysTheStepsAndReadsNoCargo()
+    {
+        var trade = new TradeBetweenMarketsGoal { TradeSymbol = "FOOD", BuyWaypointSymbol = "X1-AB-BUY", SellWaypointSymbol = "X1-AB-SELL" };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(trade);
+        _executor.CanExecute(trade).Returns(true);
+        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), trade, Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns<GoalExecutionResult>(_ => throw new InvalidOperationException("the API's 500"));
+
+        var step = () => CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        await step.Should().ThrowAsync<InvalidOperationException>();
+        await _port.DidNotReceive().GetShipCargoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _ships.DidNotReceive().UpdateCargoAsync(Arg.Any<string>(), Arg.Any<CargoModel>(), Arg.Any<CancellationToken>());
     }
 }

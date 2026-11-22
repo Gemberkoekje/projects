@@ -13,6 +13,7 @@ public sealed class ShipGoalExecutorService(
     IEnumerable<IShipGoalExecutor> executors,
     IShipGoalRepository goals,
     IShipRepository ships,
+    ISpaceTradersPort port,
     IScoutAllMarketplacesPlanService scoutPlanService,
     ISettingsRepository settings,
     IGoalStepCircuitBreaker circuitBreaker,
@@ -154,9 +155,16 @@ public sealed class ShipGoalExecutorService(
 
         // D115: a trade trip's requests go before every other ship's while they wait for the rate limit.
         GoalExecutionResult result;
-        using (ApiPriority.For(activeGoal))
+        try
         {
-            result = await executor.ExecuteStepAsync(ship, activeGoal, new ShipGoalContext(), ct);
+            using (ApiPriority.For(activeGoal))
+            {
+                result = await executor.ExecuteStepAsync(ship, activeGoal, new ShipGoalContext(), ct);
+            }
+        }
+        catch (CargoRefusedException refused)
+        {
+            return await ReadCargoAgainAsync(refused, ct);
         }
 
         if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal scoutGoal)
@@ -170,6 +178,27 @@ public sealed class ShipGoalExecutorService(
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// B95: the API refused a sale for units the ship no longer holds, so the bot's cargo is ahead of the ship's: a sale the
+    /// API carried out lost its answer. On 2026-11-21 Wolverine's 60-second limit cancelled SPECTER-1F4's sale of 45 AMMUNITION
+    /// while the API made it, and every step for 11 hours sent the same sale again. Whichever goal sold (a trade, a miner, a
+    /// siphon), the cargo comes from the API instead and the step ends; the next one sells what the ship holds.
+    /// </summary>
+    private async Task<GoalExecutionResult> ReadCargoAgainAsync(CargoRefusedException refused, CancellationToken ct)
+    {
+        var cargo = await port.GetShipCargoAsync(refused.ShipSymbol, ct);
+        await ships.UpdateCargoAsync(refused.ShipSymbol, cargo, ct);
+        var held = cargo.Inventory?.Where(item => item.Symbol == refused.TradeSymbol).Sum(item => item.Units) ?? 0;
+        logger.LogWarning(
+            "ShipGoalExecutorService: the API refused ship {ShipSymbol}'s sale of {Units} {TradeSymbol}: it holds {UnitsHeld}, fewer than the bot stored; its cargo is taken from the API.",
+            refused.ShipSymbol,
+            refused.Units,
+            refused.TradeSymbol,
+            held);
+        return GoalExecutionResult.Progressing(
+            $"The API refused the sale of {refused.Units} {refused.TradeSymbol}: the ship holds {held}. Its cargo was read again.");
     }
 
     private async Task<int> GetMaxGoalStepsPerMinuteAsync(CancellationToken ct)
