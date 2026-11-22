@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-22, slice 6.78)
+- B95: when the API refuses a sale because the ship's cargo doesn't hold the units, the goal step reads the ship's cargo
+  from the API, stores it, warns and ends; the next step sells what is aboard. A sale the API carried out but whose answer
+  was lost (cancelled by Wolverine's 60-second limit on 2026-11-21) left SPECTER-1F4's cargo 45 AMMUNITION ahead of the
+  ship's, and every step for 11 hours sent the same refused sale again: 236 Error lines in one night.
+- Tests: `CargoRefusalTests`, `ShipGoalExecutorServiceTests`.
+
+### Plan – Changed (2026-11-22)
+- B95 (above) and B96: since PostgreSQL moved to another node at 02:02Z on 2026-11-22, a market's price history takes over
+  30 s to read from the cold NFS disk and times out; slice 6.79 is planned, its way the user's call. Slice 6.75 is recorded
+  as deployed, with its first numbers; the slow-tick alert waits for 6.77.
+
 ### Code – Added (2026-11-21, slice 6.75)
 - B94: the bot measures its loops. `spacetraders_plan_tick_seconds` and `spacetraders_plan_tick_ended_timestamp_seconds`
   say how long the last plan tick took and when it ended, `spacetraders_plan_pass_seconds{plan}` how long each plan's last

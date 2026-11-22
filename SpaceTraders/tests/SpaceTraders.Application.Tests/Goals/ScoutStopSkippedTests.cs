@@ -156,6 +156,7 @@ public sealed class ScoutStopSkippedTests
             [new ScoutWaypointGoalExecutor(_visits, tradeContexts, Substitute.For<IDockSubCommand>(), Substitute.For<IMessageBus>())],
             _goals,
             ships,
+            Substitute.For<ISpaceTradersPort>(),
             CreateScoutPlan(),
             settings,
             Substitute.For<IGoalStepCircuitBreaker>(),

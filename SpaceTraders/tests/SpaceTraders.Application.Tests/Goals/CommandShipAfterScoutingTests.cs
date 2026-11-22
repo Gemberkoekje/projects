@@ -98,6 +98,7 @@ public sealed class CommandShipAfterScoutingTests
             [new ScoutWaypointGoalExecutor(_visits, Substitute.For<ITradeContextReader>(), Substitute.For<IDockSubCommand>(), Substitute.For<IMessageBus>())],
             _goals,
             ships,
+            Substitute.For<ISpaceTradersPort>(),
             scoutPlan,
             settings,
             Substitute.For<IGoalStepCircuitBreaker>(),

@@ -148,6 +148,7 @@ public sealed class GoalStepCircuitBreakerTests
             [executor],
             _goals,
             _ships,
+            Substitute.For<ISpaceTradersPort>(),
             Substitute.For<IScoutAllMarketplacesPlanService>(),
             _settings,
             new GoalStepCircuitBreaker(),

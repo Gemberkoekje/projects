@@ -111,7 +111,17 @@ public sealed partial class SpaceTradersPortAdapter(ISpaceTradersApiClient clien
     public Task<TradeActionResult> SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
         => TradeInPartsAsync(units, async part =>
         {
-            var result = await client.SellCargoAsync(shipSymbol, tradeSymbol, part, cancellationToken);
+            SellCargoResult result;
+            try
+            {
+                result = await client.SellCargoAsync(shipSymbol, tradeSymbol, part, cancellationToken);
+            }
+            catch (SpaceTradersApiException exception) when (CargoRefusedException.IsCargoShort(exception.Message))
+            {
+                // B95: the ship holds fewer units than the bot stored, and the same sale would fail again on every step.
+                throw new CargoRefusedException(shipSymbol, tradeSymbol, part, exception.Message, exception);
+            }
+
             return new TradeActionResult(result.Agent.Symbol, result.Agent.Credits, MapCargo(result.Cargo), result.Transaction.TotalPrice);
         });
 
