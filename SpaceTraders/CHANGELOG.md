@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-22, slice 6.79)
+- B96: a market's price history is read from one index. `market_price_samples` has a covering index on (`AgentId`,
+  `WaypointSymbol`, `ObservedAt`) with every column the read takes, in place of the (`AgentId`, `WaypointSymbol`,
+  `GoodSymbol`, `ObservedAt`) one; the first start swaps them. The dead reckoning's read of 8 days touched a table page a
+  row and, with PostgreSQL's cache cold on the NFS volume, took 29.7 s and timed out; on the copy of 2026-11-21's world it
+  went from 1,923 pages to 270, without a sort.
+- Tests: `MarketPriceHistoryIndexTests`, `DatabaseInitializerTests`.
+
 ### Code – Fixed (2026-11-22, slice 6.78)
 - B95: when the API refuses a sale because the ship's cargo doesn't hold the units, the goal step reads the ship's cargo
   from the API, stores it, warns and ends; the next step sells what is aboard. A sale the API carried out but whose answer
