@@ -92,8 +92,9 @@ everything else is formulas.
   **Only the slapers know beforehand.** Dad picks them himself, by turns, so sitting out is shared
   fairly over the evenings (Q10 and his note). **They get the numbers 1, 2, 3 …**, as many as that
   evening needs (3, 6 or 9), and **the other numbers are drawn from a pot** (Dad, Q18). Their card
-  says **"Slaper 1"**, **"Slaper 2"** … in the number box, which is their number. The table plan puts
-  those lowest numbers in the sit-out places and says which round each sits out.
+  has **their number printed** in the number box, and **"Slaper 1"**, **"Slaper 2"** … in the Pitten
+  box of the round they sit out, so they know it beforehand (Dad's note, your example card). The
+  table plan puts those lowest numbers in the sit-out places and says which round each sits out.
 - **R13** Some Mondays have no play (2026: Easter Monday, 4 May, Whit Monday). The season starts in
   week 3 (12 January 2026).
 - **R14** Substitutes are known people kept in the same list as the members (status, not ranking).
@@ -170,7 +171,7 @@ everything else is formulas.
     one row per slaper, "Slaper 1" to "Slaper k", each with its number and the round it sits out
     (from the table plan). Each name shows how often that member sat out this season (this replaces
     the `slapers` sheet). **"Eerlijk voorstel"** fills the empty places with those who sat out least,
-    and he can change any of it. Their cards print "Slaper n" (R12). Fewer picked than needed is
+    and he can change any of it. Their cards print the number and "Slaper n" (R12). Fewer picked than needed is
     allowed (a note says so); he can write it on a card himself.
   - **Tafelindeling op nummer:** pick the number of players and print that plan (seat numbers per
     round and table, and which numbers sit out), or a booklet for every number from 4 to 28.
@@ -186,7 +187,8 @@ everything else is formulas.
   and birthday, plus a printable member list (replacing the "Leden" sheet).
 - **D15** The app prints **the personal score cards in Dad's own layout**, 12 per A4 (3 across,
   4 down). The card is one bordered table of 8 rows of equal height: the club name with an **empty
-  cell top right for the seat number** (for a slaper it says "Slaper 1", "Slaper 2" …, R12), the **first name**
+  cell top right for the seat number** (a slaper's number is printed there, centred, with "Slaper n"
+  in the Pitten box of the round sat out, R12), the **first name**
   large across the whole width (Dad, Q16; the full name when two active members share a first name),
   Datum, a header row with "Ronde" (written upwards), "Punten:" and "Pitten", rounds 1–3, and Totaal.
   Name and date are printed; the number is written in after the draw (R12). **No address or QR code** on the cards
@@ -241,7 +243,7 @@ Sheet number → question → answer:
 2. Q5 New member: **4200 per evening missed** (R17).
 3. Q4 Member stops: **out of the stand** (R18, D16).
 4. Q9 Slaper: **the card total already includes the 1600** (R11). His note: nothing needs to be
-   computed; the slapers get their "number" beforehand ("Slaper 1", "Slaper 2" … in the box), so they
+   computed; the slapers get their number beforehand ("Slaper 1", "Slaper 2" … in the Pitten box), so they
    know which round they sit out, and he shares sitting out fairly over the evenings (R12, D12).
 5. Q3 Substitutes' pits in Week totalen: **no, as now** (R7).
 6. Q6 **Eindstand in December: yes; January starts at 0: yes** (R19).
@@ -271,7 +273,7 @@ Follow-ups, relayed by you the same day:
 2. **Import 2026 from "Standen", and an export of all scores (D17).** The app's totals after the latest week must match the workbook's,
    and any differences are listed (like the week-46/47 pits totals).
 3. **Kaartjes en tafelindeling.** "Wie slaapt er?" with the fair proposal (D12), printing the name
-   cards without numbers except "Slaper n" for the slapers (D15), and Dad's table schemes by seat number (D13),
+   cards without numbers, except the slapers' (D15), and Dad's table schemes by seat number (D13),
    one or all numbers of players, with the table score sheets (D18).
 4. **Players' page** at klaverjas.gemberkoekje.nl with the players' password, the handout slips (D5),
    "Zet de stand online", and the /beheer split. This is Dad's main wish, so it comes
