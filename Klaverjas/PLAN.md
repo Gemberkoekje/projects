@@ -9,9 +9,10 @@ sheet by sheet, is in `explainer/index.html` (git-ignored: personal reference)._
 (received 2026-11-21) and, since 2026-11-23, puts the online standings first. **Dad has seen all the
 pages and approved them** (2026-11-23), and **answered the question sheet**
 [vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) the same day (see "Dad's answers" below).
-His answers changed the slapers (he picks them beforehand, D12) and a few rules (R16–R19); the mock
-follows them. Nothing is built yet. One question is left before slice 1: **Q17**, when the lowest
-evening of a quarter is dropped.
+His answers changed the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12)
+and a few rules (R16–R19); the mock follows them. Nothing is built yet. **Nothing blocks slice 1
+any more**: the weekly standings count every evening, exactly as the sheet does (R16). Q17 (does the
+Eindstand drop the quarters' lowest evenings?) only matters for the Eindstand.
 
 ## What it is
 
@@ -89,18 +90,21 @@ everything else is formulas.
   impression of a fixed draw (Dad, 2026-11-23). Each player writes the drawn number on their card. The
   table plan for that number of players says which seat number sits where in each round.
   **Only the slapers know beforehand.** Dad picks them himself, by turns, so sitting out is shared
-  fairly over the evenings (Q10 and his note). Their card says **"Slaper 1"**, **"Slaper 2"** or
-  **"Slaper 3"** in the number box: the round they sit out, as on his `PK bl-1` sheet. They don't
-  draw; they get the lowest numbers, the ones the plan has sitting out (with one per round, Slaper 1
-  is number 1; see Q18 for two or three per round).
+  fairly over the evenings (Q10 and his note). **They get the numbers 1, 2, 3 …**, as many as that
+  evening needs (3, 6 or 9), and **the other numbers are drawn from a pot** (Dad, Q18). Their card
+  says **"Slaper 1"**, **"Slaper 2"** … in the number box, which is their number. The table plan puts
+  those lowest numbers in the sit-out places and says which round each sits out.
 - **R13** Some Mondays have no play (2026: Easter Monday, 4 May, Whit Monday). The season starts in
   week 3 (12 January 2026).
 - **R14** Substitutes are known people kept in the same list as the members (status, not ranking).
 - **R15** After the cards are handed in, nothing can be changed by the players. Dad can still
   correct his own typing.
-- **R16** **Each quarter, a member's lowest evening doesn't count** (Dad, Q8). The workbook finds it
-  per quarter ("Laagste waarde vervalt") and colours it, but never subtracted it. An absence (4200)
-  can be the lowest. _When_ it drops, every week or only in the Eindstand, is Q17.
+- **R16** **The lowest evening per quarter** (Dad, Q8 and Q17). The workbook finds each member's
+  lowest evening per quarter (the "vervalt" column, shown as a minus and coloured), but the weekly
+  Totaal is the plain sum of every evening: checked for all 20 members in "Standen week 45". Dad: "it
+  worked correctly in the sheet". So **the weekly standings count every evening**, and the quarter's
+  lowest is only marked. An absence (4200) can be the lowest. His tick "per kwartaal vervalt de
+  laagste avond" can then only take effect in the Eindstand (R19): Q17.
 - **R17** A member who **joins** during the year gets 4200 for every evening of the season before
   they joined, as if absent (Dad, Q5).
 - **R18** A member who **stops** during the year goes out of the standings (Dad, Q4). The scores stay
@@ -161,12 +165,13 @@ everything else is formulas.
   impression of false play). _(2026-11-23.)_
   - **Kaartjes printen:** a card for every active member (Dad unticks anyone he knows won't come),
     plus a few blank ones for substitutes, with names and date but **no number**.
-  - **Wie slaapt er?** (Dad's answer Q10 and his note, 2026-11-23.) Before printing, Dad picks the
-    slapers. The expected number of players (by default the ticked members) gives how many per round.
-    Per round he picks the names; each name shows how often that member sat out this season (this
-    replaces the `slapers` sheet). **"Eerlijk voorstel"** fills the empty places with those who sat
-    out least, and he can change any of it. Their cards print "Slaper 1/2/3" (R12). Fewer picked
-    than needed is allowed (a note says so); he can write it on a card himself.
+  - **Wie slaapt er?** (Dad's answers Q10 and Q18 and his note, 2026-11-23.) Before printing, Dad
+    picks the slapers. The expected number of players (by default the ticked members) gives how many:
+    one row per slaper, "Slaper 1" to "Slaper k", each with its number and the round it sits out
+    (from the table plan). Each name shows how often that member sat out this season (this replaces
+    the `slapers` sheet). **"Eerlijk voorstel"** fills the empty places with those who sat out least,
+    and he can change any of it. Their cards print "Slaper n" (R12). Fewer picked than needed is
+    allowed (a note says so); he can write it on a card himself.
   - **Tafelindeling op nummer:** pick the number of players and print that plan (seat numbers per
     round and table, and which numbers sit out), or a booklet for every number from 4 to 28.
   - **Deze tafelindeling printen** gives the overview plus the table score sheets for that number of
@@ -181,7 +186,7 @@ everything else is formulas.
   and birthday, plus a printable member list (replacing the "Leden" sheet).
 - **D15** The app prints **the personal score cards in Dad's own layout**, 12 per A4 (3 across,
   4 down). The card is one bordered table of 8 rows of equal height: the club name with an **empty
-  cell top right for the seat number** (for a slaper it says "Slaper 1/2/3", R12), the **first name**
+  cell top right for the seat number** (for a slaper it says "Slaper 1", "Slaper 2" …, R12), the **first name**
   large across the whole width (Dad, Q16; the full name when two active members share a first name),
   Datum, a header row with "Ronde" (written upwards), "Punten:" and "Pitten", rounds 1–3, and Totaal.
   Name and date are printed; the number is written in after the draw (R12). **No address or QR code** on the cards
@@ -224,13 +229,9 @@ scores, and there was never a proper fix for it. So:
 - **Q1 (yours)** Sender address for the optional email: your Gmail via the cluster's mail secret, or a
   separate club address? (Less urgent now that the standings are online first.)
 - **Q2 (yours)** The web address: `klaverjas.gemberkoekje.nl` for now, or one with the club's name (De Samenspelers)?
-- **Q17 (Dad, blocks slice 1)** **When does the lowest evening of a quarter drop out (R16)?** Every
-  week already (the lowest so far in each quarter, so the standings during the year are lower than
-  today's), or only in the Eindstand in December (the weekly standings stay as today)? And only for
-  the points, or for the pits too?
-- **Q18 (Dad, slice 3)** With two or three slapers per round, two or three cards say "Slaper 1". Do
-  they simply share the lowest numbers at the door (with 18 players: numbers 1 and 2), or should each
-  card carry its own number?
+- **Q17 (Dad, before the Eindstand is built; not blocking)** The weekly standings count every evening,
+  as the sheet does (R16). **In the Eindstand in December, are the four lowest evenings (one per
+  quarter) taken off?** Or is "vervalt" only a marking? (Points only; the pits sheet has no such column.)
 
 ## Dad's answers (question sheet, 2026-11-23)
 
@@ -252,18 +253,25 @@ Sheet number → question → answer:
     played 4200s typed around the green rule (R3).
 12. Q12 Club money: **stays in Excel**.
 
+Follow-ups, relayed by you the same day:
+
+- Q17 When the quarter's lowest drops: "**it worked correctly in the sheet**". The sheet never
+  subtracts it from the weekly total (R16); what the Eindstand does is the narrowed Q17.
+- Q18 Slaper numbers: **the slapers get the numbers 1, 2, 3 …** (as many as needed that evening), and
+  the rest of the numbers are drawn from a pot (R12).
+
 ## Slices (one PR each; I stop after each for review)
 
 0. **Plan + mock** (this). The mock is approved (Dad, 2026-11-23).
 1. **Core app.** Players (members and substitutes), uitslag invullen with statuses, standings,
    Instellingen (incl. evenings without play), sign-in and local `docker-compose`. Specs cover
    R1–R19: ties, absence (green by status, not by value), slapers, substitutes in the week podium
-   only, the gap column, the month columns, the pits totals, the lowest evening per quarter (as Q17
-   decides), joining and stopping mid-season, and the season boundary.
+   only, the gap column, the month columns, the pits totals, the weekly total counting every evening
+   with each quarter's lowest marked (R16), joining and stopping mid-season, and the season boundary.
 2. **Import 2026 from "Standen", and an export of all scores (D17).** The app's totals after the latest week must match the workbook's,
    and any differences are listed (like the week-46/47 pits totals).
 3. **Kaartjes en tafelindeling.** "Wie slaapt er?" with the fair proposal (D12), printing the name
-   cards without numbers but with "Slaper 1/2/3" (D15), and Dad's table schemes by seat number (D13),
+   cards without numbers except "Slaper n" for the slapers (D15), and Dad's table schemes by seat number (D13),
    one or all numbers of players, with the table score sheets (D18).
 4. **Players' page** at klaverjas.gemberkoekje.nl with the players' password, the handout slips (D5),
    "Zet de stand online", and the /beheer split. This is Dad's main wish, so it comes
@@ -279,7 +287,7 @@ Sheet number → question → answer:
 - **Avonden:** the next evening with "Kaartjes en tafels printen" before and "Uitslag invullen" after,
   then every evening with its mail status, including evenings without play.
 - **Kaartjes en tafelindeling:** who gets a card (all active members ticked), blank cards for
-  substitutes, "Wie slaapt er?" (expected number of players, names per round, "Eerlijk voorstel"),
+  substitutes, "Wie slaapt er?" (expected number of players, a name per slaper number, "Eerlijk voorstel"),
   "Kaartjes printen", then the plan by seat number for a chosen number of players with
   "Deze tafelindeling printen" (overview plus table score sheets) / "Alle aantallen printen".
 - **Uitslag invullen:** status (slapers pre-set), points and pits per player, the substitutes, and
