@@ -1,0 +1,170 @@
+/* Taken from the approved mock (../mock/index.html): Verdana, big type, plain controls, one obvious next button. */
+:root {
+  --page: #eef2ef;
+  --card: #ffffff;
+  --ink: #141a16;
+  --ink-soft: #46524a;
+  --line: #c7d1ca;
+  --accent: #1d5a39;
+  --accent-dark: #123f27;
+  --accent-soft: #e2efe6;
+  --warn-ink: #6e4400;
+  --warn-bg: #fff3d1;
+  --warn-line: #c98a00;
+  --bad-ink: #9b1c1c;
+  --bad-bg: #fde8e8;
+  --ok-ink: #17602d;
+  --ok-bg: #e0f3e5;
+  --focus: #f0b323;
+  /* Dad's Invulblad colours: green plays, yellow sits out a round, light red is absent */
+  --st-speelt: #a9d08e;
+  --st-slaper: #ffff66;
+  --st-afwezig: #f4b6b6;
+  /* The sheet's own colours; the layout overrides the first four from Instellingen */
+  --c-first: #ffff00;
+  --c-second: #e9a3e4;
+  --c-third: #5bb8ec;
+  --c-absent: #92d88b;
+  --c-rest: #e3f1da;
+  --c-head: #d3ebf7;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 100%; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font-family: Verdana, Geneva, "DejaVu Sans", sans-serif; font-size: 1.25rem; line-height: 1.5;
+}
+.wrap { max-width: 78rem; margin: 0 auto; padding: 0 1.25rem; }
+h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 .4rem; }
+h2 { font-size: 1.4rem; line-height: 1.25; margin: 0 0 .75rem; }
+h3 { font-size: 1.15rem; margin: 0 0 .5rem; }
+p { margin: 0 0 1rem; }
+:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.muted { color: var(--ink-soft); }
+.lead { font-size: 1.15rem; color: var(--ink-soft); margin-bottom: 1.25rem; }
+[hidden] { display: none !important; }
+
+/* ---------- Header + tabs ---------- */
+.top { background: var(--accent); color: #fff; }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: .8rem; padding-bottom: .8rem; }
+.brand { font-size: 1.6rem; font-weight: 700; display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+.brand small { font-size: 1rem; font-weight: 400; opacity: .9; }
+.suit { font-size: 1.9rem; line-height: 1; }
+.logout { font: inherit; font-size: 1rem; color: #fff; background: transparent; border: 2px solid rgba(255,255,255,.75); border-radius: 6px; padding: .3rem .8rem; cursor: pointer; }
+nav.tabs { background: #fff; border-bottom: 2px solid var(--line); }
+nav.tabs .wrap { display: flex; gap: .25rem; flex-wrap: wrap; }
+nav.tabs a { font-weight: 700; color: var(--accent); text-decoration: none; border-bottom: 5px solid transparent; padding: .85rem 1.1rem .6rem; }
+nav.tabs a:hover { background: var(--accent-soft); }
+nav.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+main { padding: 1.5rem 0 3rem; }
+main.has-savebar { padding-bottom: 9rem; }
+
+/* ---------- Building blocks ---------- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1.4rem 1.5rem; margin-bottom: 1.25rem; }
+.btn { font: inherit; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 3.1rem; padding: .55rem 1.3rem; border-radius: 8px; border: 2px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; text-decoration: none; }
+.btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+.btn.secondary { background: #fff; color: var(--accent); }
+.btn.secondary:hover { background: var(--accent-soft); }
+.btn.big { font-size: 1.4rem; min-height: 3.8rem; padding: .7rem 1.8rem; }
+.btn.small { font-size: 1rem; min-height: 2.5rem; padding: .3rem .9rem; }
+.btn.danger { background: #fff; color: var(--bad-ink); border-color: var(--bad-ink); }
+.actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+
+.banner { border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1.25rem; border: 2px solid; }
+.banner p:last-child, .banner ul:last-child { margin-bottom: 0; }
+.banner.ok { background: var(--ok-bg); border-color: var(--ok-ink); color: var(--ok-ink); }
+.banner.warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
+.banner ul { margin: .25rem 0 0; padding-left: 1.4rem; }
+
+.field { margin-bottom: 1.4rem; }
+.field > label, .field > .label { display: block; font-weight: 700; margin-bottom: .2rem; }
+.help { font-size: 1rem; color: var(--ink-soft); margin: 0 0 .45rem; }
+input.text, select { font: inherit; padding: .45rem .6rem; border: 2px solid #8a978e; border-radius: 6px; width: 100%; max-width: 32rem; background: #fff; color: var(--ink); }
+input.text.short { max-width: 9rem; }
+select.round { width: auto; font-size: 1rem; padding: .25rem .4rem; }
+.inline { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+input[type="color"] { width: 3.2rem; height: 2.4rem; padding: .1rem; border: 2px solid #8a978e; border-radius: 6px; background: #fff; }
+
+/* Speelt / Slaper / Afwezig: radio buttons drawn as one segmented control, so it works without script too */
+.seg { display: inline-flex; border: 2px solid #8a978e; border-radius: 8px; overflow: hidden; vertical-align: middle; }
+.seg label { position: relative; display: block; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg span { display: block; font-size: 1rem; padding: .35rem .75rem; border-left: 2px solid #8a978e; background: #fff; cursor: pointer; }
+.seg label:first-child span { border-left: none; }
+.seg input:checked + span { font-weight: 700; }
+.seg input[value="Speelt"]:checked + span { background: var(--st-speelt); }
+.seg input[value="Slaper"]:checked + span { background: var(--st-slaper); }
+.seg input[value="Afwezig"]:checked + span { background: var(--st-afwezig); }
+.seg input:focus-visible + span { outline: 4px solid var(--focus); outline-offset: -4px; }
+
+/* ---------- Avonden ---------- */
+.next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem 2rem; border-left: 8px solid var(--accent); }
+.next .when { font-size: 1.5rem; font-weight: 700; margin: 0; }
+table.list { width: 100%; border-collapse: collapse; }
+table.list th { text-align: left; font-size: 1rem; color: var(--ink-soft); padding: .45rem .6rem; border-bottom: 2px solid var(--line); }
+table.list td { padding: .55rem .6rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.list tr:last-child td { border-bottom: none; }
+table.list tr.off td { color: var(--ink-soft); font-style: italic; }
+table.list td.knop { text-align: right; white-space: nowrap; }
+
+/* ---------- Uitslag invullen ---------- */
+.dateline { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; margin-bottom: 1rem; }
+.dateline .date { font-size: 1.45rem; font-weight: 700; }
+.scroll { overflow-x: auto; }
+table.entry { width: 100%; border-collapse: collapse; }
+table.entry th { text-align: left; font-size: 1rem; color: var(--ink-soft); padding: .4rem .5rem; border-bottom: 2px solid var(--line); white-space: nowrap; }
+table.entry td { padding: .3rem .5rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.entry tbody tr:nth-child(even) td { background: #f6f9f7; }
+table.entry .name { font-weight: 700; }
+table.entry td.st { white-space: nowrap; }
+table.entry tr.is-afwezig .name { color: var(--ink-soft); font-weight: 400; }
+input.num { font: inherit; font-size: 1.3rem; width: 6.2em; padding: .3rem .5rem; border: 2px solid #8a978e; border-radius: 6px; text-align: right; font-variant-numeric: tabular-nums; background: #fff; color: var(--ink); }
+input.num.pits { width: 3.4em; }
+input.num:disabled { background: #eceeec; color: #5b625d; border-color: #cfd5d1; }
+input.num.flag { border-color: var(--warn-line); background: var(--warn-bg); }
+input.num.bad { border-color: var(--bad-ink); background: var(--bad-bg); }
+td.hint { font-size: 1rem; min-width: 13rem; }
+.hint.warn { color: var(--warn-ink); font-weight: 700; }
+.hint.bad { color: var(--bad-ink); font-weight: 700; }
+.hint.info { color: var(--ink-soft); }
+
+.savebar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 3px solid var(--accent); box-shadow: 0 -4px 14px rgba(0,0,0,.08); z-index: 5; }
+.savebar .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1.5rem; padding-top: .7rem; padding-bottom: .7rem; }
+.facts { display: flex; flex-wrap: wrap; gap: .2rem 1.4rem; font-size: 1.05rem; }
+.facts b { font-size: 1.15rem; }
+.facts .todo { color: var(--warn-ink); font-weight: 700; }
+
+/* ---------- Stand ---------- */
+.stand-wrap { display: flex; flex-direction: column; gap: 1.75rem; align-items: flex-start; }
+.stand-wrap > div { max-width: 100%; }
+table.stand { border-collapse: collapse; font-size: 1rem; background: #fff; }
+table.stand caption { text-align: left; font-size: 1.35rem; font-weight: 700; padding-bottom: .35rem; }
+table.stand th, table.stand td { border: 1px solid #6f7a73; padding: .2rem .45rem; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.stand thead th { background: var(--c-head); font-size: .82rem; line-height: 1.25; }
+table.stand td.nm { text-align: left; }
+table.stand td.tot { font-weight: 700; }
+table.stand td.gap { background: #e8f2f8; font-weight: 700; }
+table.stand td.vrij { color: var(--ink-soft); font-style: italic; font-size: .85rem; }
+table.stand tr.sub td { font-style: italic; }
+table.stand tfoot td { font-weight: 700; background: #f3f6f4; }
+.c1 { background: var(--c-first) !important; }
+.c2 { background: var(--c-second) !important; }
+.c3 { background: var(--c-third) !important; }
+.ca { background: var(--c-absent) !important; }
+.cr { background: var(--c-rest) !important; }
+.legend { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; font-size: .9rem; }
+.legend span { padding: .1rem .7rem; border: 1px solid #6f7a73; }
+.winners { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.winners li { display: flex; align-items: center; gap: .5rem; }
+.medal { display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; border: 1px solid #6f7a73; font-weight: 700; font-size: .95rem; }
+
+/* ---------- Spelers ---------- */
+.bewerk { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; }
+.bewerk input.text, .bewerk select { width: auto; }
+
+/* ---------- Inloggen ---------- */
+.login { max-width: 30rem; margin: 3rem auto; }
+.login .brand { color: var(--accent); margin-bottom: 1rem; }
+.login .fout { color: var(--bad-ink); font-weight: 700; }

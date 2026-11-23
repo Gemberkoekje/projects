@@ -1,0 +1,107 @@
+@page
+@model InstellingenModel
+@{
+    ViewData["Title"] = "Instellingen";
+    ViewData["Tab"] = "instellingen";
+    var h = Model.Huidig;
+    var dagen = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday };
+}
+
+<h1>Instellingen</h1>
+<p class="lead">Alles hieronder mag u veranderen. Vergeet niet op <b>Opslaan</b> te klikken.</p>
+
+@if (!string.IsNullOrEmpty(Model.Bevestiging))
+{
+    <div class="banner ok"><p>@Model.Bevestiging</p></div>
+}
+@if (Model.Meldingen.Count > 0)
+{
+    <div class="banner warn" role="alert">
+        <ul>
+            @foreach (var melding in Model.Meldingen)
+            {
+                <li>@melding</li>
+            }
+        </ul>
+    </div>
+}
+
+@* One settings form; its fields sit in several cards and point at it with form="instellingen". *@
+<form method="post" asp-page="/Instellingen" id="instellingen"></form>
+
+<div class="card">
+    <h2>Club</h2>
+    <div class="field">
+        <label for="club">Naam van de club</label>
+        <p class="help">Staat bovenaan de schermen.</p>
+        <input id="club" class="text" name="Formulier.Club" value="@h.Club" form="instellingen" required>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Spelregels</h2>
+    <div class="field">
+        <label for="afwezig">Punten bij afwezigheid</label>
+        <p class="help">Wie een avond overslaat, krijgt dit aantal punten en geen pitten.</p>
+        <input id="afwezig" class="text short" name="Formulier.PuntenAfwezig" value="@h.PuntenAfwezig" inputmode="numeric" form="instellingen" required>
+    </div>
+    <div class="field">
+        <label for="speeldag">Speelavond</label>
+        <select id="speeldag" name="Formulier.Speeldag" style="max-width:14rem" form="instellingen">
+            @foreach (var dag in dagen)
+            {
+                <option value="@dag" selected="@(dag == h.Speeldag)">@Weergave.Dag(dag)</option>
+            }
+        </select>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Seizoen @h.EersteAvond.Year</h2>
+    <div class="field">
+        <label for="eerste">Eerste speelavond</label>
+        <p class="help">Een seizoen is een kalenderjaar: in januari begint de stand weer bij 0.</p>
+        <input id="eerste" class="text" type="date" name="Formulier.EersteAvond" value="@Weergave.Iso(h.EersteAvond)" style="max-width:14rem" form="instellingen" required>
+    </div>
+    <div class="field">
+        <span class="label">Geen klaverjassen op</span>
+        <p class="help">Deze avonden slaat het programma over. In de stand staat dan de reden, zoals nu.</p>
+        @if (h.GeenSpeelavonden.Count > 0)
+        {
+            <table class="list" style="max-width:40rem">
+                <tbody>
+                    @foreach (var vrij in h.GeenSpeelavonden)
+                    {
+                        <tr>
+                            <td>@Weergave.Lang(vrij.Datum)</td>
+                            <td>@vrij.Reden</td>
+                            <td class="knop">
+                                <form method="post" asp-page-handler="VrijWeghalen">
+                                    <input type="hidden" name="datum" value="@Weergave.Iso(vrij.Datum)">
+                                    <button type="submit" class="btn danger small">Weghalen</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        <form method="post" asp-page-handler="VrijToevoegen" class="inline" style="margin-top:.6rem">
+            <input class="text" type="date" name="VrijDatum" style="max-width:14rem" aria-label="Datum zonder klaverjassen" required>
+            <input class="text" name="VrijReden" placeholder="Reden, bijv. Kerst" style="max-width:14rem" aria-label="Reden">
+            <button type="submit" class="btn secondary small">Toevoegen</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Kleuren in de stand</h2>
+    <div class="inline" style="gap:1.25rem 2rem">
+        <label class="inline"><input type="color" name="Formulier.KleurEerste" value="@h.Kleuren.Eerste" form="instellingen"> 1e plaats</label>
+        <label class="inline"><input type="color" name="Formulier.KleurTweede" value="@h.Kleuren.Tweede" form="instellingen"> 2e plaats</label>
+        <label class="inline"><input type="color" name="Formulier.KleurDerde" value="@h.Kleuren.Derde" form="instellingen"> 3e plaats</label>
+        <label class="inline"><input type="color" name="Formulier.KleurAfwezig" value="@h.Kleuren.Afwezig" form="instellingen"> Niet aanwezig</label>
+    </div>
+</div>
+
+<button type="submit" class="btn big" form="instellingen">Opslaan</button>

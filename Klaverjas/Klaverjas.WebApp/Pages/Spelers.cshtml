@@ -1,0 +1,113 @@
+@page
+@model SpelersModel
+@{
+    ViewData["Title"] = "Spelers";
+    ViewData["Tab"] = "spelers";
+}
+
+<h1>Spelers</h1>
+<p class="lead">De leden en de invallers. Alleen leden staan in de jaarstand.</p>
+
+@if (!string.IsNullOrEmpty(Model.Bevestiging))
+{
+    <div class="banner ok"><p>@Model.Bevestiging</p></div>
+}
+@if (Model.Meldingen.Count > 0)
+{
+    <div class="banner warn" role="alert">
+        <ul>
+            @foreach (var melding in Model.Meldingen)
+            {
+                <li>@melding</li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="card">
+    <table class="list">
+        <thead><tr><th>Naam</th><th>Soort</th><th>E-mailadres</th><th>Doet mee?</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var s in Model.Spelers)
+            {
+                if (s.Id == Model.Bewerk)
+                {
+                    <tr>
+                        <td colspan="5">
+                            <form method="post" asp-page-handler="Opslaan" class="bewerk" data-bewerk>
+                                <input type="hidden" name="Formulier.Id" value="@s.Id">
+                                <input class="text" name="Formulier.Naam" value="@s.Naam" aria-label="Naam" style="max-width:18rem" required>
+                                <select name="Formulier.Soort" aria-label="Soort">
+                                    <option value="Lid" selected="@s.IsLid">Lid</option>
+                                    <option value="Invaller" selected="@(!s.IsLid)">Invaller</option>
+                                </select>
+                                <input class="text" name="Formulier.Email" value="@s.Email" placeholder="E-mailadres" aria-label="E-mailadres" style="max-width:18rem">
+                                <input class="text" name="Formulier.Telefoon" value="@s.Telefoon" placeholder="Telefoon" aria-label="Telefoon" style="max-width:11rem">
+                                <input class="text" name="Formulier.Adres" value="@s.Adres" placeholder="Adres" aria-label="Adres" style="max-width:16rem">
+                                <input class="text" name="Formulier.Verjaardag" value="@s.Verjaardag" placeholder="Verjaardag, bijv. 5 februari" aria-label="Verjaardag" style="max-width:15rem">
+                                <select name="Formulier.DoetMee" aria-label="Doet mee?" data-doet-mee>
+                                    <option value="true" selected="@s.DoetMee">Doet mee</option>
+                                    <option value="false" selected="@(!s.DoetMee)">Gestopt</option>
+                                </select>
+                                @if (s.IsLid)
+                                {
+                                    <select name="Formulier.InStand" aria-label="In de stand?" data-in-stand>
+                                        <option value="true" selected="@s.InStand">Blijft in de stand</option>
+                                        <option value="false" selected="@(!s.InStand)">Uit de stand halen</option>
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input type="hidden" name="Formulier.InStand" value="@(s.InStand ? "true" : "false")">
+                                }
+                                <button type="submit" class="btn small">Opslaan</button>
+                                <a class="btn secondary small" asp-page="/Spelers">Annuleren</a>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <td><b>@s.Naam</b></td>
+                        <td>@(s.IsLid ? "Lid" : "Invaller")</td>
+                        <td>@if (s.Email.Length > 0) { @s.Email } else { <span class="muted">geen e-mail</span> }</td>
+                        <td>
+                            @if (s.DoetMee) { <text>Doet mee</text> } else { <span class="muted">Gestopt</span> }
+                            @if (s.IsLid && !s.InStand) { <br><span class="muted" style="font-size:1rem">uit de stand</span> }
+                        </td>
+                        <td class="knop"><a class="btn secondary small" asp-page="/Spelers" asp-route-bewerk="@s.Id">Wijzigen</a></td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    <p class="help" style="margin:1rem 0 0">Een naam verbeteren past hem overal aan, ook in oude weken.
+        Stopt iemand (of is iemand overleden)? Zet die op <b>Gestopt</b>: de naam komt niet meer op het invulscherm, en gaat <b>uit de stand</b> van dit seizoen.
+        De scores blijven bewaard, en u kunt het altijd terugzetten. Wilt u iemand die stopt toch in de stand houden? Kies dan daarna <b>Blijft in de stand</b>.
+        Adres, telefoon en verjaardag staan onder <b>Wijzigen</b>.</p>
+</div>
+
+<div class="card">
+    <h2>Nieuwe speler</h2>
+    <form method="post" asp-page-handler="Toevoegen" class="inline">
+        <input class="text" name="Formulier.Naam" placeholder="Voornaam en achternaam" style="max-width:20rem" aria-label="Naam van de nieuwe speler" required>
+        <select name="Formulier.Soort" style="max-width:10rem" aria-label="Soort"><option value="Lid">Lid</option><option value="Invaller">Invaller</option></select>
+        <input class="text" name="Formulier.Email" placeholder="E-mailadres (mag leeg)" style="max-width:20rem" aria-label="E-mailadres van de nieuwe speler">
+        <button type="submit" class="btn">Toevoegen</button>
+    </form>
+    <p class="help" style="margin:.8rem 0 0">Een nieuw <b>lid</b> krijgt voor elke avond die dit seizoen al geweest is dezelfde punten als bij afwezigheid.</p>
+</div>
+
+@section Scripts {
+    <script>
+        // "Gestopt" takes a member out of the stand by default (R18); "Doet mee" puts them back.
+        document.querySelectorAll('[data-bewerk]').forEach(function (form) {
+            var doetMee = form.querySelector('[data-doet-mee]');
+            var inStand = form.querySelector('[data-in-stand]');
+            if (doetMee && inStand) {
+                doetMee.addEventListener('change', function () { inStand.value = doetMee.value; });
+            }
+        });
+    </script>
+}

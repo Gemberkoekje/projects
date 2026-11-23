@@ -1,0 +1,133 @@
+# Top level entry required to mark this as a global AnalyzerConfig file
+is_global = true
+
+# .NET diagnostics overrides
+dotnet_diagnostic.AsyncFixer01.severity = none       # Unnecessary async/await usage [Justification: Methods should be in the stack-trace.]
+
+dotnet_diagnostic.CA1012.severity   = none       # Abstract types should not have public constructors [Justification: Similar to S3442.]
+dotnet_diagnostic.CA1019.severity   = none       # Define accessors for attribute arguments [Justification: Similar to S3993.]
+dotnet_diagnostic.CA1064.severity   = none       # Exceptions should be public [Justification: Similar to S3871.]
+dotnet_diagnostic.CA1822.severity   = none       # Mark members as static [Justification: Similar to S2325.]
+dotnet_diagnostic.CA1860.severity   = none       # Avoid using 'Enumerable.Any()' extension method [Justification: Any() is easier to read.]
+dotnet_diagnostic.CA1873.severity   = none       # [Justification: Disabled because tomany warnings.]
+dotnet_diagnostic.CA2000.severity   = none       # Dispose objects before losing scope [Justification: Similar to IDISP001]
+dotnet_diagnostic.CA2201.severity   = none       # Do not raise reserved exception types [Justification: Similar to S122.]
+
+dotnet_diagnostic.CA1008.severity   = warning    # Enums should have zero value
+dotnet_diagnostic.CA1044.severity   = warning    # Properties should not be write only
+dotnet_diagnostic.CA1045.severity   = warning    # Do not pass types by reference
+dotnet_diagnostic.CA1063.severity   = warning    # Implement IDisposable Correctly
+dotnet_diagnostic.CA1069.severity   = warning    # Enums values should not be duplicated
+dotnet_diagnostic.CA1806.severity   = warning    # Do not ignore method results
+dotnet_diagnostic.CA1816.severity   = warning    # Dispose methods should call SuppressFinalize
+dotnet_diagnostic.CA1825.severity   = warning    # Avoid zero-length array allocations
+dotnet_diagnostic.CA1827.severity   = warning    # Do not use Count() or LongCount() when Any() can be used
+dotnet_diagnostic.CA1828.severity   = warning    # Do not use CountAsync() or LongCountAsync() when AnyAsync() can be used
+dotnet_diagnostic.CA1854.severity   = warning    # Prefer the 'IDictionary.TryGetValue(TKey, out TValue)' method
+dotnet_diagnostic.CA1864.severity   = warning    # Prefer the 'IDictionary.TryAdd(TKey, TValue)' method
+dotnet_diagnostic.CA1869.severity   = warning    # Cache and reuse 'JsonSerializerOptions' instances
+dotnet_diagnostic.CA2016.severity   = warning    # Forward the 'CancellationToken' parameter to methods
+dotnet_diagnostic.CA2211.severity   = warning    # Non-constant fields should not be visible
+dotnet_diagnostic.CA2213.severity   = warning    # Disposable fields should be disposed
+dotnet_diagnostic.CA2231.severity   = warning    # Overload operator equals on overriding value type Equals
+dotnet_diagnostic.CA2254.severity   = warning    # Template should be a static expression
+
+dotnet_diagnostic.CS1591.severity = none         # CS1591: Missing XML comment for publicly visible type or member
+
+dotnet_diagnostic.IDE0130.severity  = none       # [Justification: Namespaces can differ.]
+
+dotnet_diagnostic.NUnit1001.severity = none       # The individual arguments provided by a TestCaseAttribute must match the type of the corresponding parameter of the method [Justification: Too many false positives.]
+dotnet_diagnostic.NUnit1003.severity = none       # The TestCaseAttribute provided too few arguments [Justification: Too many false positives.]
+
+dotnet_diagnostic.Proj0039.severity = none       # Treat all warnings as errors is considered a bad practice [Justification: projects/ house style is warnings-as-errors.]
+dotnet_diagnostic.Proj0241.severity = none       # Enable package baseline validation [Justification: Baseline validation is not supported on Azure DevOps.]
+
+dotnet_diagnostic.QW0001.severity   = none       # Use a testable Time Provider [Justification: Similar to S6354.]
+dotnet_diagnostic.QW0015.severity   = none       # Define global using statements in single file [Justification: Too many false positives.]
+
+dotnet_diagnostic.S100.severity     = none       # Methods and properties should be named in PascalCase [Justification: Sometimes underscores increase readability.]
+dotnet_diagnostic.S101.severity     = none       # Types should be named in PascalCase [Justification: This is not written in stone.]
+dotnet_diagnostic.S1694.severity    = none       # An abstract class should have both abstract and concrete methods [Justification: An abstract class can act as a factory.]
+dotnet_diagnostic.S2156.severity    = none       # "sealed" classes should not have "protected" members [Justification: Similar to CS0628.]
+dotnet_diagnostic.S2326.severity    = none       # Unused type parameters should be removed [Justification: CQRS marker interfaces carry the result type of their handler.]
+dotnet_diagnostic.S3376.severity    = none       # Attribute, EventArgs, and Exception type names should end with the type being extended [Justification: Exception names should not need the Exception suffix.]
+dotnet_diagnostic.S3925.severity    = none       # "ISerializable" should be implemented correctly [Justification: Intended for now obsolete binary serialization.]
+dotnet_diagnostic.S6608.severity    = none       # Prefer indexing instead of "Enumerable" methods on types implementing "IList" [Justification: First() is easier to understand then [0].]
+
+dotnet_diagnostic.S1128.severity    = suggestion # Unnecessary "using" should be removed [Justification: Too many false positives.]
+dotnet_diagnostic.S2148.severity    = suggestion # Underscores should be used to make large numbers readable
+
+dotnet_diagnostic.S105.severity     = warning    # Tabulation characters should not be used
+dotnet_diagnostic.S107.severity     = none       # Methods should not have too many parameters
+dotnet_diagnostic.S113.severity     = warning    # Files should end with a newline
+dotnet_diagnostic.S1210.severity    = none       # When implementing IComparable or IComparable<T>, you should also override <, <=, >, and >=
+dotnet_diagnostic.S1479.severity    = warning    # "switch" statements with many "case" clauses should have only one statement
+dotnet_diagnostic.S1858.severity    = warning    # "ToString()" calls should not be redundant
+dotnet_diagnostic.S2302.severity    = warning    # "nameof" should be used
+dotnet_diagnostic.S2333.severity    = warning    # Redundant modifiers should not be used
+dotnet_diagnostic.S2342.severity    = warning    # Enumeration types should comply with a naming convention
+dotnet_diagnostic.S2436.severity    = warning    # Types and methods should not have too many generic parameters
+dotnet_diagnostic.S3215.severity    = warning    # "interface" instances should not be cast to concrete types
+dotnet_diagnostic.S3257.severity    = warning    # Declarations and initializations should be as concise as possible
+dotnet_diagnostic.S3353.severity    = warning    # Unchanged variables should be marked as "const"
+dotnet_diagnostic.S3717.severity    = warning    # Track use of "NotImplementedException" [Justification: Equivalent to TODO.]
+dotnet_diagnostic.S3776.severity    = warning    # Cognitive Complexity of methods should not be too high
+dotnet_diagnostic.S4457.severity    = warning    # Parameter validation in "async"/"await" methods should be wrapped
+dotnet_diagnostic.S4462.severity    = warning    # Calls to "async" methods should not be blocking
+dotnet_diagnostic.S6354.severity    = warning    # Use a testable date/time provider
+dotnet_diagnostic.S6513.severity    = warning    # "ExcludeFromCodeCoverage" attributes should include a justification
+
+dotnet_diagnostic.SA1001.severity   = none       # Commas should be spaced correctly
+dotnet_diagnostic.SA1009.severity   = none       # Closing parenthesis should not be followed by a space
+dotnet_diagnostic.SA1010.severity   = none       # something with by a space
+dotnet_diagnostic.SA1015.severity   = none       # Closing generic bracket should be followed by a space
+dotnet_diagnostic.SA1101.severity   = none       # Prefix local calls with this
+dotnet_diagnostic.SA1118.severity   = none       # The parameter spans multiple lines
+dotnet_diagnostic.SA1127.severity   = none       # Generic type constraints should be on their own line
+dotnet_diagnostic.SA1128.severity   = none       # Put constructor initializers on their own line
+dotnet_diagnostic.SA1200.severity   = none       # Using directives should be placed correctly
+dotnet_diagnostic.SA1201.severity   = none       # Elements should appear in the correct order
+dotnet_diagnostic.SA1202.severity   = none       # Elements should be ordered by access
+dotnet_diagnostic.SA1203.severity   = none       # Constants should appear before fields
+dotnet_diagnostic.SA1204.severity   = none       # Static elements should appear before instance elements
+dotnet_diagnostic.SA1208.severity   = none       # System using directives should be placed before other using directives
+dotnet_diagnostic.SA1214.severity   = none       # Readonly fields should appear before non-readonly fields
+dotnet_diagnostic.SA1300.severity   = none       # Element should begin with upper-case letter
+dotnet_diagnostic.SA1302.severity   = none       # Interface names should begin with I
+dotnet_diagnostic.SA1304.severity   = none       # Non-private readonly fields should begin with upper-case letter
+dotnet_diagnostic.SA1306.severity   = none       # Field names should begin with lower-case letter
+dotnet_diagnostic.SA1307.severity   = none       # Accessible fields should begin with upper-case letter
+dotnet_diagnostic.SA1308.severity   = none       # Variable names should not be prefixed
+dotnet_diagnostic.SA1309.severity   = none       # Field names should not begin with underscore
+dotnet_diagnostic.SA1310.severity   = none       # Field names should not contain underscore
+dotnet_diagnostic.SA1311.severity   = none       # Static readonly fields should begin with upper-case letter
+dotnet_diagnostic.SA1313.severity   = none       # Parameter names should begin with lower-case letter
+dotnet_diagnostic.SA1402.severity   = none       # File may only contain a single type
+dotnet_diagnostic.SA1502.severity   = none       # Element should not be on a single line
+dotnet_diagnostic.SA1503.severity   = none       # Braces should not be omitted
+dotnet_diagnostic.SA1513.severity   = none       # Closing brace should be followed by blank line
+dotnet_diagnostic.SA1515.severity   = none       # Single-line comment should be preceded by blank line
+dotnet_diagnostic.SA1516.severity   = none       # Elements should be separated by blank line [Justification: Fires on generated Razor code.]
+dotnet_diagnostic.SA1519.severity   = none       # Braces should not be omitted from multi-line child statement
+dotnet_diagnostic.SA1520.severity   = none       # Use braces consistently
+dotnet_diagnostic.SA1600.severity   = none       # Elements should be documented
+dotnet_diagnostic.SA1601.severity   = none       # Partial elements should be documented
+dotnet_diagnostic.SA1602.severity   = none       # Enumeration items should be documented
+dotnet_diagnostic.SA1611.severity   = none       # Element parameters should be documented
+dotnet_diagnostic.SA1615.severity   = none       # Element return value should be documented
+dotnet_diagnostic.SA1618.severity   = none       # Generic type parameters should be documented
+dotnet_diagnostic.SA1623.severity   = none       # Property summary documentation should match accessors
+dotnet_diagnostic.SA1633.severity   = none       # File should have header
+dotnet_diagnostic.SA1636.severity   = none       # File header copyright text should match
+dotnet_diagnostic.SA1637.severity   = none       # File header should contain file name
+dotnet_diagnostic.SA1640.severity   = none       # File header should have valid company text
+dotnet_diagnostic.SA1649.severity   = none       # File name should match first type name
+
+dotnet_diagnostic.SA1401.severity   = suggestion # Fields should be private
+dotnet_diagnostic.SA1407.severity   = suggestion # Arithmetic expressions should declare precedence
+dotnet_diagnostic.SA1501.severity   = suggestion # Statement should not be on a single line
+dotnet_diagnostic.SA1512.severity   = suggestion # Single-line comments should not be followed by blank line
+
+dotnet_diagnostic.SX1101.severity   = warning    # Do not prefix local calls with 'this.' [Justification: 'this.' is redundant.]
+
+dotnet_diagnostic.SYSLIB1045.severity = warning   
