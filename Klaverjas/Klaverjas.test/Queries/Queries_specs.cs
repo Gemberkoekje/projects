@@ -13,7 +13,7 @@ public sealed class Queries_specs
     public async Task a_new_evening_lists_every_active_member_as_playing()
     {
         var gestopt = Lid("Gerrit Kok") with { DoetMee = false };
-        var handler = new UitslagOphalenHandler(new InMemoryAvondStore(), new InMemorySpelerStore(kees, annie, gestopt, bert), new InMemoryInstellingenStore());
+        var handler = new UitslagOphalenHandler(new InMemoryAvondStore(), new InMemorySpelerStore(kees, annie, gestopt, bert), new InMemoryInstellingenStore(), new InMemoryVoorbereidingStore());
 
         var formulier = (await handler.HandleAsync(new UitslagOphalen { Datum = Wk47 })).Value;
 
@@ -26,7 +26,7 @@ public sealed class Queries_specs
     public async Task an_entered_evening_shows_what_was_saved()
     {
         var avonden = new InMemoryAvondStore(Avond(Wk47, Speelt(annie, 4918, pitten: 1), Afwezig(kees), Speelt(bert, 5000)));
-        var handler = new UitslagOphalenHandler(avonden, new InMemorySpelerStore(annie, kees, bert), new InMemoryInstellingenStore());
+        var handler = new UitslagOphalenHandler(avonden, new InMemorySpelerStore(annie, kees, bert), new InMemoryInstellingenStore(), new InMemoryVoorbereidingStore());
 
         var formulier = (await handler.HandleAsync(new UitslagOphalen { Datum = Wk47 })).Value;
 
@@ -40,7 +40,7 @@ public sealed class Queries_specs
     public async Task an_evening_without_play_has_no_entry_screen()
     {
         var instellingen = new InMemoryInstellingenStore(Standaard with { GeenSpeelavonden = [new GeenSpeelavond { Datum = Wk47, Reden = "Feest" }] });
-        var handler = new UitslagOphalenHandler(new InMemoryAvondStore(), new InMemorySpelerStore(annie), instellingen);
+        var handler = new UitslagOphalenHandler(new InMemoryAvondStore(), new InMemorySpelerStore(annie), instellingen, new InMemoryVoorbereidingStore());
 
         (await handler.HandleAsync(new UitslagOphalen { Datum = Wk47 })).IsValid.Should().BeFalse();
     }
@@ -50,7 +50,7 @@ public sealed class Queries_specs
     {
         var instellingen = new InMemoryInstellingenStore(Standaard with { GeenSpeelavonden = [new GeenSpeelavond { Datum = Wk46, Reden = "Feest" }] });
         var avonden = new InMemoryAvondStore(Avond(Wk45, Speelt(annie, 4000), Slaper(kees, 4500, 1)), Avond(Wk47, Speelt(annie, 4000), Afwezig(kees)));
-        var handler = new AvondenOphalenHandler(avonden, instellingen);
+        var handler = new AvondenOphalenHandler(avonden, instellingen, new InMemoryVoorbereidingStore());
 
         var overzicht = (await handler.HandleAsync(new AvondenOphalen())).Value;
 

@@ -1,0 +1,43 @@
+@page
+@model Klaverjas.WebApp.Pages.Afdrukken.KaartjesModel
+@{
+    Layout = "_Afdruk";
+    var k = Model.Kaartjes;
+    ViewData["Title"] = "Kaartjes " + Weergave.InZin(k.Datum);
+    ViewData["Soort"] = "kaartjes";
+    ViewData["Terug"] = Url.Page("/Voorbereiden", new { datum = Weergave.Iso(k.Datum) });
+    var open = k.OpenSlapers == 1 ? "is nog 1 slaper" : $"zijn nog {k.OpenSlapers} slapers";
+    ViewData["Uitleg"] = $"{k.Lijst.Count} kaartjes op {Model.Vellen.Count} A4. Print op A4, staand, zonder marges."
+        + (k.OpenSlapers > 0 ? $" Let op: er {open} niet gekozen." : string.Empty);
+    var datum = k.Datum.ToString("d MMMM", Weergave.Nl);
+}
+
+@foreach (var vel in Model.Vellen)
+{
+    <div class="vel a4p">
+        @foreach (var kaart in vel)
+        {
+            <div class="scard">
+                <table>
+                    <colgroup><col style="width:22%"><col style="width:46%"><col style="width:32%"></colgroup>
+                    <tr class="club"><td colspan="2">"@k.Club"</td><td>@(kaart.SlaperNummer > 0 ? kaart.SlaperNummer.ToString(Weergave.Nl) : string.Empty)</td></tr>
+                    <tr class="naam@(kaart.Naam.Length > 16 ? " lang" : string.Empty)"><td colspan="3">@kaart.Naam</td></tr>
+                    <tr><td class="lbl">Datum:</td><td colspan="2">@datum</td></tr>
+                    <tr><th class="ronde"><span>Ronde</span></th><th class="punten">Punten:</th><th class="pitten">Pitten</th></tr>
+                    @for (var r = 1; r <= 3; r++)
+                    {
+                        if (r == kaart.RondeStil)
+                        {
+                            <tr><td class="r">@r</td><td class="sl-pts">1600</td><td class="sl">Slaper @kaart.SlaperNummer</td></tr>
+                        }
+                        else
+                        {
+                            <tr><td class="r">@r</td><td></td><td></td></tr>
+                        }
+                    }
+                    <tr><td class="lbl"><b>Totaal:</b></td><td></td><td></td></tr>
+                </table>
+            </div>
+        }
+    </div>
+}

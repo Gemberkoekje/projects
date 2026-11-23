@@ -5,10 +5,10 @@ _To understand this, start with this file, then open [mock/index.html](mock/inde
 week-47 standings' real numbers, because this repository is public. What Dad's two workbooks do,
 sheet by sheet, is in `explainer/index.html` (git-ignored: personal reference)._
 
-**Status (2026-11-23):** **slices 1 and 2 are built**: sign-in, players, entering an evening, the
-standings, reading Dad's "Standen" workbook (every points total matches it) and downloading every
-score. What they do, the decisions taken while building and the gotchas are in [NOTES.md](NOTES.md);
-next is slice 3 (kaartjes en tafelindeling). Before that: the plan
+**Status (2026-11-23):** **slices 1 to 3 are built**: sign-in, players, entering an evening, the
+standings, reading Dad's "Standen" workbook (every points total matches it), downloading every score,
+and preparing an evening (cards, slapers, table plan and score sheets). What they do, the decisions
+taken while building and the gotchas are in [NOTES.md](NOTES.md); next is slice 4 (the players' page). Before that: the plan
 and the mock, which **Dad approved** (2026-11-23), and his answers to the question sheet
 [vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) (see "Dad's answers" below), which changed
 the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12) and added R16–R19.
@@ -180,8 +180,9 @@ everything else is formulas.
     players (D18).
   - Absence is set while entering the result (D1). The slapers come pre-set from here, and Dad can
     still change them there if the evening went differently.
-- **D13** The table plans come from **Dad's own schemes** in the workbook (4–28 players), imported
-  once, so the evening works exactly as the club is used to. The mock computes a plan instead. With
+- **D13** The table plans are **computed** with the approved mock's seeded search, so Dad gets the plans
+  he saw (changed 2026-11-23: Dad's workbook holds no clean scheme to import; its score sheets mix seat
+  numbers with names from the last draw and broken references). Seven players has no plan. With
   16 or more players nobody sits with the same people twice. With fewer (only 3 tables a round)
   that's impossible, so then nobody gets the same partner twice. Dad's 12-player scheme also repeats.
 - **D14** Spelers holds members and substitutes (type Lid / Invaller) with email, phone, address
@@ -276,12 +277,11 @@ Follow-ups, relayed by you the same day:
    with each quarter's lowest marked (R16), joining and stopping mid-season, and the season boundary.
    _Done (merged, projects#276). Dad's password comes from configuration for now; changing it in
    Instellingen comes with the players' password in slice 4._
-2. **Import 2026 from "Standen", and an export of all scores (D17).** _Built 2026-11-23 (see NOTES.md):
-   upload on Instellingen, a check screen before anything is written, a download of every score._ The app's totals after the latest week must match the workbook's,
+2. **Import 2026 from "Standen", and an export of all scores (D17).** _Done (merged, projects#277)._ The app's totals after the latest week must match the workbook's,
    and any differences are listed (like the week-46/47 pits totals).
 3. **Kaartjes en tafelindeling.** "Wie slaapt er?" with the fair proposal (D12), printing the name
    cards without numbers, except the slapers' (D15), and Dad's table schemes by seat number (D13),
-   one or all numbers of players, with the table score sheets (D18).
+   one or all numbers of players, with the table score sheets (D18). _Built 2026-11-23 (see NOTES.md)._
 4. **Players' page** at klaverjas.gemberkoekje.nl with the players' password, the handout slips (D5),
    "Zet de stand online", and the /beheer split. This is Dad's main wish, so it comes
    before email.

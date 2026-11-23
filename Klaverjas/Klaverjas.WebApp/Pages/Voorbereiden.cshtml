@@ -1,0 +1,150 @@
+@page
+@model VoorbereidenModel
+@using Klaverjas.core.Tafels
+@{
+    ViewData["Title"] = "Kaartjes en tafelindeling";
+    ViewData["Tab"] = "avonden";
+    var f = Model.Formulier;
+    var v = f.Voorbereiding;
+    var schema = f.Schema;
+    var metKaartje = f.Leden.Where(l => v.Kaartjes.Contains(l.Speler.Id)).OrderBy(l => l.Geslapen.Keer).ThenBy(l => l.Speler.Naam, StandBerekening.NaamVolgorde).ToList();
+    var kaartjes = v.Kaartjes.Count + v.Blanco;
+    var datum = Weergave.Iso(v.Datum);
+}
+
+<h1>Kaartjes en tafelindeling</h1>
+<div class="dateline"><span class="date">@Weergave.Lang(v.Datum) (week @Kalender.Week(v.Datum))</span></div>
+
+@if (!string.IsNullOrEmpty(Model.Fout))
+{
+    <div class="banner warn" role="alert"><p>@Model.Fout</p></div>
+}
+
+<div class="card">
+    <p style="margin:0">De nummers worden <b>op de avond zelf getrokken</b>, zodat niemand kan denken dat er iets is voorgekookt.
+        Daarom staat er op de kaartjes nog geen nummer: dat schrijft iedereen zelf in het vakje, na het trekken.
+        Alleen de <b>slapers</b> trekken niet: zij krijgen van tevoren de nummers 1, 2, 3 … (zoveel als er die avond nodig zijn).
+        Hun nummer staat al rechtsboven op het kaartje, en bij de ronde waarin ze stilzitten staat al <b>1600</b> bij de punten en <b>Slaper 1</b>, <b>Slaper 2</b> … bij de pitten.
+        De andere nummers worden uit de pot getrokken.</p>
+</div>
+
+<form method="post" asp-page="/Voorbereiden" asp-page-handler="Opslaan" id="voorbereiding">
+    <input type="hidden" name="Datum" value="@datum">
+
+    <div class="card">
+        <h2>Wie krijgt een kaartje?</h2>
+        <p class="help">Alle leden staan aangevinkt. Weet u al dat iemand niet komt? Vink die dan uit. Een kaartje te veel is niet erg.</p>
+        <div class="checklist">
+            @foreach (var speler in f.Leden.Select(l => l.Speler))
+            {
+                <label><input type="checkbox" name="Kaartjes" value="@speler.Id" checked="@v.Kaartjes.Contains(speler.Id)" data-kaartje> @speler.Naam</label>
+            }
+        </div>
+        <div class="inline" style="margin-top:1rem">
+            <label for="blanco" style="font-weight:700">Lege kaartjes voor invallers:</label>
+            <input class="text short" id="blanco" name="Blanco" value="@v.Blanco" inputmode="numeric" style="max-width:5rem">
+        </div>
+    </div>
+
+    <div class="card" id="slapers">
+        <h2>Wie slaapt er?</h2>
+        <p class="help">Komen er niet precies 4, 8, 12 … spelers, dan zit er elke ronde iemand stil. U kiest zelf wie, om de beurt:
+            achter elke naam staat hoe vaak die dit jaar al heeft geslapen. Slaper 1 krijgt nummer 1, Slaper 2 nummer 2, enzovoort;
+            de tafelindeling zegt in welke ronde elk nummer stilzit. De 1600 punten zet de slaper zelf op het kaartje, zoals nu.</p>
+        <div class="inline">
+            <label for="verwacht" style="font-weight:700">Aantal spelers (verwacht):</label>
+            <select id="verwacht" name="Verwacht" style="max-width:7rem" data-verzend data-zelf="@(v.VerwachtZelfGekozen ? "ja" : "nee")">
+                @foreach (var n in Tafelschemas.Aantallen)
+                {
+                    <option value="@n" selected="@(n == schema.Aantal)">@n</option>
+                }
+            </select>
+            <span class="muted">@(schema.Aantal / 4) tafels, @(schema.Slapers == 0 ? "niemand slaapt" : $"{schema.Slapers} slapers ({schema.StilPerRonde} per ronde)") · <span id="aangevinkt">@v.Kaartjes.Count</span> kaartjes met naam</span>
+            <button type="submit" class="btn secondary small" data-zonder-script>Bijwerken</button>
+        </div>
+        @if (schema.Slapers == 0)
+        {
+            <p class="muted" style="margin:1rem 0 0">Bij dit aantal spelers hoeft niemand te slapen.</p>
+        }
+        else
+        {
+            <div class="sleepers">
+                @for (var i = 0; i < v.Slapers.Count; i++)
+                {
+                    var nummer = i + 1;
+                    var gekozen = v.Slapers[i];
+                    <div class="srow">
+                        <span class="tag">Slaper @nummer</span>
+                        <select name="Slapers" aria-label="Slaper @nummer">
+                            <option value="">— kies een naam —</option>
+                            @foreach (var lid in metKaartje)
+                            {
+                                <option value="@lid.Speler.Id" selected="@(lid.Speler.Id == gekozen)">@lid.Speler.Naam (@(lid.Geslapen.Keer)× geslapen)</option>
+                            }
+                        </select>
+                        <span class="muted">nummer @nummer, zit stil in ronde @schema.RondeStil(nummer)</span>
+                    </div>
+                }
+            </div>
+            <div class="actions">
+                <button type="submit" class="btn secondary" asp-page-handler="Voorstel">Eerlijk voorstel</button>
+                <span class="muted">Kiest wie dit jaar het minst heeft geslapen. U kunt het daarna gewoon veranderen.</span>
+            </div>
+        }
+        <div class="actions print-row">
+            <button type="submit" class="btn big" asp-page-handler="Kaartjes">Kaartjes printen</button>
+            <span class="muted">@kaartjes kaartjes = @((kaartjes + 11) / 12) A4</span>
+        </div>
+    </div>
+</form>
+
+<div class="card">
+    <h2>Tafelindeling (op nummer)</h2>
+    <p class="help">Welk nummer in welke ronde aan welke tafel zit, en welke nummers stil zitten. Dat hangt alleen af van het aantal spelers, niet van wie er komt.
+        <b>Deze tafelindeling printen</b> geeft het overzicht én de tafelbriefjes: per tafel per ronde, spel voor spel, met bovenaan de vier nummers van die tafel.</p>
+    <form method="get" class="inline">
+        <input type="hidden" name="datum" value="@datum">
+        <label for="aantal" style="font-weight:700">Aantal spelers:</label>
+        <select id="aantal" name="aantal" style="max-width:7rem" data-verzend>
+            @foreach (var n in Tafelschemas.Aantallen)
+            {
+                <option value="@n" selected="@(n == Model.Plan.Aantal)">@n</option>
+            }
+        </select>
+        <span class="muted">@(Model.Plan.Aantal / 4) tafels@(Model.Plan.StilPerRonde == 0 ? ", niemand zit stil" : $", per ronde {Model.Plan.StilPerRonde} stil: de slapers, met de laagste nummers").
+            @(Model.Plan.NooitTweeKeerSamen ? "Niemand zit twee keer met dezelfde mensen aan tafel." : "Met zo weinig tafels zit iedereen wel eens twee keer met iemand aan tafel, maar nooit twee keer met dezelfde maat.")</span>
+        <button type="submit" class="btn secondary small" data-zonder-script>Tonen</button>
+    </form>
+    <div style="margin-top:1rem">
+        <partial name="_Tafelindeling" model="Model.Plan" />
+    </div>
+    <div class="actions" style="margin-top:1.25rem">
+        <a class="btn" asp-page="/Afdrukken/Tafels" asp-route-aantal="@Model.Plan.Aantal" asp-route-datum="@datum">Deze tafelindeling printen</a>
+        <a class="btn secondary" asp-page="/Afdrukken/Tafels" asp-route-alle="true">Alle aantallen printen (4 t/m 28)</a>
+        <button type="submit" class="btn secondary" form="voorbereiding" asp-page-handler="Klaar">Klaar, terug naar Avonden</button>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // A changed number shows its slapers or plan at once; the buttons are for when script is off.
+        document.querySelectorAll('[data-zonder-script]').forEach(function (b) { b.hidden = true; });
+        document.querySelectorAll('select[data-verzend]').forEach(function (s) {
+            s.addEventListener('change', function () { s.form.submit(); });
+        });
+
+        // Ticking cards updates the count at once. Until Dad picks a number himself, the expected number
+        // follows the cards: a moment after the last tick the page saves, and shows the slaper places.
+        var wacht = 0;
+        var verwacht = document.getElementById('verwacht');
+        document.querySelectorAll('[data-kaartje]').forEach(function (c) {
+            c.addEventListener('change', function () {
+                document.getElementById('aangevinkt').textContent = document.querySelectorAll('[data-kaartje]:checked').length;
+                if (verwacht.dataset.zelf !== 'ja') {
+                    clearTimeout(wacht);
+                    wacht = setTimeout(function () { verwacht.form.submit(); }, 1500);
+                }
+            });
+        });
+    </script>
+}

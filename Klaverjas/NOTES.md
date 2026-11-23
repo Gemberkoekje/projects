@@ -156,3 +156,77 @@ gembernodes still shows the old card).
 | `Klaverjas.test/Import` | reader (on an invented workbook built in code), planner, export specs |
 
 **Next: slice 3**, "Kaartjes en tafelindeling" (D12, D13, D15, D18).
+
+## Slice 3: kaartjes en tafelindeling (2026-11-23)
+
+Dad can prepare an evening: tick who gets a card, pick the slapers (with a fair proposal), print the
+score cards, and print the table plan with its score sheets. Built from the approved mock; the app
+never draws numbers (R12).
+
+**What is there**
+
+- **Avonden**: "Kaartjes en tafels printen" is the big button before the evening; once the evening is
+  prepared, "Uitslag invullen" becomes the big one.
+- **Kaartjes en tafelindeling** (`/Voorbereiden?datum=…`): who gets a card (all active members
+  ticked), blank cards, "Wie slaapt er?" (the expected number of players, one row per slaper number
+  with its round and each member's "N× geslapen", "Eerlijk voorstel"), "Kaartjes printen", and the
+  plan by seat number for any number of players with "Deze tafelindeling printen" / "Alle aantallen".
+- **Kaartjes printen** (`/Afdrukken/Kaartjes`): 12 per A4 in Dad's own layout. First name (full name
+  when two active members share it); a slaper's card has the number top right, and 1600 plus a red
+  "Slaper n" in the round sat out.
+- **Deze tafelindeling printen** (`/Afdrukken/Tafels?aantal=…`): the overview for the wall (A4
+  portrait), then one score sheet per table per round, two A5 per A4 landscape, cut down the middle.
+  **Alle aantallen**: an overview for every number of players, 24 A4.
+- **Uitslag invullen** starts the picked slapers as Slaper in their round.
+
+**Decisions taken while building**
+
+- **The table plans are computed, not imported (D13 changed).** Dad's evening workbook has no clean
+  scheme: its score sheets mix seat numbers with names pulled in from the last draw, the formulas behind
+  those names point at different columns from sheet to sheet, some blocks are empty or `#REF!`, and
+  there are no sheets for 19, 23 or the small odd numbers. The plans use the approved mock's seeded
+  search (ported exactly; specs pin a few rounds to the mock's values), so Dad gets the plans he saw.
+  Properties, checked for every number by the specs: everyone plays once a round; the slapers are
+  the lowest numbers (round 1 sits out 1…s, round 2 the next s, round 3 the next s, so slaper n's
+  round follows from n); nobody gets the same partner twice; with 16+ players nobody sits with the
+  same people twice. **Seven players has no plan** (nine sit-outs, seven players).
+- The **expected number of players follows the ticked cards** until Dad picks one himself (stored as
+  `VerwachtZelfGekozen`); a moment after the last tick the page saves itself and shows the slaper rows.
+- **Eerlijk voorstel** keeps every pick and fills the empty places with who sat out least, then
+  longest ago, then by name. A slaper must have a card.
+- The **"N× geslapen" count starts from the evenings entered in the app**: neither the Excel import
+  nor the app knows the old `slapers` sheet's history.
+- **Printing is HTML** with named pages (`@page staand` / `@page liggend`), so one print job holds
+  the portrait overview and the landscape sheets. The designs are in rem with the proof prints' root
+  sizes (3.3 mm for cards, 4.95 mm for sheets). QuestPDF (D6) is not needed for this.
+
+**Checked**
+
+- 187 specs, including the plan properties for all 24 numbers of players, the fair proposal, the
+  expected-number rule, the cards and the pre-set slapers.
+- In the browser with invented players: unticking three gave 17 expected and three slaper places;
+  "Eerlijk voorstel" skipped the three who sat out before; 19 cards on 2 A4; the entry screen started the
+  slapers in rounds 1–3; Avonden switched its big button.
+- Printed to PDF through Chrome: the cards on 2 portrait A4; the 17-player plan as 1 portrait overview
+  plus 6 landscape pages of score sheets, matching the proof print; every overview keeps at least
+  33 mm to the paper edge (25–28 players got tighter rows).
+
+**Gotchas**
+
+- Chrome's `printToPDF` honours named pages only with `preferCSSPageSize: true`.
+- A Razor `RedirectToPage(null, null, values, "slapers")` keeps the scroll place with a fragment.
+- The table plan must stay stable: printed overviews and score sheets of one evening must agree. The
+  pinned specs guard the seeded search; never "improve" it without accepting that plans change.
+
+**Files**
+
+| Where | What |
+|---|---|
+| `Klaverjas.core/Tafels` | `Tafelschema` (+ `Tafel`, `Ronde`), `Tafelschemas` (the seeded search), `SlaperKeuze` |
+| `Klaverjas.core/Models/Voorbereiding.cs` | an evening's preparation |
+| `Klaverjas.application` | `VoorbereidingOpslaan`, `VoorbereidingOphalen`, `KaartjesOphalen`, `IVoorbereidingStore`; `UitslagOphalen` pre-sets slapers |
+| `Klaverjas.WebApp/Pages` | `Voorbereiden`, `Afdrukken/Kaartjes`, `Afdrukken/Tafels`, `Shared/_Afdruk`, `Shared/_Tafelindeling` |
+| `Klaverjas.WebApp/wwwroot/css/afdruk.css` | the print pages |
+
+**Next: slice 4**, the players' page at klaverjas.gemberkoekje.nl with the players' password, the
+handout slips, "Zet de stand online" and the /beheer split.

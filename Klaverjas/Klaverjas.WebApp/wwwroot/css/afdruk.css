@@ -1,0 +1,96 @@
+/* Print pages: the cards (A4 portrait, 12 per page) and the table plan with its score sheets (the
+   overview A4 portrait, the sheets two A5 per A4 landscape). Sizes are the proof prints Dad checked:
+   the card and sheet designs are in rem, so the page sets the root size (3.3 mm and 4.95 mm). */
+@page { size: A4 portrait; margin: 0; }
+@page staand { size: A4 portrait; margin: 0; }
+@page liggend { size: A4 landscape; margin: 0; }
+
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html.kaartjes { font-size: 3.3mm; }
+html.tafels { font-size: 4.95mm; }
+body { margin: 0; background: #c9cfcb; color: #111; font-family: Verdana, Geneva, "DejaVu Sans", sans-serif; }
+
+.werkbalk { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px; background: #1d5a39; color: #fff; font-size: 16px; }
+.werkbalk .knop { font: inherit; font-weight: 700; color: #1d5a39; background: #fff; border: 2px solid #fff; border-radius: 8px; padding: 8px 16px; text-decoration: none; cursor: pointer; }
+.werkbalk .knop.hoofd { font-size: 20px; padding: 10px 24px; }
+
+.vel { margin: 8mm auto; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, .25); break-after: page; overflow: hidden; }
+.vel:last-child { break-after: auto; }
+
+@media print {
+  body { background: #fff; }
+  .werkbalk { display: none; }
+  .vel { margin: 0; box-shadow: none; }
+}
+
+/* ---------- Score cards (Dad's own card: the table is the card, 8 rows of equal height) ---------- */
+.a4p { page: staand; width: 210mm; height: 297mm; padding: 7mm; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 4mm; }
+.scard { background: #fff; font-size: .9rem; overflow: hidden; display: flex; flex-direction: column; }
+.scard table { flex: 1; width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; border: 2.5px solid #111; }
+.scard th, .scard td { border: 1.5px solid #111; height: 2.3rem; padding: 0 .3rem; font-weight: 400; text-align: center; white-space: nowrap; overflow: hidden; }
+.scard tr.club td { font-weight: 700; font-size: 1.05rem; }
+.scard tr.naam td { font-weight: 700; font-size: 1.45rem; white-space: normal; line-height: 1.1; }
+.scard tr.naam.lang td { font-size: 1.1rem; }
+.scard td.lbl { text-align: left; font-size: .85rem; padding: 0 .15rem; }
+.scard th.ronde { padding: 0; }
+.scard th.ronde span { display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg); font-size: .68rem; }
+.scard th.punten { font-size: 1.4rem; }
+.scard th.pitten { font-size: 1.15rem; }
+.scard td.r { font-weight: 700; font-size: 1.4rem; }
+.scard td.sl { font-size: .8rem; padding: 0 .1rem; color: #c00; }
+.scard td.sl-pts { font-size: 1.4rem; }
+
+/* ---------- Table plan overview (for the wall) ---------- */
+.overzicht { page: staand; width: 210mm; height: 297mm; padding: 14mm 14mm 10mm; font-size: 12pt; }
+.overzicht h1 { font-size: 22pt; margin: 0 0 1mm; }
+.overzicht .sub { font-size: 12pt; color: #333; margin: 0 0 6mm; }
+.overzicht .rondes { display: grid; gap: 5mm; }
+.overzicht .ronde { border: .5mm solid #555; border-radius: 2mm; padding: 3mm 4mm; break-inside: avoid; }
+.overzicht h2 { font-size: 15pt; margin: 0 0 2mm; }
+.overzicht table { width: 100%; border-collapse: collapse; }
+.overzicht td { border-top: .3mm solid #aaa; padding: 1.4mm 2mm; font-size: 14pt; }
+.overzicht td.t { width: 30mm; font-weight: 700; }
+.overzicht td b { font-size: 16pt; }
+.overzicht .vs { color: #555; font-size: 11pt; }
+.overzicht .stil td { background: #ffff66; }
+/* Six or seven tables: tighter rows, so three rounds stay well inside the printable area. */
+.overzicht.veel .rondes { gap: 3mm; }
+.overzicht.veel .ronde { padding: 2mm 4mm; }
+.overzicht.veel td { padding: .7mm 2mm; }
+
+/* ---------- Table score sheets: two A5 forms per A4 landscape, cut down the middle (D18) ---------- */
+.a4 { page: liggend; width: 297mm; height: 210mm; display: grid; grid-template-columns: 1fr 1fr; position: relative; }
+.a4 .cut { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 2px dashed #9a9a9a; }
+.a4 .cut span { position: absolute; top: 45%; left: -.7rem; background: #fff; font-size: 1.1rem; color: #666; line-height: 1; }
+.a5 { padding: 1.1rem 1.2rem; display: flex; min-width: 0; min-height: 0; }
+.tsheet { flex: 1; min-width: 0; border: 1.5px solid #333; padding: .4rem .5rem; background: #fff; font-size: .78rem; display: flex; flex-direction: column; overflow: hidden; }
+.ts-head { display: flex; justify-content: space-between; align-items: baseline; gap: .2rem .6rem; border-bottom: 1px solid #555; padding-bottom: .15rem; }
+.ts-head b { font-size: .98rem; }
+.ts-head span { font-size: .72rem; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ts-pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; padding: .15rem 0 .3rem; }
+.ts-pairs .who { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #444; padding-left: 1.2rem; }
+.ts-pairs .pbody { display: flex; align-items: stretch; gap: .3rem; }
+.ts-pairs .arr { width: .95rem; height: 2.5rem; color: #c00; flex: none; }
+.ts-pairs .prows { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+.ts-pairs .prow { display: flex; align-items: flex-end; gap: .35rem; height: 1.2rem; }
+.ts-pairs .prow b { font-size: 1rem; min-width: 1.4rem; text-align: right; line-height: 1; }
+.ts-pairs .nm-line { flex: 1; border-bottom: 1.5px solid #222; }
+.ts-body { display: grid; grid-template-columns: 6.4rem minmax(0, 1fr); gap: .35rem; align-items: start; min-height: 0; }
+.tsheet table { border-collapse: collapse; width: 100%; }
+.tsheet th, .tsheet td { border: 1px solid #666; padding: 0 .2rem; height: 1.25rem; font-weight: 400; overflow: hidden; white-space: nowrap; }
+.tsheet th { font-size: .66rem; height: 1.15rem; }
+.tsheet table.split th { font-size: .62rem; }
+.tsheet table.split td { font-size: .56rem; line-height: 1.22; height: auto; padding: 0 .15rem; border-color: #c4c4c4; text-align: center; }
+.tsheet table.hands { table-layout: fixed; }
+.tsheet .c { text-align: center; }
+.tsheet th.spel { font-size: .58rem; padding: 0; }
+.tsheet tr.chk td { background: #fff7cc; border-top: 2px solid #333; border-bottom: 2px solid #333; }
+.tsheet tr.tot th, .tsheet tr.tot td { border-top: 2px solid #333; font-weight: 700; }
+.tsheet tr.tot th { font-size: .55rem; padding: 0 .05rem; }
+.tsheet td.nr { font-weight: 700; font-size: .8rem; padding: 0; }
+.tsheet th.gs { font-size: .52rem; padding: 0; }
+.tsheet td.lbl2 { font-size: .6rem; text-align: left; padding-left: .3rem; font-weight: 400; }
+.tsheet th.totcol { background: #f3f3f3; font-size: .62rem; font-weight: 700; vertical-align: middle; padding: 0; }
+.tsheet th.totcol span { display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg); }
+.tsheet tr.eind td { border-top: 2px solid #333; }
+.tsheet tr.chk td.ctrl { text-align: center; font-weight: 700; font-size: .8rem; color: #444; }

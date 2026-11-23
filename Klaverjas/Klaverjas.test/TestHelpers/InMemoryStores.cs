@@ -75,3 +75,29 @@ internal sealed class InMemoryInstellingenStore(Instellingen begin) : IInstellin
         return Task.CompletedTask;
     }
 }
+
+internal sealed class InMemoryVoorbereidingStore : IVoorbereidingStore
+{
+    private readonly Dictionary<DateOnly, Voorbereiding> voorbereidingen = [];
+
+    public InMemoryVoorbereidingStore(params Voorbereiding[] begin)
+    {
+        foreach (var voorbereiding in begin)
+        {
+            voorbereidingen[voorbereiding.Datum] = voorbereiding;
+        }
+    }
+
+    public IReadOnlyCollection<Voorbereiding> Alle => voorbereidingen.Values;
+
+    public Task<Result<Voorbereiding>> LadenAsync(DateOnly datum, CancellationToken cancellationToken = default)
+        => Task.FromResult(voorbereidingen.TryGetValue(datum, out var voorbereiding)
+            ? Result.For(voorbereiding)
+            : Result.WithMessages<Voorbereiding>(ValidationMessage.Error("Die avond is nog niet voorbereid.")));
+
+    public Task OpslaanAsync(Voorbereiding voorbereiding, CancellationToken cancellationToken = default)
+    {
+        voorbereidingen[voorbereiding.Datum] = voorbereiding;
+        return Task.CompletedTask;
+    }
+}

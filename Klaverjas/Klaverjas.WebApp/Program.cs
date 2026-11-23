@@ -44,8 +44,8 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Auth:Password"]))
     throw new InvalidOperationException("Auth:Password is not set; without it nobody can sign in.");
 }
 
-// Marten as a document store: players, evenings (plus every replaced version), the settings, a
-// planned workbook import and the data-protection keys. The standings are computed, never stored (D8).
+// Marten as a document store: players, evenings (plus every replaced version), each evening's
+// preparation, the settings, a planned workbook import and the data-protection keys. The standings are computed, never stored (D8).
 builder.Services.AddMarten(options =>
 {
     options.Connection(connectionString);
@@ -60,6 +60,7 @@ builder.Services.AddMarten(options =>
     options.Schema.For<AvondVersie>().Identity(x => x.Id);
     options.Schema.For<Instellingen>().Identity(x => x.Id);
     options.Schema.For<ImportVoorstel>().Identity(x => x.Id);
+    options.Schema.For<Voorbereiding>().Identity(x => x.Id);
     options.Schema.For<DataProtectionSleutel>().Identity(x => x.Id);
 });
 
@@ -107,6 +108,8 @@ builder.Services.AddScoped<MartenInstellingenStore>();
 builder.Services.AddScoped<IInstellingenStore>(sp => sp.GetRequiredService<MartenInstellingenStore>());
 builder.Services.AddScoped<MartenImportVoorstelStore>();
 builder.Services.AddScoped<IImportVoorstelStore>(sp => sp.GetRequiredService<MartenImportVoorstelStore>());
+builder.Services.AddScoped<MartenVoorbereidingStore>();
+builder.Services.AddScoped<IVoorbereidingStore>(sp => sp.GetRequiredService<MartenVoorbereidingStore>());
 
 // The workbook reader and the export writer hold no state.
 builder.Services.AddSingleton<ClosedXmlStandenLezer>();
@@ -125,6 +128,7 @@ builder.Services.AddScoped<ImportVoorbereidenHandler>();
 builder.Services.AddScoped<ImportKoppelingWijzigenHandler>();
 builder.Services.AddScoped<ImportUitvoerenHandler>();
 builder.Services.AddScoped<ImportAnnulerenHandler>();
+builder.Services.AddScoped<VoorbereidingOpslaanHandler>();
 
 // Query handlers.
 builder.Services.AddScoped<AvondenOphalenHandler>();
@@ -134,6 +138,8 @@ builder.Services.AddScoped<SpelersOphalenHandler>();
 builder.Services.AddScoped<InstellingenOphalenHandler>();
 builder.Services.AddScoped<ImportVoorstelOphalenHandler>();
 builder.Services.AddScoped<ExportMakenHandler>();
+builder.Services.AddScoped<VoorbereidingOphalenHandler>();
+builder.Services.AddScoped<KaartjesOphalenHandler>();
 
 var app = builder.Build();
 
