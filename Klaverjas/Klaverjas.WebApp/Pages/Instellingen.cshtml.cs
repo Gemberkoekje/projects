@@ -39,6 +39,10 @@ public sealed class InstellingenModel(
     /// <summary>Why the last change was refused.</summary>
     public IReadOnlyList<string> Meldingen { get; private set; } = [];
 
+    /// <summary>Why the uploaded workbook could not be read (set by the Inlezen page).</summary>
+    [TempData]
+    public string ExcelFout { get; set; } = string.Empty;
+
     /// <summary>Shows the settings.</summary>
     /// <param name="cancellationToken">Cancels the load.</param>
     /// <returns>A task that completes once loaded.</returns>

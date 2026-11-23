@@ -5,9 +5,10 @@ _To understand this, start with this file, then open [mock/index.html](mock/inde
 week-47 standings' real numbers, because this repository is public. What Dad's two workbooks do,
 sheet by sheet, is in `explainer/index.html` (git-ignored: personal reference)._
 
-**Status (2026-11-23):** **slice 1 (the core app) is built**: sign-in, players, entering an evening
-and the standings, run locally against PostgreSQL. What it does, the decisions taken while building
-it and the gotchas are in [NOTES.md](NOTES.md); next is slice 2 (the import). Before that: the plan
+**Status (2026-11-23):** **slices 1 and 2 are built**: sign-in, players, entering an evening, the
+standings, reading Dad's "Standen" workbook (every points total matches it) and downloading every
+score. What they do, the decisions taken while building and the gotchas are in [NOTES.md](NOTES.md);
+next is slice 3 (kaartjes en tafelindeling). Before that: the plan
 and the mock, which **Dad approved** (2026-11-23), and his answers to the question sheet
 [vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) (see "Dad's answers" below), which changed
 the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12) and added R16–R19.
@@ -91,8 +92,9 @@ everything else is formulas.
   **Only the slapers know beforehand.** Dad picks them himself, by turns, so sitting out is shared
   fairly over the evenings (Q10 and his note). **They get the numbers 1, 2, 3 …**, as many as that
   evening needs (3, 6 or 9), and **the other numbers are drawn from a pot** (Dad, Q18). Their card
-  has **their number printed** in the number box, and **"Slaper 1"**, **"Slaper 2"** … in the Pitten
-  box of the round they sit out, so they know it beforehand (Dad's note, your example card). The
+  has **their number printed** in the number box, and in the round they sit out **1600** under
+  Punten and **"Slaper 1"**, **"Slaper 2"** … (in red) under Pitten, so they know it beforehand and the
+  card total includes the 1600 by itself (Dad's own card sheet, 2026-11-23). The
   table plan puts those lowest numbers in the sit-out places and says which round each sits out.
 - **R13** Some Mondays have no play (2026: Easter Monday, 4 May, Whit Monday). The season starts in
   week 3 (12 January 2026).
@@ -186,8 +188,8 @@ everything else is formulas.
   and birthday, plus a printable member list (replacing the "Leden" sheet).
 - **D15** The app prints **the personal score cards in Dad's own layout**, 12 per A4 (3 across,
   4 down). The card is one bordered table of 8 rows of equal height: the club name with an **empty
-  cell top right for the seat number** (a slaper's number is printed there, centred, with "Slaper n"
-  in the Pitten box of the round sat out, R12), the **first name**
+  cell top right for the seat number** (a slaper's number is printed there, centred, with 1600 and a
+  red "Slaper n" in the round sat out, R12), the **first name**
   large across the whole width (Dad, Q16; the full name when two active members share a first name),
   Datum, a header row with "Ronde" (written upwards), "Punten:" and "Pitten", rounds 1–3, and Totaal.
   Name and date are printed; the number is written in after the draw (R12). **No address or QR code** on the cards
@@ -229,6 +231,9 @@ scores, and there was never a proper fix for it. So:
 
 - **Q1 (yours)** Sender address for the optional email: your Gmail via the cluster's mail secret, or a
   separate club address? (Less urgent now that the standings are online first.)
+- **Q19 (Dad, not blocking)** **4 May**: the pits sheet has 9 pits that evening, but the points sheet
+  says "vier mei" (no play). Was there play? The import leaves those pits out; if there was play, Dad
+  can enter the evening himself.
 - **Q2 (yours)** The web address: `klaverjas.gemberkoekje.nl` for now, or one with the club's name (De Samenspelers)?
 - **Q17 (Dad, before the Eindstand is built; not blocking)** The weekly standings count every evening,
   as the sheet does (R16). **In the Eindstand in December, are the four lowest evenings (one per
@@ -269,9 +274,10 @@ Follow-ups, relayed by you the same day:
    R1–R19: ties, absence (green by status, not by value), slapers, substitutes in the week podium
    only, the gap column, the month columns, the pits totals, the weekly total counting every evening
    with each quarter's lowest marked (R16), joining and stopping mid-season, and the season boundary.
-   _Built 2026-11-23 (see NOTES.md). Dad's password comes from configuration for now; changing it in
+   _Done (merged, projects#276). Dad's password comes from configuration for now; changing it in
    Instellingen comes with the players' password in slice 4._
-2. **Import 2026 from "Standen", and an export of all scores (D17).** The app's totals after the latest week must match the workbook's,
+2. **Import 2026 from "Standen", and an export of all scores (D17).** _Built 2026-11-23 (see NOTES.md):
+   upload on Instellingen, a check screen before anything is written, a download of every score._ The app's totals after the latest week must match the workbook's,
    and any differences are listed (like the week-46/47 pits totals).
 3. **Kaartjes en tafelindeling.** "Wie slaapt er?" with the fair proposal (D12), printing the name
    cards without numbers, except the slapers' (D15), and Dad's table schemes by seat number (D13),

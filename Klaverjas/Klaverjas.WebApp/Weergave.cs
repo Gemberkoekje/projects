@@ -28,6 +28,12 @@ public static class Weergave
     /// <returns>Day and month.</returns>
     public static string DagMaand(DateOnly datum) => datum.ToString("d MMM", Nl).Replace(".", string.Empty, StringComparison.Ordinal);
 
+    /// <summary>"15:42": the time of an instant, on Amsterdam's clock.</summary>
+    /// <param name="utc">The instant (UTC).</param>
+    /// <returns>Hours and minutes.</returns>
+    public static string Tijd(DateTime utc)
+        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Kalender.Zone).ToString("HH:mm", Nl);
+
     /// <summary>"November".</summary>
     /// <param name="datum">A date in the month.</param>
     /// <returns>The month's name, capitalised.</returns>

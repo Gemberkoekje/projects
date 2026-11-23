@@ -22,6 +22,9 @@ configuration through the colon-path indexer, Razor Pages + vanilla JS, the anal
   `Instellingen` (one document).
 - **The repository is public. Real club data never goes into git** (D9): specs, the mock and any
   example use invented names. Dad's workbooks hold addresses, phones and birthdays.
+- **Dad's workbooks stay off git and off screenshots.** Specs build an invented workbook in code
+  (`StandenWerkboek`). Try a real file only locally, through the upload, then wipe the local
+  database (`docker compose down -v`); the check screen shows real names.
 - **Nobody is deleted** (D16): "Gestopt" and "Uit de stand halen" keep every score and can be undone.
 - One password for now (`Auth:Password`, Dad's), cookie auth for a year, fallback policy closes
   every page. The players' password and /beheer split come with slice 4.

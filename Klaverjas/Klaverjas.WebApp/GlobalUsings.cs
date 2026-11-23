@@ -1,4 +1,5 @@
 global using Klaverjas.application.Commands;
+global using Klaverjas.application.Import;
 global using Klaverjas.application.Queries;
 global using Klaverjas.application.ReadModels;
 global using Klaverjas.core.Enums;
