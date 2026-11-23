@@ -1,0 +1,190 @@
+@page
+@model InlezenModel
+@inject Klaverjas.application.Queries.InstellingenOphalenHandler InstellingenOphalen
+@{
+    var afwezig = Weergave.Getal((await InstellingenOphalen.HandleAsync(new Klaverjas.application.Queries.InstellingenOphalen())).Value.PuntenAfwezig);
+    ViewData["Title"] = "Excel inlezen";
+    ViewData["Tab"] = "instellingen";
+    var v = Model.Voorstel;
+    var b = v.Bestand;
+    var aandacht = v.Spelers.Where(s => s.Koppeling != Koppeling.Precies).ToList();
+    var precies = v.Spelers.Where(s => s.Koppeling == Koppeling.Precies).Select(s => s.Naam).OrderBy(n => n, StandBerekening.NaamVolgorde).ToList();
+    var punten = v.Verschillen.Where(x => x.Soort == VerschilSoort.TotaalPunten).ToList();
+    var pitten = v.Verschillen.Where(x => x.Soort == VerschilSoort.TotaalPitten).OrderByDescending(x => x.Excel).ToList();
+    var zonderAvond = v.Verschillen.Where(x => x.Soort == VerschilSoort.PittenZonderAvond).ToList();
+    var weken = v.Verschillen.Where(x => x.Soort == VerschilSoort.WeekTotaalPitten).OrderBy(x => x.Datum).ToList();
+    var nieuw = v.Spelers.Count(s => s.IsNieuw);
+}
+
+<h1>Excel inlezen</h1>
+
+@if (Model.IsWeg)
+{
+    <div class="card">
+        <p>Dit Excel-bestand is al ingelezen of geannuleerd.</p>
+        <a class="btn" asp-page="/Instellingen">Terug naar Instellingen</a>
+    </div>
+    return;
+}
+
+<p class="lead">@v.Bestandsnaam · gelezen om @Weergave.Tijd(v.GemaaktOp). Er is nog niets opgeslagen.</p>
+
+<div class="card">
+    <h2>Dit komt erin</h2>
+    <ul class="feiten">
+        <li><b>@b.Avonden.Count avonden</b>@if (b.Avonden.Count > 0) { <text>van @Weergave.InZin(b.Avonden[0]) t/m @Weergave.InZin(b.Avonden[^1])</text> }</li>
+        <li><b>@v.Spelers.Count leden</b>@(nieuw == v.Spelers.Count ? "allemaal nieuw in het programma" : $"{nieuw} nieuw, {v.Spelers.Count - nieuw} al in het programma")</li>
+        <li><b>@b.GeenSpeelavonden.Count avonden zonder klaverjassen</b>@string.Join(", ", b.GeenSpeelavonden.Select(g => g.Reden))</li>
+        @if (b.Invallers.Count > 0)
+        {
+            <li><b>@b.Invallers.Count keer een invaller</b>de Excel noemt geen namen; ze komen samen onder "@ImportPlanner.InvallerNaam"</li>
+        }
+    </ul>
+    <p class="help" style="margin:1rem 0 0">Wie @afwezig punten heeft, krijgt in het programma de status Afwezig (groen), behalve wie die avond pitten heeft: die heeft echt @afwezig gespeeld.</p>
+    @if (v.VervangenAvonden > 0)
+    {
+        <p class="help" style="margin:.5rem 0 0"><b>@v.VervangenAvonden @(v.VervangenAvonden == 1 ? "avond staat" : "avonden staan")</b> al in het programma: daar komt de Excel voor in de plaats. De oude blijven bewaard.</p>
+    }
+</div>
+
+<div class="card">
+    <h2>Namen op de twee bladen</h2>
+    @if (aandacht.Count == 0)
+    {
+        <p class="goed">✓ Alle @v.Spelers.Count namen staan op het blad met de punten en het blad met de pitten precies hetzelfde.</p>
+    }
+    else
+    {
+        <p>Het blad met de punten en het blad met de pitten schrijven @(aandacht.Count == 1 ? "een naam" : $"{aandacht.Count} namen") net anders. Klopt de koppeling hieronder? Zo niet, kies de goede naam.</p>
+        <table class="list">
+            <thead><tr><th>Naam bij de punten</th><th>Naam bij de pitten</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var s in aandacht)
+                {
+                    <tr class="let">
+                        <td><b>@s.Naam</b></td>
+                        <td>
+                            <form method="post" asp-page-handler="Koppel" class="inline" data-koppel>
+                                <input type="hidden" name="Id" value="@v.Id">
+                                <input type="hidden" name="Naam" value="@s.Naam">
+                                <select name="PitNaam" aria-label="Naam bij de pitten voor @s.Naam" style="width:auto">
+                                    <option value="" selected="@(s.PitNaam.Length == 0)">(geen pitten)</option>
+                                    @foreach (var pit in Model.PitNamen())
+                                    {
+                                        <option value="@pit" selected="@(pit == s.PitNaam)">@pit</option>
+                                    }
+                                </select>
+                                <button type="submit" class="btn secondary small" data-koppel-knop>Kiezen</button>
+                            </form>
+                        </td>
+                        <td>
+                            @switch (s.Koppeling)
+                            {
+                                case Koppeling.LijktOp: <span class="tag let">Lijkt op: klopt dit?</span> break;
+                                case Koppeling.Handmatig: <span class="tag ok">Zelf gekozen</span> break;
+                                default: <span class="tag let">Zonder pitten</span> break;
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (precies.Count > 0)
+        {
+            <details><summary>De andere @precies.Count namen zijn precies gelijk</summary>
+                <p class="muted" style="font-size:1rem; margin:.5rem 0 0">@string.Join(", ", precies).</p>
+            </details>
+        }
+    }
+    @if (v.LossePitNamen.Count > 0)
+    {
+        <p class="help" style="margin:1rem 0 0">Op het blad met de pitten @(v.LossePitNamen.Count == 1 ? "staat een naam die" : "staan namen die") bij niemand hoort: <b>@string.Join(", ", v.LossePitNamen)</b>. Die pitten komen er niet in.</p>
+    }
+</div>
+
+<div class="card">
+    <h2>Klopt het met de Excel?</h2>
+    @if (punten.Count == 0)
+    {
+        <p class="goed">✓ De punten kloppen: voor alle @v.Spelers.Count leden komt het totaal precies uit.</p>
+    }
+    else
+    {
+        <div class="banner warn"><p>Bij @(punten.Count == 1 ? "dit lid" : "deze leden") komt het programma op een ander totaal dan de Excel. Het programma telt alle avonden van het blad op; kijk in de Excel of het totaal daar klopt.</p></div>
+        <table class="list smal">
+            <thead><tr><th>Naam</th><th class="n">Excel</th><th class="n">Programma</th></tr></thead>
+            <tbody>
+                @foreach (var x in punten)
+                {
+                    <tr><td>@x.Wie</td><td class="n">@Weergave.Getal(x.Excel)</td><td class="n">@Weergave.Getal(x.Programma)</td></tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (zonderAvond.Count > 0 || pitten.Count > 0)
+    {
+        <h3>@(zonderAvond.Count > 0 ? "Pitten op een avond zonder klaverjassen" : "Pitten")</h3>
+        @foreach (var x in zonderAvond)
+        {
+            <div class="banner warn"><p>Op <b>@Weergave.InZin(x.Datum)</b> staan <b>@x.Excel pitten</b> op het blad met de pitten, maar volgens het blad met de punten werd er toen niet gespeeld. Die pitten neemt het programma niet over.</p></div>
+        }
+        @if (pitten.Count > 0)
+        {
+            <p>@(zonderAvond.Count > 0 ? "Daardoor hebben deze leden minder pitten dan in de Excel:" : "Bij deze leden komt het programma op een ander aantal pitten dan de Excel:")</p>
+            <table class="list smal">
+                <thead><tr><th>Naam</th><th class="n">Excel</th><th class="n">Programma</th></tr></thead>
+                <tbody>
+                    @foreach (var x in pitten)
+                    {
+                        <tr><td>@x.Wie</td><td class="n">@x.Excel</td><td class="n">@x.Programma</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+        @if (zonderAvond.Count > 0)
+        {
+            <p class="help" style="margin-top:.6rem">Is er toen toch gespeeld? Dan kunt u die avond na het inlezen zelf invullen bij Avonden.</p>
+        }
+    }
+    else
+    {
+        <p class="goed">✓ De pitten kloppen ook.</p>
+    }
+
+    @if (weken.Count > 0)
+    {
+        <h3>Week totalen van de pitten</h3>
+        <p>In @weken.Count @(weken.Count == 1 ? "week" : "weken") telt de formule in de Excel niet alle leden mee. Het programma telt ze allemaal; dat is de reden van deze verschillen.</p>
+        <details><summary>De @weken.Count @(weken.Count == 1 ? "week" : "weken") bekijken</summary>
+            <table class="list smal" style="margin-top:.6rem">
+                <thead><tr><th>Week</th><th class="n">Excel</th><th class="n">Programma</th></tr></thead>
+                <tbody>
+                    @foreach (var x in weken)
+                    {
+                        <tr><td>@InlezenModel.WeekLabel(x.Datum)</td><td class="n">@x.Excel</td><td class="n">@x.Programma</td></tr>
+                    }
+                </tbody>
+            </table>
+        </details>
+    }
+</div>
+
+<div class="card">
+    <form method="post" class="actions">
+        <input type="hidden" name="Id" value="@v.Id">
+        <button type="submit" class="btn big" asp-page-handler="Inlezen">Inlezen</button>
+        <button type="submit" class="btn secondary" asp-page-handler="Annuleren">Annuleren</button>
+    </form>
+    <p class="help" style="margin:.8rem 0 0">Staat een avond al in het programma, dan komt de Excel ervoor in de plaats; de oude blijft bewaard. U kunt het inlezen later gewoon nog een keer doen met een nieuwere Excel.</p>
+</div>
+
+@section Scripts {
+    <script>
+        // Choosing another name applies it at once; the "Kiezen" button is there for when script is off.
+        document.querySelectorAll('[data-koppel]').forEach(function (form) {
+            form.querySelector('[data-koppel-knop]').hidden = true;
+            form.querySelector('select').addEventListener('change', function () { form.submit(); });
+        });
+    </script>
+}

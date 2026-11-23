@@ -8,6 +8,10 @@ public sealed class IndexModel(AvondenOphalenHandler avondenOphalen) : PageModel
     /// <summary>The overview.</summary>
     public AvondenOverzicht Overzicht { get; private set; } = new AvondenOverzicht();
 
+    /// <summary>The confirmation after an Excel import.</summary>
+    [TempData]
+    public string Ingelezen { get; set; } = string.Empty;
+
     /// <summary>Another evening to open, typed in the date field.</summary>
     [BindProperty(SupportsGet = true)]
     public DateOnly Andere { get; set; }

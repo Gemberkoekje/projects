@@ -6,6 +6,11 @@
     var volgende = Model.Overzicht.VolgendeAvond;
 }
 
+@if (!string.IsNullOrEmpty(Model.Ingelezen))
+{
+    <div class="banner ok"><p>@Model.Ingelezen</p></div>
+}
+
 <h1>Avonden</h1>
 <p class="lead">Na de avond: <b>Uitslag invullen</b>. Daarna ziet u meteen de nieuwe stand.</p>
 

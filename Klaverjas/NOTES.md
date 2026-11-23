@@ -87,3 +87,72 @@ will see them. Built from the approved mock; nothing is online yet and nothing i
 **Next: slice 2**, importing 2026 from "Standen" plus an export of all scores. Set `LidVanaf` to
 "since always" for imported members, turn the holiday texts into evenings without play, and list
 every difference with the workbook's totals.
+
+## Slice 2: Excel inlezen and alle scores downloaden (2026-11-23)
+
+Dad (or you) can read his "Standen week NN.xlsx" into the app and download every score again. Reading
+writes nothing: a check screen first shows what comes in and every place where the app's sums differ
+from Excel's; only "Inlezen" writes. Built from the approved mock `mock/inlezen.html`.
+
+**What is there**
+
+- **Instellingen → Excel**: "Bestand lezen" (upload) and "Downloaden (Excel)".
+- **Excel inlezen** (`/Inlezen?id=…`): what comes in (evenings, members, evenings without play,
+  substitute scores), the names the two sheets spell differently with a choice to re-couple, "Klopt
+  het met de Excel?" (points, pits, pits on an evening without play, week totals), "Inlezen" /
+  "Annuleren". After "Inlezen", Avonden says what was written.
+- **Download**: one .xlsx with "Punten {jaar}" and "Pitten {jaar}" laid out like Dad's sheet (with his
+  colours), "Alle uitslagen" (one row per result, every season) and "Spelers".
+
+**How the import reads the workbook** (`ClosedXmlStandenLezer`, `ImportPlanner`)
+
+- It finds its way by labels, not addresses: the "Naam" header, the row with the most dates, the
+  totals right of "Naam", the "invallers" row (points sheet) and "Week totalen" row (pits sheet).
+  Totals are read as Excel last saved them, never recalculated.
+- A date column with text instead of scores ("Pasen") is an evening without play. Next January's
+  column on the sheet is left out.
+- Names are coupled across the two sheets: the same name first (capitals, accents and spacing don't
+  count), then one at least 85% alike and clearly the best ("Lijkt op: klopt dit?"). Dad can re-couple.
+- Exactly 4200 is Afwezig, **unless that player has pits that evening**: then it was a played 4200.
+- The unnamed "invallers" row becomes one substitute, "Invaller (uit Excel)".
+- Members get `LidVanaf = since always`; players already in the app are reused by name.
+- An evening already in the app is replaced (the old one kept as an `AvondVersie`); the season's first
+  evening and the evenings without play go into Instellingen.
+- The differences are computed with the same `StandBerekening` as the live standings, over the
+  workbook's evenings only.
+
+**What the real workbook gave** (checked locally on "Standen week 45"; the data was wiped afterwards)
+
+- 42 evenings, 20 members, 3 evenings without play, 4 substitute scores; 18 names equal, 2 a letter off.
+- **All 20 points totals equal the workbook's**, also on the Stand page after "Inlezen".
+- Pits: 699 against Excel's 708. The 9 are pits typed on 4 May, which the points sheet marks "vier
+  mei" (no play): not imported, and said so on the check screen (Q19 for Dad).
+- One 4200 with 2 pits (7 September) was a played 4200: that rule came from it.
+- 14 "Week totalen" cells differ: the sheet's formula skips members (always lower in Excel).
+
+**Gotchas**
+
+- ClosedXML: read `CachedValue` for formula cells; `Value` would recalculate.
+- curl on Windows (Git Bash): `-F "file=@path;type=…"` fails with error 26 when the path has spaces;
+  copy the file first.
+- The in-app browser can't pick a local file for an upload; test uploads with curl and the auth cookie.
+- Sonar S5693 caps upload limits at 8 MB; the page allows 5 MB (the workbook is about 200 kB).
+- Never commit the workbook, a real name, or a screenshot of the check screen: it shows real names.
+
+**Also on this branch**: slaper cards print 1600 under Punten and a red "Slaper n" under Pitten in
+the round sat out, as on Dad's own card sheet (mock and card proof print updated; the live mock on
+gembernodes still shows the old card).
+
+**Files**
+
+| Where | What |
+|---|---|
+| `Klaverjas.application/Import` | `StandenBestand` (as read), `ImportPlanner` (pure), `ImportVoorstel`, `NaamVergelijker` |
+| `Klaverjas.application/Commands` | `ImportVoorbereiden`, `ImportKoppelingWijzigen`, `ImportUitvoeren`, `ImportAnnuleren` |
+| `Klaverjas.application/Queries` | `ImportVoorstelOphalen`, `ExportMaken` |
+| `Klaverjas.application/Ports` | `IStandenLezer`, `IImportVoorstelStore`, `IExportSchrijver` |
+| `Klaverjas.infrastructure/Adapters/Excel` | `ClosedXmlStandenLezer`, `ClosedXmlExportSchrijver` |
+| `Klaverjas.WebApp/Pages/Inlezen.*` | the check screen, upload and download handlers |
+| `Klaverjas.test/Import` | reader (on an invented workbook built in code), planner, export specs |
+
+**Next: slice 3**, "Kaartjes en tafelindeling" (D12, D13, D15, D18).

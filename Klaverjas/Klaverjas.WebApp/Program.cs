@@ -1,6 +1,7 @@
 using Klaverjas.application.Ports;
 using Klaverjas.infrastructure.Adapters.Application;
 using Klaverjas.infrastructure.Adapters.DataProtection;
+using Klaverjas.infrastructure.Adapters.Excel;
 using Klaverjas.WebApp.Pages;
 using Marten;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -43,8 +44,8 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Auth:Password"]))
     throw new InvalidOperationException("Auth:Password is not set; without it nobody can sign in.");
 }
 
-// Marten as a document store: players, evenings (plus every replaced version), the settings and
-// the data-protection keys. The standings are computed, never stored (D8).
+// Marten as a document store: players, evenings (plus every replaced version), the settings, a
+// planned workbook import and the data-protection keys. The standings are computed, never stored (D8).
 builder.Services.AddMarten(options =>
 {
     options.Connection(connectionString);
@@ -58,6 +59,7 @@ builder.Services.AddMarten(options =>
     options.Schema.For<Avond>().Identity(x => x.Id);
     options.Schema.For<AvondVersie>().Identity(x => x.Id);
     options.Schema.For<Instellingen>().Identity(x => x.Id);
+    options.Schema.For<ImportVoorstel>().Identity(x => x.Id);
     options.Schema.For<DataProtectionSleutel>().Identity(x => x.Id);
 });
 
@@ -103,6 +105,14 @@ builder.Services.AddScoped<MartenAvondStore>();
 builder.Services.AddScoped<IAvondStore>(sp => sp.GetRequiredService<MartenAvondStore>());
 builder.Services.AddScoped<MartenInstellingenStore>();
 builder.Services.AddScoped<IInstellingenStore>(sp => sp.GetRequiredService<MartenInstellingenStore>());
+builder.Services.AddScoped<MartenImportVoorstelStore>();
+builder.Services.AddScoped<IImportVoorstelStore>(sp => sp.GetRequiredService<MartenImportVoorstelStore>());
+
+// The workbook reader and the export writer hold no state.
+builder.Services.AddSingleton<ClosedXmlStandenLezer>();
+builder.Services.AddSingleton<IStandenLezer>(sp => sp.GetRequiredService<ClosedXmlStandenLezer>());
+builder.Services.AddSingleton<ClosedXmlExportSchrijver>();
+builder.Services.AddSingleton<IExportSchrijver>(sp => sp.GetRequiredService<ClosedXmlExportSchrijver>());
 
 // Command handlers.
 builder.Services.AddScoped<UitslagOpslaanHandler>();
@@ -111,6 +121,10 @@ builder.Services.AddScoped<SpelerAanpassenHandler>();
 builder.Services.AddScoped<InstellingenOpslaanHandler>();
 builder.Services.AddScoped<GeenSpeelavondToevoegenHandler>();
 builder.Services.AddScoped<GeenSpeelavondWeghalenHandler>();
+builder.Services.AddScoped<ImportVoorbereidenHandler>();
+builder.Services.AddScoped<ImportKoppelingWijzigenHandler>();
+builder.Services.AddScoped<ImportUitvoerenHandler>();
+builder.Services.AddScoped<ImportAnnulerenHandler>();
 
 // Query handlers.
 builder.Services.AddScoped<AvondenOphalenHandler>();
@@ -118,6 +132,8 @@ builder.Services.AddScoped<UitslagOphalenHandler>();
 builder.Services.AddScoped<StandOphalenHandler>();
 builder.Services.AddScoped<SpelersOphalenHandler>();
 builder.Services.AddScoped<InstellingenOphalenHandler>();
+builder.Services.AddScoped<ImportVoorstelOphalenHandler>();
+builder.Services.AddScoped<ExportMakenHandler>();
 
 var app = builder.Build();
 

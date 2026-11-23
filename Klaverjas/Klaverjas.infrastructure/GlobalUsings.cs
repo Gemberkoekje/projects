@@ -1,3 +1,4 @@
+global using Klaverjas.application.Import;
 global using Klaverjas.application.Ports;
 global using Klaverjas.core.Enums;
 global using Klaverjas.core.Models;

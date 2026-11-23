@@ -105,3 +105,25 @@
 </div>
 
 <button type="submit" class="btn big" form="instellingen">Opslaan</button>
+
+<div class="card" id="excel" style="margin-top:2rem">
+    <h2>Excel</h2>
+    @if (!string.IsNullOrEmpty(Model.ExcelFout))
+    {
+        <div class="banner warn" role="alert"><p>@Model.ExcelFout</p></div>
+    }
+    <div class="field">
+        <span class="label">De standen uit Excel inlezen</span>
+        <p class="help">Kies het bestand "Standen week …" dat u nu elke week bijhoudt. Er wordt nog niets opgeslagen: u ziet eerst wat er gebeurt, en of alles klopt.</p>
+        <form method="post" enctype="multipart/form-data" asp-page="/Inlezen" asp-page-handler="Lezen" class="inline">
+            <input class="file" type="file" name="bestand" accept=".xlsx" aria-label="Het Excel-bestand met de standen" required>
+            <button type="submit" class="btn">Bestand lezen</button>
+        </form>
+    </div>
+    <hr class="sep">
+    <div class="field" style="margin-bottom:0">
+        <span class="label">Alle scores downloaden</span>
+        <p class="help">Alle spelers en alle uitslagen in één Excel-bestand: de stand en de pitten zoals u gewend bent, plus elke uitslag op een rij. Bewaar het als reservekopie, of om zelf mee te rekenen.</p>
+        <a class="btn secondary" asp-page="/Inlezen" asp-page-handler="Downloaden">Downloaden (Excel)</a>
+    </div>
+</div>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Klaverjassen – ontwerp Excel inlezen</title>
+<!--
+  Mock for slice 2 (see ../PLAN.md): the new "Excel" card on Instellingen and the check screen after
+  choosing Dad's "Standen" workbook. Invented names; the counts and dates are what the app read from
+  the real "Standen week 45.xlsx" (2026-11-23). Static: nothing works, it only shows the layout.
+-->
+<style>
+  :root { --page:#eef2ef; --card:#fff; --ink:#141a16; --ink-soft:#46524a; --line:#c7d1ca; --accent:#1d5a39; --accent-dark:#123f27; --accent-soft:#e2efe6;
+          --warn-ink:#6e4400; --warn-bg:#fff3d1; --warn-line:#c98a00; --ok-ink:#17602d; --ok-bg:#e0f3e5; --focus:#f0b323; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font-family:Verdana, Geneva, "DejaVu Sans", sans-serif; font-size:1.25rem; line-height:1.5; }
+  .wrap { max-width:78rem; margin:0 auto; padding:0 1.25rem; }
+  h1 { font-size:1.9rem; line-height:1.2; margin:0 0 .4rem; } h2 { font-size:1.4rem; margin:0 0 .75rem; } h3 { font-size:1.15rem; margin:1.25rem 0 .4rem; }
+  p { margin:0 0 1rem; } .muted { color:var(--ink-soft); } .lead { font-size:1.15rem; color:var(--ink-soft); margin-bottom:1.25rem; }
+  .mockbar { background:#111; color:#fff; font-size:.95rem; padding:.45rem 0; }
+  .top { background:var(--accent); color:#fff; } .top .wrap { display:flex; align-items:center; justify-content:space-between; padding-top:.8rem; padding-bottom:.8rem; }
+  .brand { font-size:1.6rem; font-weight:700; } .brand small { font-size:1rem; font-weight:400; opacity:.9; }
+  .logout { font:inherit; font-size:1rem; color:#fff; background:transparent; border:2px solid rgba(255,255,255,.75); border-radius:6px; padding:.3rem .8rem; }
+  nav.tabs { background:#fff; border-bottom:2px solid var(--line); } nav.tabs .wrap { display:flex; gap:.25rem; }
+  nav.tabs a { font-weight:700; color:var(--accent); text-decoration:none; border-bottom:5px solid transparent; padding:.85rem 1.1rem .6rem; }
+  nav.tabs a.nu { color:var(--ink); border-bottom-color:var(--accent); }
+  main { padding:1.5rem 0 3rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1.4rem 1.5rem; margin-bottom:1.25rem; }
+  .btn { font:inherit; font-weight:700; display:inline-flex; align-items:center; min-height:3.1rem; padding:.55rem 1.3rem; border-radius:8px; border:2px solid var(--accent); background:var(--accent); color:#fff; text-decoration:none; }
+  .btn.secondary { background:#fff; color:var(--accent); } .btn.big { font-size:1.4rem; min-height:3.8rem; padding:.7rem 1.8rem; } .btn.small { font-size:1rem; min-height:2.5rem; padding:.3rem .9rem; }
+  .actions { display:flex; flex-wrap:wrap; gap:.75rem; align-items:center; }
+  .field { margin-bottom:1.4rem; } .label { display:block; font-weight:700; margin-bottom:.2rem; } .help { font-size:1rem; color:var(--ink-soft); margin:0 0 .45rem; }
+  .file { font:inherit; font-size:1.05rem; padding:.45rem .6rem; border:2px solid #8a978e; border-radius:6px; background:#fff; }
+  select { font:inherit; font-size:1rem; padding:.3rem .5rem; border:2px solid #8a978e; border-radius:6px; background:#fff; }
+  .sep { border:0; border-top:2px solid var(--line); margin:1.4rem 0; }
+  .banner { border-radius:8px; padding:1rem 1.2rem; margin-bottom:1.25rem; border:2px solid; } .banner p:last-child { margin:0; }
+  .banner.ok { background:var(--ok-bg); border-color:var(--ok-ink); color:var(--ok-ink); } .banner.warn { background:var(--warn-bg); border-color:var(--warn-line); color:var(--warn-ink); }
+  .feiten { display:grid; grid-template-columns:repeat(auto-fit, minmax(14rem, 1fr)); gap:.75rem; margin:0; padding:0; list-style:none; }
+  .feiten li { background:#f4f7f5; border:1px solid var(--line); border-radius:8px; padding:.7rem .9rem; font-size:1.05rem; }
+  .feiten b { display:block; font-size:1.6rem; }
+  table.list { width:100%; border-collapse:collapse; font-size:1.05rem; }
+  table.list th { text-align:left; font-size:.95rem; color:var(--ink-soft); padding:.4rem .6rem; border-bottom:2px solid var(--line); }
+  table.list td { padding:.45rem .6rem; border-bottom:1px solid var(--line); }
+  table.list td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  tr.let td { background:var(--warn-bg); }
+  .tag { display:inline-block; font-size:.9rem; font-weight:700; padding:.05rem .5rem; border-radius:4px; }
+  .tag.ok { background:var(--ok-bg); color:var(--ok-ink); } .tag.let { background:#ffe7a8; color:var(--warn-ink); }
+  details summary { cursor:pointer; color:var(--accent); font-weight:700; font-size:1.05rem; margin-top:.6rem; }
+  .goed { color:var(--ok-ink); font-weight:700; }
+  .twee { display:grid; grid-template-columns:repeat(auto-fit, minmax(20rem, 1fr)); gap:1.25rem; }
+  .divider { background:#111; color:#fff; font-size:.95rem; padding:.35rem 1.25rem; margin:2rem 0 0; }
+</style>
+</head>
+<body>
+<div class="mockbar"><div class="wrap">Ontwerp, slice 2: Excel inlezen en alle scores downloaden. Niets werkt; het laat alleen zien hoe het eruitziet. Namen verzonnen, aantallen echt.</div></div>
+
+<div class="divider">Scherm 1: Instellingen, nieuw kaartje onderaan</div>
+<header class="top"><div class="wrap"><div class="brand">♣ De Samenspelers <small>Beheer</small></div><button class="logout">Uitloggen</button></div></header>
+<nav class="tabs"><div class="wrap"><a href="#">Avonden</a><a href="#">Stand</a><a href="#">Spelers</a><a href="#" class="nu">Instellingen</a></div></nav>
+<main class="wrap">
+  <p class="muted" style="font-size:1rem">… de kaartjes Club, Spelregels, Seizoen en Kleuren, zoals nu …</p>
+  <div class="card">
+    <h2>Excel</h2>
+    <div class="field">
+      <span class="label">De standen uit Excel inlezen</span>
+      <p class="help">Kies het bestand "Standen week …" dat u nu elke week bijhoudt. Er wordt nog niets opgeslagen: u ziet eerst wat er gebeurt, en of alles klopt.</p>
+      <div class="actions"><input class="file" type="file" accept=".xlsx"> <button class="btn">Bestand lezen</button></div>
+    </div>
+    <hr class="sep">
+    <div class="field" style="margin-bottom:0">
+      <span class="label">Alle scores downloaden</span>
+      <p class="help">Alle spelers en alle uitslagen in één Excel-bestand: de stand en de pitten zoals u gewend bent, plus elke uitslag op een rij. Bewaar het als reservekopie, of om zelf mee te rekenen.</p>
+      <button class="btn secondary">Downloaden (Excel)</button>
+    </div>
+  </div>
+</main>
+
+<div class="divider">Scherm 2: na "Bestand lezen" – controleren, dan pas inlezen</div>
+<header class="top"><div class="wrap"><div class="brand">♣ De Samenspelers <small>Beheer</small></div><button class="logout">Uitloggen</button></div></header>
+<nav class="tabs"><div class="wrap"><a href="#">Avonden</a><a href="#">Stand</a><a href="#">Spelers</a><a href="#" class="nu">Instellingen</a></div></nav>
+<main class="wrap">
+  <h1>Excel inlezen</h1>
+  <p class="lead">Standen week 45.xlsx · gelezen om 15:42. Er is nog niets opgeslagen.</p>
+
+  <div class="card">
+    <h2>Dit komt erin</h2>
+    <ul class="feiten">
+      <li><b>42 avonden</b>van maandag 12 januari t/m maandag 16 november 2026</li>
+      <li><b>20 leden</b>allemaal nieuw in het programma</li>
+      <li><b>3 avonden zonder klaverjassen</b>Pasen, vier mei, Pinksteren</li>
+      <li><b>4 keer een invaller</b>de Excel noemt geen namen; ze komen samen onder "Invaller (uit Excel)"</li>
+    </ul>
+    <p class="help" style="margin:1rem 0 0">Wie 4200 punten heeft, krijgt in het programma de status Afwezig (groen), behalve wie die avond pitten heeft: die heeft echt 4200 gespeeld.</p>
+  </div>
+
+  <div class="card">
+    <h2>Namen op de twee bladen</h2>
+    <p>Het blad met de punten en het blad met de pitten schrijven twee namen net anders. Klopt de koppeling hieronder? Zo niet, kies de goede naam.</p>
+    <table class="list">
+      <thead><tr><th>Naam bij de punten</th><th>Naam bij de pitten</th><th></th></tr></thead>
+      <tbody>
+        <tr class="let"><td><b>Joop Verhoeven</b></td><td><select><option selected>Joop Verhoven</option><option>(geen pitten)</option><option>Kees Bakker</option></select></td><td><span class="tag let">Lijkt op: klopt dit?</span></td></tr>
+        <tr class="let"><td><b>Theo Jansen</b></td><td><select><option selected>Teo Jansen</option><option>(geen pitten)</option><option>Kees Bakker</option></select></td><td><span class="tag let">Lijkt op: klopt dit?</span></td></tr>
+      </tbody>
+    </table>
+    <details><summary>De andere 18 namen zijn precies gelijk</summary>
+      <p class="muted" style="font-size:1rem; margin:.5rem 0 0">Annie de Graaf, Bep Willems, Corrie Smits, Dineke Prins, Frits Hoekstra, Gerrit Kok, Harrie van Dam, Kees Bakker, Lenie Brouwer, Marga Peters, Mien Koster, Nel Hendriks, Piet de Wit, Ria Bos, Riet Mulder, Sjaak Meijer, Ton Dekker, Wilhelmina van Oosterhout.</p>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>Klopt het met de Excel?</h2>
+    <p class="goed">✓ De punten kloppen: voor alle 20 leden komt het totaal precies uit.</p>
+
+    <h3>Pitten op een avond zonder klaverjassen</h3>
+    <div class="banner warn"><p>Op <b>maandag 4 mei</b> staan <b>9 pitten</b> op het blad met de pitten, maar volgens het blad met de punten werd er toen niet gespeeld ("vier mei"). Die pitten neemt het programma niet over. Daardoor hebben deze leden minder pitten dan in de Excel:</p></div>
+    <table class="list" style="max-width:36rem">
+      <thead><tr><th>Naam</th><th style="text-align:right">Excel</th><th style="text-align:right">Programma</th></tr></thead>
+      <tbody>
+        <tr><td>Corrie Smits</td><td class="n">63</td><td class="n">61</td></tr>
+        <tr><td>Annie de Graaf</td><td class="n">53</td><td class="n">51</td></tr>
+        <tr><td>Nel Hendriks</td><td class="n">44</td><td class="n">43</td></tr>
+        <tr><td>Theo Jansen</td><td class="n">42</td><td class="n">41</td></tr>
+        <tr><td>Wilhelmina van Oosterhout</td><td class="n">36</td><td class="n">34</td></tr>
+        <tr><td>Ton Dekker</td><td class="n">25</td><td class="n">24</td></tr>
+      </tbody>
+    </table>
+    <p class="help" style="margin-top:.6rem">Is er op 4 mei toch gespeeld? Dan kunt u die avond na het inlezen zelf invullen bij Avonden.</p>
+
+    <h3>Week totalen van de pitten</h3>
+    <p>In 14 weken telt de formule in de Excel niet alle leden mee. Het programma telt ze allemaal; dat is de enige reden van deze verschillen.</p>
+    <details><summary>De 14 weken bekijken</summary>
+      <div class="twee" style="margin-top:.6rem">
+        <table class="list"><thead><tr><th>Week</th><th style="text-align:right">Excel</th><th style="text-align:right">Programma</th></tr></thead><tbody>
+          <tr><td>wk 3 · 12 jan</td><td class="n">22</td><td class="n">24</td></tr><tr><td>wk 5 · 26 jan</td><td class="n">5</td><td class="n">6</td></tr>
+          <tr><td>wk 7 · 9 feb</td><td class="n">9</td><td class="n">12</td></tr><tr><td>wk 10 · 2 mrt</td><td class="n">14</td><td class="n">18</td></tr>
+          <tr><td>wk 11 · 9 mrt</td><td class="n">9</td><td class="n">13</td></tr><tr><td>wk 12 · 16 mrt</td><td class="n">7</td><td class="n">9</td></tr>
+          <tr><td>wk 13 · 23 mrt</td><td class="n">16</td><td class="n">19</td></tr></tbody></table>
+        <table class="list"><thead><tr><th>Week</th><th style="text-align:right">Excel</th><th style="text-align:right">Programma</th></tr></thead><tbody>
+          <tr><td>wk 30 · 20 jul</td><td class="n">16</td><td class="n">17</td></tr><tr><td>wk 31 · 27 jul</td><td class="n">20</td><td class="n">22</td></tr>
+          <tr><td>wk 39 · 21 sep</td><td class="n">20</td><td class="n">21</td></tr><tr><td>wk 40 · 28 sep</td><td class="n">18</td><td class="n">22</td></tr>
+          <tr><td>wk 41 · 5 okt</td><td class="n">17</td><td class="n">18</td></tr><tr><td>wk 42 · 12 okt</td><td class="n">24</td><td class="n">26</td></tr>
+          <tr><td>wk 46 · 9 nov</td><td class="n">25</td><td class="n">28</td></tr><tr><td>wk 47 · 16 nov</td><td class="n">35</td><td class="n">36</td></tr></tbody></table>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <div class="actions">
+      <button class="btn big">Inlezen</button>
+      <button class="btn secondary">Annuleren</button>
+    </div>
+    <p class="help" style="margin:.8rem 0 0">Staat een avond al in het programma, dan komt de Excel ervoor in de plaats; de oude blijft bewaard. U kunt het inlezen later gewoon nog een keer doen met een nieuwere Excel.</p>
+  </div>
+
+  <div class="banner ok" style="margin-top:2rem"><p><b>Na "Inlezen", op het scherm Avonden:</b> Ingelezen: 42 avonden, 21 spelers en 3 avonden zonder klaverjassen. Kijk bij Stand of alles klopt.</p></div>
+</main>
+</body>
+</html>

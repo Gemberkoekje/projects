@@ -1,4 +1,5 @@
 global using AwesomeAssertions;
+global using Klaverjas.application.Import;
 global using Klaverjas.application.Ports;
 global using Klaverjas.application.ReadModels;
 global using Klaverjas.core.Enums;
