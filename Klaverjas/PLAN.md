@@ -5,14 +5,13 @@ _To understand this, start with this file, then open [mock/index.html](mock/inde
 week-47 standings' real numbers, because this repository is public. What Dad's two workbooks do,
 sheet by sheet, is in `explainer/index.html` (git-ignored: personal reference)._
 
-**Status (2026-11-23):** phase 0, the plan and the mock. The mock follows Dad's two workbooks
-(received 2026-11-21) and, since 2026-11-23, puts the online standings first. **Dad has seen all the
-pages and approved them** (2026-11-23), and **answered the question sheet**
-[vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) the same day (see "Dad's answers" below).
-His answers changed the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12)
-and a few rules (R16–R19); the mock follows them. Nothing is built yet. **Nothing blocks slice 1
-any more**: the weekly standings count every evening, exactly as the sheet does (R16). Q17 (does the
-Eindstand drop the quarters' lowest evenings?) only matters for the Eindstand.
+**Status (2026-11-23):** **slice 1 (the core app) is built**: sign-in, players, entering an evening
+and the standings, run locally against PostgreSQL. What it does, the decisions taken while building
+it and the gotchas are in [NOTES.md](NOTES.md); next is slice 2 (the import). Before that: the plan
+and the mock, which **Dad approved** (2026-11-23), and his answers to the question sheet
+[vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) (see "Dad's answers" below), which changed
+the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12) and added R16–R19.
+Q17 (does the Eindstand drop the quarters' lowest evenings?) only matters for the Eindstand.
 
 ## What it is
 
@@ -264,12 +263,14 @@ Follow-ups, relayed by you the same day:
 
 ## Slices (one PR each; I stop after each for review)
 
-0. **Plan + mock** (this). The mock is approved (Dad, 2026-11-23).
+0. **Plan + mock.** The mock is approved (Dad, 2026-11-23). _Done (merged)._
 1. **Core app.** Players (members and substitutes), uitslag invullen with statuses, standings,
    Instellingen (incl. evenings without play), sign-in and local `docker-compose`. Specs cover
    R1–R19: ties, absence (green by status, not by value), slapers, substitutes in the week podium
    only, the gap column, the month columns, the pits totals, the weekly total counting every evening
    with each quarter's lowest marked (R16), joining and stopping mid-season, and the season boundary.
+   _Built 2026-11-23 (see NOTES.md). Dad's password comes from configuration for now; changing it in
+   Instellingen comes with the players' password in slice 4._
 2. **Import 2026 from "Standen", and an export of all scores (D17).** The app's totals after the latest week must match the workbook's,
    and any differences are listed (like the week-46/47 pits totals).
 3. **Kaartjes en tafelindeling.** "Wie slaapt er?" with the fair proposal (D12), printing the name

@@ -1,0 +1,149 @@
+@page
+@model StandModel
+@{
+    ViewData["Title"] = "Stand";
+    ViewData["Tab"] = "stand";
+    var stand = Model.Overzicht.Stand;
+    var afwezigScore = Model.Overzicht.Instellingen.PuntenAfwezig;
+    var maandNaam = stand.IsLeeg ? string.Empty : Weergave.Maand(stand.LaatsteAvond);
+
+    void Cellen(StandRegel regel)
+    {
+        foreach (var dag in Model.Maand)
+        {
+            var vrij = Model.GeenSpeelavond(dag);
+            var cel = regel.Op(dag);
+            if (vrij.Length > 0)
+            {
+                <td class="vrij">@vrij</td>
+            }
+            else if (cel.IsLeeg)
+            {
+                <td></td>
+            }
+            else if (cel.IsAfwezig)
+            {
+                <td class="ca">@Weergave.Getal(afwezigScore)</td>
+            }
+            else
+            {
+                <td class="@Weergave.PlaatsKlasse(cel.AvondPlaats)">@Weergave.Getal(cel.Punten)</td>
+            }
+        }
+    }
+}
+
+@if (stand.IsLeeg)
+{
+    <h1>Stand</h1>
+    <div class="card">
+        <p>Er is nog geen avond ingevuld. Begin bij <a asp-page="/Index">Avonden</a> met <b>Uitslag invullen</b>.</p>
+    </div>
+    return;
+}
+
+@if (Model.Opgeslagen != default)
+{
+    <div class="banner ok"><p><b>De uitslag van @Weergave.InZin(Model.Opgeslagen) is opgeslagen.</b> Kijk of de stand klopt.</p></div>
+}
+
+<h1>Stand na week @Kalender.Week(stand.LaatsteAvond)</h1>
+<p class="lead">@Weergave.Lang(stand.LaatsteAvond)</p>
+
+<div class="card">
+    <div class="actions" style="justify-content:space-between; margin-bottom:1rem">
+        <h2 style="margin:0">Zo zien de spelers de stand</h2>
+        <span>Klopt er iets niet? <a class="btn secondary small" asp-page="/Uitslag" asp-route-datum="@Weergave.Iso(stand.LaatsteAvond)">Uitslag wijzigen</a></span>
+    </div>
+
+    <ul class="winners">
+        <li class="muted">Winnaars van de avond:</li>
+        @foreach (var winnaar in stand.Winnaars)
+        {
+            <li><span class="medal @Weergave.PlaatsKlasse(winnaar.Plaats)">@winnaar.Plaats</span> @winnaar.Speler.Naam@(winnaar.Speler.IsLid ? string.Empty : " (invaller)") <b>@Weergave.Getal(winnaar.Punten)</b></li>
+        }
+    </ul>
+
+    <div class="stand-wrap">
+        <div class="scroll">
+            <table class="stand">
+                <caption>Punten @stand.Jaar</caption>
+                <thead>
+                    <tr><th rowspan="2">Plaats</th><th rowspan="2">Naam</th><th rowspan="2">Totaal</th><th rowspan="2">Verschil<br>met vorige</th><th colspan="@Model.Maand.Count">@maandNaam</th></tr>
+                    <tr>
+                        @foreach (var dag in Model.Maand)
+                        {
+                            <th>wk @Kalender.Week(dag)<br>@Weergave.DagMaand(dag)</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var regel in stand.Punten)
+                    {
+                        var totaalKlasse = Weergave.PlaatsKlasse(regel.Plaats);
+                        <tr>
+                            <td>@regel.Plaats</td>
+                            <td class="nm">@regel.Speler.Naam</td>
+                            <td class="tot @(totaalKlasse.Length > 0 ? totaalKlasse : "cr")">@Weergave.Getal(regel.Totaal)</td>
+                            <td class="gap">@Weergave.Getal(regel.Verschil)</td>
+                            @{ Cellen(regel); }
+                        </tr>
+                    }
+                    @foreach (var invaller in stand.Invallers.Where(r => Model.Maand.Any(d => !r.Op(d).IsLeeg)))
+                    {
+                        <tr class="sub">
+                            <td></td>
+                            <td class="nm">@invaller.Speler.Naam (invaller)</td>
+                            <td></td>
+                            <td></td>
+                            @{ Cellen(invaller); }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="legend"><span class="c1">1e plaats</span><span class="c2">2e plaats</span><span class="c3">3e plaats</span><span class="ca">Niet aanwezig</span></div>
+        </div>
+
+        <div class="scroll">
+            <table class="stand">
+                <caption>Pitten @stand.Jaar</caption>
+                <thead>
+                    <tr><th rowspan="2">Plaats</th><th rowspan="2">Naam</th><th rowspan="2">Totaal</th><th colspan="@Model.Maand.Count">@maandNaam</th></tr>
+                    <tr>
+                        @foreach (var dag in Model.Maand)
+                        {
+                            <th>wk @Kalender.Week(dag)</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var regel in stand.Pitten)
+                    {
+                        var totaalKlasse = Weergave.PlaatsKlasse(regel.PlaatsPitten);
+                        <tr>
+                            <td>@regel.PlaatsPitten</td>
+                            <td class="nm">@regel.Speler.Naam</td>
+                            <td class="tot @(totaalKlasse.Length > 0 ? totaalKlasse : "cr")">@Weergave.Getal(regel.Pitten)</td>
+                            @foreach (var dag in Model.Maand)
+                            {
+                                var cel = regel.Op(dag);
+                                <td>@(cel.IsLeeg ? string.Empty : Weergave.Getal(cel.Pitten))</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td></td>
+                        <td class="nm">Week totalen</td>
+                        <td></td>
+                        @foreach (var dag in Model.Maand)
+                        {
+                            <td>@(stand.WeekTotalenPitten.TryGetValue(dag, out var totaal) ? Weergave.Getal(totaal) : string.Empty)</td>
+                        }
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Klaverjas.WebApp</RootNamespace>
+    <Nullable>enable</Nullable>
+    <OutputType>exe</OutputType>
+    <IsPublishable>true</IsPublishable>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <SelfContained>false</SelfContained>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    <UserSecretsId>aspnet-Klaverjas.WebApp-3d9b6c2e-5a41-4f0e-8c7d-2b6e9f1a4c58</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Klaverjas.test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Qowaiv.Diagnostics.Contracts" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Klaverjas.infrastructure/Klaverjas.infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

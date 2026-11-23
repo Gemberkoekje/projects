@@ -1,0 +1,135 @@
+@page
+@model UitslagModel
+@{
+    ViewData["Title"] = "Uitslag invullen";
+    ViewData["Tab"] = "avonden";
+    ViewData["MainClass"] = "has-savebar";
+    var f = Model.Formulier;
+    var index = 0;
+    var gespeeld = f.Leden.Concat(f.Invallers).Count(r => r.Status != Status.Afwezig);
+    var slapers = f.Leden.Concat(f.Invallers).Count(r => r.Status == Status.Slaper);
+    var afwezig = f.Leden.Count(r => r.Status == Status.Afwezig);
+
+    async Task Rij(UitslagRegel regel, int i, bool lid)
+    {
+        var naam = regel.Speler.Naam;
+        <tr class="is-@regel.Status.ToString().ToLowerInvariant()" data-rij>
+            <td class="name">@naam<input type="hidden" name="Regels[@i].SpelerId" value="@regel.Speler.Id"></td>
+            <td class="st">
+                <span class="seg" role="radiogroup" aria-label="Status van @naam">
+                    <label><input type="radio" name="Regels[@i].Status" value="Speelt" checked="@(regel.Status == Status.Speelt)"><span>Speelt</span></label>
+                    <label><input type="radio" name="Regels[@i].Status" value="Slaper" checked="@(regel.Status == Status.Slaper)"><span>Slaper</span></label>
+                    @if (lid)
+                    {
+                        <label><input type="radio" name="Regels[@i].Status" value="Afwezig" checked="@(regel.Status == Status.Afwezig)"><span>Afwezig</span></label>
+                    }
+                </span>
+                <select class="round" name="Regels[@i].Ronde" aria-label="Stil in ronde" hidden="@(regel.Status != Status.Slaper)">
+                    @for (var r = 1; r <= 3; r++)
+                    {
+                        <option value="@r" selected="@(regel.Ronde == r)">ronde @r</option>
+                    }
+                </select>
+            </td>
+            <td><input class="num pts" name="Regels[@i].Punten" value="@regel.Punten" inputmode="numeric" autocomplete="off" aria-label="Punten van @naam"></td>
+            <td><input class="num pits" name="Regels[@i].Pitten" value="@regel.Pitten" inputmode="numeric" autocomplete="off" aria-label="Pitten van @naam"></td>
+            <td class="hint"></td>
+            @if (!lid)
+            {
+                <td><button type="submit" class="btn danger small" formaction="@Url.Page("/Uitslag", "Weghalen")" name="weghalen" value="@regel.Speler.Id">Weghalen</button></td>
+            }
+        </tr>
+    }
+}
+
+<h1>@(f.IsNieuw ? "Uitslag invullen" : "Uitslag wijzigen")</h1>
+<div class="dateline"><span class="date">@Weergave.Lang(f.Datum) (week @Kalender.Week(f.Datum))</span></div>
+
+@if (Model.Meldingen.Count > 0)
+{
+    <div class="banner warn" role="alert">
+        <p><b>Nog niet helemaal klaar.</b> Er is nog niets opgeslagen.</p>
+        <ul>
+            @foreach (var melding in Model.Meldingen)
+            {
+                <li>@melding</li>
+            }
+        </ul>
+    </div>
+}
+
+@* An explicit action: after "Invaller toevoegen" the address ends in ?handler=Invaller, and Opslaan must not post there. *@
+<form method="post" asp-page="/Uitslag" id="uitslag" data-afwezig="@f.PuntenAfwezig">
+    <input type="hidden" name="Datum" value="@Weergave.Iso(f.Datum)">
+    <div class="card">
+        <p style="margin-bottom:.4rem">Typ per speler het <b>totaal</b> en de <b>pitten</b> van het puntenkaartje.
+            Met <b>Enter</b> of <b>Tab</b> gaat u naar het volgende vakje.</p>
+        <p class="help">Bij een <b>slaper</b> staat de 1600 voor de stille ronde al in het totaal op het kaartje: typ gewoon dat totaal.
+            Wie <b>afwezig</b> is, krijgt vanzelf @f.PuntenAfwezig punten; die worden groen in de stand.
+            Heeft iemand echt precies @f.PuntenAfwezig gespeeld? Typ dan gewoon @f.PuntenAfwezig: dat wordt niet groen. Klopt de status niet meer? Klik hem gewoon om.</p>
+        <div class="scroll">
+            <table class="entry">
+                <thead><tr><th>Naam</th><th>Status</th><th>Punten</th><th>Pitten</th><th>Let op</th></tr></thead>
+                <tbody>
+                    @foreach (var regel in f.Leden)
+                    {
+                        await Rij(regel, index++, lid: true);
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Invallers</h2>
+        <p class="help">Een invaller kan de avond winnen, maar telt niet mee in de jaarstand.</p>
+        @if (f.Invallers.Count > 0)
+        {
+            <div class="scroll">
+                <table class="entry">
+                    <thead><tr><th>Naam</th><th>Status</th><th>Punten</th><th>Pitten</th><th>Let op</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var regel in f.Invallers)
+                        {
+                            await Rij(regel, index++, lid: false);
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p class="muted" style="margin:.5rem 0 1rem">Deze avond geen invallers.</p>
+        }
+        <div class="inline" style="margin-top:1rem">
+            @if (f.AndereInvallers.Count > 0)
+            {
+                <select name="InvallerId" style="max-width:16rem" aria-label="Kies een invaller">
+                    @foreach (var invaller in f.AndereInvallers)
+                    {
+                        <option value="@invaller.Id">@invaller.Naam</option>
+                    }
+                </select>
+                <span class="muted">of een nieuwe:</span>
+            }
+            <input class="text" name="NieuweInvaller" placeholder="Naam van een nieuwe invaller" style="max-width:18rem" aria-label="Naam van een nieuwe invaller">
+            <button type="submit" class="btn secondary small" asp-page-handler="Invaller">+ Invaller toevoegen</button>
+        </div>
+    </div>
+
+    <div class="savebar">
+        <div class="wrap">
+            <div class="facts" id="feiten">
+                <span><b>@gespeeld</b> gespeeld</span><span><b>@slapers</b> slapers</span><span><b>@afwezig</b> afwezig</span>
+            </div>
+            <div class="actions">
+                <a class="btn secondary" asp-page="/Index">Annuleren</a>
+                <button type="submit" class="btn big" id="opslaan">Opslaan en stand bekijken</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="~/js/uitslag.js" asp-append-version="true"></script>
+}

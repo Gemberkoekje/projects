@@ -1,0 +1,15 @@
+global using AwesomeAssertions;
+global using Klaverjas.application.Ports;
+global using Klaverjas.application.ReadModels;
+global using Klaverjas.core.Enums;
+global using Klaverjas.core.Models;
+global using Klaverjas.core.Standen;
+global using Klaverjas.test.TestHelpers;
+global using Microsoft.Extensions.Logging.Abstractions;
+global using Qowaiv;
+global using Qowaiv.Validation.Abstractions;
+global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading;
+global using System.Threading.Tasks;

@@ -1,0 +1,58 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Avonden";
+    ViewData["Tab"] = "avonden";
+    var volgende = Model.Overzicht.VolgendeAvond;
+}
+
+<h1>Avonden</h1>
+<p class="lead">Na de avond: <b>Uitslag invullen</b>. Daarna ziet u meteen de nieuwe stand.</p>
+
+<div class="card next">
+    <div>
+        <p class="muted" style="margin:0">Volgende speelavond</p>
+        <p class="when">@Weergave.Lang(volgende) <span class="muted" style="font-weight:400">(week @Kalender.Week(volgende))</span></p>
+    </div>
+    <div class="actions">
+        <a class="btn big" asp-page="/Uitslag" asp-route-datum="@Weergave.Iso(volgende)">Uitslag invullen</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Alle avonden van dit seizoen</h2>
+    @if (Model.Overzicht.Regels.Count == 0)
+    {
+        <p class="muted">Er is nog geen avond ingevuld.</p>
+    }
+    else
+    {
+        <table class="list">
+            <thead><tr><th>Datum</th><th>Week</th><th>Spelers</th><th>Slapers</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var regel in Model.Overzicht.Regels)
+                {
+                    if (regel.IsGeenSpeelavond)
+                    {
+                        <tr class="off"><td>@Weergave.Kort(regel.Datum)</td><td>@Kalender.Week(regel.Datum)</td><td colspan="3">Geen klaverjassen: @regel.GeenSpeelavond</td></tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td><b>@Weergave.Kort(regel.Datum)</b></td>
+                            <td>@Kalender.Week(regel.Datum)</td>
+                            <td>@regel.Gespeeld</td>
+                            <td>@regel.Slapers</td>
+                            <td class="knop"><a class="btn secondary small" asp-page="/Uitslag" asp-route-datum="@Weergave.Iso(regel.Datum)">Wijzigen</a></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    }
+    <form method="get" asp-page-handler="Openen" class="inline" style="margin-top:1.25rem">
+        <label for="andere" class="help" style="margin:0">Een andere avond invullen of wijzigen:</label>
+        <input id="andere" class="text" type="date" name="andere" style="max-width:12rem" required>
+        <button type="submit" class="btn secondary small">Openen</button>
+    </form>
+</div>

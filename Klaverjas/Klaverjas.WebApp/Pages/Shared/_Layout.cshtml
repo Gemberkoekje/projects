@@ -1,0 +1,46 @@
+@inject Klaverjas.application.Queries.InstellingenOphalenHandler InstellingenOphalen
+@{
+    var instellingen = (await InstellingenOphalen.HandleAsync(new Klaverjas.application.Queries.InstellingenOphalen())).Value;
+    var ingelogd = User.Identity is { IsAuthenticated: true };
+    var tab = ViewData["Tab"] as string ?? string.Empty;
+    string Huidig(string naam) => naam == tab ? "page" : "false";
+}
+<!doctype html>
+<html lang="nl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>@ViewData["Title"] · @instellingen.Club</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
+    @* The standings' colours are Dad's to change (Instellingen); only #rrggbb values get this far. *@
+    <style>
+        :root { --c-first: @instellingen.Kleuren.Eerste; --c-second: @instellingen.Kleuren.Tweede; --c-third: @instellingen.Kleuren.Derde; --c-absent: @instellingen.Kleuren.Afwezig; }
+    </style>
+</head>
+<body>
+    @if (ingelogd)
+    {
+        <header class="top">
+            <div class="wrap">
+                <div class="brand"><span class="suit" aria-hidden="true">♣</span> <span>@instellingen.Club</span> <small>Beheer</small></div>
+                <form method="post" asp-page="/Aanmelden" asp-page-handler="Afmelden">
+                    <button type="submit" class="logout">Uitloggen</button>
+                </form>
+            </div>
+        </header>
+        <nav class="tabs" aria-label="Hoofdmenu">
+            <div class="wrap">
+                <a asp-page="/Index" aria-current="@Huidig("avonden")">Avonden</a>
+                <a asp-page="/Stand" aria-current="@Huidig("stand")">Stand</a>
+                <a asp-page="/Spelers" aria-current="@Huidig("spelers")">Spelers</a>
+                <a asp-page="/Instellingen" aria-current="@Huidig("instellingen")">Instellingen</a>
+            </div>
+        </nav>
+    }
+    <main class="wrap @ViewData["MainClass"]">
+        @RenderBody()
+    </main>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,21 @@
+@page
+@model AanmeldenModel
+@inject Klaverjas.application.Queries.InstellingenOphalenHandler InstellingenOphalen
+@{
+    ViewData["Title"] = "Inloggen";
+    var club = (await InstellingenOphalen.HandleAsync(new Klaverjas.application.Queries.InstellingenOphalen())).Value.Club;
+}
+
+<form method="post" class="card login">
+    <div class="brand"><span class="suit" aria-hidden="true">♣</span> <span>@club</span> <small style="color:var(--ink-soft)">Beheer</small></div>
+    <div class="field">
+        <label for="wachtwoord">Wachtwoord voor het beheer</label>
+        <input id="wachtwoord" class="text" type="password" asp-for="Wachtwoord" autocomplete="current-password" autofocus required />
+    </div>
+    @if (!string.IsNullOrEmpty(Model.Fout))
+    {
+        <p class="fout" role="alert">@Model.Fout</p>
+    }
+    <button type="submit" class="btn big" style="width:100%">Inloggen</button>
+    <p class="help" style="margin-top:1rem">U blijft een jaar ingelogd op deze computer.<br>Wachtwoord vergeten? Bel de beheerder van de site.</p>
+</form>

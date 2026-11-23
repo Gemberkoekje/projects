@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".globalconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="Dockerfile" />
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="Klaverjas.core/Klaverjas.core.csproj" />
+  <Project Path="Klaverjas.application/Klaverjas.application.csproj" />
+  <Project Path="Klaverjas.infrastructure/Klaverjas.infrastructure.csproj" />
+  <Project Path="Klaverjas.WebApp/Klaverjas.WebApp.csproj" />
+  <Project Path="Klaverjas.test/Klaverjas.test.csproj" />
+</Solution>
