@@ -1,0 +1,98 @@
+@page
+@model Klaverjas.WebApp.Pages.Afdrukken.TafelsModel
+@using Klaverjas.core.Tafels
+@{
+    Layout = "_Afdruk";
+    var eerste = Model.Schemas[0];
+    var metDatum = Model.Datum != default;
+    var bladen = Model.Alle ? [] : TafelsModel.Bladen(eerste).ToList();
+    var vellen = bladen.Chunk(2).ToList();
+    ViewData["Title"] = Model.Alle ? "Alle tafelindelingen" : $"Tafelindeling {eerste.Aantal} spelers";
+    ViewData["Soort"] = "tafels";
+    ViewData["Terug"] = metDatum ? Url.Page("/Voorbereiden", new { datum = Weergave.Iso(Model.Datum), aantal = eerste.Aantal }) : Url.Page("/Index");
+    ViewData["Uitleg"] = Model.Alle
+        ? $"Een overzicht voor elk aantal spelers: {Model.Schemas.Count} A4, staand."
+        : $"Eerst het overzicht (1 A4, staand), dan {bladen.Count} tafelbriefjes op {vellen.Count} A4 (liggend): doormidden knippen tot A5.";
+    var kop = metDatum ? $"\"{Model.Club}\" · {Model.Datum.ToString("d MMMM", Weergave.Nl)} · week {Kalender.Week(Model.Datum)}" : $"\"{Model.Club}\" · datum: ____________";
+
+    static string En(IReadOnlyList<int> nummers)
+        => nummers.Count > 1 ? string.Join(", ", nummers.Take(nummers.Count - 1)) + " en " + nummers[^1] : string.Join(string.Empty, nummers);
+
+    // The two seats of a pair, linked by a big arrow: some players otherwise think they play with the person across.
+    const string Pijl = "<svg class=\"arr\" viewBox=\"0 0 14 40\" aria-hidden=\"true\"><path d=\"M7 4 L7 36\" stroke=\"currentColor\" stroke-width=\"2.8\"/><path d=\"M1.5 10.5 L7 3 L12.5 10.5 M1.5 29.5 L7 37 L12.5 29.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>";
+}
+
+@foreach (var schema in Model.Schemas)
+{
+    <div class="vel overzicht@(schema.Aantal >= 24 ? " veel" : string.Empty)">
+        <h1>Tafelindeling voor @schema.Aantal spelers</h1>
+        <p class="sub">@(metDatum && !Model.Alle ? Weergave.Lang(Model.Datum) + " · " : string.Empty)@(schema.Aantal / 4) tafels@(schema.StilPerRonde == 0 ? ", niemand zit stil" : $", per ronde {schema.StilPerRonde} stil: de slapers")</p>
+        <div class="rondes">
+            @for (var r = 0; r < schema.Rondes.Count; r++)
+            {
+                var ronde = schema.Rondes[r];
+                <div class="ronde">
+                    <h2>Ronde @(r + 1)</h2>
+                    <table>
+                        @for (var t = 0; t < ronde.Tafels.Count; t++)
+                        {
+                            var tafel = ronde.Tafels[t];
+                            <tr><td class="t">Tafel @(t + 1)</td><td><b>@tafel.Wij1</b> &amp; <b>@tafel.Wij2</b> <span class="vs">tegen</span> <b>@tafel.Zij1</b> &amp; <b>@tafel.Zij2</b></td></tr>
+                        }
+                        @if (ronde.Stil.Count > 0)
+                        {
+                            <tr class="stil"><td class="t">Stil</td><td>nr <b>@En(ronde.Stil)</b> <span class="vs">(Slaper @En(ronde.Stil))</span></td></tr>
+                        }
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@foreach (var vel in vellen)
+{
+    <div class="vel a4">
+        @foreach (var (ronde, tafel) in vel)
+        {
+            <div class="a5">
+                <div class="tsheet">
+                    <div class="ts-head"><b>Ronde @ronde</b><span>@kop · @(eerste.Aantal / 4) tafels</span></div>
+                    <div class="ts-pairs">
+                        @foreach (var (wie, a, b) in new[] { ("Wij", tafel.Wij1, tafel.Wij2), ("Zij", tafel.Zij1, tafel.Zij2) })
+                        {
+                            <div class="pair"><div class="who">@wie</div><div class="pbody">@Html.Raw(Pijl)<div class="prows"><div class="prow"><b>@a</b><span class="nm-line"></span></div><div class="prow"><b>@b</b><span class="nm-line"></span></div></div></div></div>
+                        }
+                    </div>
+                    <div class="ts-body">
+                        <table class="split">
+                            <tr><th colspan="2">Verdeling</th></tr>
+                            @for (var i = 0; i <= 40; i++)
+                            {
+                                <tr><td>@i – @(162 - i)</td><td>@(i + 41) – @(121 - i)</td></tr>
+                            }
+                        </table>
+                        <table class="hands">
+                            <colgroup><col style="width:8%"><col style="width:23.5%"><col style="width:12%"><col style="width:23.5%"><col style="width:12%"><col style="width:10.5%"><col style="width:10.5%"></colgroup>
+                            <tr><th rowspan="2" class="spel">Spel</th><th colspan="2">Wij</th><th colspan="2">Zij</th><th rowspan="2" class="gs">Gever</th><th rowspan="2" class="gs">Speler</th></tr>
+                            <tr><th>Punten</th><th>Roem</th><th>Punten</th><th>Roem</th></tr>
+                            @for (var spel = 1; spel <= 16; spel++)
+                            {
+                                <tr><td class="c">@spel</td><td></td><td></td><td></td><td></td><td class="c nr">@tafel.Gever(spel)</td><td class="c nr">@tafel.Speler(spel)</td></tr>
+                                if (spel % 4 == 0)
+                                {
+                                    <tr class="chk" title="Subtotaal na @spel spellen: wij + zij samen @(162 * spel) punten (zonder roem)"><td></td><td></td><td></td><td></td><td></td><td colspan="2" class="ctrl">@(162 * spel)</td></tr>
+                                }
+                            }
+                            <tr class="tot"><th rowspan="4" class="totcol"><span>Totaal</span></th><td colspan="2"></td><td colspan="2"></td><td colspan="2" class="lbl2">Punten</td></tr>
+                            <tr class="tot2"><td colspan="2"></td><td colspan="2"></td><td colspan="2" class="lbl2">Roem</td></tr>
+                            <tr class="eind"><td colspan="2"></td><td colspan="2"></td><td colspan="2" class="lbl2"><b>Eindtotaal</b></td></tr>
+                            <tr class="tot2"><td colspan="2"></td><td colspan="2"></td><td colspan="2" class="lbl2">Pitten</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        <div class="cut"><span>✂</span></div>
+    </div>
+}

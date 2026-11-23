@@ -1,8 +1,9 @@
 namespace Klaverjas.application.Queries;
 
 /// <summary>Lists the season's evenings, newest first, with the evenings without play among them.</summary>
-public sealed class AvondenOphalenHandler(IAvondStore avonden, IInstellingenStore instellingen)
+public sealed class AvondenOphalenHandler(IAvondStore avonden, IInstellingenStore instellingen, IVoorbereidingStore voorbereidingen)
 {
+    private readonly IVoorbereidingStore voorbereidingen = voorbereidingen ?? throw new ArgumentNullException(nameof(voorbereidingen));
     private readonly IAvondStore avonden = avonden ?? throw new ArgumentNullException(nameof(avonden));
     private readonly IInstellingenStore instellingen = instellingen ?? throw new ArgumentNullException(nameof(instellingen));
 
@@ -42,6 +43,7 @@ public sealed class AvondenOphalenHandler(IAvondStore avonden, IInstellingenStor
         return Result.For(new AvondenOverzicht
         {
             VolgendeAvond = volgende,
+            VolgendeVoorbereid = (await voorbereidingen.LadenAsync(volgende, cancellationToken)).IsValid,
             Regels = [.. gespeeld.Concat(vrij).OrderByDescending(r => r.Datum)],
         });
     }

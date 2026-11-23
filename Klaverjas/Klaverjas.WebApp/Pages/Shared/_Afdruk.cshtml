@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="nl" class="@ViewData["Soort"]">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/css/afdruk.css" asp-append-version="true">
+</head>
+<body>
+    <div class="werkbalk">
+        <a class="knop" href="@ViewData["Terug"]">← Terug</a>
+        <button type="button" class="knop hoofd" onclick="window.print()">Printen</button>
+        <span>@ViewData["Uitleg"]</span>
+    </div>
+    @RenderBody()
+</body>
+</html>

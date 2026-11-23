@@ -1,0 +1,25 @@
+@model Klaverjas.core.Tafels.Tafelschema
+@{
+    static string En(IReadOnlyList<int> nummers)
+        => nummers.Count > 1 ? string.Join(", ", nummers.Take(nummers.Count - 1)) + " en " + nummers[^1] : string.Join(string.Empty, nummers);
+}
+<div class="rounds">
+    @for (var r = 0; r < Model.Rondes.Count; r++)
+    {
+        var ronde = Model.Rondes[r];
+        <div class="round">
+            <h3>Ronde @(r + 1)</h3>
+            <table>
+                @for (var t = 0; t < ronde.Tafels.Count; t++)
+                {
+                    var tafel = ronde.Tafels[t];
+                    <tr><td class="t">Tafel @(t + 1)</td><td class="nrs"><b>@tafel.Wij1</b> &amp; <b>@tafel.Wij2</b> <span class="vs">tegen</span> <b>@tafel.Zij1</b> &amp; <b>@tafel.Zij2</b></td></tr>
+                }
+                @if (ronde.Stil.Count > 0)
+                {
+                    <tr><td class="t stil">Stil</td><td class="stil nrs">nr @En(ronde.Stil) <span class="vs">(Slaper @En(ronde.Stil))</span></td></tr>
+                }
+            </table>
+        </div>
+    }
+</div>

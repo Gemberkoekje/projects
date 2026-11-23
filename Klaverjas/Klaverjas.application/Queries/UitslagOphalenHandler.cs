@@ -1,13 +1,16 @@
+using Klaverjas.core.Tafels;
 using System.Globalization;
 
 namespace Klaverjas.application.Queries;
 
 /// <summary>
-/// Fills the entry screen. A new evening lists every active member as "Speelt" (D1); an entered
-/// evening lists who is on it, as saved.
+/// Fills the entry screen. A new evening lists every active member as "Speelt", except the slapers
+/// Dad picked when preparing it, who start as "Slaper" in their round (D1, D12); an entered evening
+/// lists who is on it, as saved.
 /// </summary>
-public sealed class UitslagOphalenHandler(IAvondStore avonden, ISpelerStore spelers, IInstellingenStore instellingen)
+public sealed class UitslagOphalenHandler(IAvondStore avonden, ISpelerStore spelers, IInstellingenStore instellingen, IVoorbereidingStore voorbereidingen)
 {
+    private readonly IVoorbereidingStore voorbereidingen = voorbereidingen ?? throw new ArgumentNullException(nameof(voorbereidingen));
     private readonly IAvondStore avonden = avonden ?? throw new ArgumentNullException(nameof(avonden));
     private readonly ISpelerStore spelers = spelers ?? throw new ArgumentNullException(nameof(spelers));
     private readonly IInstellingenStore instellingen = instellingen ?? throw new ArgumentNullException(nameof(instellingen));
@@ -35,9 +38,10 @@ public sealed class UitslagOphalenHandler(IAvondStore avonden, ISpelerStore spel
         var perId = alle.ToDictionary(s => s.Id);
         var geladen = await avonden.LadenAsync(datum, cancellationToken);
 
+        var voorbereid = await voorbereidingen.LadenAsync(datum, cancellationToken);
         var regels = geladen.IsValid
             ? geladen.Value.Uitslagen.Where(u => perId.ContainsKey(u.SpelerId)).Select(u => Regel(perId[u.SpelerId], u)).ToList()
-            : [.. alle.Where(s => s.IsLid && s.DoetMee).Select(s => new UitslagRegel { Speler = s })];
+            : [.. alle.Where(s => s.IsLid && s.DoetMee).Select(s => Nieuw(s, voorbereid))];
 
         var opHetScherm = regels.Select(r => r.Speler.Id).ToHashSet();
 
@@ -52,6 +56,20 @@ public sealed class UitslagOphalenHandler(IAvondStore avonden, ISpelerStore spel
                 .OrderBy(s => s.Naam, StandBerekening.NaamVolgorde)],
             PuntenAfwezig = instelling.PuntenAfwezig,
         });
+    }
+
+    /// <summary>A member's row on a new evening: a slaper picked in the preparation starts as Slaper in their round.</summary>
+    private static UitslagRegel Nieuw(Speler speler, Result<Voorbereiding> voorbereid)
+    {
+        if (!voorbereid.IsValid || !Tafelschemas.KanMet(voorbereid.Value.Verwacht))
+        {
+            return new UitslagRegel { Speler = speler };
+        }
+
+        var nummer = voorbereid.Value.SlaperNummer(speler.Id);
+        return nummer == 0
+            ? new UitslagRegel { Speler = speler }
+            : new UitslagRegel { Speler = speler, Status = Status.Slaper, Ronde = Tafelschemas.Voor(voorbereid.Value.Verwacht).RondeStil(nummer) };
     }
 
     private static UitslagRegel Regel(Speler speler, Uitslag uitslag) => new UitslagRegel

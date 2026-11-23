@@ -6,6 +6,9 @@ public sealed record AvondenOverzicht
     /// <summary>The next evening to enter.</summary>
     public DateOnly VolgendeAvond { get; init; }
 
+    /// <summary>Whether the next evening has been prepared (cards and tables).</summary>
+    public bool VolgendeVoorbereid { get; init; }
+
     /// <summary>The season's entered evenings and evenings without play, newest first.</summary>
     public IReadOnlyList<AvondRegel> Regels { get; init; } = [];
 }

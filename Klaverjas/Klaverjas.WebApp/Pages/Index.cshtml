@@ -12,15 +12,17 @@
 }
 
 <h1>Avonden</h1>
-<p class="lead">Na de avond: <b>Uitslag invullen</b>. Daarna ziet u meteen de nieuwe stand.</p>
+<p class="lead">Vóór de avond: <b>kaartjes en tafels printen</b> (de nummers worden op de avond zelf getrokken). Na de avond: <b>Uitslag invullen</b>.</p>
 
 <div class="card next">
     <div>
         <p class="muted" style="margin:0">Volgende speelavond</p>
         <p class="when">@Weergave.Lang(volgende) <span class="muted" style="font-weight:400">(week @Kalender.Week(volgende))</span></p>
+        <p class="muted" style="margin:0; font-size:1rem">@(Model.Overzicht.VolgendeVoorbereid ? "✓ Kaartjes en tafels klaargezet. Na de avond: Uitslag invullen." : "Vóór de avond: kaartjes en tafels printen.")</p>
     </div>
     <div class="actions">
-        <a class="btn big" asp-page="/Uitslag" asp-route-datum="@Weergave.Iso(volgende)">Uitslag invullen</a>
+        <a class="btn @(Model.Overzicht.VolgendeVoorbereid ? "secondary" : "big")" asp-page="/Voorbereiden" asp-route-datum="@Weergave.Iso(volgende)">Kaartjes en tafels printen</a>
+        <a class="btn @(Model.Overzicht.VolgendeVoorbereid ? "big" : "secondary")" asp-page="/Uitslag" asp-route-datum="@Weergave.Iso(volgende)">Uitslag invullen</a>
     </div>
 </div>
 
