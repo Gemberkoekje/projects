@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vragenblad klaverjassen</title>
+<!-- One A4 page of questions for Dad. Maps to PLAN.md: 1=Q8, 2=Q5, 3=Q4, 4=Q9, 5=Q3, 6=Q6,
+     7=Q16, 8=Q10, 9=Q15, 10=Q13, 11=Q11, 12=Q12. -->
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html { background: #ddd; }
+  body { margin: 0; font-family: Verdana, Geneva, sans-serif; color: #111; }
+  .page { width: 210mm; height: 297mm; margin: 0 auto; background: #fff; padding: 11mm 14mm 9mm; overflow: hidden; display: flex; flex-direction: column; }
+  h1 { font-size: 19pt; margin: 0 0 1.5mm; }
+  .intro { font-size: 11pt; line-height: 1.4; margin: 0 0 3mm; }
+  h2 { font-size: 11pt; margin: 2.5mm 0 .5mm; padding: 1mm 2.5mm; background: #e6efe8; border-left: 2mm solid #2d6a3e; }
+  h2 small { font-weight: 400; }
+  .q { padding: 1.5mm 0 1.5mm 9mm; position: relative; border-bottom: .3mm solid #ccc; }
+  .q:last-of-type { border-bottom: none; }
+  .nr { position: absolute; left: 0; top: 1.3mm; font-weight: 700; font-size: 13pt; }
+  .q p { margin: 0; font-size: 11pt; line-height: 1.35; }
+  .q p b { font-size: 11.5pt; }
+  .opts { display: flex; flex-wrap: wrap; gap: 1.2mm 7mm; margin-top: 1.2mm; font-size: 11pt; }
+  .opts.col { flex-direction: column; }
+  .opt { display: flex; align-items: center; gap: 2.2mm; }
+  .opt.grow { flex: 1; min-width: 60mm; }
+  .box { width: 4.6mm; height: 4.6mm; border: .45mm solid #111; flex: none; }
+  .line { flex: 1; border-bottom: .35mm solid #555; height: 4.2mm; min-width: 30mm; }
+  .end { margin-top: auto; padding-top: 2mm; font-size: 11pt; text-align: center; font-weight: 700; }
+  @media print { html { background: #fff; } .page { margin: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Vragen over het klaverjasprogramma</h1>
+  <p class="intro">De schermen en het printwerk vond u goed, dank u wel. Er zijn nog een paar vragen.
+    Zet bij elke vraag een kruisje in één vakje, of schrijf erbij hoe het moet.</p>
+
+  <h2>Nodig om te beginnen</h2>
+
+  <div class="q"><span class="nr">1</span>
+    <p><b>Laagste score vervalt?</b> In uw Excel staat per kwartaal "Laagste waarde vervalt", maar die
+      score wordt nergens van het totaal afgetrokken.</p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>Alles telt mee (is van vroeger)</span>
+      <span class="opt"><span class="box"></span>Per kwartaal vervalt de laagste avond</span>
+      <span class="opt grow"><span class="box"></span>Anders:<span class="line"></span></span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">2</span>
+    <p><b>Nieuw lid halverwege het jaar.</b> Met hoeveel punten begint hij of zij?</p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>4200 per gemiste avond (zoals afwezig)</span>
+      <span class="opt"><span class="box"></span>Op 0 (alleen gespeelde avonden)</span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">3</span>
+    <p><b>Lid stopt halverwege het jaar.</b> Wat gebeurt er met de stand? (U kunt het later per persoon
+      zelf veranderen.)</p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>Blijft staan met de punten tot dan</span>
+      <span class="opt"><span class="box"></span>Gaat uit de stand</span>
+      <span class="opt"><span class="box"></span>Krijgt daarna 4200 per avond, net als bij afwezig</span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">4</span>
+    <p><b>Slaper.</b> Wie een ronde stilzit, krijgt daarvoor 1600 punten. Staat die 1600 al in het
+      totaal op het kaartje?</p>
+    <div class="opts col">
+      <span class="opt"><span class="box"></span>Nee, die tel ik er zelf bij (dat doet het programma dan voor u)</span>
+      <span class="opt"><span class="box"></span>Ja, het totaal op het kaartje is al met de 1600</span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">5</span>
+    <p><b>Pitten van invallers.</b> Tellen die mee bij "Week totalen"?</p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>Nee, zoals nu</span>
+      <span class="opt"><span class="box"></span>Ja</span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">6</span>
+    <p><b>Eind van het jaar.</b></p>
+    <div class="opts">
+      <span class="opt">Een aparte "Eindstand" in december?</span>
+      <span class="opt"><span class="box"></span>Ja</span>
+      <span class="opt"><span class="box"></span>Nee, de laatste stand is genoeg</span>
+    </div>
+    <div class="opts">
+      <span class="opt">Begint in januari alles weer bij 0?</span>
+      <span class="opt"><span class="box"></span>Ja</span>
+      <span class="opt grow"><span class="box"></span>Nee:<span class="line"></span></span>
+    </div>
+  </div>
+
+  <h2>Mag ook later <small>(maar graag nu, als het u lukt)</small></h2>
+
+  <div class="q"><span class="nr">7</span>
+    <p><b>Naam op het kaartje.</b></p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>Alleen de voornaam ("Annie")</span>
+      <span class="opt"><span class="box"></span>Voor- en achternaam ("Annie de Graaf")</span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">8</span>
+    <p><b>Wie zit er stil?</b></p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>De laagste nummers, zoals in uw Excel</span>
+      <span class="opt"><span class="box"></span>Dat bepaal ik zelf (bijv. om de beurt)</span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">9</span>
+    <p><b>Tafelbriefje.</b> Bij spel 1 geeft de bovenste "Wij", en wie links van de gever zit, moet
+      spelen. In de spelregels staat "links naast de schrijver". Klopt het briefje?</p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>Ja</span>
+      <span class="opt grow"><span class="box"></span>Nee, het moet zo:<span class="line"></span></span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">10</span>
+    <p><b>Website.</b> Hoe horen de spelers het adres en het wachtwoord?</p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>Ik vertel het op de avond</span>
+      <span class="opt"><span class="box"></span>Een briefje om uit te delen</span>
+      <span class="opt grow"><span class="box"></span>Anders:<span class="line"></span></span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">11</span>
+    <p><b>4199 en 4201.</b> In de stand staat soms 4199 of 4201 waar 4200 hoort.</p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>Tikfout, het moet 4200 zijn</span>
+      <span class="opt grow"><span class="box"></span>Zo bedoeld, omdat:<span class="line"></span></span>
+    </div>
+  </div>
+
+  <div class="q"><span class="nr">12</span>
+    <p><b>Clubgeld</b> (Rekening, zieken, Kerst): blijft dat in Excel?</p>
+    <div class="opts">
+      <span class="opt"><span class="box"></span>Ja</span>
+      <span class="opt"><span class="box"></span>Nee, ook in het programma</span>
+    </div>
+  </div>
+
+  <p class="end">Hartelijk dank! Geef het blad terug, dan kan het bouwen beginnen.</p>
+</div>
+</body>
+</html>
