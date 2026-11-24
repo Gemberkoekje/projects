@@ -14,6 +14,7 @@
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="DotNetProjectFile.Analyzers" Version="1.15.2" />
     <PackageVersion Include="IDisposableAnalyzers" Version="4.0.8" />
+    <PackageVersion Include="MailKit" Version="4.18.2" />
     <PackageVersion Include="Marten" Version="9.14.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.6.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.302" />
@@ -26,6 +27,7 @@
     <PackageVersion Include="Qowaiv.Analyzers.CSharp" Version="2.5.1" />
     <PackageVersion Include="Qowaiv.Diagnostics.Contracts" Version="2.0.6" />
     <PackageVersion Include="Qowaiv.Validation.Abstractions" Version="2.1.0" />
+    <PackageVersion Include="QuestPDF" Version="2026.9.1" />
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.30.0.144632" />
     <PackageVersion Include="StyleCop.Analyzers" Version="1.1.118" />
   </ItemGroup>

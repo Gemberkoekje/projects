@@ -245,3 +245,14 @@ table.ptab td.pl, table.ptab th.pl { width: 2rem; text-align: center; font-weigh
 .banner.big { font-size: 1.35rem; font-weight: 700; }
 textarea.text { font: inherit; width: 100%; max-width: 40rem; min-height: 6rem; padding: .5rem .7rem; border: 2px solid #8a978e; border-radius: 6px; background: #fff; color: var(--ink); }
 .btn:disabled { background: var(--ok-bg); border-color: var(--ok-ink); color: var(--ok-ink); cursor: default; }
+
+/* ---------- E-mail (from the mock) ---------- */
+.bevestig { border: 3px solid var(--accent); border-radius: 10px; padding: 1rem 1.2rem; background: var(--accent-soft); }
+.actions form { display: inline-flex; margin: 0; }
+.mail { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.mail-head { background: #f3f5f4; padding: 1rem 1.25rem; font-size: 1rem; border-bottom: 1px solid var(--line); }
+.mail-head div { margin: .1rem 0; }
+.mail-head .subject { font-size: 1.3rem; font-weight: 700; margin-bottom: .4rem; }
+.mail iframe { display: block; width: 100%; border: 0; min-height: 30rem; }
+.attach { display: inline-flex; gap: .5rem; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: .45rem .8rem; background: #fafafa; font-size: 1rem; margin-top: .5rem; color: var(--ink); text-decoration: none; }
+.attach .pdf { background: #b3261e; color: #fff; font-weight: 700; font-size: .75rem; padding: .1rem .35rem; border-radius: 3px; }

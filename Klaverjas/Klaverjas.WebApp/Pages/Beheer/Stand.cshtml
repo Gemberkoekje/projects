@@ -4,6 +4,7 @@
     ViewData["Title"] = "Stand";
     ViewData["Tab"] = "stand";
     var o = Model.Overzicht;
+    var m = Model.Mail;
     var stand = o.Weergave;
     var adres = HttpContext.Request.Host.Value;
     var knop = "Staat online ✓";
@@ -77,7 +78,7 @@ else if (o.StaatOnline)
     <form method="post" asp-page="/Beheer/Stand" asp-page-handler="Online" id="online-form">
         <div class="field">
             <label for="bericht">Bericht erbij <span class="muted" style="font-weight:400">(mag leeg blijven)</span></label>
-            <p class="help">Dit komt boven de stand op de spelerspagina.</p>
+            <p class="help">Dit komt boven de stand: op de spelerspagina, en in de e-mail als u die ook stuurt.</p>
             <textarea id="bericht" class="text" name="Bericht" maxlength="@OnlineStand.MaxBericht" placeholder="Bijvoorbeeld: volgende week beginnen we een half uur later.">@Model.Bericht</textarea>
         </div>
         <div class="actions">
@@ -85,6 +86,84 @@ else if (o.StaatOnline)
             <a class="btn secondary" href="~/" target="_blank" rel="noopener">Bekijk de spelerspagina</a>
         </div>
     </form>
+</div>
+
+<div class="card" id="mail">
+    <h2>Ook e-mailen</h2>
+    <p>Wie wil, krijgt de stand ook per e-mail, met de PDF erbij. Het hoeft niet: de stand staat al online.</p>
+    @if (!string.IsNullOrEmpty(Model.MailUitslag))
+    {
+        <div class="banner @(Model.MailMislukt ? "warn" : "ok big")" role="status"><p>@Model.MailUitslag</p></div>
+    }
+    @if (!string.IsNullOrEmpty(Model.MailFout))
+    {
+        <div class="banner warn" role="alert"><p>@Model.MailFout</p></div>
+    }
+    @if (!m.IsIngesteld)
+    {
+        <p class="help status-warn">Mailen staat nog niet aan op de server. De beheerder van de site zet het aan.</p>
+    }
+    else if (o.Online.IsLeeg)
+    {
+        <p class="help">Zet de stand eerst online; daarna kunt u hem ook mailen.</p>
+    }
+    else if (o.IsGewijzigd)
+    {
+        <p class="help status-warn">Zet eerst de verbeterde stand online; die gaat dan ook in de e-mail.</p>
+    }
+    else
+    {
+        <p>De e-mail gaat naar <b>@m.Ontvangers @(m.Ontvangers == 1 ? "lid" : "leden")</b> (ieder een eigen e-mail), met de stand van week @Kalender.Week(o.Online.Stand.LaatsteAvond).
+            @if (m.ZonderEmail.Count > 0)
+            {
+                <text>@(m.ZonderEmail.Count == 1 ? "Deze speler heeft" : "Deze spelers hebben") geen e-mailadres: <b>@string.Join(", ", m.ZonderEmail)</b>. Print de PDF voor @(m.ZonderEmail.Count == 1 ? "die speler" : "hen").</text>
+            }
+        </p>
+        @if (!Emailadres.IsGeldig(m.Antwoordadres))
+        {
+            <div class="banner warn"><p>Vul eerst bij <a asp-page="/Beheer/Instellingen" asp-fragment="email">Instellingen</a> uw eigen e-mailadres in, bij "Antwoorden gaan naar". Daar komen de antwoorden van de spelers, en de proefmail.</p></div>
+        }
+        @if (m.IsGemaild)
+        {
+            <p class="status-ok">✓ Gemaild op @Weergave.Moment(m.LaatsteVerzending.Verstuurd) aan @m.LaatsteVerzending.Gelukt @(m.LaatsteVerzending.Gelukt == 1 ? "lid" : "leden").@(m.AlGemaild ? string.Empty : " Daarna is de stand verbeterd.")</p>
+        }
+        @if (m.IsProefGestuurd)
+        {
+            <p class="muted">Proefmail gestuurd op @Weergave.Moment(m.LaatsteProef.Verstuurd) naar @m.LaatsteProef.Ontvangers.Select(x => x.Email).FirstOrDefault().</p>
+        }
+
+        @if (Model.Bevestigen && m.Ontvangers > 0)
+        {
+            <div class="bevestig">
+                <p><b>Stand van week @Kalender.Week(o.Online.Stand.LaatsteAvond) mailen naar @m.Ontvangers @(m.Ontvangers == 1 ? "lid" : "leden"), met de PDF erbij?</b><br>Onderwerp: "@m.Onderwerp"</p>
+                @if (m.AlGemaild)
+                {
+                    <p class="status-warn">Let op: precies deze stand is al gemaild op @Weergave.Moment(m.LaatsteVerzending.Verstuurd). Dan krijgt iedereen hem twee keer.</p>
+                }
+                <form method="post" asp-page="/Beheer/Stand" asp-page-handler="Mailen" class="actions bezig" data-bezig="Bezig met versturen…">
+                    <button type="submit" class="btn big">@(m.AlGemaild ? "Toch nog een keer versturen" : "Ja, versturen")</button>
+                    <a class="btn secondary" asp-page="/Beheer/Stand" asp-fragment="mail">Nee, nog niet</a>
+                </form>
+            </div>
+        }
+        else
+        {
+            <div class="actions">
+                @if (m.Ontvangers > 0 && Emailadres.IsGeldig(m.Antwoordadres))
+                {
+                    <a class="btn" asp-page="/Beheer/Stand" asp-route-stap="mailen" asp-fragment="mail">@(m.IsGemaild && m.AlGemaild ? "Nog een keer e-mailen…" : "E-mailen…")</a>
+                }
+                @if (Emailadres.IsGeldig(m.Antwoordadres))
+                {
+                    <form method="post" asp-page="/Beheer/Stand" asp-page-handler="Proef" class="bezig" data-bezig="Bezig met versturen…">
+                        <button type="submit" class="btn secondary">Proefmail naar mij</button>
+                    </form>
+                }
+                <a class="btn secondary" asp-page="/Beheer/MailVoorbeeld">Zo ziet de e-mail eruit</a>
+                <a class="btn secondary" asp-page="/Beheer/Stand" asp-page-handler="Pdf" target="_blank" rel="noopener">PDF bekijken</a>
+            </div>
+        }
+    }
 </div>
 
 @section Scripts {

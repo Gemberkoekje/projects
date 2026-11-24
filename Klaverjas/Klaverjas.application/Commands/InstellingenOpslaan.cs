@@ -18,6 +18,15 @@ public sealed record InstellingenOpslaan : ICommand
     /// <summary>The standings' colours.</summary>
     public Kleuren Kleuren { get; init; } = new Kleuren();
 
+    /// <summary>The sender's name above the email.</summary>
+    public string AfzenderNaam { get; init; } = string.Empty;
+
+    /// <summary>Where replies go.</summary>
+    public string Antwoordadres { get; init; } = string.Empty;
+
+    /// <summary>The email's subject, before the week number.</summary>
+    public string Onderwerp { get; init; } = string.Empty;
+
     /// <summary>The players' password; empty keeps the players' page closed.</summary>
     public string Spelerswachtwoord { get; init; } = string.Empty;
 

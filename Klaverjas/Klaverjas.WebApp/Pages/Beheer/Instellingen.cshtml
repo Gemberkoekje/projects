@@ -94,6 +94,30 @@
     </div>
 </div>
 
+<div class="card" id="email">
+    <h2>De e-mail</h2>
+    <p class="help">Mailen is een extra: de stand staat al online. Wie wil, krijgt hem ook per e-mail, met de PDF erbij.</p>
+    @if (!Model.MailIngesteld)
+    {
+        <p class="help status-warn">Mailen staat nog niet aan op de server. De beheerder van de site zet het aan.</p>
+    }
+    <div class="field">
+        <label for="afzender">Naam van de afzender</label>
+        <p class="help">Deze naam zien de spelers boven de e-mail.</p>
+        <input id="afzender" class="text" name="Formulier.AfzenderNaam" value="@h.AfzenderNaam" form="instellingen">
+    </div>
+    <div class="field">
+        <label for="antwoord">Antwoorden gaan naar</label>
+        <p class="help">Uw eigen e-mailadres. Als een speler op de e-mail antwoordt, komt het antwoord hier; de proefmail gaat ook hierheen.</p>
+        <input id="antwoord" class="text" type="email" name="Formulier.Antwoordadres" value="@h.Antwoordadres" autocomplete="email" form="instellingen">
+    </div>
+    <div class="field" style="margin-bottom:0">
+        <label for="onderwerp">Onderwerp</label>
+        <p class="help">Het weeknummer komt er vanzelf achter, bijvoorbeeld: <b>@h.Onderwerp @Kalender.Week(Kalender.Vandaag())</b></p>
+        <input id="onderwerp" class="text" name="Formulier.Onderwerp" value="@h.Onderwerp" style="max-width:20rem" form="instellingen" required>
+    </div>
+</div>
+
 <div class="card">
     <h2>Kleuren in de stand</h2>
     <div class="inline" style="gap:1.25rem 2rem">

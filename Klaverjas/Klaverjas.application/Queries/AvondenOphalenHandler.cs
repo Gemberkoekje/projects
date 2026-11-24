@@ -8,8 +8,10 @@ public sealed class AvondenOphalenHandler(
     IInstellingenStore instellingen,
     IVoorbereidingStore voorbereidingen,
     ISpelerStore spelers,
-    IOnlineStandStore online)
+    IOnlineStandStore online,
+    IVerzendingStore verzendingen)
 {
+    private readonly IVerzendingStore verzendingen = verzendingen ?? throw new ArgumentNullException(nameof(verzendingen));
     private readonly ISpelerStore spelers = spelers ?? throw new ArgumentNullException(nameof(spelers));
     private readonly IOnlineStandStore online = online ?? throw new ArgumentNullException(nameof(online));
     private readonly IVoorbereidingStore voorbereidingen = voorbereidingen ?? throw new ArgumentNullException(nameof(voorbereidingen));
@@ -60,6 +62,7 @@ public sealed class AvondenOphalenHandler(
             OnlineTot = nuOnline.Stand.LaatsteAvond,
             OnlineSinds = nuOnline.OnlineSinds,
             OnlineGewijzigd = gewijzigd,
+            Gemaild = [.. (await verzendingen.AllesAsync(cancellationToken)).Where(v => !v.IsProef && v.Gelukt > 0).Select(v => v.Datum).Distinct()],
         });
     }
 }

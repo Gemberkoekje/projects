@@ -21,6 +21,9 @@ public sealed record AvondenOverzicht
     /// <summary>Whether the standings changed after they were put online.</summary>
     public bool OnlineGewijzigd { get; init; }
 
+    /// <summary>The evenings whose standings were mailed to the members (not just a test mail).</summary>
+    public IReadOnlyCollection<DateOnly> Gemaild { get; init; } = [];
+
     /// <summary>Whether an evening's results are in the standings online.</summary>
     /// <param name="datum">The evening.</param>
     /// <returns><see langword="true"/> up to the latest evening online.</returns>

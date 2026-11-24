@@ -46,6 +46,13 @@ configuration through the colon-path indexer, Razor Pages + vanilla JS, the anal
   that signs in over and over gets 429 locally too.
 - NUnit makes one instance per fixture, not per test: build stores in a `[SetUp]`, never in field
   initialisers, or one test's data leaks into the next.
+- **Mail is optional** (`Mail:*` settings; on the cluster the site keeper's Gmail). Development points
+  at `localhost:2525` without TLS: run any local SMTP catcher there to see the mails, or the screens
+  record each mail as failed. Never send to real addresses from a local run.
+- **The mail and the PDF show the standings online** (`OnlineStand`), never newer ones. The mail
+  HTML (`StandMail`) uses inline styles only, and encodes everything typed.
+- The PDF is **QuestPDF** under its Community licence (individual use). It brings its own font
+  (Lato) and its Linux native libraries need nothing beyond the aspnet image.
 
 ## Working here
 

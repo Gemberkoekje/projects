@@ -114,3 +114,19 @@ internal sealed class InMemoryOnlineStandStore : IOnlineStandStore
         return Task.CompletedTask;
     }
 }
+
+internal sealed class InMemoryVerzendingStore : IVerzendingStore
+{
+    private readonly List<Verzending> verzendingen = [];
+
+    public IReadOnlyList<Verzending> Alle => verzendingen;
+
+    public Task<IReadOnlyList<Verzending>> AllesAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<Verzending>>([.. verzendingen]);
+
+    public Task OpslaanAsync(Verzending verzending, CancellationToken cancellationToken = default)
+    {
+        verzendingen.Add(verzending);
+        return Task.CompletedTask;
+    }
+}
