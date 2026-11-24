@@ -42,6 +42,10 @@ services:
       TZ: Europe/Amsterdam
       ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-klaverjas};Username=${POSTGRES_USER:-klaverjas};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       Auth__Password: ${KLAVERJAS_PASSWORD:?Set KLAVERJAS_PASSWORD in .env}
+      # Optional: without a sender address mailing stays off. Gmail: the account, an app password.
+      Mail__User: ${MAIL_USER:-}
+      Mail__Password: ${MAIL_PASSWORD:-}
+      Mail__From: ${MAIL_FROM:-}
 
 volumes:
   postgres_data:

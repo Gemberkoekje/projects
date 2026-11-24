@@ -2,6 +2,8 @@ using Klaverjas.application.Ports;
 using Klaverjas.infrastructure.Adapters.Application;
 using Klaverjas.infrastructure.Adapters.DataProtection;
 using Klaverjas.infrastructure.Adapters.Excel;
+using Klaverjas.infrastructure.Adapters.Mail;
+using Klaverjas.infrastructure.Adapters.Pdf;
 using Klaverjas.WebApp;
 using Marten;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -43,9 +45,21 @@ var connectionString = builder.Configuration.GetConnectionString("Postgres")
 // password is Dad's to choose in Instellingen (D7).
 Toegang.ConfigWachtwoord(builder.Configuration);
 
+// The mail account (D2, Q1): on the cluster the site keeper's Gmail, from its mail secret. Optional:
+// without a sender address (and, with a user, its password) mailing is switched off and the screens say so.
+var smtp = new SmtpInstellingen
+{
+    Host = builder.Configuration["Mail:Host"] ?? string.Empty,
+    Port = builder.Configuration.GetValue("Mail:Port", 587),
+    StartTls = builder.Configuration.GetValue("Mail:StartTls", true),
+    Gebruiker = builder.Configuration["Mail:User"] ?? string.Empty,
+    Wachtwoord = builder.Configuration["Mail:Password"] ?? string.Empty,
+    Van = builder.Configuration["Mail:From"] is { Length: > 0 } van ? van : builder.Configuration["Mail:User"] ?? string.Empty,
+};
+
 // Marten as a document store: players, evenings (plus every replaced version), each evening's
-// preparation, the settings, a planned workbook import, the standings Dad put online and the
-// data-protection keys. The standings are computed; only the copy online is stored (D2, D8).
+// preparation, the settings, a planned workbook import, the standings Dad put online, every mailing
+// and the data-protection keys. The standings are computed; only the copy online is stored (D2, D8).
 builder.Services.AddMarten(options =>
 {
     options.Connection(connectionString);
@@ -62,6 +76,7 @@ builder.Services.AddMarten(options =>
     options.Schema.For<ImportVoorstel>().Identity(x => x.Id);
     options.Schema.For<Voorbereiding>().Identity(x => x.Id);
     options.Schema.For<OnlineStand>().Identity(x => x.Id);
+    options.Schema.For<Verzending>().Identity(x => x.Id);
     options.Schema.For<DataProtectionSleutel>().Identity(x => x.Id);
 });
 
@@ -123,12 +138,21 @@ builder.Services.AddScoped<MartenVoorbereidingStore>();
 builder.Services.AddScoped<IVoorbereidingStore>(sp => sp.GetRequiredService<MartenVoorbereidingStore>());
 builder.Services.AddScoped<MartenOnlineStandStore>();
 builder.Services.AddScoped<IOnlineStandStore>(sp => sp.GetRequiredService<MartenOnlineStandStore>());
+builder.Services.AddScoped<MartenVerzendingStore>();
+builder.Services.AddScoped<IVerzendingStore>(sp => sp.GetRequiredService<MartenVerzendingStore>());
 
 // The workbook reader and the export writer hold no state.
 builder.Services.AddSingleton<ClosedXmlStandenLezer>();
 builder.Services.AddSingleton<IStandenLezer>(sp => sp.GetRequiredService<ClosedXmlStandenLezer>());
 builder.Services.AddSingleton<ClosedXmlExportSchrijver>();
 builder.Services.AddSingleton<IExportSchrijver>(sp => sp.GetRequiredService<ClosedXmlExportSchrijver>());
+
+// The PDF maker and the mail sender hold no state between calls (the sender opens a connection per mailing).
+builder.Services.AddSingleton<QuestPdfStandMaker>();
+builder.Services.AddSingleton<IStandPdfMaker>(sp => sp.GetRequiredService<QuestPdfStandMaker>());
+builder.Services.AddSingleton(smtp);
+builder.Services.AddSingleton<MailKitMailVerzender>();
+builder.Services.AddSingleton<IMailVerzender>(sp => sp.GetRequiredService<MailKitMailVerzender>());
 
 // Command handlers.
 builder.Services.AddScoped<UitslagOpslaanHandler>();
@@ -143,6 +167,7 @@ builder.Services.AddScoped<ImportUitvoerenHandler>();
 builder.Services.AddScoped<ImportAnnulerenHandler>();
 builder.Services.AddScoped<VoorbereidingOpslaanHandler>();
 builder.Services.AddScoped<StandOnlineZettenHandler>();
+builder.Services.AddScoped<StandMailenHandler>();
 
 // Query handlers.
 builder.Services.AddScoped<AvondenOphalenHandler>();
@@ -155,8 +180,14 @@ builder.Services.AddScoped<ExportMakenHandler>();
 builder.Services.AddScoped<VoorbereidingOphalenHandler>();
 builder.Services.AddScoped<KaartjesOphalenHandler>();
 builder.Services.AddScoped<OnlineStandOphalenHandler>();
+builder.Services.AddScoped<MailOphalenHandler>();
 
 var app = builder.Build();
+
+if (!smtp.IsCompleet)
+{
+    app.Logger.LogInformation("Mailen staat uit: Mail:From (en bij een Mail:User ook Mail:Password) is niet ingesteld.");
+}
 
 app.UseForwardedHeaders();
 

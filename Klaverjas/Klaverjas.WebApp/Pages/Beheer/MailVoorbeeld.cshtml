@@ -1,0 +1,27 @@
+@page
+@model MailVoorbeeldModel
+@{
+    ViewData["Title"] = "Zo ziet de e-mail eruit";
+    ViewData["Tab"] = "stand";
+    var v = Model.Voorbeeld;
+}
+
+<p><a asp-page="/Beheer/Stand" asp-fragment="mail">← Terug naar de stand</a></p>
+<h1>Zo ziet de e-mail eruit</h1>
+<p class="lead">Zo komt de e-mail binnen bij een speler (hier de nummer 1). Elke speler krijgt een eigen e-mail, met zijn eigen plaats erin.</p>
+
+<div class="mail">
+    <div class="mail-head">
+        <div class="subject">@v.Onderwerp</div>
+        <div><b>Van:</b> @v.Van</div>
+        <div><b>Aan:</b> @v.Aan</div>
+        <div><b>Antwoorden naar:</b> @(v.Antwoordadres.Length > 0 ? v.Antwoordadres : "(nog niet ingevuld bij Instellingen)")</div>
+        <a class="attach" asp-page="/Beheer/Stand" asp-page-handler="Pdf" target="_blank" rel="noopener"><span class="pdf">PDF</span> @v.BijlageNaam</a>
+    </div>
+    @* The mail is a whole HTML document with its own styles; the frame keeps it apart from this page. *@
+    <iframe title="De e-mail" srcdoc="@v.Html" sandbox="allow-same-origin allow-popups" id="mail-inhoud"></iframe>
+</div>
+
+@section Scripts {
+    <script src="~/js/mailvoorbeeld.js" asp-append-version="true"></script>
+}

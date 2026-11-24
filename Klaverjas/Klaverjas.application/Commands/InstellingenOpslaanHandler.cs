@@ -31,6 +31,9 @@ public sealed class InstellingenOpslaanHandler(IInstellingenStore instellingen, 
             EersteAvond = command.EersteAvond,
             Kleuren = command.Kleuren ?? new Kleuren(),
             Spelerswachtwoord = (command.Spelerswachtwoord ?? string.Empty).Trim(),
+            AfzenderNaam = string.IsNullOrWhiteSpace(command.AfzenderNaam) ? oud.AfzenderNaam : command.AfzenderNaam.Trim(),
+            Antwoordadres = (command.Antwoordadres ?? string.Empty).Trim(),
+            Onderwerp = (command.Onderwerp ?? string.Empty).Trim(),
         };
 
         var fouten = Instellingen.Controleer(nieuw).Messages.Concat(WachtwoordFouten(command, oud, nieuw)).ToList();

@@ -44,6 +44,15 @@ public sealed record Instellingen
     /// <summary>Whether the players can sign in.</summary>
     public bool SpelerspaginaOpen => Spelerswachtwoord.Length > 0;
 
+    /// <summary>The sender's name above the email (D10).</summary>
+    public string AfzenderNaam { get; init; } = "Wedstrijdleiding klaverjassen";
+
+    /// <summary>Where a player's reply goes (D2): Dad's own address. Empty until he fills it in.</summary>
+    public string Antwoordadres { get; init; } = string.Empty;
+
+    /// <summary>The email's subject; the week number follows it ("Standen week 47").</summary>
+    public string Onderwerp { get; init; } = "Standen week";
+
     /// <summary>Whether no play is planned on a date.</summary>
     /// <param name="datum">The date.</param>
     /// <returns><see langword="true"/> for an evening without play.</returns>
@@ -71,6 +80,16 @@ public sealed record Instellingen
         if (!new[] { instellingen.Kleuren.Eerste, instellingen.Kleuren.Tweede, instellingen.Kleuren.Derde, instellingen.Kleuren.Afwezig }.All(Kleuren.IsKleur))
         {
             fouten.Add(ValidationMessage.Error("Een van de kleuren klopt niet."));
+        }
+
+        if (instellingen.Antwoordadres.Length > 0 && !Emailadres.IsGeldig(instellingen.Antwoordadres))
+        {
+            fouten.Add(ValidationMessage.Error("Het adres voor antwoorden klopt niet. Typ een e-mailadres, zoals naam@voorbeeld.nl."));
+        }
+
+        if (string.IsNullOrWhiteSpace(instellingen.Onderwerp))
+        {
+            fouten.Add(ValidationMessage.Error("Typ een onderwerp voor de e-mail, zoals \"Standen week\"."));
         }
 
         if (instellingen.Spelerswachtwoord.Length is > 0 and < Wachtwoord.MinimumLengteSpelers)

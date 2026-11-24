@@ -1,3 +1,4 @@
+using Klaverjas.application.Ports;
 using Microsoft.Extensions.Configuration;
 using Qowaiv.Diagnostics.Contracts;
 
@@ -5,21 +6,26 @@ namespace Klaverjas.WebApp.Pages.Beheer;
 
 /// <summary>
 /// Instellingen (D10): the club name, the absence score, the play day, the season and its evenings
-/// without play, the colours, the players' password with its slips, and Dad's own password (D7).
-/// Mail comes with its slice.
+/// without play, the colours, the email's sender, reply address and subject, the players' password
+/// with its slips, and Dad's own password (D7).
 /// </summary>
 public sealed class InstellingenModel(
     IConfiguration configuration,
+    IMailVerzender mail,
     InstellingenOphalenHandler ophalen,
     InstellingenOpslaanHandler opslaan,
     GeenSpeelavondToevoegenHandler vrijToevoegen,
     GeenSpeelavondWeghalenHandler vrijWeghalen) : PageModel
 {
     private readonly IConfiguration configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    private readonly IMailVerzender mail = mail ?? throw new ArgumentNullException(nameof(mail));
     private readonly InstellingenOphalenHandler ophalen = ophalen ?? throw new ArgumentNullException(nameof(ophalen));
     private readonly InstellingenOpslaanHandler opslaan = opslaan ?? throw new ArgumentNullException(nameof(opslaan));
     private readonly GeenSpeelavondToevoegenHandler vrijToevoegen = vrijToevoegen ?? throw new ArgumentNullException(nameof(vrijToevoegen));
     private readonly GeenSpeelavondWeghalenHandler vrijWeghalen = vrijWeghalen ?? throw new ArgumentNullException(nameof(vrijWeghalen));
+
+    /// <summary>Whether the server can send mail.</summary>
+    public bool MailIngesteld => mail.IsIngesteld;
 
     /// <summary>The settings as stored.</summary>
     public Instellingen Huidig { get; private set; } = new Instellingen();
@@ -70,6 +76,9 @@ public sealed class InstellingenModel(
                 Speeldag = f.Speeldag,
                 EersteAvond = f.EersteAvond,
                 Kleuren = new Kleuren { Eerste = f.KleurEerste, Tweede = f.KleurTweede, Derde = f.KleurDerde, Afwezig = f.KleurAfwezig },
+                AfzenderNaam = f.AfzenderNaam,
+                Antwoordadres = f.Antwoordadres,
+                Onderwerp = f.Onderwerp,
                 Spelerswachtwoord = f.Spelerswachtwoord,
                 NieuwWachtwoord = f.NieuwWachtwoord,
                 NieuwWachtwoordHerhaald = f.NieuwWachtwoordHerhaald,
@@ -167,6 +176,15 @@ public sealed class InstellingenFormulier
 
     /// <summary>Absent.</summary>
     public string KleurAfwezig { get; set; } = string.Empty;
+
+    /// <summary>The email's sender name.</summary>
+    public string AfzenderNaam { get; set; } = string.Empty;
+
+    /// <summary>Where replies go.</summary>
+    public string Antwoordadres { get; set; } = string.Empty;
+
+    /// <summary>The email's subject, before the week number.</summary>
+    public string Onderwerp { get; set; } = string.Empty;
 
     /// <summary>The players' password.</summary>
     public string Spelerswachtwoord { get; set; } = string.Empty;

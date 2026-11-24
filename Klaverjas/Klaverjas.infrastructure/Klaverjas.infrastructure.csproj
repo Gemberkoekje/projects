@@ -16,9 +16,11 @@
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" />
+    <PackageReference Include="MailKit" />
     <PackageReference Include="Marten" />
     <PackageReference Include="Qowaiv" />
     <PackageReference Include="Qowaiv.Validation.Abstractions" />
+    <PackageReference Include="QuestPDF" />
   </ItemGroup>
 
   <ItemGroup>

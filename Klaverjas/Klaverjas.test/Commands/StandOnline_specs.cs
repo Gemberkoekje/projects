@@ -111,7 +111,7 @@ public sealed class StandOnline_specs
         await avonden.OpslaanAsync(Avond(Wk46, Speelt(annie, 4000), Speelt(kees, 4100)));
         await OnlineZetten().HandleAsync(new StandOnlineZetten());
         await avonden.OpslaanAsync(Avond(Wk47, Speelt(annie, 4800), Speelt(kees, 4500)));
-        var handler = new AvondenOphalenHandler(avonden, instellingen, new InMemoryVoorbereidingStore(), spelers, online);
+        var handler = new AvondenOphalenHandler(avonden, instellingen, new InMemoryVoorbereidingStore(), spelers, online, new InMemoryVerzendingStore());
 
         var overzicht = (await handler.HandleAsync(new AvondenOphalen())).Value;
 

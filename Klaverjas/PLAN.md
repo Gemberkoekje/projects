@@ -5,11 +5,12 @@ _To understand this, start with this file, then open [mock/index.html](mock/inde
 week-47 standings' real numbers, because this repository is public. What Dad's two workbooks do,
 sheet by sheet, is in `explainer/index.html` (git-ignored: personal reference)._
 
-**Status (2026-11-23):** **slices 1 to 4 are built**: sign-in, players, entering an evening, the
+**Status (2026-11-24):** **slices 1 to 5 are built**: sign-in, players, entering an evening, the
 standings, reading Dad's "Standen" workbook (every points total matches it), downloading every score,
-preparing an evening (cards, slapers, table plan and score sheets), and the players' page with "Zet de
-stand online", the slips and both passwords (Dad's admin now lives at /beheer). What they do, the decisions
-taken while building and the gotchas are in [NOTES.md](NOTES.md); next is slice 5 (email + PDF). Before that: the plan
+preparing an evening (cards, slapers, table plan and score sheets), the players' page with "Zet de
+stand online", the slips and both passwords (Dad's admin now lives at /beheer), and the optional email
+with the PDF. What they do, the decisions taken while building and the gotchas are in
+[NOTES.md](NOTES.md); next is slice 6 (putting it live on gembernodes). Before that: the plan
 and the mock, which **Dad approved** (2026-11-23), and his answers to the question sheet
 [vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) (see "Dad's answers" below), which changed
 the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12) and added R16–R19.
@@ -135,7 +136,9 @@ everything else is formulas.
 - **D2** **Online first.** After checking, Dad presses "Zet de stand online" and the players' page shows
   the new standings at once. After a correction the button reads "Verbeterde stand online zetten".
   **Email is an optional extra**: one mail per member with the standings and the PDF, a test mail
-  first, replies going to Dad. _(Your call on email, 2026-11-20; online first, 2026-11-23.)_
+  first, replies going to Dad. _(Your call on email, 2026-11-20; online first, 2026-11-23.)_ As built
+  (slice 5): the mail always carries the standings that are online, so it is refused while a
+  correction waits to go online; it is sent from your Gmail (Q1) with Dad's address as reply-to.
 - **D3** The screens are designed for a **PC or laptop** with a mouse and keyboard. _(Your call.)_
 - **D4** The 2026 weeks are **imported from "Standen"** (`Stand` + `pit`). Holiday text becomes
   evenings without play, and the "invallers" row becomes substitutes. Names are matched across the
@@ -237,8 +240,6 @@ scores, and there was never a proper fix for it. So:
 
 ## Open questions
 
-- **Q1 (yours)** Sender address for the optional email: your Gmail via the cluster's mail secret, or a
-  separate club address? (Less urgent now that the standings are online first.)
 - **Q19 (Dad, not blocking)** **4 May**: the pits sheet has 9 pits that evening, but the points sheet
   says "vier mei" (no play). Was there play? The import leaves those pits out; if there was play, Dad
   can enter the evening himself.
@@ -293,7 +294,8 @@ Follow-ups, relayed by you the same day:
    "Zet de stand online", and the /beheer split. This is Dad's main wish, so it comes
    before email. _Built 2026-11-23 (see NOTES.md)._
 5. **Email + PDF (optional extra).** One HTML mail per member, the PDF like today's month sheet, the
-   test mail, the send log and the list of members without email.
+   test mail, the send log and the list of members without email. Sent from your Gmail through the
+   cluster's mail secret (Q1, your answer 2026-11-24). _Built 2026-11-24 (see NOTES.md)._
 6. **gembernodes.** Manifests, 1Password items, `DEPLOY.md` and a live check.
 7. **Hand-over.** For two Mondays the app runs alongside the workbooks and the results are compared.
    Dad gets a one-page printed guide, and I fix whatever he trips over.

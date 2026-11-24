@@ -79,6 +79,7 @@ public sealed record StandWeergave
 
     private static WeergaveRegel PuntenRegel(StandRegel regel, List<DateOnly> dagen) => new WeergaveRegel
     {
+        SpelerId = regel.Speler.Id,
         Plaats = regel.Plaats,
         Naam = regel.Speler.Naam,
         Totaal = regel.Totaal,
@@ -88,6 +89,7 @@ public sealed record StandWeergave
 
     private static WeergaveRegel PittenRegel(StandRegel regel, List<DateOnly> dagen) => new WeergaveRegel
     {
+        SpelerId = regel.Speler.Id,
         Plaats = regel.PlaatsPitten,
         Naam = regel.Speler.Naam,
         Totaal = regel.Pitten,
@@ -117,6 +119,9 @@ public sealed record Kolom
 /// <summary>One row as the players see it.</summary>
 public sealed record WeergaveRegel
 {
+    /// <summary>Whose row: lets each member's email say where they stand. An identity, no personal detail.</summary>
+    public Guid SpelerId { get; init; }
+
     /// <summary>The place (on points or on pits); 0 for a substitute.</summary>
     public int Plaats { get; init; }
 

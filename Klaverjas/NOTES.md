@@ -329,3 +329,87 @@ stand online". His own screens moved to /beheer. Built from the approved mock.
 
 **Next: slice 5**, email and the PDF as an optional extra (D2), then slice 6 (gembernodes: the
 players' page replaces the static mock at klaverjas.gemberkoekje.nl).
+
+## Slice 5: email and the PDF, an optional extra (2026-11-24)
+
+Below "Online zetten", Dad can now mail the standings that are online to every member with an
+address, with the PDF attached, after a test mail to himself if he likes. Built from the approved
+mock; sent from your Gmail through the cluster's mail secret (Q1).
+
+**What is there**
+
+- **Stand → "Ook e-mailen"**: how many members get it (each their own mail), who has no address ("Print
+  de PDF voor hen"), what went out this week, and the buttons "E-mailen…", "Proefmail naar mij",
+  "Zo ziet de e-mail eruit" and "PDF bekijken". "E-mailen…" asks first ("Stand van week 47 mailen naar
+  18 leden, met de PDF erbij?"); if exactly this stand was mailed already it warns that everyone gets
+  it twice and the button reads "Toch nog een keer versturen". Afterwards: "✓ De e-mail is verstuurd
+  aan 17 leden", or which members failed and why to check their address.
+- **The mail** (as in the mock): "Beste {first name}," Dad's note, "Je staat 3e met … punten en …
+  pitten.", the evening's winners, the month's points and pits tables in the sheet's colours, the
+  link to the players' page, "Groeten, {sender}". Subject "Standen week 47", "(verbeterd)" when that
+  week went out before with other numbers; the PDF is "Standen week 47.pdf". Replies go to Dad.
+- **The test mail** shows Dad the number 1's mail, sent to his own address, subject "Proef: …".
+- **"Zo ziet de e-mail eruit"** (`/beheer/mailvoorbeeld`): the mock's mail view with the real mail in a frame.
+- **The PDF** (`?handler=Pdf`, opened in the browser): one A4 landscape like Dad's month sheet: club,
+  "Stand na week N" and the date, the note, the winners, the points and pits tables side by side,
+  the legend. Scaled to fit one page (26 members with long names still fit).
+- **Instellingen → "De e-mail"**: sender name, "Antwoorden gaan naar" (Dad's own address; required
+  before mailing, the test mail goes there too) and the subject. Members' addresses are now checked.
+- **Avonden** marks a mailed evening "✉ Gemaild"; every mailing is logged (`Verzending`) per member.
+
+**Decisions taken while building**
+
+- **The mail carries the standings that are online, never newer ones**, so the mail and the
+  players' page always agree. While a correction waits to go online, mailing is refused with "Zet
+  eerst de verbeterde stand online".
+- **The confirm step is a page state** (`?stap=mailen`), not a script dialog: it works without
+  JavaScript and reads like the mock's dialog. The buttons then show "Bezig met versturen…".
+- **One connection, one mail per member, failures recorded per member**: one bad address never
+  stops the rest. The mails go out in the request (20 members take a few seconds).
+- **An address needs a dot in its domain**: Qowaiv accepts `naam@voorbeeld`, which for club members
+  is a typo.
+- Mailing is **switched off** while the server has no sender address (or a user without its
+  password); the screens say "Mailen staat nog niet aan op de server".
+- The online copy's rows now carry the member's id (no personal detail), so each mail finds that
+  member's place even with two similar names.
+- The mail's tables are the full month, as in the mock; on a phone the mail program scrolls them.
+  The PDF is the printable copy.
+
+**Checked**
+
+- 257 specs (28 new): the mail text (first name, place line, note encoded with its line breaks,
+  names encoded, winners, tables, link, subject and "(verbeterd)", attachment names); mailing (one
+  per playing member with an address, not to stopped members or substitutes, PDF attached, reply-to
+  Dad, logged per member with failures; the test mail to Dad only; refused when nothing is online,
+  after an unpublished correction, without Dad's address or without a mail account); the mail card
+  (counts, members without address, already mailed, verbeterd); Avonden's "✉ Gemaild" (not for a
+  test); the PDF fitting one page; the address checks.
+- Locally with invented members and a small SMTP catcher on port 2525 (scratch script): the test
+  mail and a real mailing went out (17 of 18; the one address the catcher refused was reported by
+  name); every caught mail had the right From, To, Reply-To, subject, HTML, text and PDF; the
+  confirm step warned before a second identical mailing; the preview and the PDF looked like the
+  mock and Dad's month sheet.
+- QuestPDF's Linux libraries resolve inside `mcr.microsoft.com/dotnet/aspnet:10.0` with only libc,
+  libstdc++ and zlib (checked with `ldd` in the image).
+- **Not checked: a real Gmail delivery.** That needs the cluster's mail secret, so it is part of
+  slice 6's live check (first a test mail to Dad's address).
+
+**Gotchas**
+
+- A Razor `srcdoc="@html"` encodes the mail correctly for the attribute; a sandboxed frame with
+  `allow-same-origin` lets the page size it to the mail.
+- The browser pane treats a PDF as a download: check PDFs by fetching and rendering them (`pdftoppm`).
+- Gmail rewrites From to the signed-in account anyway: `Mail:From` must be the account's own address.
+
+**Files**
+
+| Where | What |
+|---|---|
+| `Klaverjas.core/Models` | `Verzending` (+ `Ontvanger`), `Emailadres`; `Instellingen` sender, reply address, subject |
+| `Klaverjas.application/Mail` | `StandMail` (subject, HTML, text, attachment name), `Ontvangers` (who gets it, what went out), `MailBericht` |
+| `Klaverjas.application` | `StandMailen` (+ handler), `MailOphalenHandler` (mail card, preview, PDF), ports `IMailVerzender`, `IStandPdfMaker`, `IVerzendingStore` |
+| `Klaverjas.infrastructure/Adapters` | `Mail/MailKitMailVerzender` (+ `SmtpInstellingen`), `Pdf/QuestPdfStandMaker`, `Application/MartenVerzendingStore` |
+| `Klaverjas.WebApp` | `Pages/Beheer/Stand` (mail card), `Pages/Beheer/MailVoorbeeld`, Instellingen "De e-mail", `js/mailvoorbeeld.js`; `Mail:*` in appsettings, compose and `.env.example` |
+
+**Next: slice 6**, gembernodes: the app replaces the static mock at klaverjas.gemberkoekje.nl, with
+the mail secret, and a live check that starts with a test mail.

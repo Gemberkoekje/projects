@@ -71,6 +71,11 @@ public sealed record Speler
             fouten.Add(ValidationMessage.Error("Kies of het een lid of een invaller is."));
         }
 
+        if (!string.IsNullOrEmpty(speler.Email) && !Emailadres.IsGeldig(speler.Email))
+        {
+            fouten.Add(ValidationMessage.Error("Dat e-mailadres klopt niet. Typ het zoals naam@voorbeeld.nl, of laat het leeg."));
+        }
+
         return fouten.Count == 0 ? Result.OK : Result.WithMessages(fouten);
     }
 }
