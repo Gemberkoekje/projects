@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Fixed (2026-11-24, slice 6.80)
+- B97: the contract plan mines only at an asteroid, an asteroid field or an engineered asteroid, as the mining command
+  does. On 2026-11-22 it chose the asteroid base the command ship stood at, X1-CJ53-J61, because its type contains
+  "ASTEROID"; the mining command refused it on every round (29,347 times in 42 hours), nothing else earned, and the
+  credits stood at 102,663. An active plan whose stored source can't be mined moves to the nearest asteroid on the next
+  tick, its ships with it, or is deferred when the system has none.
+- Tests: `ContractPlanServiceTests`.
+
+### Plan – Changed (2026-11-24)
+- B97 (above). Slices 6.78 and 6.79 are recorded as deployed (gembernodes#262, 2026-11-22).
+
 ### Code – Fixed (2026-11-22, slice 6.79)
 - B96: a market's price history is read from one index. `market_price_samples` has a covering index on (`AgentId`,
   `WaypointSymbol`, `ObservedAt`) with every column the read takes, in place of the (`AgentId`, `WaypointSymbol`,
