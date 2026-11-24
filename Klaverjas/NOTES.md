@@ -446,3 +446,47 @@ the gembernodes manifests and [DEPLOY.md](DEPLOY.md) here. It goes live after yo
   `/healthz`, the redirect, signing in at `/beheer`, the players' password, a test mail through Gmail.
 - Q2 (a web address with the club's name) is still open; the slips and links follow the hostname by
   themselves.
+
+## Stand printen: a button of its own (2026-11-24)
+
+Dad asked, with his week-48 sheet, whether "dit blad" can be printed with a button. The PDF already
+is that sheet (slice 5), but its only button, "PDF bekijken", sat in the "Ook e-mailen" card, between
+the mail buttons. Your call: give him an obvious button outside the mail.
+
+**What changed**
+
+- The Stand page has a **"Stand printen"** card between "Online zetten" and "Ook e-mailen", with one
+  big button, "🖨 Stand printen". It opens the same PDF (`?handler=Pdf`) in a new tab, and one line
+  says to click the printer at the top right or press Ctrl+P. It doesn't depend on mail being on.
+- It prints **the standings online**, like the mail and the PDF always have. Before anything is
+  online the card says to put it online first; after a correction, to put the corrected standings
+  online first. In both cases there's no button, so the sheet never shows old figures.
+- After "Zet de stand online" the green banner adds "Ook printen? Dat kan onderaan, bij Stand
+  printen" with a link down to the card. Once online, the online button is greyed out ("Staat online
+  ✓"), so "Stand printen" is the one obvious next button.
+- In the mail card, "Print de PDF voor hen" (members without an address, failed mails) now reads
+  "Print de stand voor hen (bij Stand printen)". "PDF bekijken" stays there, next to "Zo ziet de
+  e-mail eruit".
+
+**Not changed**
+
+- The PDF itself. Next to Dad's sheet it differs only in small things: the line on top (club, week,
+  note, winners), no orange bar between the two tables, the legend in a row instead of stacked,
+  "Oscar (invaller)" instead of "Invaller 1 / Oscar", and "2 nov" instead of "2-11-2026". Match those
+  only if he asks for it.
+- The mock still shows "PDF bekijken" in the online card. The page now has its own print card.
+
+**Checked**
+
+- 257 specs still pass (the PDF handler is unchanged; the card is markup only).
+- Locally, with the invented workbook (`StandenWerkboek`) imported through Instellingen: the card
+  before going online (text only), after going online (the button and the banner link, which jumps to
+  the card), after a correction (the warning, no button) and after putting it online again; the
+  button's address returns `application/pdf` inline, named "Standen week 46.pdf".
+
+**Files**
+
+| Where | What |
+|---|---|
+| `Klaverjas.WebApp/Pages/Beheer/Stand.cshtml` | the "Stand printen" card, the banner link, the mail card's wording |
+| `Klaverjas.WebApp/Pages/Beheer/Stand.cshtml.cs` | doc comments; the failed-mail summary points at "Stand printen" |
