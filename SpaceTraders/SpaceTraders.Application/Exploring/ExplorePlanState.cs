@@ -126,6 +126,12 @@ public sealed record ExplorePlanState
     /// <summary>Where the next explorer's purchase stands, as the last pass left it.</summary>
     public ExplorerPurchaseState Purchase { get; init; } = new();
 
+    /// <summary>
+    /// Whether the command ship earns before it explores (slice 6.81, D155): <c>Explore.CommandShipWaitsForCargoShip</c> is on
+    /// and the fleet has no shuttle or hauler. The plan says so in the journal when it changes.
+    /// </summary>
+    public bool CommandShipEarnsFirst { get; init; }
+
     /// <summary>When the state last changed.</summary>
     public required DateTimeOffset UpdatedAt { get; init; }
 }

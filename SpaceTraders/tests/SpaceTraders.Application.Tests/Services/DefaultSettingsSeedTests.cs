@@ -103,6 +103,9 @@ public sealed class DefaultSettingsSeedTests
         // The rings the exploring ships take in turn (slice 6.33, D114), their own width since slice 6.35 (D117).
         "Explore.RingWidth",
 
+        // The command ship earns before it explores while the fleet has no cargo ship (slice 6.81, D155).
+        "Explore.CommandShipWaitsForCargoShip",
+
         // Surveying (slice 6.4): SurveyPlanService's stock of usable surveys per ore (D27).
         "Survey.StockPerOre",
 

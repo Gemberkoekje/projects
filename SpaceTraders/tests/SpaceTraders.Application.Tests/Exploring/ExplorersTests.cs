@@ -502,6 +502,30 @@ public sealed class ExplorersTests
         (await StateAsync()).Explorers.Single().Should().BeEquivalentTo(new { Status = ExploreStatus.Exploring, TargetSystemSymbol = "X1-S01" });
     }
 
+    [Fact]
+    public async Task WhileTheCommandShipEarnsFirst_NoExplorerIsBought_AndItFetchesNone()
+    {
+        // Slice 6.81 (D155), asked on 2026-11-24: "If there are no other haulers, SPECTER-1 should prioritize making money
+        // before exploring, up until a proper shuttle or hauler is bought." Only the command ship could fetch this explorer.
+        _settings.GetAsync<bool>(ExplorePlanService.CommandShipWaitsForCargoShipSetting, Arg.Any<CancellationToken>()).Returns(true);
+        await SeedAsync();
+
+        await PassesAsync(3);
+
+        await _order.DidNotReceive().ReportAsync(AutomationPlan.Explore, Arg.Is<PurchaseNeed>(need => need.Tier != PurchaseTier.None), Arg.Any<CancellationToken>());
+        await _purchases.DidNotReceiveWithAnyArgs().TryPurchaseAsync(default!, default!);
+        (await StateAsync()).Purchase.Status.Should().Be(ExplorerPurchaseStatus.None);
+        (await GoalAsync(CommandShip)).Should().BeNull();
+        (await AssignmentAsync(CommandShip)).Should().BeNull();
+
+        // Once a shuttle is bought, the explorer is wanted again, and the command ship fetches it.
+        await AddShipAsync("SPECTER-2", Home, "X1-FJ91-A1", "SHIP_LIGHT_SHUTTLE");
+        await PassAsync();
+
+        (await StateAsync()).Purchase.Status.Should().Be(ExplorerPurchaseStatus.CommandShipFetchesIt);
+        (await GoalAsync(CommandShip)).Should().BeEquivalentTo(new { TargetWaypointSymbol = Shipyard });
+    }
+
     private void Settings(int perExplorer, int cap)
     {
         _settings.GetAsync<int>(ExplorePlanService.SystemsPerExplorerSetting, Arg.Any<CancellationToken>()).Returns(perExplorer);
