@@ -1726,12 +1726,223 @@ public sealed class ContractPlanServiceTests
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
 
+        // B97: the asteroid base the ship stands at is nearest, but no mining laser works there
+        // (AsteroidDeposits.IsExtractable); this test once expected it. J68 is the nearest asteroid.
         await plans.Received(1).UpsertAsync(
             Arg.Is<ContractMineralPlanState>(p =>
                 p.Status == ContractMineralPlanStatus.Active
                 && p.ContractId == "C-NEAR-1"
-                && p.SourceWaypoint == "X1-AB-J59"),
+                && p.SourceWaypoint == "X1-AB-J68"),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TheContractsSource_IsNeverTheAsteroidBaseTheShipStandsAt()
+    {
+        // B97, seen on 2026-11-22: the command ship's scout trip ended at X1-CJ53-J61, an asteroid base, and the
+        // contract plan chose it as the IRON_ORE source because its type contains "ASTEROID" and it was 0 away. The
+        // mining command refused it on every round for 42 hours.
+        var plans = Substitute.For<IContractMineralPlanRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+
+        plans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
+        contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            new ContractDto(
+                Id: "C-B97",
+                FactionSymbol: "COSMIC",
+                Type: "PROCUREMENT",
+                IsAccepted: true,
+                IsFulfilled: false,
+                Expiration: DateTimeOffset.UtcNow.AddDays(3),
+                DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+                DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto>
+                {
+                    new("IRON_ORE", "X1-CJ53-H54", 64, 0),
+                }))
+        ]);
+
+        var commandShip = new ShipModel(
+            Symbol: "SPECTER-1",
+            SystemSymbol: "X1-CJ53",
+            WaypointSymbol: "X1-CJ53-J61",
+            Status: "IN_ORBIT",
+            FlightMode: "BURN",
+            FuelCurrent: 400,
+            FuelCapacity: 400,
+            CargoCurrent: 0,
+            CargoCapacity: 40,
+            ShipType: "SHIP_COMMAND_FRIGATE",
+            MountSymbols: ["MOUNT_SENSOR_ARRAY_II", "MOUNT_GAS_SIPHON_II", "MOUNT_MINING_LASER_II", "MOUNT_SURVEYOR_II"]);
+
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([commandShip]);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        waypoints.GetBySystemAsync("X1-CJ53", Arg.Any<CancellationToken>()).Returns([
+            Waypoint("X1-CJ53-J61", "ASTEROID_BASE", 300, 300, """[{"symbol":"HOLLOWED_INTERIOR"},{"symbol":"PIRATE_BASE"},{"symbol":"MARKETPLACE"}]"""),
+            Waypoint("X1-CJ53-B6", "ENGINEERED_ASTEROID", 310, 290, """[{"symbol":"COMMON_METAL_DEPOSITS"}]"""),
+            Waypoint("X1-CJ53-H54", "PLANET", 0, 0, """[{"symbol":"MARKETPLACE"}]"""),
+        ]);
+
+        var sut = new ContractPlanService(
+            plans,
+            contracts,
+            ships,
+            assignments,
+            Substitute.For<IShipyardRepository>(),
+            waypoints,
+            Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
+            new OpenPurchaseOrder(),
+            NullLogger<ContractPlanService>.Instance);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        await plans.Received(1).UpsertAsync(
+            Arg.Is<ContractMineralPlanState>(p => p.Status == ContractMineralPlanStatus.Active && p.SourceWaypoint == "X1-CJ53-B6"),
+            Arg.Any<CancellationToken>());
+        await assignments.Received(1).UpsertAsync(
+            Arg.Is<ShipAssignmentDto>(a => a.ShipSymbol == "SPECTER-1" && a.OriginWaypoint == "X1-CJ53-B6"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AnActivePlanWhoseSourceCannotBeMined_MinesAtTheNearestAsteroid_AndItsShipsGoThere()
+    {
+        // B97: the plan stores its source, and the tick gives the ship its assignment again from it after a restart, so
+        // the plan chosen on 2026-11-22 kept the asteroid base until something changed it. The tick changes it.
+        var (sut, plans, assignments, waypoints) = ActivePlanAtAnAsteroidBase();
+        waypoints.GetBySystemAsync("X1-CJ53", Arg.Any<CancellationToken>()).Returns([
+            Waypoint("X1-CJ53-J61", "ASTEROID_BASE", 300, 300),
+            Waypoint("X1-CJ53-B6", "ENGINEERED_ASTEROID", 310, 290),
+            Waypoint("X1-CJ53-B7", "ASTEROID", -400, -400),
+            Waypoint("X1-CJ53-H54", "PLANET", 0, 0),
+        ]);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        await plans.Received(1).UpsertAsync(
+            Arg.Is<ContractMineralPlanState>(p =>
+                p.Status == ContractMineralPlanStatus.Active
+                && p.ContractId == "C-B97"
+                && p.SourceWaypoint == "X1-CJ53-B6"),
+            Arg.Any<CancellationToken>());
+        await assignments.Received(1).UpsertAsync(
+            Arg.Is<ShipAssignmentDto>(a =>
+                a.ShipSymbol == "SPECTER-1"
+                && a.OriginWaypoint == "X1-CJ53-B6"
+                && !a.CompletedAt.HasValue),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AnActivePlanWhoseSourceCannotBeMined_WithNoAsteroidLeft_IsDeferred_AndReleasesItsShips()
+    {
+        // As a new plan with no asteroid is (D1: one contract per reset).
+        var (sut, plans, assignments, waypoints) = ActivePlanAtAnAsteroidBase();
+        waypoints.GetBySystemAsync("X1-CJ53", Arg.Any<CancellationToken>()).Returns([
+            Waypoint("X1-CJ53-J61", "ASTEROID_BASE", 300, 300),
+            Waypoint("X1-CJ53-H54", "PLANET", 0, 0),
+        ]);
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        await plans.Received(1).UpsertAsync(
+            Arg.Is<ContractMineralPlanState>(p => p.Status == ContractMineralPlanStatus.DeferredUnsupported && p.ContractId == "C-B97"),
+            Arg.Any<CancellationToken>());
+        await assignments.Received(1).UpsertAsync(
+            Arg.Is<ShipAssignmentDto>(a => a.ShipSymbol == "SPECTER-1" && a.CompletedAt.HasValue),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AnActivePlanWhoseSourceIsAnAsteroid_KeepsIt()
+    {
+        var (sut, plans, assignments, waypoints) = ActivePlanAtAnAsteroidBase(sourceType: "ENGINEERED_ASTEROID");
+
+        await sut.EnsureBootstrappedAsync(CancellationToken.None);
+
+        await waypoints.DidNotReceive().GetBySystemAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await plans.DidNotReceive().UpsertAsync(Arg.Any<ContractMineralPlanState>(), Arg.Any<CancellationToken>());
+        await assignments.DidNotReceive().UpsertAsync(Arg.Any<ShipAssignmentDto>(), Arg.Any<CancellationToken>());
+    }
+
+    private static WaypointCacheModel Waypoint(string symbol, string type, int x, int y, string? traitsJson = null)
+        => new(symbol, "X1-CJ53", type, x, y, traitsJson?.Contains("MARKETPLACE", StringComparison.Ordinal) == true, false, DateTimeOffset.UtcNow, TraitsJson: traitsJson);
+
+    // The live plan of 2026-11-22: SPECTER-1 to mine IRON_ORE at X1-CJ53-J61 (an asteroid base unless said otherwise) for
+    // X1-CJ53-H54, nothing delivered.
+    private static (ContractPlanService Sut, IContractMineralPlanRepository Plans, IShipAssignmentRepository Assignments, IWaypointRepository Waypoints) ActivePlanAtAnAsteroidBase(
+        string sourceType = "ASTEROID_BASE")
+    {
+        var plans = Substitute.For<IContractMineralPlanRepository>();
+        var contracts = Substitute.For<IContractRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        plans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ContractMineralPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            ContractId = "C-B97",
+            ShipSymbol = "SPECTER-1",
+            TradeSymbol = "IRON_ORE",
+            SourceWaypoint = "X1-CJ53-J61",
+            DestinationWaypoint = "X1-CJ53-H54",
+            UnitsRequired = 64,
+            UnitsFulfilled = 0,
+            Status = ContractMineralPlanStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow.AddDays(-2),
+            UpdatedAt = DateTimeOffset.UtcNow.AddDays(-2),
+        });
+        contracts.FindAsync("C-B97", Arg.Any<CancellationToken>()).Returns(new ContractDto(
+            Id: "C-B97",
+            FactionSymbol: "COSMIC",
+            Type: "PROCUREMENT",
+            IsAccepted: true,
+            IsFulfilled: false,
+            Expiration: DateTimeOffset.UtcNow.AddDays(3),
+            DeadlineToAccept: DateTimeOffset.UtcNow.AddHours(1),
+            TermsDeadline: DateTimeOffset.UtcNow.AddDays(1),
+            DeliverablesJson: JsonSerializer.Serialize(new List<ContractDeliverableDto> { new("IRON_ORE", "X1-CJ53-H54", 64, 0) })));
+        var assignment = new ShipAssignmentDto(
+            ShipSymbol: "SPECTER-1",
+            AssignmentType: "Contract",
+            OriginWaypoint: "X1-CJ53-J61",
+            DestWaypoint: "X1-CJ53-H54",
+            CargoSymbol: "IRON_ORE",
+            ContractId: "C-B97",
+            StepIndex: 0,
+            AssignedAt: DateTimeOffset.UtcNow.AddDays(-2),
+            CompletedAt: null,
+            PurchaseUnitPrice: 0,
+            RequiredUnits: 64,
+            SupplyCompleted: false);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([assignment]);
+        waypoints.FindAsync("X1-CJ53-J61", Arg.Any<CancellationToken>()).Returns(Waypoint("X1-CJ53-J61", sourceType, 300, 300));
+        var sut = new ContractPlanService(
+            plans,
+            contracts,
+            Substitute.For<IShipRepository>(),
+            assignments,
+            Substitute.For<IShipyardRepository>(),
+            waypoints,
+            Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
+            Substitute.For<IAgentRepository>(),
+            Substitute.For<IMessageBus>(),
+            Substitute.For<IShipGoalRepository>(),
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<IPlanRepository>(),
+            new OpenPurchaseOrder(),
+            NullLogger<ContractPlanService>.Instance);
+        return (sut, plans, assignments, waypoints);
     }
 
     // An Active plan for 42 units, 10 of them delivered when it last advanced, and the contract as

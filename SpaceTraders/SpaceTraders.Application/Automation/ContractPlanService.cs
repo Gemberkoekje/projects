@@ -71,9 +71,15 @@ public sealed class ContractPlanService(
         {
             if (existing.Status == ContractMineralPlanStatus.Active)
             {
+                var mineable = await MoveOffASourceNoShipCanMineAsync(existing, cancellationToken);
+                if (mineable.Status != ContractMineralPlanStatus.Active)
+                {
+                    return;
+                }
+
                 // The tick advances the plan from the cached contract, which deliveries keep current.
                 // The events it used to wait for are never published (B9).
-                var advanced = await AdvanceActivePlanAsync(existing, cancellationToken);
+                var advanced = await AdvanceActivePlanAsync(mineable, cancellationToken);
                 if (advanced.Status == ContractMineralPlanStatus.Active)
                 {
                     await AddFreeMinersAsync(advanced, cancellationToken);
@@ -685,26 +691,110 @@ public sealed class ContractPlanService(
         return purchased.PurchasedShip;
     }
 
-    public async Task<string> ResolveSourceAsteroidAsync(ShipModel ship, string tradeSymbol, CancellationToken cancellationToken)
+    /// <summary>
+    /// The contract's source: the asteroid nearest the ship that a mining laser works at, the one whose traits name the
+    /// good first among equals. Not an asteroid base, though its type has "ASTEROID" in it (B97).
+    /// </summary>
+    /// <param name="ship">The contract's first ship.</param>
+    /// <param name="tradeSymbol">The good the contract wants.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The source waypoint, or an empty string when the ship's system has no such asteroid.</returns>
+    public Task<string> ResolveSourceAsteroidAsync(ShipModel ship, string tradeSymbol, CancellationToken cancellationToken)
+        => NearestMineableAsteroidAsync(ship.SystemSymbol, ship.WaypointSymbol, tradeSymbol, cancellationToken);
+
+    private async Task<string> NearestMineableAsteroidAsync(
+        string? systemSymbol,
+        string? fromWaypoint,
+        string tradeSymbol,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(ship.SystemSymbol))
+        if (string.IsNullOrWhiteSpace(systemSymbol))
         {
             return string.Empty;
         }
 
-        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol, cancellationToken);
-        var currentWaypoint = string.IsNullOrWhiteSpace(ship.WaypointSymbol)
+        var systemWaypoints = await waypoints.GetBySystemAsync(systemSymbol, cancellationToken);
+        var currentWaypoint = string.IsNullOrWhiteSpace(fromWaypoint)
             ? null
-            : systemWaypoints.FirstOrDefault(w => w.Symbol.Equals(ship.WaypointSymbol, StringComparison.OrdinalIgnoreCase));
+            : systemWaypoints.FirstOrDefault(w => w.Symbol.Equals(fromWaypoint, StringComparison.OrdinalIgnoreCase));
 
+        // The mining command takes only these (MineResourceVolumeHandler); anything else it refuses on every round (B97).
         var asteroid = systemWaypoints
-            .Where(w => w.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase))
+            .Where(w => AsteroidDeposits.IsExtractable(w.Type))
             .OrderBy(w => DistanceFrom(currentWaypoint, w))
             .ThenByDescending(w => ScoreTradeSymbolMatch(w, tradeSymbol))
             .ThenBy(w => w.LastObservedAt)
             .FirstOrDefault();
 
         return asteroid?.Symbol ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Moves an active plan off a source no ship can mine at, to the asteroid nearest it that one can, and sends the plan's
+    /// ships there; with none left the plan is deferred, as a new plan without an asteroid is, and its ships are released.
+    /// The plan of 2026-11-22 stored an asteroid base, and the tick gave it to the ship again after every restart (B97).
+    /// A source whose waypoint isn't cached is kept: the mining command doesn't refuse that one either.
+    /// </summary>
+    /// <param name="plan">The active plan.</param>
+    /// <param name="cancellationToken">Cancels the reads and writes.</param>
+    /// <returns>The plan as stored.</returns>
+    private async Task<ContractMineralPlanState> MoveOffASourceNoShipCanMineAsync(
+        ContractMineralPlanState plan,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(plan.SourceWaypoint)
+            || await waypoints.FindAsync(plan.SourceWaypoint, cancellationToken) is not { } source
+            || AsteroidDeposits.IsExtractable(source.Type))
+        {
+            return plan;
+        }
+
+        var now = TimeProvider.System.GetUtcNow();
+        var asteroid = await NearestMineableAsteroidAsync(source.SystemSymbol, source.Symbol, plan.TradeSymbol, cancellationToken);
+        var open = await ContractAssignmentsAsync(plan.ContractId, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(asteroid))
+        {
+            var deferred = plan with
+            {
+                Status = ContractMineralPlanStatus.DeferredUnsupported,
+                UpdatedAt = now,
+                StopReason = $"The source {source.Symbol} is a {source.Type}, which no ship can mine, and no asteroid is left in {source.SystemSymbol}.",
+            };
+            await contractPlans.UpsertAsync(deferred, cancellationToken);
+            foreach (var assignment in open)
+            {
+                await assignments.UpsertAsync(assignment with { CompletedAt = now }, cancellationToken);
+            }
+
+            logger.LogWarning(
+                "{EventKind:l}: {Plan} plan for contract {ContractId} deferred ({Reason}): its source {Source} is a {WaypointType}, which no ship can mine, and {SystemSymbol} has no asteroid (B97).",
+                JournalEvents.PlanBlocked,
+                AutomationPlan.Contract,
+                plan.ContractId,
+                "no_asteroid",
+                source.Symbol,
+                source.Type,
+                source.SystemSymbol);
+            return deferred;
+        }
+
+        var moved = plan with { SourceWaypoint = asteroid, UpdatedAt = now };
+        await contractPlans.UpsertAsync(moved, cancellationToken);
+        foreach (var assignment in open)
+        {
+            await assignments.UpsertAsync(assignment with { OriginWaypoint = asteroid }, cancellationToken);
+        }
+
+        logger.LogWarning(
+            "{Plan} plan for contract {ContractId}: its source {Source} is a {WaypointType}, which no ship can mine; it mines {TradeSymbol} at {Asteroid} instead (B97).",
+            AutomationPlan.Contract,
+            plan.ContractId,
+            source.Symbol,
+            source.Type,
+            plan.TradeSymbol,
+            asteroid);
+        return moved;
     }
 
     private static decimal DistanceFrom(WaypointCacheModel? from, WaypointCacheModel to)

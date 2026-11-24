@@ -112,6 +112,7 @@ fixes: look there before giving a symptom a new number. Each fix starts with a t
 | B94 | **The plan tick slowed from seconds to 14 minutes as the explorers found markets, and the ships waited for it** (seen on 2026-11-21; slices 6.75–6.77).<br>• Plan ticks per 6 hours, from the `Tick` numbers in Loki: about 2,000 on 2026-11-16 and 11-17 (about 11 s a tick, 60 to 119 ships); 60 to 140 from 11-18 on (2.5 to 6 minutes, 141 to 200 ships); 75 in the 16 hours of pod `q84d4`, started 2026-11-21 02:27Z (about 14 minutes, 252 ships). Of tick 77 (18:26:48 to 18:40:17Z), about 8.5 minutes went by between the explore plan's line and the probe plan's, which is the role board and the contract plan; the trading plan's lines took about 2.5 minutes.<br>• The API pod used 1.8 of its 2 cores and was CFS-throttled in about half of the periods (1.1 cores and 5% on 2026-11-17).<br>• The trade list covers every market the bot knows (`Trade.MaxHaulDistance` is 9999): a build took 3.7 s over 1,293 markets on 11-17, 92 s over 5,138 on 11-18, 222 s over 6,464 on 11-20 and 268 s over 6,841 (9,844,291 trades estimated) on 11-21, and the worker builds again 60 s after each build ends.<br>• What it did: the probe plan runs once a tick, so a roaming probe waits a tick for its next market. `ShipLeftIdle` was raised 1,940 times in three days for probes "while the ProbeDeployment plan has work it could do", about 80 an hour by 11-21 18:00Z. Arrival handlers ran past Wolverine's 60-second default and were cancelled and retried: 199 Errors in two days (`ShipNavigationCompletedEvent`, `@i=f24941d0`, `OperationCanceledException`). Grafana sent 85 mails in 16 hours (D154).<br>• Not known yet: how much of the tick is CPU the build takes from it, and how much is the role board's own work over 6,841 markets (slice 6.76).<br>• 6.75's first numbers (2026-11-21 22:10Z, 3 cores): a tick 700–756 s, of which the role board 440 s, trading 166 s, probes 83 s, explore 68 s; a step round 68 s; a build 251 s. | Loki: `max(max_over_time({namespace="spacetraders"} \| json \| Tick=~"[0-9]+" \| unwrap Tick [6h]))`, the `TradeListService` lines, the anomaly lines; Prometheus: `container_cpu_usage_seconds_total`, `container_cpu_cfs_throttled_periods_total`; Grafana: `grafana_alerting_notifications_total` | 6.75, 6.76, 6.77 |
 | B95 | **A sale cancelled in flight left the bot's cargo ahead of the ship's, and the same refused sale went out every step for 11 hours** (seen on 2026-11-22; slice 6.78).<br>• SPECTER-1F4 bought 490 AMMUNITION at X1-VU4-DD7E and sold nine batches of 45 at X1-V44-CA1C from 23:10:10Z on 2026-11-21. At 23:10:58Z Wolverine's 60-second limit cancelled the arrival handler (`TaskCanceledException`) during the tenth sale, which the API carried out: the bot counted 85 aboard, the API 40. Every retry and every step after asked to sell 45 ("cargo does not contain 45 unit(s) of AMMUNITION. Ship has 40") until the next morning: 236 Error lines in the night, the `ShipStuck` anomaly on the ship, and the error alert kept on.<br>• The sale is missing from the ledger as well (about 65,000 credits).<br>• First: the step reads the cargo again when the API refuses a sale for it (6.78), as B83 does for a lost navigate.<br>• Second, open: a sale in flight shouldn't be cancelled half way (its answer would be stored and the ledger would have it); the arrival handler's sales of many small batches run past 60 s whatever the tick. | Loki: `{namespace="spacetraders"}` with `SPECTER-1F4`, `@i=038d77aa` (goal step failed), `@i=f24941d0` (handler failed) | 6.78 |
 | B96 | **The price history of one market takes over 30 s to read since PostgreSQL moved, and the read times out** (seen on 2026-11-22; slice 6.79).<br>• kured drained gembernode-01 at 02:00:57Z on 2026-11-22 and PostgreSQL started again on gembernode-02 at 02:02:36Z. From then `MarketPredictions`' read of a market's 8 days of samples (`GetWaypointPricesAsync`) ran into the 30-second command timeout 2 to 24 times an hour (`@i=627a98df`, none before), and the arrival handlers waiting on it timed out too.<br>• `EXPLAIN (ANALYZE, BUFFERS)` for X1-RS9-D18B at 10:50Z: 12,336 rows by the (`AgentId`, `WaypointSymbol`, `GoodSymbol`, `ObservedAt`) index in 29.7 s, 787 of 12,204 pages read from disk, ~38 ms each; again at once: all from memory. So no index is missing: the rows lie on scattered pages and the cache is cold. `market_price_samples` is 579 MB (1.7 million rows, 8,461 markets); PostgreSQL has 1 GiB and `shared_buffers` 256 MB for every app's database, on `qnap-nfs`.<br>• The fix (6.79, the user's choice): a covering index, so the read touches ~270 index pages in order instead of a table page a row. | `EXPLAIN (ANALYZE, BUFFERS)` as `spacetraders_ro`; `pg_indexes`, `pg_stat_user_tables`; Loki `@i=627a98df` | 6.79 |
+| B97 | **The contract plan sent the command ship to mine an asteroid base, and the run stood still from its first hour** (seen on 2026-11-24; slice 6.80).<br>• After the reset of 2026-11-22 13:00Z the bot bought three probes, about 71,000, which left 102,663 credits, just above the credit reserve of 100,000. The command ship's scout trip ended at X1-CJ53-J61, an `ASTEROID_BASE`. At 13:51:46Z the contract plan made it the IRON_ORE source: `ResolveSourceAsteroidAsync` took any waypoint whose type contains "ASTEROID", the nearest first, and J61 was 0 away.<br>• `MineResourceVolumeHandler` mines only where `AsteroidDeposits.IsExtractable` (an asteroid, an asteroid field, an engineered asteroid) and refused J61 on every round: 29,347 `ShipStateMismatchEvent` rows in `activity_logs` until 2026-11-24 07:59Z, none of them in Loki. `ShipStuck` (SPECTER-1), `ContractStalled` and, after 24 hours, `CreditsUnchanged` were the only signs.<br>• Nothing else earned: the first cargo ship (85,437) would leave less than the reserve, and the mining drones were refused by D150 and, once another agent finished the home gate on 2026-11-23 11:29Z, by D153.<br>• A restart doesn't help: it closes the assignment (D26), but the next tick gives the ship one again from the plan's stored source.<br>• `ContractPlanServiceTests.EnsureBootstrappedAsync_PrefersNearestAsteroid_OverTraitScoredFarTarget` (from the first checkpoint, May 2026) expected the asteroid base; `AsteroidDepositsTests.OnlyAsteroids_CanBeMined` says it can't be mined. | `st.py check`; `cached_ships`, `ship_assignment_records`, `activity_logs` (`EventType` `ShipStateMismatchEvent`), `cached_waypoints` as `spacetraders_ro`; Loki `SPECTER-1` | 6.80 |
 | B24 | **WebUI loose ends** (minor).<br>• SignalR refresh hints probably never match a query: the client reads a string `kind`, but the server sends an object.<br>• The end-to-end test opens `/orchestration`, but the route is `/plans`.<br>• The unrouted pages in `src/Future` call endpoints that don't exist. | `signalr.tsx:27-28`, `DashboardNotifier.cs:19,28`, `orchestration.e2e.ts:5` | with D5 |
 
 ### Decisions
@@ -407,8 +408,9 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.75 The loops measured (B94, D154), deployed (below)
 - 6.76 What takes the tick's time, measured on the day's world (B94), planned (below)
 - 6.77 The tick's work cut (B94), planned (below)
-- 6.78 A sale refused for cargo the ship doesn't hold reads the cargo again (B95), merged (below)
-- 6.79 A market's price history read from one index (B96), built (below)
+- 6.78 A sale refused for cargo the ship doesn't hold reads the cargo again (B95), deployed (below)
+- 6.79 A market's price history read from one index (B96), deployed (below)
+- 6.80 The contract mines only where a mining laser works (B97), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -1164,7 +1166,7 @@ the gates of other systems (D68).
 - **6.77 The tick's work cut** (B94): planned after 6.76; where it can, as 6.61 did, with the same decisions
   (`RoutePlannerGoldenTests`).
 - **6.78 A sale refused for cargo the ship doesn't hold reads the cargo again** (B95; asked on 2026-11-22 with the night's
-  mails): merged as projects#273 (`e001ba0b`); not deployed yet.
+  mails): merged as projects#273 (`e001ba0b`), deployed with 6.79 by gembernodes#262 (2026-11-22 11:45Z).
   - `SpaceTradersPortAdapter.SellCargoAsync` raises `CargoRefusedException` (a port exception, as B83's
     `NavigateRefusedException`) when the API refuses a sale because the ship's cargo "does not contain" the units; its
     code isn't known here, so the message is matched. Other refusals stay the API's error.
@@ -1179,7 +1181,10 @@ the gates of other systems (D68).
     error and progresses; another failure reads no cargo). Without the change the first, second and fourth fail.
   - To understand this, start with `ShipGoalExecutorService.ReadCargoAgainAsync`, then `CargoRefusedException`.
 - **6.79 A market's price history read from one index** (B96; the user chose the covering index on 2026-11-22, over more
-  memory for PostgreSQL or summing the samples up as they arrive): built on branch `claude/spacetraders-b96-covering-index`.
+  memory for PostgreSQL or summing the samples up as they arrive): merged as projects#274 (`3d573406`), deployed by
+  gembernodes#262 (2026-11-22 11:45Z). Not "well under" the probe, as written below: the `CREATE INDEX` ran into EF's
+  30-second command timeout at the first two starts, and the third built it; the index is valid (191 MB) and the old one
+  is gone. A longer timeout for the schema step is still to do.
   - `market_price_samples` gets the index (`AgentId`, `WaypointSymbol`, `ObservedAt`) INCLUDE (`Id`, `GoodSymbol`,
     `PurchasePrice`, `SellPrice`, `Supply`, `Activity`, `TradeVolume`), every column the read takes, in place of
     (`AgentId`, `WaypointSymbol`, `GoodSymbol`, `ObservedAt`). The dead reckoning's read of a market's 8 days
@@ -1201,3 +1206,23 @@ the gates of other systems (D68).
     `DatabaseInitializerTests` (a database with the old index ends with the model's indexes).
   - To understand this, start with the `MarketPriceSample` block of `SpaceTradersDbContext.OnModelCreating`, then
     `SpaceTradersDatabaseInitializer.AddedSchema`.
+- **6.80 The contract mines only where a mining laser works** (B97; asked on 2026-11-24, "look at the anomalies", then
+  "yes, fix it"): built on branch `claude/spacetraders-b97-asteroid-source`.
+  - `ContractPlanService.ResolveSourceAsteroidAsync` takes only the waypoints `AsteroidDeposits.IsExtractable` takes, the
+    rule `MineResourceVolumeHandler`, `ExtractResourcesCommand` and the mining plan already go by: an asteroid, an
+    asteroid field or an engineered asteroid, never an asteroid base. Nearest first and traits second, as before.
+  - An active plan whose stored source is cached as a waypoint no ship can mine is moved, on the tick, to the asteroid
+    nearest that source, and the open contract assignments go there too (a warning says so). With no asteroid in the
+    system the plan is deferred and its ships released, as a new plan without an asteroid is (D1). This puts the live
+    plan of 2026-11-22 right at the first tick after the deploy; a source not cached is kept, as the mining command keeps
+    it.
+  - Not changed: the mining command's refusals still go only to `activity_logs`, so a refused step every round shows in
+    Loki only as `ShipStuck`.
+  - Tests: `ContractPlanServiceTests`: `TheContractsSource_IsNeverTheAsteroidBaseTheShipStandsAt` (the live case: the
+    command ship at J61), `AnActivePlanWhoseSourceCannotBeMined_MinesAtTheNearestAsteroid_AndItsShipsGoThere`,
+    `AnActivePlanWhoseSourceCannotBeMined_WithNoAsteroidLeft_IsDeferred_AndReleasesItsShips`,
+    `AnActivePlanWhoseSourceIsAnAsteroid_KeepsIt`; `EnsureBootstrappedAsync_PrefersNearestAsteroid_OverTraitScoredFarTarget`
+    now expects the nearest asteroid, not the asteroid base the ship stands at. Without the change the first three and the
+    changed test fail.
+  - To understand this, start with `ContractPlanService.NearestMineableAsteroidAsync`, then
+    `MoveOffASourceNoShipCanMineAsync` and its call in `EnsureBootstrappedAsync`.
