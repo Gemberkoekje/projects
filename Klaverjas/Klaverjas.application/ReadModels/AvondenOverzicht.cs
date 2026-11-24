@@ -11,6 +11,20 @@ public sealed record AvondenOverzicht
 
     /// <summary>The season's entered evenings and evenings without play, newest first.</summary>
     public IReadOnlyList<AvondRegel> Regels { get; init; } = [];
+
+    /// <summary>The latest evening in the standings online; <see cref="DateOnly.MinValue"/> when nothing is online.</summary>
+    public DateOnly OnlineTot { get; init; } = DateOnly.MinValue;
+
+    /// <summary>When the standings went online (UTC).</summary>
+    public DateTime OnlineSinds { get; init; } = DateTime.MinValue;
+
+    /// <summary>Whether the standings changed after they were put online.</summary>
+    public bool OnlineGewijzigd { get; init; }
+
+    /// <summary>Whether an evening's results are in the standings online.</summary>
+    /// <param name="datum">The evening.</param>
+    /// <returns><see langword="true"/> up to the latest evening online.</returns>
+    public bool IsOnline(DateOnly datum) => OnlineTot != DateOnly.MinValue && datum <= OnlineTot;
 }
 
 /// <summary>One line of the Avonden screen.</summary>

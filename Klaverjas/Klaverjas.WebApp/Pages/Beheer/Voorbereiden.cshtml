@@ -28,7 +28,7 @@
         De andere nummers worden uit de pot getrokken.</p>
 </div>
 
-<form method="post" asp-page="/Voorbereiden" asp-page-handler="Opslaan" id="voorbereiding">
+<form method="post" asp-page="/Beheer/Voorbereiden" asp-page-handler="Opslaan" id="voorbereiding">
     <input type="hidden" name="Datum" value="@datum">
 
     <div class="card">
@@ -119,8 +119,8 @@
         <partial name="_Tafelindeling" model="Model.Plan" />
     </div>
     <div class="actions" style="margin-top:1.25rem">
-        <a class="btn" asp-page="/Afdrukken/Tafels" asp-route-aantal="@Model.Plan.Aantal" asp-route-datum="@datum">Deze tafelindeling printen</a>
-        <a class="btn secondary" asp-page="/Afdrukken/Tafels" asp-route-alle="true">Alle aantallen printen (4 t/m 28)</a>
+        <a class="btn" asp-page="/Beheer/Afdrukken/Tafels" asp-route-aantal="@Model.Plan.Aantal" asp-route-datum="@datum">Deze tafelindeling printen</a>
+        <a class="btn secondary" asp-page="/Beheer/Afdrukken/Tafels" asp-route-alle="true">Alle aantallen printen (4 t/m 28)</a>
         <button type="submit" class="btn secondary" form="voorbereiding" asp-page-handler="Klaar">Klaar, terug naar Avonden</button>
     </div>
 </div>

@@ -1,0 +1,92 @@
+@page
+@model StandModel
+@{
+    ViewData["Title"] = "Stand";
+    ViewData["Tab"] = "stand";
+    var o = Model.Overzicht;
+    var stand = o.Weergave;
+    var adres = HttpContext.Request.Host.Value;
+    var knop = "Staat online ✓";
+    if (o.Online.IsLeeg)
+    {
+        knop = "Zet de stand online";
+    }
+    else if (o.IsGewijzigd)
+    {
+        knop = "Verbeterde stand online zetten";
+    }
+}
+
+@if (stand.IsLeeg)
+{
+    <h1>Stand</h1>
+    <div class="card">
+        <p>Er is nog geen avond ingevuld. Begin bij <a asp-page="/Beheer/Index">Avonden</a> met <b>Uitslag invullen</b>.</p>
+    </div>
+    return;
+}
+
+@if (Model.NetOnline)
+{
+    <div class="banner ok big"><p>✓ De stand staat online. De spelers zien hem nu op @adres.</p></div>
+}
+else if (o.IsGewijzigd)
+{
+    <div class="banner warn"><p><b>U heeft iets gewijzigd nadat de stand online is gezet.</b><br>Zet de verbeterde stand online, dan zien de spelers de goede cijfers.</p></div>
+}
+else if (Model.Opgeslagen != default)
+{
+    <div class="banner ok"><p><b>De uitslag van @Weergave.InZin(Model.Opgeslagen) is opgeslagen.</b> Kijk of de stand klopt en zet hem dan online.</p></div>
+}
+else if (o.StaatOnline)
+{
+    <div class="banner ok"><p>Deze stand staat online sinds @Weergave.Moment(o.Online.OnlineSinds).</p></div>
+}
+
+<h1>Stand na week @Kalender.Week(stand.LaatsteAvond)</h1>
+<p class="lead">@Weergave.Lang(stand.LaatsteAvond)</p>
+
+<div class="card">
+    <div class="actions" style="justify-content:space-between; margin-bottom:1rem">
+        <h2 style="margin:0">Zo zien de spelers de stand</h2>
+        <span>Klopt er iets niet? <a class="btn secondary small" asp-page="/Beheer/Uitslag" asp-route-datum="@Weergave.Iso(stand.LaatsteAvond)">Uitslag wijzigen</a></span>
+    </div>
+
+    <ul class="winners">
+        <li class="muted">Winnaars van de avond:</li>
+        @foreach (var winnaar in stand.Winnaars)
+        {
+            <li><span class="medal @Weergave.PlaatsKlasse(winnaar.Plaats)">@winnaar.Plaats</span> @winnaar.Naam@(winnaar.IsInvaller ? " (invaller)" : string.Empty) <b>@Weergave.Getal(winnaar.Punten)</b></li>
+        }
+    </ul>
+
+    <partial name="_StandTabellen" model="stand" />
+</div>
+
+<div class="card" id="online">
+    <h2>Online zetten</h2>
+    <p>Met één klik staat de stand op <b>@adres</b>. De spelers kijken daar met het wachtwoord van de club.</p>
+    @if (!o.Instellingen.SpelerspaginaOpen)
+    {
+        <div class="banner warn"><p>Er is nog geen wachtwoord voor de spelers, dus zij kunnen nog niet kijken. Kies er een bij <a asp-page="/Beheer/Instellingen" asp-fragment="spelerspagina">Instellingen</a>.</p></div>
+    }
+    @if (!string.IsNullOrEmpty(Model.Fout))
+    {
+        <div class="banner warn" role="alert"><p>@Model.Fout</p></div>
+    }
+    <form method="post" asp-page="/Beheer/Stand" asp-page-handler="Online" id="online-form">
+        <div class="field">
+            <label for="bericht">Bericht erbij <span class="muted" style="font-weight:400">(mag leeg blijven)</span></label>
+            <p class="help">Dit komt boven de stand op de spelerspagina.</p>
+            <textarea id="bericht" class="text" name="Bericht" maxlength="@OnlineStand.MaxBericht" placeholder="Bijvoorbeeld: volgende week beginnen we een half uur later.">@Model.Bericht</textarea>
+        </div>
+        <div class="actions">
+            <button type="submit" class="btn big" id="online-knop" disabled="@o.StaatOnline" data-opnieuw="Opnieuw online zetten, met dit bericht">@knop</button>
+            <a class="btn secondary" href="~/" target="_blank" rel="noopener">Bekijk de spelerspagina</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="~/js/stand.js" asp-append-version="true"></script>
+}

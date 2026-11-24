@@ -1,0 +1,27 @@
+@inject InstellingenOphalenHandler Ophalen
+@{
+    var instellingen = (await Ophalen.HandleAsync(new InstellingenOphalen())).Value;
+}
+<!doctype html>
+<html lang="nl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>@ViewData["Title"] · @instellingen.Club</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
+    @* The standings' colours are Dad's to change (Instellingen); only #rrggbb values get this far. *@
+    <style>
+        :root { --c-first: @instellingen.Kleuren.Eerste; --c-second: @instellingen.Kleuren.Tweede; --c-third: @instellingen.Kleuren.Derde; --c-absent: @instellingen.Kleuren.Afwezig; }
+    </style>
+</head>
+<body class="spelers">
+    <header class="p-head">
+        <div class="wrap"><span aria-hidden="true">♣</span> @instellingen.Club @ViewData["Jaar"]</div>
+    </header>
+    <main class="wrap p-body">
+        @RenderBody()
+        <p class="beheer-link"><a href="~/beheer">Beheer</a></p>
+    </main>
+</body>
+</html>

@@ -61,7 +61,7 @@
                                     <input type="hidden" name="Formulier.InStand" value="@(s.InStand ? "true" : "false")">
                                 }
                                 <button type="submit" class="btn small">Opslaan</button>
-                                <a class="btn secondary small" asp-page="/Spelers">Annuleren</a>
+                                <a class="btn secondary small" asp-page="/Beheer/Spelers">Annuleren</a>
                             </form>
                         </td>
                     </tr>
@@ -76,7 +76,7 @@
                             @if (s.DoetMee) { <text>Doet mee</text> } else { <span class="muted">Gestopt</span> }
                             @if (s.IsLid && !s.InStand) { <br><span class="muted" style="font-size:1rem">uit de stand</span> }
                         </td>
-                        <td class="knop"><a class="btn secondary small" asp-page="/Spelers" asp-route-bewerk="@s.Id">Wijzigen</a></td>
+                        <td class="knop"><a class="btn secondary small" asp-page="/Beheer/Spelers" asp-route-bewerk="@s.Id">Wijzigen</a></td>
                     </tr>
                 }
             }

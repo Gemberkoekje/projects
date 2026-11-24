@@ -1,6 +1,6 @@
 using Qowaiv.Diagnostics.Contracts;
 
-namespace Klaverjas.WebApp.Pages;
+namespace Klaverjas.WebApp.Pages.Beheer;
 
 /// <summary>
 /// Uitslag invullen (D1): per player the card total and the pits, with a status. A half-typed
@@ -46,13 +46,13 @@ public sealed class UitslagModel(
     {
         if (Datum == default)
         {
-            return RedirectToPage("/Index");
+            return RedirectToPage("/Beheer/Index");
         }
 
         var formulier = await ophalen.HandleAsync(new UitslagOphalen { Datum = Datum }, cancellationToken);
         if (!formulier.IsValid)
         {
-            return RedirectToPage("/Index");
+            return RedirectToPage("/Beheer/Index");
         }
 
         Formulier = formulier.Value;
@@ -69,7 +69,7 @@ public sealed class UitslagModel(
 
         if (result.IsValid)
         {
-            return RedirectToPage("/Stand", new { opgeslagen = Weergave.Iso(Datum) });
+            return RedirectToPage("/Beheer/Stand", new { opgeslagen = Weergave.Iso(Datum) });
         }
 
         Meldingen = [.. result.Messages.Select(m => m.Message ?? string.Empty)];
@@ -119,7 +119,7 @@ public sealed class UitslagModel(
         var basis = await ophalen.HandleAsync(new UitslagOphalen { Datum = Datum }, cancellationToken);
         if (!basis.IsValid)
         {
-            return RedirectToPage("/Index");
+            return RedirectToPage("/Beheer/Index");
         }
 
         var perId = (await spelersOphalen.HandleAsync(new SpelersOphalen(), cancellationToken)).Value.ToDictionary(s => s.Id);

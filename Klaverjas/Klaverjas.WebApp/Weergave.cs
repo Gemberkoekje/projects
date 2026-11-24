@@ -34,6 +34,11 @@ public static class Weergave
     public static string Tijd(DateTime utc)
         => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Kalender.Zone).ToString("HH:mm", Nl);
 
+    /// <summary>"maandag 16 november 2026 om 22:14": a day and time on Amsterdam's clock.</summary>
+    /// <param name="utc">The instant (UTC).</param>
+    /// <returns>The moment in a sentence.</returns>
+    public static string Moment(DateTime utc) => $"{InZin(Kalender.Datum(utc))} om {Tijd(utc)}";
+
     /// <summary>"November".</summary>
     /// <param name="datum">A date in the month.</param>
     /// <returns>The month's name, capitalised.</returns>

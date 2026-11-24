@@ -36,7 +36,7 @@
             <td class="hint"></td>
             @if (!lid)
             {
-                <td><button type="submit" class="btn danger small" formaction="@Url.Page("/Uitslag", "Weghalen")" name="weghalen" value="@regel.Speler.Id">Weghalen</button></td>
+                <td><button type="submit" class="btn danger small" formaction="@Url.Page("/Beheer/Uitslag", "Weghalen")" name="weghalen" value="@regel.Speler.Id">Weghalen</button></td>
             }
         </tr>
     }
@@ -59,7 +59,7 @@
 }
 
 @* An explicit action: after "Invaller toevoegen" the address ends in ?handler=Invaller, and Opslaan must not post there. *@
-<form method="post" asp-page="/Uitslag" id="uitslag" data-afwezig="@f.PuntenAfwezig">
+<form method="post" asp-page="/Beheer/Uitslag" id="uitslag" data-afwezig="@f.PuntenAfwezig">
     <input type="hidden" name="Datum" value="@Weergave.Iso(f.Datum)">
     <div class="card">
         <p style="margin-bottom:.4rem">Typ per speler het <b>totaal</b> en de <b>pitten</b> van het puntenkaartje.
@@ -123,7 +123,7 @@
                 <span><b>@gespeeld</b> gespeeld</span><span><b>@slapers</b> slapers</span><span><b>@afwezig</b> afwezig</span>
             </div>
             <div class="actions">
-                <a class="btn secondary" asp-page="/Index">Annuleren</a>
+                <a class="btn secondary" asp-page="/Beheer/Index">Annuleren</a>
                 <button type="submit" class="btn big" id="opslaan">Opslaan en stand bekijken</button>
             </div>
         </div>

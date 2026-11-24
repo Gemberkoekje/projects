@@ -1,11 +1,11 @@
 @page
-@model Klaverjas.WebApp.Pages.Afdrukken.KaartjesModel
+@model Klaverjas.WebApp.Pages.Beheer.Afdrukken.KaartjesModel
 @{
     Layout = "_Afdruk";
     var k = Model.Kaartjes;
     ViewData["Title"] = "Kaartjes " + Weergave.InZin(k.Datum);
     ViewData["Soort"] = "kaartjes";
-    ViewData["Terug"] = Url.Page("/Voorbereiden", new { datum = Weergave.Iso(k.Datum) });
+    ViewData["Terug"] = Url.Page("/Beheer/Voorbereiden", new { datum = Weergave.Iso(k.Datum) });
     var open = k.OpenSlapers == 1 ? "is nog 1 slaper" : $"zijn nog {k.OpenSlapers} slapers";
     ViewData["Uitleg"] = $"{k.Lijst.Count} kaartjes op {Model.Vellen.Count} A4. Print op A4, staand, zonder marges."
         + (k.OpenSlapers > 0 ? $" Let op: er {open} niet gekozen." : string.Empty);

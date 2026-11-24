@@ -1,8 +1,17 @@
+using Klaverjas.application.Online;
+
 namespace Klaverjas.application.Queries;
 
-/// <summary>Lists the season's evenings, newest first, with the evenings without play among them.</summary>
-public sealed class AvondenOphalenHandler(IAvondStore avonden, IInstellingenStore instellingen, IVoorbereidingStore voorbereidingen)
+/// <summary>Lists the season's evenings, newest first, with the evenings without play among them, and what is online.</summary>
+public sealed class AvondenOphalenHandler(
+    IAvondStore avonden,
+    IInstellingenStore instellingen,
+    IVoorbereidingStore voorbereidingen,
+    ISpelerStore spelers,
+    IOnlineStandStore online)
 {
+    private readonly ISpelerStore spelers = spelers ?? throw new ArgumentNullException(nameof(spelers));
+    private readonly IOnlineStandStore online = online ?? throw new ArgumentNullException(nameof(online));
     private readonly IVoorbereidingStore voorbereidingen = voorbereidingen ?? throw new ArgumentNullException(nameof(voorbereidingen));
     private readonly IAvondStore avonden = avonden ?? throw new ArgumentNullException(nameof(avonden));
     private readonly IInstellingenStore instellingen = instellingen ?? throw new ArgumentNullException(nameof(instellingen));
@@ -40,11 +49,17 @@ public sealed class AvondenOphalenHandler(IAvondStore avonden, IInstellingenStor
             .Where(g => g.Datum.Year == jaar && g.Datum < volgende)
             .Select(g => new AvondRegel { Datum = g.Datum, GeenSpeelavond = g.Reden });
 
+        var nuOnline = await online.LadenAsync(cancellationToken);
+        var gewijzigd = !nuOnline.IsLeeg && HuidigeStand.IsGewijzigd(nuOnline, HuidigeStand.Bereken(await spelers.AllesAsync(cancellationToken), alle, instelling));
+
         return Result.For(new AvondenOverzicht
         {
             VolgendeAvond = volgende,
             VolgendeVoorbereid = (await voorbereidingen.LadenAsync(volgende, cancellationToken)).IsValid,
             Regels = [.. gespeeld.Concat(vrij).OrderByDescending(r => r.Datum)],
+            OnlineTot = nuOnline.Stand.LaatsteAvond,
+            OnlineSinds = nuOnline.OnlineSinds,
+            OnlineGewijzigd = gewijzigd,
         });
     }
 }

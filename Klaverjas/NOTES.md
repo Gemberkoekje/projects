@@ -2,7 +2,9 @@
 
 _To understand the code, start with `Klaverjas.core/Standen/StandBerekening.cs` (every scoring rule
 in one pure function), then `Klaverjas.application/Commands/UitslagOpslaanHandler.cs` (what Dad types)
-and `Klaverjas.WebApp/Pages/Uitslag.cshtml` (where he types it). The why is in [PLAN.md](PLAN.md)._
+and `Klaverjas.WebApp/Pages/Beheer/Uitslag.cshtml` (where he types it). For who may see what, read
+`Klaverjas.WebApp/Toegang.cs`. The why is in [PLAN.md](PLAN.md). (Slices 1–3 below name the admin pages
+by their old root paths; since slice 4 they live under `Pages/Beheer` and `/beheer/...`.)_
 
 ## Slice 1: the core app (2026-11-23)
 
@@ -230,3 +232,100 @@ never draws numbers (R12).
 
 **Next: slice 4**, the players' page at klaverjas.gemberkoekje.nl with the players' password, the
 handout slips, "Zet de stand online" and the /beheer split.
+
+## Slice 4: the players' page, online and two passwords (2026-11-23)
+
+The standings are online for the players, behind the club's password, the moment Dad presses "Zet de
+stand online". His own screens moved to /beheer. Built from the approved mock.
+
+**What is there**
+
+- **The players' page** (`/`): "Stand na week N", the date, Dad's note, "Winnaars van de avond", then
+  on a phone the points and pits rankings with only the latest week (`#`, Naam, Totaal, wk N), and
+  on a computer (60rem and wider) the whole month as on Dad's sheet. "Online gezet op …" and a small
+  "Beheer" link at the bottom. Before anything is online it says so.
+- **The players' sign-in** (`/aanmelden`): the mock's "De stand bekijken" screen. While no players'
+  password is set it says the page is not open yet.
+- **Dad's screens under /beheer** (`/beheer`, `/beheer/stand`, …) with his own sign-in at
+  `/beheer/aanmelden`. A player who follows the "Beheer" link is sent there too.
+- **Stand → "Online zetten"**: the note ("Bericht erbij"), and one button that reads "Zet de stand
+  online", then "Staat online ✓" (resting), or "Verbeterde stand online zetten" with a warning banner
+  once anything the players would see has changed. Editing the note wakes the resting button.
+  "Bekijk de spelerspagina" opens `/` in a new tab.
+- **Avonden** has the mock's Online column: "✓ Online" (with the time on the latest), "Gewijzigd, nog
+  niet opnieuw online", or "Nog niet online".
+- **Instellingen**: "Spelerspagina" with the players' password and "Briefjes printen", and "Uw
+  wachtwoord" (new, twice). **Briefjes** (`/beheer/afdrukken/briefjes`): 10 per A4 portrait, cut lines,
+  club, address, password and "Eén keer intypen, daarna onthoudt uw telefoon of computer het."
+
+**Decisions taken while building**
+
+- **What goes online is a frozen copy** (`OnlineStand` holding a `StandWeergave`): names and numbers
+  only, never email, phone or address (a spec checks it). Dad's own Stand screen draws the same
+  `StandWeergave` live, through the same partial (`_StandTabellen`), so "Zo zien de spelers de stand"
+  is literally what goes online. Whether it changed is a SHA-256 of the copy's JSON against the live
+  one, so new colours do not count as a change and a new name or score does.
+- **One cookie, two roles.** Dad's role opens everything, the players' page included. The cookie's key
+  is derived from the password it was opened with, checked on every request, so a password change
+  signs the other phones or computers out; Dad's own computer is signed in again on the spot when he
+  changes his password.
+- **The players' password ignores capitals and spaces at the ends**: phones capitalise the first
+  letter and older players do not notice. It is kept readable (Dad prints it on the slips); Dad's
+  own password is a salted PBKDF2-SHA256 hash (600,000 rounds).
+- **The players' password never opens /beheer**, even if someone once made them equal; saving
+  refuses to make them equal in the first place (both ways).
+- **`Auth:Password` stays valid** after Dad chooses his own: it is the site keeper's way back in
+  ("Wachtwoord vergeten? Bel de beheerder van de site").
+- **No confirm dialog** before going online (the mock had one): Dad has just checked the standings
+  above the button, and a mistake is fixed by correcting and pressing again. Fewer clicks for him.
+- **Sign-in posts are rate limited per address**, opening the form is not: Dad's form 10 posts per
+  5 minutes, the players' 40, since a whole club evening may sign in over one wifi.
+- **Addresses are lower case** (`LowercaseUrls`), so links read `/beheer/stand` like what Dad types.
+- The slips and the online texts take the address from the request, so they follow whatever web
+  address the site gets (Q2).
+- The month columns now also include an evening entered on another weekday, so the latest evening
+  always has its column (the phone's "wk N").
+
+**Checked**
+
+- 229 specs (42 new): password hashing; the players' password rules; the cookie keys changing with
+  each password and only that door's; the copy online (refused before the first evening, the note,
+  the time, too long a note); "Verbeterde stand" after a correction and not after new colours; the
+  players seeing the copy, not the correction; the Avonden column; `StandWeergave` columns, cells,
+  substitutes, winners and that no personal details go online.
+- Against the running app with invented players: every redirect (`/` → `/aanmelden`, `/beheer/…` →
+  `/beheer/aanmelden` with the way back); a player's password with a capital and spaces signs in; a
+  player gets nowhere in /beheer; the players' password at /beheer is refused with its own message;
+  an outside return address is ignored; changing the players' password signed the player out and
+  kept Dad in; Dad choosing his own password kept his computer in and signed a second computer out,
+  and both his own and the configured password sign in afterwards; the rate limit answered 429.
+- In the browser: Dad's Stand with the note and "Zet de stand online" → banner and "Staat online ✓";
+  a correction → warning banner and "Verbeterde stand online zetten" while the players still saw the
+  old total; after pressing, the new total. The players' page at phone width (375px, no sideways
+  scroll; matches the mock) and computer width (the month tables); the sign-in on a phone; the
+  Instellingen cards; the slips (10 on one A4, the real address `klaverjas.gemberkoekje.nl` on one
+  line); every admin page and print page answering 200 with no link left to an old path.
+
+**Gotchas**
+
+- In a Razor *page* the request is `HttpContext`, not `Context` (that is the MVC view property).
+- `dotnet run --environment Development` does not set the environment: `dotnet run` takes
+  `--environment` for itself. Use the launch profile.
+- NUnit shares one fixture instance across its tests: stores built in field initialisers leak.
+- Bash heredocs choked on some of the C# in this slice; scripts went into files instead.
+
+**Files**
+
+| Where | What |
+|---|---|
+| `Klaverjas.core/Standen/StandWeergave.cs` | the standings as the players see them (+ `Kolom`, `WeergaveRegel`, `WeergaveCel`, `WeergaveWinnaar`) |
+| `Klaverjas.core/Models/OnlineStand.cs`, `Wachtwoord.cs` | the copy online; Dad's password hash and the players' comparison form |
+| `Klaverjas.core/Models/Instellingen.cs` | `Spelerswachtwoord`, `BeheerWachtwoord` |
+| `Klaverjas.application` | `StandOnlineZetten`, `OnlineStandOphalen`, `IOnlineStandStore`, `Online/HuidigeStand` (live copy + fingerprint); `StandOphalen` and `AvondenOphalen` compare with what is online; `InstellingenOpslaan` takes the passwords |
+| `Klaverjas.infrastructure/Adapters/Application/MartenOnlineStandStore.cs` | the copy online |
+| `Klaverjas.WebApp/Toegang.cs` | roles, keys, sign-in, the cookie check, the right sign-in page |
+| `Klaverjas.WebApp/Pages` | `Index` + `Aanmelden` (players), `Shared/_Spelers` (their layout), `Shared/_StandTabellen`; `Beheer/*` (all of Dad's pages, moved), `Beheer/Aanmelden`, `Beheer/Afdrukken/Briefjes` |
+| `Klaverjas.WebApp/wwwroot` | players' page and online styles in `site.css`, slips in `afdruk.css`, `js/stand.js` |
+
+**Next: slice 5**, email and the PDF as an optional extra (D2), then slice 6 (gembernodes: the
+players' page replaces the static mock at klaverjas.gemberkoekje.nl).

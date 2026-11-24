@@ -1,17 +1,21 @@
+using Microsoft.Extensions.Configuration;
 using Qowaiv.Diagnostics.Contracts;
 
-namespace Klaverjas.WebApp.Pages;
+namespace Klaverjas.WebApp.Pages.Beheer;
 
 /// <summary>
 /// Instellingen (D10): the club name, the absence score, the play day, the season and its evenings
-/// without play, and the colours. Mail, the players' page and the passwords come with their slices.
+/// without play, the colours, the players' password with its slips, and Dad's own password (D7).
+/// Mail comes with its slice.
 /// </summary>
 public sealed class InstellingenModel(
+    IConfiguration configuration,
     InstellingenOphalenHandler ophalen,
     InstellingenOpslaanHandler opslaan,
     GeenSpeelavondToevoegenHandler vrijToevoegen,
     GeenSpeelavondWeghalenHandler vrijWeghalen) : PageModel
 {
+    private readonly IConfiguration configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     private readonly InstellingenOphalenHandler ophalen = ophalen ?? throw new ArgumentNullException(nameof(ophalen));
     private readonly InstellingenOpslaanHandler opslaan = opslaan ?? throw new ArgumentNullException(nameof(opslaan));
     private readonly GeenSpeelavondToevoegenHandler vrijToevoegen = vrijToevoegen ?? throw new ArgumentNullException(nameof(vrijToevoegen));
@@ -57,6 +61,7 @@ public sealed class InstellingenModel(
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         var f = Formulier;
+        var oudSpelerswachtwoord = (await ophalen.HandleAsync(new InstellingenOphalen(), cancellationToken)).Value.Spelerswachtwoord;
         var result = await opslaan.HandleAsync(
             new InstellingenOpslaan
             {
@@ -65,10 +70,33 @@ public sealed class InstellingenModel(
                 Speeldag = f.Speeldag,
                 EersteAvond = f.EersteAvond,
                 Kleuren = new Kleuren { Eerste = f.KleurEerste, Tweede = f.KleurTweede, Derde = f.KleurDerde, Afwezig = f.KleurAfwezig },
+                Spelerswachtwoord = f.Spelerswachtwoord,
+                NieuwWachtwoord = f.NieuwWachtwoord,
+                NieuwWachtwoordHerhaald = f.NieuwWachtwoordHerhaald,
             },
             cancellationToken);
 
-        return await AfrondenAsync(result, "Opgeslagen. De stand rekent vanaf nu met deze instellingen.", cancellationToken);
+        var bevestiging = "Opgeslagen. De stand rekent vanaf nu met deze instellingen.";
+
+        if (result.IsValid)
+        {
+            var nieuw = (await ophalen.HandleAsync(new InstellingenOphalen(), cancellationToken)).Value;
+
+            if (nieuw.Spelerswachtwoord != oudSpelerswachtwoord && nieuw.SpelerspaginaOpen)
+            {
+                bevestiging += " Het nieuwe wachtwoord voor de spelers geldt vanaf nu: print nieuwe briefjes.";
+            }
+
+            // The new password changes the key of Dad's cookie: sign in again here, so only his
+            // other computers ask for it.
+            if (!string.IsNullOrEmpty(f.NieuwWachtwoord))
+            {
+                await Toegang.AanmeldenAsync(HttpContext, Toegang.Beheer, Toegang.Sleutel(Toegang.Beheer, nieuw, Toegang.ConfigWachtwoord(configuration)));
+                bevestiging += " Uw nieuwe wachtwoord geldt vanaf nu; op een andere computer moet u het één keer intypen.";
+            }
+        }
+
+        return await AfrondenAsync(result, bevestiging, cancellationToken);
     }
 
     /// <summary>"Toevoegen" under "Geen klaverjassen op".</summary>
@@ -139,4 +167,13 @@ public sealed class InstellingenFormulier
 
     /// <summary>Absent.</summary>
     public string KleurAfwezig { get; set; } = string.Empty;
+
+    /// <summary>The players' password.</summary>
+    public string Spelerswachtwoord { get; set; } = string.Empty;
+
+    /// <summary>Dad's new password; empty keeps the current one.</summary>
+    public string NieuwWachtwoord { get; set; } = string.Empty;
+
+    /// <summary>Dad's new password, a second time.</summary>
+    public string NieuwWachtwoordHerhaald { get; set; } = string.Empty;
 }

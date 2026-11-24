@@ -1,26 +1,17 @@
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Configuration;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace Klaverjas.WebApp.Pages;
 
 /// <summary>
-/// Dad's password (D7). Typed once per computer; the cookie then lasts a year and slides, so the
-/// Monday-evening visit never asks again.
+/// The players' password (D5, D7): typed once from the slip, then the phone or computer stays signed
+/// in for a year. Capitals and spaces at the ends do not matter.
 /// </summary>
 [AllowAnonymous]
-[EnableRateLimiting(RateLimitPolicy)]
-public sealed class AanmeldenModel(IConfiguration configuration, ILogger<AanmeldenModel> logger) : PageModel
+[EnableRateLimiting(Toegang.RateLimitSpelers)]
+public sealed class AanmeldenModel(InstellingenOphalenHandler instellingenOphalen, ILogger<AanmeldenModel> logger) : PageModel
 {
-    /// <summary>The rate-limit policy on this page.</summary>
-    internal const string RateLimitPolicy = "aanmelden";
-
-    /// <summary>How long a sign-in lasts without use.</summary>
-    internal static TimeSpan Geldigheid { get; } = TimeSpan.FromDays(365);
+    private readonly InstellingenOphalenHandler instellingenOphalen = instellingenOphalen ?? throw new ArgumentNullException(nameof(instellingenOphalen));
+    private readonly ILogger<AanmeldenModel> logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>The password as typed.</summary>
     [BindProperty]
@@ -29,59 +20,46 @@ public sealed class AanmeldenModel(IConfiguration configuration, ILogger<Aanmeld
     /// <summary>Why the last attempt failed, if it did.</summary>
     public string Fout { get; private set; } = string.Empty;
 
+    /// <summary>The settings: the club's name, and whether the page is open yet.</summary>
+    public Instellingen Instellingen { get; private set; } = new Instellingen();
+
     /// <summary>Shows the form, or skips it when already signed in.</summary>
-    /// <returns>The page, or the Avonden screen.</returns>
-    public IActionResult OnGet()
-        => User.Identity is { IsAuthenticated: true } ? LocalRedirect("~/") : Page();
+    /// <param name="cancellationToken">Cancels the load.</param>
+    /// <returns>The page, or the standings.</returns>
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
+    {
+        if (User.Identity is { IsAuthenticated: true })
+        {
+            return LocalRedirect("~/");
+        }
+
+        Instellingen = (await instellingenOphalen.HandleAsync(new InstellingenOphalen(), cancellationToken)).Value;
+        return Page();
+    }
 
     /// <summary>Checks the password and signs in.</summary>
     /// <param name="returnUrl">Where to go afterwards; only local addresses are honoured.</param>
-    /// <returns>The return address, or the form with an error.</returns>
-    public async Task<IActionResult> OnPostAsync(string returnUrl = "~/")
+    /// <param name="cancellationToken">Cancels the work.</param>
+    /// <returns>The standings, or the form with an error.</returns>
+    public async Task<IActionResult> OnPostAsync(string returnUrl, CancellationToken cancellationToken)
     {
-        var verwacht = configuration["Auth:Password"];
+        Instellingen = (await instellingenOphalen.HandleAsync(new InstellingenOphalen(), cancellationToken)).Value;
 
-        if (string.IsNullOrWhiteSpace(verwacht))
+        if (!Instellingen.SpelerspaginaOpen)
         {
-            throw new InvalidOperationException("Auth:Password is not set.");
-        }
-
-        if (!Klopt(Wachtwoord, verwacht))
-        {
-            logger.LogWarning("Aanmelden mislukt vanaf {Adres}.", HttpContext.Connection.RemoteIpAddress);
-            Fout = "Dat wachtwoord klopt niet. Let op hoofdletters.";
             return Page();
         }
 
-        var identiteit = new ClaimsIdentity([new Claim(ClaimTypes.Name, "beheer")], CookieAuthenticationDefaults.AuthenticationScheme);
+        if (!Toegang.KloptSpelers(Wachtwoord, Instellingen))
+        {
+            logger.LogWarning("Aanmelden voor de stand mislukt vanaf {Adres}.", HttpContext.Connection.RemoteIpAddress);
+            Fout = "Dat wachtwoord klopt niet. Kijk nog eens op het briefje.";
+            return Page();
+        }
 
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            new ClaimsPrincipal(identiteit),
-            new AuthenticationProperties { IsPersistent = true, AllowRefresh = true });
+        await Toegang.AanmeldenAsync(HttpContext, Toegang.Speler, Toegang.Sleutel(Toegang.Speler, Instellingen, string.Empty));
 
-        logger.LogInformation("Aangemeld vanaf {Adres}.", HttpContext.Connection.RemoteIpAddress);
-        return LocalRedirect(Url.IsLocalUrl(returnUrl) ? returnUrl : "~/");
-    }
-
-    /// <summary>Signs out on this computer.</summary>
-    /// <returns>The sign-in form.</returns>
-    public async Task<IActionResult> OnPostAfmeldenAsync()
-    {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        return RedirectToPage();
-    }
-
-    /// <summary>Compares two passwords in constant time.</summary>
-    /// <param name="gegeven">What was typed.</param>
-    /// <param name="verwacht">The configured password.</param>
-    /// <returns><see langword="true"/> when they are equal.</returns>
-    internal static bool Klopt(string gegeven, string verwacht)
-    {
-        // Hashing first makes both sides the same length, so the comparison time says nothing
-        // about the length of the real password either.
-        var links = SHA256.HashData(Encoding.UTF8.GetBytes(gegeven ?? string.Empty));
-        var rechts = SHA256.HashData(Encoding.UTF8.GetBytes(verwacht ?? string.Empty));
-        return CryptographicOperations.FixedTimeEquals(links, rechts);
+        logger.LogInformation("Speler aangemeld vanaf {Adres}.", HttpContext.Connection.RemoteIpAddress);
+        return LocalRedirect(!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "~/");
     }
 }

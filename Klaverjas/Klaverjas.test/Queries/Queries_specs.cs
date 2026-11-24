@@ -50,7 +50,7 @@ public sealed class Queries_specs
     {
         var instellingen = new InMemoryInstellingenStore(Standaard with { GeenSpeelavonden = [new GeenSpeelavond { Datum = Wk46, Reden = "Feest" }] });
         var avonden = new InMemoryAvondStore(Avond(Wk45, Speelt(annie, 4000), Slaper(kees, 4500, 1)), Avond(Wk47, Speelt(annie, 4000), Afwezig(kees)));
-        var handler = new AvondenOphalenHandler(avonden, instellingen, new InMemoryVoorbereidingStore());
+        var handler = new AvondenOphalenHandler(avonden, instellingen, new InMemoryVoorbereidingStore(), new InMemorySpelerStore(annie, kees), new InMemoryOnlineStandStore());
 
         var overzicht = (await handler.HandleAsync(new AvondenOphalen())).Value;
 

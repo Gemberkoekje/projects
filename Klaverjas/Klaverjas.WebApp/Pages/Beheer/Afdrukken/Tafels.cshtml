@@ -1,5 +1,5 @@
 @page
-@model Klaverjas.WebApp.Pages.Afdrukken.TafelsModel
+@model Klaverjas.WebApp.Pages.Beheer.Afdrukken.TafelsModel
 @using Klaverjas.core.Tafels
 @{
     Layout = "_Afdruk";
@@ -9,7 +9,7 @@
     var vellen = bladen.Chunk(2).ToList();
     ViewData["Title"] = Model.Alle ? "Alle tafelindelingen" : $"Tafelindeling {eerste.Aantal} spelers";
     ViewData["Soort"] = "tafels";
-    ViewData["Terug"] = metDatum ? Url.Page("/Voorbereiden", new { datum = Weergave.Iso(Model.Datum), aantal = eerste.Aantal }) : Url.Page("/Index");
+    ViewData["Terug"] = metDatum ? Url.Page("/Beheer/Voorbereiden", new { datum = Weergave.Iso(Model.Datum), aantal = eerste.Aantal }) : Url.Page("/Beheer/Index");
     ViewData["Uitleg"] = Model.Alle
         ? $"Een overzicht voor elk aantal spelers: {Model.Schemas.Count} A4, staand."
         : $"Eerst het overzicht (1 A4, staand), dan {bladen.Count} tafelbriefjes op {vellen.Count} A4 (liggend): doormidden knippen tot A5.";
