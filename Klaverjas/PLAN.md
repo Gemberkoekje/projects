@@ -314,7 +314,7 @@ Follow-ups, relayed by you the same day:
 - **Uitslag invullen:** status (slapers pre-set), points and pits per player, the substitutes, and
   the counts with "Opslaan en stand bekijken".
 - **Stand online:** the standings as players will see them, the note, "Zet de stand online",
-  optionally "Ook e-mailen", and the PDF.
+  "Stand printen" (the PDF, whether or not mail is on), and optionally "Ook e-mailen".
 - **Spelers:** members and substitutes, with more details under "Wijzigen", and "Ledenlijst printen".
   Adding a member mid-season says how many evenings get 4200 (R17).
 - **Instellingen:** every setting from D10, and "Briefjes printen" for the players' slips (D5).

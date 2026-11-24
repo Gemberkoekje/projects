@@ -29,7 +29,7 @@
 
 @if (Model.NetOnline)
 {
-    <div class="banner ok big"><p>✓ De stand staat online. De spelers zien hem nu op @adres.</p></div>
+    <div class="banner ok big"><p>✓ De stand staat online. De spelers zien hem nu op @adres.<br><span style="font-weight:400">Ook printen? Dat kan onderaan, bij <a href="#printen">Stand printen</a>.</span></p></div>
 }
 else if (o.IsGewijzigd)
 {
@@ -88,6 +88,25 @@ else if (o.StaatOnline)
     </form>
 </div>
 
+<div class="card" id="printen">
+    <h2>Stand printen</h2>
+    @if (o.Online.IsLeeg)
+    {
+        <p class="help">Zet de stand eerst online; daarna kunt u hem hier printen.</p>
+    }
+    else if (o.IsGewijzigd)
+    {
+        <p class="help status-warn">Zet eerst de verbeterde stand online; die komt dan op het blad.</p>
+    }
+    else
+    {
+        <p>Het blad van week @Kalender.Week(o.Online.Stand.LaatsteAvond) met de punten en de pitten naast elkaar, op één A4 (liggend). Het opent in een nieuw venster: klik daar rechtsboven op het printertje, of druk op <b>Ctrl+P</b>.</p>
+        <div class="actions">
+            <a class="btn big" asp-page="/Beheer/Stand" asp-page-handler="Pdf" target="_blank" rel="noopener">🖨 Stand printen</a>
+        </div>
+    }
+</div>
+
 <div class="card" id="mail">
     <h2>Ook e-mailen</h2>
     <p>Wie wil, krijgt de stand ook per e-mail, met de PDF erbij. Het hoeft niet: de stand staat al online.</p>
@@ -116,7 +135,7 @@ else if (o.StaatOnline)
         <p>De e-mail gaat naar <b>@m.Ontvangers @(m.Ontvangers == 1 ? "lid" : "leden")</b> (ieder een eigen e-mail), met de stand van week @Kalender.Week(o.Online.Stand.LaatsteAvond).
             @if (m.ZonderEmail.Count > 0)
             {
-                <text>@(m.ZonderEmail.Count == 1 ? "Deze speler heeft" : "Deze spelers hebben") geen e-mailadres: <b>@string.Join(", ", m.ZonderEmail)</b>. Print de PDF voor @(m.ZonderEmail.Count == 1 ? "die speler" : "hen").</text>
+                <text>@(m.ZonderEmail.Count == 1 ? "Deze speler heeft" : "Deze spelers hebben") geen e-mailadres: <b>@string.Join(", ", m.ZonderEmail)</b>. Print de stand voor @(m.ZonderEmail.Count == 1 ? "die speler" : "hen") (bij <a href="#printen">Stand printen</a>).</text>
             }
         </p>
         @if (!Emailadres.IsGeldig(m.Antwoordadres))

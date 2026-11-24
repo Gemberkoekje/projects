@@ -2,8 +2,9 @@ namespace Klaverjas.WebApp.Pages.Beheer;
 
 /// <summary>
 /// The standings after the latest evening, exactly as the players will see them, and "Zet de stand
-/// online" (D2). After a correction the button reads "Verbeterde stand online zetten". Below it the
-/// optional extra: "Ook e-mailen" with the PDF, after a test mail if Dad likes.
+/// online" (D2). After a correction the button reads "Verbeterde stand online zetten". Then "Stand
+/// printen" (the PDF of the standings online, whether or not mail is on), and the optional extra:
+/// "Ook e-mailen" with the PDF, after a test mail if Dad likes.
 /// </summary>
 public sealed class StandModel(
     StandOphalenHandler standOphalen,
@@ -95,7 +96,7 @@ public sealed class StandModel(
     public Task<IActionResult> OnPostProefAsync(CancellationToken cancellationToken)
         => MailenAsync(proef: true, cancellationToken);
 
-    /// <summary>"PDF bekijken": the PDF of the standings online, opened in the browser.</summary>
+    /// <summary>"Stand printen" (and "PDF bekijken" by the mail): the PDF of the standings online, opened in the browser to print.</summary>
     /// <param name="cancellationToken">Cancels the work.</param>
     /// <returns>The PDF, or this page when nothing is online.</returns>
     public async Task<IActionResult> OnGetPdfAsync(CancellationToken cancellationToken)
@@ -141,7 +142,7 @@ public sealed class StandModel(
         }
 
         var namen = string.Join(", ", mislukt.Select(o => o.Naam));
-        return $"{verzending.Gelukt} van de {verzending.Ontvangers.Count} e-mails zijn verstuurd. Niet gelukt bij: {namen}. Kijk of hun e-mailadres klopt (bij Spelers) of print de PDF voor hen.";
+        return $"{verzending.Gelukt} van de {verzending.Ontvangers.Count} e-mails zijn verstuurd. Niet gelukt bij: {namen}. Kijk of hun e-mailadres klopt (bij Spelers) of print de stand voor hen (bij Stand printen).";
     }
 
     private async Task<IActionResult> FoutAsync(IEnumerable<IValidationMessage> meldingen, bool mail, CancellationToken cancellationToken)
