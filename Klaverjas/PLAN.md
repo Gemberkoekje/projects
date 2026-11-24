@@ -10,7 +10,8 @@ standings, reading Dad's "Standen" workbook (every points total matches it), dow
 preparing an evening (cards, slapers, table plan and score sheets), the players' page with "Zet de
 stand online", the slips and both passwords (Dad's admin now lives at /beheer), and the optional email
 with the PDF. What they do, the decisions taken while building and the gotchas are in
-[NOTES.md](NOTES.md); next is slice 6 (putting it live on gembernodes). Before that: the plan
+[NOTES.md](NOTES.md); slice 6 (putting it live on gembernodes) is ready to deploy, see
+[DEPLOY.md](DEPLOY.md). Before that: the plan
 and the mock, which **Dad approved** (2026-11-23), and his answers to the question sheet
 [vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) (see "Dad's answers" below), which changed
 the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12) and added R16–R19.
@@ -296,7 +297,9 @@ Follow-ups, relayed by you the same day:
 5. **Email + PDF (optional extra).** One HTML mail per member, the PDF like today's month sheet, the
    test mail, the send log and the list of members without email. Sent from your Gmail through the
    cluster's mail secret (Q1, your answer 2026-11-24). _Built 2026-11-24 (see NOTES.md)._
-6. **gembernodes.** Manifests, 1Password items, `DEPLOY.md` and a live check.
+6. **gembernodes.** Manifests, 1Password items, `DEPLOY.md` and a live check. _Manifests and
+   [DEPLOY.md](DEPLOY.md) written 2026-11-24; live once you've made the database and the item and
+   merged the gembernodes PR._
 7. **Hand-over.** For two Mondays the app runs alongside the workbooks and the results are compared.
    Dad gets a one-page printed guide, and I fix whatever he trips over.
 
