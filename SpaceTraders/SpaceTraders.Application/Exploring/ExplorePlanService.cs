@@ -78,6 +78,15 @@ public interface IExplorePlanService
 ///   back to one they do, and is released there to trade (D102).</item>
 ///   <item>A system only a warp reaches doesn't count towards the explorers wanted (D107).</item>
 /// </list>
+/// Slice 6.81 (D155), asked on 2026-11-24: "If there are no other haulers, SPECTER-1 should prioritize making money before
+/// exploring, up until a proper shuttle or hauler is bought." While <see cref="CommandShipWaitsForCargoShipSetting"/> is on
+/// and the fleet has no cargo ship (<see cref="FleetRoles.IsCargoShip"/>) besides the command ship:
+/// <list type="bullet">
+///   <item>the plan takes no free command ship, which the plans that earn give work instead: the contract, trades;</item>
+///   <item>a command ship that is exploring finishes the step it is on, flies home and is released there (D60);</item>
+///   <item>it buys no explorer, which only the command ship might fetch, and which the cargo ships come before anyway (D113).</item>
+/// </list>
+/// The explorers it has explore on.
 /// What it knows of the gates comes from the API: home's gate, then the connections of each system it explores, and the
 /// gates those lead to. A pass asks for one of those at most, as the reads give way to the moves (D19); a gate still under
 /// construction is looked at again hourly. A system an exploring ship has just jumped into has its waypoints fetched at once.
@@ -120,12 +129,19 @@ public sealed class ExplorePlanService(
     /// <summary>The width of each ring when <see cref="RingWidthSetting"/> gives none (D117: "defaulting to 5").</summary>
     public const int DefaultRingWidth = 5;
 
+    /// <summary>
+    /// The setting for whether the command ship earns before it explores while the fleet has no shuttle or hauler (slice 6.81,
+    /// D155); false lets it explore whenever it is free, as before.
+    /// </summary>
+    public const string CommandShipWaitsForCargoShipSetting = "Explore.CommandShipWaitsForCargoShip";
+
     private const string JumpGateType = "JUMP_GATE";
     private const string Antimatter = "ANTIMATTER";
     private const string WaitingForCredits = "waiting_for_credits";
     private const string NoWayHome = "no_way_home";
     private const string NothingToExplore = "nothing_to_explore";
     private const string Scanning = "scanning";
+    private const string EarningFirst = "earning_first";
     private const int WaypointPageSize = 20;
 
     private static readonly JsonSerializerOptions CompareOptions = new();
@@ -175,9 +191,18 @@ public sealed class ExplorePlanService(
         var explorers = fleet.Where(FleetRoles.IsExplorer).OrderBy(explorer => explorer.Symbol, StringComparer.Ordinal).ToList();
         state = await LearnAsync(state, [ship, .. explorers], [.. explorers.Where(Warps.HasDrive)], now, cancellationToken);
         state = await CountAsync(state, now, cancellationToken);
-        state = state with { Purchase = await BuyAsync(state, fleet, explorers.Count, now, cancellationToken) };
+
+        // Slice 6.81 (D155): with no shuttle or hauler yet, the command ship earns first, and no explorer is bought.
+        var earnsFirst = await EarnsFirstAsync(fleet, cancellationToken);
+        if (earnsFirst != state.CommandShipEarnsFirst)
+        {
+            LogEarnsFirst(ship, earnsFirst);
+            state = state with { CommandShipEarnsFirst = earnsFirst };
+        }
+
+        state = state with { Purchase = earnsFirst ? new ExplorerPurchaseState() : await BuyAsync(state, fleet, explorers.Count, now, cancellationToken) };
         var ringWidth = await RingWidthAsync(cancellationToken);
-        state = await StepAsync(state, ship, explorers.Count > 0 || state.Purchase.Status == ExplorerPurchaseStatus.Bought, ringWidth, now, cancellationToken);
+        state = await StepAsync(state, ship, explorers.Count > 0 || state.Purchase.Status == ExplorerPurchaseStatus.Bought, earnsFirst, ringWidth, now, cancellationToken);
 
         // The explorers the fleet has, each with what the plan does with it; one bought this pass joins on the next.
         state = state with
@@ -600,8 +625,35 @@ public sealed class ExplorePlanService(
         return false;
     }
 
+    /// <summary>
+    /// Whether the command ship earns before it explores (slice 6.81, D155): the fleet has no cargo ship
+    /// (<see cref="FleetRoles.IsCargoShip"/>) besides the command ship, and <see cref="CommandShipWaitsForCargoShipSetting"/> is on.
+    /// </summary>
+    private async Task<bool> EarnsFirstAsync(IReadOnlyList<ShipModel> fleet, CancellationToken ct)
+        => !fleet.Any(ship => FleetRoles.IsCargoShip(ship) && !IsCommandShip(ship))
+            && await settings.GetAsync<bool>(CommandShipWaitsForCargoShipSetting, ct);
+
+    /// <summary>Says in the journal that the command ship now earns before it explores (slice 6.81, D155), or explores again.</summary>
+    private void LogEarnsFirst(ShipModel ship, bool earnsFirst)
+    {
+        if (earnsFirst)
+        {
+            logger.LogInformation(
+                "{EventKind:l}: {Plan} plan waits ({Reason}): the fleet has no shuttle or hauler yet, so command ship {ShipSymbol} earns before it explores, and no explorer is bought (D155).",
+                JournalEvents.PlanBlocked,
+                AutomationPlan.Explore,
+                EarningFirst,
+                ship.Symbol);
+            return;
+        }
+
+        logger.LogInformation(
+            "Explore plan: the fleet has a shuttle or hauler now, so command ship {ShipSymbol} explores again once it is free (D155).",
+            ship.Symbol);
+    }
+
     /// <summary>The command ship's next step, when it is exploring, fetching an explorer, or free (its trip has ended).</summary>
-    private async Task<ExplorePlanState> StepAsync(ExplorePlanState state, ShipModel ship, bool explorersExplore, int ringWidth, DateTimeOffset now, CancellationToken ct)
+    private async Task<ExplorePlanState> StepAsync(ExplorePlanState state, ShipModel ship, bool explorersExplore, bool earnsFirst, int ringWidth, DateTimeOffset now, CancellationToken ct)
     {
         var goal = await goals.GetActiveGoalAsync(ship.Symbol, ct);
         var assignment = await assignments.FindAsync(ship.Symbol, ct);
@@ -633,7 +685,7 @@ public sealed class ExplorePlanService(
                 return state;
             }
 
-            return await DecideAsync(state, ship, assignment, explorersExplore, ringWidth, now, ct);
+            return await DecideAsync(state, ship, assignment, explorersExplore, earnsFirst, ringWidth, now, ct);
         }
 
         if (!FleetRoles.IsFree(ship, goal, hasOpenAssignment: false))
@@ -641,20 +693,22 @@ public sealed class ExplorePlanService(
             return state.Status is ExploreStatus.Done ? state : state with { Status = ExploreStatus.Waiting, TargetSystemSymbol = string.Empty };
         }
 
-        return await DecideAsync(state, ship, assignment: null, explorersExplore, ringWidth, now, ct);
+        return await DecideAsync(state, ship, assignment: null, explorersExplore, earnsFirst, ringWidth, now, ct);
     }
 
     /// <summary>
     /// Chooses the command ship's next step: scout the system it is in, if not explored yet; while an explorer waits for it at
     /// the shipyard, that shipyard (slice 6.30, D98; every explorer since slice 6.32, D108); once an explorer explores, home;
     /// else a jump towards the nearest system not explored yet, or towards home; at home with nothing left, it is released to
-    /// the other plans. A free ship is taken (an <see cref="AssignmentType"/> assignment) only for a step it has to take.
+    /// the other plans. A free ship is taken (an <see cref="AssignmentType"/> assignment) only for a step it has to take. While
+    /// it earns first (slice 6.81, D155), none of that: <see cref="EarnFirstAsync"/>.
     /// </summary>
     private async Task<ExplorePlanState> DecideAsync(
         ExplorePlanState state,
         ShipModel ship,
         ShipAssignmentDto? assignment,
         bool explorersExplore,
+        bool earnsFirst,
         int ringWidth,
         DateTimeOffset now,
         CancellationToken ct)
@@ -668,6 +722,17 @@ public sealed class ExplorePlanService(
         }
 
         state = Ensure(state, here);
+        if (earnsFirst)
+        {
+            // A tour of this system that has ended still counts as explored; no new one starts.
+            if (Find(state, here) is { ExploredAt: null, ScoutingSince: not null })
+            {
+                (_, state) = await ScoutAsync(state, ship, assignment, here, cached, now, ct);
+            }
+
+            return await EarnFirstAsync(state, ship, assignment, now, ct);
+        }
+
         if (Find(state, here)!.ExploredAt is null)
         {
             (var scouting, state) = await ScoutAsync(state, ship, assignment, here, cached, now, ct);
@@ -763,6 +828,51 @@ public sealed class ExplorePlanService(
 
             case ExploreStepKind.NoWayHome:
                 return NoWayHomeFor(state, ship, ship.SystemSymbol ?? string.Empty);
+
+            default:
+                return state;
+        }
+    }
+
+    /// <summary>
+    /// The command ship's step while it earns before it explores (slice 6.81, D155): a free one is left to the plans that earn;
+    /// one the plan still has, its step done, jumps home and is released there (D60), as when the explorers explore
+    /// (<see cref="HomeAsync"/>).
+    /// </summary>
+    private async Task<ExplorePlanState> EarnFirstAsync(ExplorePlanState state, ShipModel ship, ShipAssignmentDto? assignment, DateTimeOffset now, CancellationToken ct)
+    {
+        if (assignment is null)
+        {
+            return state with { Status = ExploreStatus.Waiting, TargetSystemSymbol = string.Empty, Reason = EarningFirst };
+        }
+
+        // The way home starts with the connections of the system it is in: until a pass has looked at them (LearnAsync), it
+        // waits, as ExploreAtlas.Next does, rather than finding no way home.
+        var here = ship.SystemSymbol ?? string.Empty;
+        if (Find(state, here) is { Connections: null })
+        {
+            return state;
+        }
+
+        var step = ExploreAtlas.HomeFrom(state, here, now);
+        switch (step.Kind)
+        {
+            case ExploreStepKind.ReturnHome:
+                return await JumpAsync(ship, assignment, step, state.Reason, ct)
+                    ? state with { Status = ExploreStatus.Returning, TargetSystemSymbol = step.TargetSystemSymbol, Reason = EarningFirst }
+                    : state with { Reason = WaitingForCredits, TargetSystemSymbol = step.TargetSystemSymbol };
+
+            case ExploreStepKind.Home:
+                await assignments.UpsertAsync(assignment with { CompletedAt = now }, ct);
+                logger.LogInformation(
+                    "{EventKind:l}: {Plan} plan for ship {ShipSymbol}: it is home, free to earn until the fleet has a shuttle or hauler (D155).",
+                    JournalEvents.PlanCompleted,
+                    AutomationPlan.Explore,
+                    ship.Symbol);
+                return state with { Status = ExploreStatus.Waiting, TargetSystemSymbol = string.Empty, Reason = EarningFirst };
+
+            case ExploreStepKind.NoWayHome:
+                return NoWayHomeFor(state, ship, here);
 
             default:
                 return state;

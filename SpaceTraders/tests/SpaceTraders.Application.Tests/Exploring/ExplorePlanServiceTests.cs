@@ -272,6 +272,105 @@ public sealed class ExplorePlanServiceTests
         (await GoalAsync()).Should().BeEquivalentTo(new { DestinationGateWaypointSymbol = Kr90Gate, Status = GoalStatus.Blocked, StatusReason = "runaway" });
     }
 
+    [Fact]
+    public async Task WhileTheFleetHasNoShuttleOrHauler_TheCommandShipEarnsFirst_AndExploresOnceOneIsBought()
+    {
+        // Slice 6.81 (D155), asked on 2026-11-24: "If there are no other haulers, SPECTER-1 should prioritize making money
+        // before exploring, up until a proper shuttle or hauler is bought." A probe is no hauler.
+        EarnFirst();
+        await SeedHomeAsync();
+        await AddShipAsync(new ShipModel("SPECTER-2", Home, "X1-DC53-A1", "DOCKED", "CRUISE", 0, 0, ShipType: "SHIP_PROBE", MountSymbols: []));
+
+        await PassesAsync(10);
+
+        (await GoalAsync()).Should().BeNull();
+        (await AssignmentAsync()).Should().BeNull("a free command ship is left to the plans that earn: the contract, trades");
+        (await StateAsync()).Should().BeEquivalentTo(new { Status = ExploreStatus.Waiting, Reason = "earning_first", CommandShipEarnsFirst = true });
+        _log.Journal.Where(line => line.EventKind == JournalEvents.PlanBlocked).Should().ContainSingle()
+            .Which.Message.Should().Contain("earning_first").And.Contain(Ship);
+
+        await AddShipAsync(new ShipModel("SPECTER-3", Home, "X1-DC53-H52", "DOCKED", "CRUISE", 300, 300, CargoCapacity: 40, ShipType: "SHIP_LIGHT_SHUTTLE", MountSymbols: []));
+        await PassAsync();
+
+        (await GoalAsync()).Should().BeEquivalentTo(new { GateWaypointSymbol = HomeGate, DestinationGateWaypointSymbol = Kr90Gate });
+        (await StateAsync()).CommandShipEarnsFirst.Should().BeFalse();
+        _log.Kept.Should().ContainSingle(line => line.Contains("explores again"));
+    }
+
+    [Fact]
+    public async Task ACommandShipOutExploring_WhenItMustEarnFirst_FinishesItsTour_FliesHome_AndIsReleasedThere()
+    {
+        // The deploy of slice 6.81 (D155) on 2026-11-24: SPECTER-1, the only ship with a hold, was out exploring.
+        await SeedHomeAsync();
+        await PassesAsync(10);
+        await JumpAsync(Kr90, Kr90Gate);
+        await PassAsync();
+        (await GoalAsync()).Should().BeOfType<ExploreSystemGoal>();
+
+        EarnFirst();
+        await PassAsync();
+
+        (await GoalAsync()).Should().BeOfType<ExploreSystemGoal>("it finishes the step it is on");
+
+        // Its tour of X1-KR90 done, that system counts as explored; once a pass has looked at its gate's connections, the ship
+        // flies home rather than on to X1-MT49.
+        await ClearGoalAsync();
+        await PassesAsync(3);
+
+        _log.Entries.Should().NotContain(entry => entry.Message.Contains("no_way_home"));
+        var state = await StateAsync();
+        state.Systems.Single(system => system.SystemSymbol == Kr90).ExploredAt.Should().NotBeNull();
+        state.Status.Should().Be(ExploreStatus.Returning);
+        (await GoalAsync()).Should().BeEquivalentTo(new { GateWaypointSymbol = Kr90Gate, DestinationGateWaypointSymbol = HomeGate });
+
+        await JumpAsync(Home, HomeGate);
+        await PassAsync();
+
+        (await GoalAsync()).Should().BeNull();
+        (await AssignmentAsync())!.CompletedAt.Should().NotBeNull();
+        (await StateAsync()).Should().BeEquivalentTo(new { Status = ExploreStatus.Waiting, Reason = "earning_first" });
+        _log.Journal.Should().ContainSingle(line => line.EventKind == JournalEvents.PlanCompleted).Which.Message.Should().Contain("D155");
+
+        await PassesAsync(3);
+        (await GoalAsync()).Should().BeNull("it stays free to earn");
+        (await AssignmentAsync())!.CompletedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task ACommandShipOutExploring_WithNoCreditsForTheJumpHome_WaitsAndSaysWhyOnce()
+    {
+        // As every jump: the antimatter (4,520 at X1-KR90's gate) must leave the 60,000 floor; 64,000 credits would leave 59,480.
+        await SeedHomeAsync();
+        await PassesAsync(10);
+        await JumpAsync(Kr90, Kr90Gate);
+        await PassAsync();
+        await using (var db = TestDbContextFactory.Create(_database))
+        {
+            await new MarketRepository(db).UpsertAsync(new MarketDataModel(
+                Kr90Gate,
+                Kr90,
+                """[{"symbol":"ANTIMATTER","type":"EXCHANGE","purchasePrice":4520,"sellPrice":4300,"tradeVolume":10,"supply":"MODERATE"}]""",
+                "[]",
+                "[]",
+                """[{"symbol":"ANTIMATTER"}]"""));
+        }
+
+        EarnFirst();
+        await CreditsAsync(64_000);
+        await ClearGoalAsync();
+        await PassesAsync(5);
+
+        (await GoalAsync()).Should().BeNull();
+        (await StateAsync()).Reason.Should().Be("waiting_for_credits");
+        _log.Journal.Where(line => line.EventKind == JournalEvents.PlanBlocked && line.Message.Contains("waiting_for_credits")).Should().ContainSingle();
+        _log.Journal.Where(line => line.EventKind == JournalEvents.PlanBlocked && line.Message.Contains("earning_first")).Should().ContainSingle();
+
+        await CreditsAsync(64_520);
+        await PassAsync();
+
+        (await GoalAsync()).Should().BeEquivalentTo(new { GateWaypointSymbol = Kr90Gate, DestinationGateWaypointSymbol = HomeGate });
+    }
+
     private static WaypointDataModel Gate(string symbol, bool built)
         => new(symbol, WaypointSymbols.SystemOf(symbol), "JUMP_GATE", 0, 0, HasMarket: true, HasShipyard: false, TraitsJson: """[{"symbol":"MARKETPLACE"}]""", IsUnderConstruction: !built);
 
@@ -288,6 +387,16 @@ public sealed class ExplorePlanServiceTests
             new WaypointCacheModel("X1-DC53-H52", Home, "MOON", 20, 0, HasMarket: true, HasShipyard: true, seen, """[{"symbol":"MARKETPLACE"},{"symbol":"SHIPYARD"}]"""),
             new WaypointCacheModel(HomeGate, Home, "JUMP_GATE", 272, -358, HasMarket: true, HasShipyard: false, seen, """[{"symbol":"MARKETPLACE"}]""", IsUnderConstruction: true),
         ]);
+    }
+
+    /// <summary>Slice 6.81 (D155): the command ship earns before it explores while the fleet has no shuttle or hauler.</summary>
+    private void EarnFirst()
+        => _settings.GetAsync<bool>(ExplorePlanService.CommandShipWaitsForCargoShipSetting, Arg.Any<CancellationToken>()).Returns(true);
+
+    private async Task AddShipAsync(ShipModel ship)
+    {
+        await using var db = TestDbContextFactory.Create(_database);
+        await new ShipRepository(db).UpsertAsync(ship);
     }
 
     private async Task CreditsAsync(long credits)

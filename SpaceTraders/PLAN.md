@@ -276,6 +276,7 @@ get the next D-number.
 | D152 | Slice 6.72 (asked with D150): how much slack a trade trip's estimated end gets before the reset. | **5 minutes** ("5 minutes", 2026-11-15; 15 was recommended): a trip starts only if its estimated time (`TradeRoute.Seconds`: the flight to the buy market, the haul, a stop at each landing) ends at least 5 minutes before the reset; a setting. |
 | D153 | Slice 6.74 (asked on 2026-11-18, hour 69 of the run of 2026-11-15, the first whose home gate was built within 24 hours: 21.6): "I'd like to stop buying any mining equipment as soon as the gate is finished." Then: "Purchases should be blocked after the home gate is built, not before." Before the gate D130, D92 and D138 already held the drones to the gate's chain; afterwards they were bought "as before", and by hour 68 the run had bought 14 mining drones abroad (D122). | **No mining equipment once the home gate is built** (2026-11-18): once the home jump gate is built (`HomeGate`, D148), a need of the plans that buy mining equipment is no need: the contract's miner (D23), the surveyors (D47, D55), the mining plan's drones and ore hounds, at home and abroad (D28, D48, D92, D120, D122), and the collection points' shuttles (D83, D142), and the siphon plan's drones and shuttles. So it holds back nothing after it in the order (D43). Before the gate is built nothing changes. Read as: "mining equipment" is what those plans buy; the trading plan's light shuttles are cargo ships and stay; the bot buys no mounts, so there are none to stop; the miners already bought keep working. Amends D28, D48, D83, D122 and D130. |
 | D154 | B94 (asked on 2026-11-21: "Can you have a look at space traders and figure out a way to decrease the warning spam I'm getting from grafana?"). The mails, 85 in 16 hours, came from the slow tick: probes waiting for it (`ShipLeftIdle`) and arrival handlers timing out (the error mail). Offered: one mail per anomaly type; a slow-tick metric and alert; fix the CPU growth (B94); raise the CPU limit to 3 cores. | **All four** (2026-11-21). In gembernodes (gembernodes#260): `ShipLeftIdle` and `ShipStuck` alert as one count of ships per rule that keeps firing for an hour after the last clears (about 5 mails in the 72 hours that sent about 89), and the API pod's CPU limit goes from 2 to 3 cores. Here: slice 6.75 measures the loops, so one gembernodes rule can mail once when ticks run long; slices 6.76 and 6.77 find and cut what takes the time. |
+| D155 | Slice 6.81 (2026-11-24, after slice 6.80's deploy): the restart freed SPECTER-1 from the contract (D26), and the explore plan, which takes a free command ship before every other plan (2026-10-04), sent it to explore the six systems the home gate reaches, built by another agent the day before. The contract (64 IRON_ORE, due 2026-11-29) was the run's only income, with the credits at 102,663 against a reserve of 100,000. Offered: contract first, or let it explore. | "If there are no other haulers, SPECTER-1 should prioritize making money before exploring, up until a proper shuttle or hauler is bought." (2026-11-24). **While the fleet has no cargo ship besides the command ship** (`FleetRoles.IsCargoShip`: a hold and a tank, nothing to mine, siphon or survey with), the explore plan takes no free command ship, so the contract and the trades give it work; one out exploring finishes the step it is on, flies home and is released there (D60); and the plan buys no explorer. Once a shuttle or hauler is bought, it explores as before. A setting, `Explore.CommandShipWaitsForCargoShip` (on). Read as: an explorer is a purchase for exploring, and the cargo ships come before it in the order anyway (D113); a probe, a drone or an explorer is no hauler; the explorers already bought explore on. Amends the explore plan of 2026-10-04 and D60. |
 
 ## Phases
 
@@ -410,7 +411,8 @@ stays your call; Claude only fixes deviations from intended behaviour.
 - 6.77 The tick's work cut (B94), planned (below)
 - 6.78 A sale refused for cargo the ship doesn't hold reads the cargo again (B95), deployed (below)
 - 6.79 A market's price history read from one index (B96), deployed (below)
-- 6.80 The contract mines only where a mining laser works (B97), built (below)
+- 6.80 The contract mines only where a mining laser works (B97), deployed (below)
+- 6.81 The command ship earns before it explores while it is the only hauler (D155), built (below)
 
 Every slice above is done but 6.42 and 6.43 (6.41 was deployed on 2026-10-29, 6.44 on 2026-10-31). The slices across systems (6.27–6.31, planned on 2026-10-06, D94–D107), 6.32–6.36 (D108–D118)
 and 6.37–6.40 with 2.19 (asked on 2026-10-09, D119–D123; merged as projects#207, deployed by gembernodes#94 on
@@ -1207,7 +1209,9 @@ the gates of other systems (D68).
   - To understand this, start with the `MarketPriceSample` block of `SpaceTradersDbContext.OnModelCreating`, then
     `SpaceTradersDatabaseInitializer.AddedSchema`.
 - **6.80 The contract mines only where a mining laser works** (B97; asked on 2026-11-24, "look at the anomalies", then
-  "yes, fix it"): built on branch `claude/spacetraders-b97-asteroid-source`.
+  "yes, fix it"): merged as projects#279 (`5da631e6`), deployed by gembernodes#274 (2026-11-24 10:04Z). At the first tick
+  the plan moved from J61 to X1-CJ53-J79, as expected; but the restart had freed SPECTER-1 (D26), and the explore plan took
+  it first (slice 6.81, D155).
   - `ContractPlanService.ResolveSourceAsteroidAsync` takes only the waypoints `AsteroidDeposits.IsExtractable` takes, the
     rule `MineResourceVolumeHandler`, `ExtractResourcesCommand` and the mining plan already go by: an asteroid, an
     asteroid field or an engineered asteroid, never an asteroid base. Nearest first and traits second, as before.
@@ -1226,3 +1230,27 @@ the gates of other systems (D68).
     changed test fail.
   - To understand this, start with `ContractPlanService.NearestMineableAsteroidAsync`, then
     `MoveOffASourceNoShipCanMineAsync` and its call in `EnsureBootstrappedAsync`.
+
+- **6.81 The command ship earns before it explores while it is the only hauler** (D155; asked on 2026-11-24, "If there
+  are no other haulers, SPECTER-1 should prioritize making money before exploring, up until a proper shuttle or hauler is
+  bought."): built on branch `claude/spacetraders-6-81-money-before-exploring`.
+  - `ExplorePlanService.EarnsFirstAsync`: true while `Explore.CommandShipWaitsForCargoShip` is on (seeded on) and no ship
+    besides the command ship is a cargo ship (`FleetRoles.IsCargoShip`, as the trading plan counts its purchases). The
+    plan records it in `ExplorePlanState.CommandShipEarnsFirst` and says so in the journal when it changes, both ways.
+  - While it earns first, `DecideAsync` hands the command ship to `EarnFirstAsync`: a free one is left alone (status
+    `Waiting`, reason `earning_first`); one the plan still has finishes the step it is on (a jump, a system's tour, whose
+    system still counts as explored), waits for a look at its system's connections, then jumps home and is released
+    there, as D60 brings it home once explorers explore. A jump home short of credits waits as every jump does.
+  - `BuyAsync` isn't asked: no explorer is wanted in the order (D43), and the command ship fetches none (D108).
+  - Not changed: the explorers already bought explore and trade as before; the tick still runs the explore plan before
+    the contract plan.
+  - Tests: `ExplorePlanServiceTests`: `WhileTheFleetHasNoShuttleOrHauler_TheCommandShipEarnsFirst_AndExploresOnceOneIsBought`,
+    `ACommandShipOutExploring_WhenItMustEarnFirst_FinishesItsTour_FliesHome_AndIsReleasedThere` (the live case),
+    `ACommandShipOutExploring_WithNoCreditsForTheJumpHome_WaitsAndSaysWhyOnce`; `ExplorersTests`:
+    `WhileTheCommandShipEarnsFirst_NoExplorerIsBought_AndItFetchesNone`; `DefaultSettingsSeedTests` knows the setting.
+    The existing explore tests leave the setting off, so they still show the plan of 2026-10-04. With the rule taken out
+    the four new tests fail.
+  - After the deploy SPECTER-1, out exploring, comes home, and the contract plan gives it the contract (at J79) on the
+    tick after it is released.
+  - To understand this, start with `ExplorePlanService.EarnsFirstAsync`, then `EarnFirstAsync` and its call in
+    `DecideAsync`.

@@ -7,6 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Code – Changed (2026-11-24, slice 6.81)
+- D155: while the fleet has no shuttle or hauler besides the command ship, the explore plan leaves the command ship to
+  the plans that earn (the contract, trades), brings it home if it is out exploring, and buys no explorer; once a cargo
+  ship is bought it explores as before. After slice 6.80's deploy the restart had freed SPECTER-1 from the contract, and
+  the explore plan took it to the six systems the home gate reaches while the contract was the run's only income. New
+  setting `Explore.CommandShipWaitsForCargoShip` (on).
+- Tests: `ExplorePlanServiceTests`, `ExplorersTests`, `DefaultSettingsSeedTests`.
+
+### Plan – Changed (2026-11-24, D155)
+- D155 (above). Slice 6.80 is recorded as deployed (gembernodes#274, 2026-11-24 10:04Z).
+
 ### Code – Fixed (2026-11-24, slice 6.80)
 - B97: the contract plan mines only at an asteroid, an asteroid field or an engineered asteroid, as the mining command
   does. On 2026-11-22 it chose the asteroid base the command ship stood at, X1-CJ53-J61, because its type contains
