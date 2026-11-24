@@ -413,3 +413,36 @@ mock; sent from your Gmail through the cluster's mail secret (Q1).
 
 **Next: slice 6**, gembernodes: the app replaces the static mock at klaverjas.gemberkoekje.nl, with
 the mail secret, and a live check that starts with a test mail.
+
+## Slice 6: live on gembernodes (2026-11-24, manifests ready)
+
+The app takes over klaverjas.gemberkoekje.nl from the static mock. This slice is two pull requests:
+the gembernodes manifests and [DEPLOY.md](DEPLOY.md) here. It goes live after your two steps
+(database, 1Password item) and the merge.
+
+**What is there**
+
+- **gembernodes `apps/klaverjas`**, set up like datumprikker: one pod on the image of projects#281's merge
+  (RollingUpdate with `maxSurge: 0`, so the old pod stops first; `Recreate` can't be switched to on the
+  mock's existing Deployment under Flux's server-side apply), `/healthz` probes, 160Mi requested and 512Mi limit (the Excel import and the PDF
+  take more than a page), `runAsNonRoot`, the `ghcr-login` pull secret Reflector already copies in.
+  The Caddyfile and the mock page are gone; the Service keeps its name, so the routes still fit.
+- **Two `OnePasswordItem`s**: `klaverjas-secrets` (`ConnectionStrings__Postgres`, `Auth__Password`,
+  optional `Mail__User`) and the existing shared `mail-secret` (`SMTP_PASSWORD`, optional).
+- **`gemberkoekje.nl/klaverjas`** now redirects to the hostname (it showed the mock): the app has
+  no path base, like plotboek's short link.
+- `create-database.sql` and a README with the steps, the deploy commands and the live check.
+
+**Decisions**
+
+- **Your Gmail address stays out of the public gembernodes repository**: it is the `Mail__User`
+  field of `klaverjas-secrets` (cov-website writes it in its manifest; this app doesn't need to).
+- **`Auth__Password` is Dad's first password, then yours:** once Dad has chosen his own, change it
+  to one only you keep, since it keeps opening `/beheer` as the way back in.
+
+**Still to do (yours, then mine)**
+
+- The database and the item, then merge the gembernodes PR; I then do the live check with you:
+  `/healthz`, the redirect, signing in at `/beheer`, the players' password, a test mail through Gmail.
+- Q2 (a web address with the club's name) is still open; the slips and links follow the hostname by
+  themselves.

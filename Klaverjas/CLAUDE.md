@@ -69,5 +69,7 @@ To run it: copy `.env.example` to `.env` and fill in `POSTGRES_PASSWORD=klaverja
 `docker compose up -d postgres` and run the WebApp (http://localhost:8088). The development password
 is in `appsettings.Development.json`.
 
+- Production runs on gembernodes: [DEPLOY.md](DEPLOY.md) here, `apps/klaverjas/README.md` there.
+  A release is an image tag bump in that repo.
 - Every slice ends with a written summary appended to `NOTES.md`, and its PLAN.md status updated.
 - One slice per PR; stop after each for review.
