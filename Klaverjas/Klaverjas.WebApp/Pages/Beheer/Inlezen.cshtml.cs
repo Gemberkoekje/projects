@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace Klaverjas.WebApp.Pages;
+namespace Klaverjas.WebApp.Pages.Beheer;
 
 /// <summary>
 /// Excel inlezen (D4) and "Alle scores downloaden" (D17). Reading a workbook writes nothing: the check
@@ -79,7 +79,7 @@ public sealed class InlezenModel(
         if (bestand is null || bestand.Length == 0)
         {
             ExcelFout = "Kies eerst het Excel-bestand met de standen.";
-            return RedirectToPage("/Instellingen");
+            return RedirectToPage("/Beheer/Instellingen");
         }
 
         using var geheugen = new MemoryStream();
@@ -89,7 +89,7 @@ public sealed class InlezenModel(
         if (!result.IsValid)
         {
             ExcelFout = string.Join(" ", result.Messages.Select(m => m.Message ?? string.Empty));
-            return RedirectToPage("/Instellingen");
+            return RedirectToPage("/Beheer/Instellingen");
         }
 
         return RedirectToPage(new { id = result.Value });
@@ -117,7 +117,7 @@ public sealed class InlezenModel(
 
         var r = result.Value;
         Ingelezen = $"Ingelezen: {r.Avonden} avonden, {r.NieuweSpelers} nieuwe spelers en {r.GeenSpeelavonden} avonden zonder klaverjassen. Kijk bij Stand of alles klopt.";
-        return RedirectToPage("/Index");
+        return RedirectToPage("/Beheer/Index");
     }
 
     /// <summary>"Annuleren": forgets the plan.</summary>
@@ -126,7 +126,7 @@ public sealed class InlezenModel(
     public async Task<IActionResult> OnPostAnnulerenAsync(CancellationToken cancellationToken)
     {
         await annuleren.HandleAsync(new ImportAnnuleren { Id = Id }, cancellationToken);
-        return RedirectToPage("/Instellingen");
+        return RedirectToPage("/Beheer/Instellingen");
     }
 
     /// <summary>"Downloaden (Excel)": every player and every score.</summary>

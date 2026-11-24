@@ -1,0 +1,23 @@
+@page
+@model Klaverjas.WebApp.Pages.Beheer.Afdrukken.BriefjesModel
+@{
+    Layout = "_Afdruk";
+    ViewData["Title"] = "Briefjes voor de spelers";
+    ViewData["Soort"] = "briefjes";
+    ViewData["Terug"] = Url.Page("/Beheer/Instellingen", null, null, null, null, "spelerspagina");
+    ViewData["Uitleg"] = "10 briefjes op 1 A4 (staand). Printen, langs de stippellijnen knippen en uitdelen op de avond.";
+    var adres = HttpContext.Request.Host.Value;
+}
+
+<div class="vel a4b">
+    @for (var i = 0; i < Klaverjas.WebApp.Pages.Beheer.Afdrukken.BriefjesModel.PerVel; i++)
+    {
+        <div class="briefje">
+            <div class="club"><span aria-hidden="true">♣</span> @Model.Club</div>
+            <div>De stand staat online:</div>
+            <div class="adres">@adres</div>
+            <div>Wachtwoord: <b class="ww">@Model.Wachtwoord</b></div>
+            <div class="uitleg">Eén keer intypen, daarna onthoudt uw telefoon of computer het.</div>
+        </div>
+    }
+</div>

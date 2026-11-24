@@ -1,6 +1,6 @@
 using Qowaiv.Diagnostics.Contracts;
 
-namespace Klaverjas.WebApp.Pages;
+namespace Klaverjas.WebApp.Pages.Beheer;
 
 /// <summary>
 /// Spelers: members and substitutes, changed in place (D14, D16). Nobody is deleted: "Gestopt" and

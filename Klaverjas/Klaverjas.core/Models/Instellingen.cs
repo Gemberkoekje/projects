@@ -29,6 +29,21 @@ public sealed record Instellingen
     /// <summary>The colours of the standings (R5).</summary>
     public Kleuren Kleuren { get; init; } = new Kleuren();
 
+    /// <summary>
+    /// The players' password for the standings page (D5, D7), kept readable so it can go on the slips.
+    /// Empty until Dad chooses one: until then the players' page stays closed.
+    /// </summary>
+    public string Spelerswachtwoord { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Dad's own password for /beheer as a <see cref="Wachtwoord"/> hash. Empty until he changes it;
+    /// until then the password from the configuration is his.
+    /// </summary>
+    public string BeheerWachtwoord { get; init; } = string.Empty;
+
+    /// <summary>Whether the players can sign in.</summary>
+    public bool SpelerspaginaOpen => Spelerswachtwoord.Length > 0;
+
     /// <summary>Whether no play is planned on a date.</summary>
     /// <param name="datum">The date.</param>
     /// <returns><see langword="true"/> for an evening without play.</returns>
@@ -56,6 +71,11 @@ public sealed record Instellingen
         if (!new[] { instellingen.Kleuren.Eerste, instellingen.Kleuren.Tweede, instellingen.Kleuren.Derde, instellingen.Kleuren.Afwezig }.All(Kleuren.IsKleur))
         {
             fouten.Add(ValidationMessage.Error("Een van de kleuren klopt niet."));
+        }
+
+        if (instellingen.Spelerswachtwoord.Length is > 0 and < Wachtwoord.MinimumLengteSpelers)
+        {
+            fouten.Add(ValidationMessage.Error($"Het wachtwoord voor de spelers moet minstens {Wachtwoord.MinimumLengteSpelers} tekens hebben."));
         }
 
         return fouten.Count == 0 ? Result.OK : Result.WithMessages(fouten);

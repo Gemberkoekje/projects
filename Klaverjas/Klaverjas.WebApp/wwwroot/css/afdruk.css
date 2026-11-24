@@ -94,3 +94,11 @@ body { margin: 0; background: #c9cfcb; color: #111; font-family: Verdana, Geneva
 .tsheet th.totcol span { display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg); }
 .tsheet tr.eind td { border-top: 2px solid #333; }
 .tsheet tr.chk td.ctrl { text-align: center; font-weight: 700; font-size: .8rem; color: #444; }
+
+/* ---------- Slips for the players: address and password, 10 per A4 portrait (D5) ---------- */
+.a4b { page: staand; width: 210mm; height: 297mm; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(5, 1fr); }
+.briefje { border: .3mm dashed #888; padding: 6mm 7mm; display: flex; flex-direction: column; justify-content: center; gap: 1.2mm; font-size: 12pt; line-height: 1.3; min-width: 0; overflow: hidden; }
+.briefje .club { font-weight: 700; font-size: 13pt; }
+.briefje .adres { font-size: 16pt; font-weight: 700; overflow-wrap: anywhere; }
+.briefje .ww { font-size: 16pt; overflow-wrap: anywhere; }
+.briefje .uitleg { font-size: 10pt; color: #333; margin-top: 1mm; }

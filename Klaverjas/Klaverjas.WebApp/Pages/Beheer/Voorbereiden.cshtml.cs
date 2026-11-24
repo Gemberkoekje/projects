@@ -1,6 +1,6 @@
 using Klaverjas.core.Tafels;
 
-namespace Klaverjas.WebApp.Pages;
+namespace Klaverjas.WebApp.Pages.Beheer;
 
 /// <summary>
 /// Kaartjes en tafelindeling (D12): who gets a card, who sits out (with a fair proposal), the cards to
@@ -52,7 +52,7 @@ public sealed class VoorbereidenModel(VoorbereidingOphalenHandler ophalen, Voorb
     {
         if (Datum == default)
         {
-            return RedirectToPage("/Index");
+            return RedirectToPage("/Beheer/Index");
         }
 
         Formulier = (await ophalen.HandleAsync(new VoorbereidingOphalen { Datum = Datum }, cancellationToken)).Value;
@@ -84,7 +84,7 @@ public sealed class VoorbereidenModel(VoorbereidingOphalenHandler ophalen, Voorb
     public async Task<IActionResult> OnPostKaartjesAsync(CancellationToken cancellationToken)
     {
         return await OpslaanAsync(voorstellen: false, cancellationToken)
-            ? RedirectToPage("/Afdrukken/Kaartjes", new { datum = Weergave.Iso(Datum) })
+            ? RedirectToPage("/Beheer/Afdrukken/Kaartjes", new { datum = Weergave.Iso(Datum) })
             : RedirectToPage(new { datum = Weergave.Iso(Datum) });
     }
 
@@ -94,7 +94,7 @@ public sealed class VoorbereidenModel(VoorbereidingOphalenHandler ophalen, Voorb
     public async Task<IActionResult> OnPostKlaarAsync(CancellationToken cancellationToken)
     {
         return await OpslaanAsync(voorstellen: false, cancellationToken)
-            ? RedirectToPage("/Index")
+            ? RedirectToPage("/Beheer/Index")
             : RedirectToPage(new { datum = Weergave.Iso(Datum) });
     }
 

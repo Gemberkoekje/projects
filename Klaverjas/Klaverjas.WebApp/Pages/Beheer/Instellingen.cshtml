@@ -27,7 +27,7 @@
 }
 
 @* One settings form; its fields sit in several cards and point at it with form="instellingen". *@
-<form method="post" asp-page="/Instellingen" id="instellingen"></form>
+<form method="post" asp-page="/Beheer/Instellingen" id="instellingen"></form>
 
 <div class="card">
     <h2>Club</h2>
@@ -104,6 +104,41 @@
     </div>
 </div>
 
+<div class="card" id="spelerspagina">
+    <h2>Spelerspagina</h2>
+    <p class="help">De spelers bekijken de stand op <b>@HttpContext.Request.Host.Value</b> (alleen kijken, niets wijzigen). De eerste keer vraagt de pagina dit wachtwoord; daarna onthoudt hun telefoon of computer het.
+        Verandert u het wachtwoord, dan moet iedereen het nieuwe één keer intypen. Hoofdletters maken voor de spelers niet uit. Uw eigen wachtwoord (voor het beheer) staat hieronder en is een ander.</p>
+    <div class="field">
+        <label for="spelerswachtwoord">Wachtwoord voor de spelers</label>
+        @if (!h.SpelerspaginaOpen)
+        {
+            <p class="help status-warn">Nog geen wachtwoord: de spelers kunnen de stand nog niet bekijken.</p>
+        }
+        <input id="spelerswachtwoord" class="text" name="Formulier.Spelerswachtwoord" value="@h.Spelerswachtwoord" style="max-width:16rem" autocomplete="off" autocapitalize="none" spellcheck="false" form="instellingen">
+    </div>
+    <div class="field" style="margin-bottom:0">
+        <span class="label">Briefjes om uit te delen</span>
+        <p class="help">Kleine briefjes met het adres en het wachtwoord, 10 per A4. Printen, knippen en uitdelen op de avond.</p>
+        @if (h.SpelerspaginaOpen)
+        {
+            <a class="btn secondary" asp-page="/Beheer/Afdrukken/Briefjes">Briefjes printen</a>
+        }
+        else
+        {
+            <p class="help">Kies eerst een wachtwoord en klik op Opslaan.</p>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <h2>Uw wachtwoord</h2>
+    <p class="help">Hiermee logt u in op het beheer. Wilt u een nieuw wachtwoord, typ het dan twee keer (minstens @Wachtwoord.MinimumLengteBeheer tekens). Laat de vakjes leeg om uw wachtwoord te houden.</p>
+    <div class="inline">
+        <input class="text" type="password" name="Formulier.NieuwWachtwoord" placeholder="Nieuw wachtwoord" style="max-width:16rem" aria-label="Nieuw wachtwoord" autocomplete="new-password" form="instellingen">
+        <input class="text" type="password" name="Formulier.NieuwWachtwoordHerhaald" placeholder="Nog een keer" style="max-width:16rem" aria-label="Nieuw wachtwoord nog een keer" autocomplete="new-password" form="instellingen">
+    </div>
+</div>
+
 <button type="submit" class="btn big" form="instellingen">Opslaan</button>
 
 <div class="card" id="excel" style="margin-top:2rem">
@@ -115,7 +150,7 @@
     <div class="field">
         <span class="label">De standen uit Excel inlezen</span>
         <p class="help">Kies het bestand "Standen week …" dat u nu elke week bijhoudt. Er wordt nog niets opgeslagen: u ziet eerst wat er gebeurt, en of alles klopt.</p>
-        <form method="post" enctype="multipart/form-data" asp-page="/Inlezen" asp-page-handler="Lezen" class="inline">
+        <form method="post" enctype="multipart/form-data" asp-page="/Beheer/Inlezen" asp-page-handler="Lezen" class="inline">
             <input class="file" type="file" name="bestand" accept=".xlsx" aria-label="Het Excel-bestand met de standen" required>
             <button type="submit" class="btn">Bestand lezen</button>
         </form>
@@ -124,6 +159,6 @@
     <div class="field" style="margin-bottom:0">
         <span class="label">Alle scores downloaden</span>
         <p class="help">Alle spelers en alle uitslagen in één Excel-bestand: de stand en de pitten zoals u gewend bent, plus elke uitslag op een rij. Bewaar het als reservekopie, of om zelf mee te rekenen.</p>
-        <a class="btn secondary" asp-page="/Inlezen" asp-page-handler="Downloaden">Downloaden (Excel)</a>
+        <a class="btn secondary" asp-page="/Beheer/Inlezen" asp-page-handler="Downloaden">Downloaden (Excel)</a>
     </div>
 </div>

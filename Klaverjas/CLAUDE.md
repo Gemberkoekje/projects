@@ -26,8 +26,13 @@ configuration through the colon-path indexer, Razor Pages + vanilla JS, the anal
   (`StandenWerkboek`). Try a real file only locally, through the upload, then wipe the local
   database (`docker compose down -v`); the check screen shows real names.
 - **Nobody is deleted** (D16): "Gestopt" and "Uit de stand halen" keep every score and can be undone.
-- One password for now (`Auth:Password`, Dad's), cookie auth for a year, fallback policy closes
-  every page. The players' password and /beheer split come with slice 4.
+- **Two doors, one cookie** (D7, `Toegang.cs`): `/` is the players' page (players' password, set in
+  Instellingen; closed while empty), `/beheer/...` is Dad's (his own hashed password, or
+  `Auth:Password`). The cookie carries a role and a key from the password it was opened with;
+  `Toegang.ControleerAsync` drops it when that password changes. Admin pages live in
+  `Pages/Beheer` and are locked by folder convention; anything new for Dad goes there.
+- **The players see only `OnlineStand`**, the copy made by "Zet de stand online": never compute the
+  standings for the players' page, and keep personal details (email, phone, address) out of it.
 - Dutch UI and domain nouns, English for technical names. Test methods are snake_case English sentences.
 - Built for a 70-year-old on a PC: Verdana, big type, plain words, one obvious next button.
 - StyleCop 1.1.118 predates some syntax: write `new Foo()` instead of `new()`, and avoid `required`.
@@ -35,6 +40,12 @@ configuration through the colon-path indexer, Razor Pages + vanilla JS, the anal
 - A `<form method="post">` without `asp-page` posts to the current address, handler included; give
   forms an explicit `asp-page` when the page can be reached through a handler.
 - Local PostgreSQL on **5437**, the web app on **8088**.
+- Start it with plain `dotnet run` (the launch profile sets Development). `dotnet run --environment X`
+  is eaten by `dotnet run` itself, so the app boots as Production and stops on a missing `Auth:Password`.
+- Sign-in posts are rate limited (Dad's 10, the players' 40 per 5 minutes per address): a script
+  that signs in over and over gets 429 locally too.
+- NUnit makes one instance per fixture, not per test: build stores in a `[SetUp]`, never in field
+  initialisers, or one test's data leaks into the next.
 
 ## Working here
 

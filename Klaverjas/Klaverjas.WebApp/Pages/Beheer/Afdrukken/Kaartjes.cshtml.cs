@@ -1,4 +1,4 @@
-namespace Klaverjas.WebApp.Pages.Afdrukken;
+namespace Klaverjas.WebApp.Pages.Beheer.Afdrukken;
 
 /// <summary>The score cards of an evening, 12 per A4, in Dad's own layout (D15).</summary>
 public sealed class KaartjesModel(KaartjesOphalenHandler ophalen) : PageModel
@@ -25,7 +25,7 @@ public sealed class KaartjesModel(KaartjesOphalenHandler ophalen) : PageModel
     {
         if (Datum == default)
         {
-            return RedirectToPage("/Index");
+            return RedirectToPage("/Beheer/Index");
         }
 
         Kaartjes = (await ophalen.HandleAsync(new KaartjesOphalen { Datum = Datum }, cancellationToken)).Value;

@@ -1,65 +1,96 @@
 @page
 @model IndexModel
 @{
-    ViewData["Title"] = "Avonden";
-    ViewData["Tab"] = "avonden";
-    var volgende = Model.Overzicht.VolgendeAvond;
-}
+    Layout = "_Spelers";
+    var online = Model.Online;
+    var stand = online.Stand;
+    var laatste = stand.LaatsteKolom;
+    ViewData["Title"] = "Stand";
+    ViewData["Jaar"] = online.IsLeeg ? string.Empty : Weergave.Getal(stand.Jaar);
 
-@if (!string.IsNullOrEmpty(Model.Ingelezen))
-{
-    <div class="banner ok"><p>@Model.Ingelezen</p></div>
-}
-
-<h1>Avonden</h1>
-<p class="lead">Vóór de avond: <b>kaartjes en tafels printen</b> (de nummers worden op de avond zelf getrokken). Na de avond: <b>Uitslag invullen</b>.</p>
-
-<div class="card next">
-    <div>
-        <p class="muted" style="margin:0">Volgende speelavond</p>
-        <p class="when">@Weergave.Lang(volgende) <span class="muted" style="font-weight:400">(week @Kalender.Week(volgende))</span></p>
-        <p class="muted" style="margin:0; font-size:1rem">@(Model.Overzicht.VolgendeVoorbereid ? "✓ Kaartjes en tafels klaargezet. Na de avond: Uitslag invullen." : "Vóór de avond: kaartjes en tafels printen.")</p>
-    </div>
-    <div class="actions">
-        <a class="btn @(Model.Overzicht.VolgendeVoorbereid ? "secondary" : "big")" asp-page="/Voorbereiden" asp-route-datum="@Weergave.Iso(volgende)">Kaartjes en tafels printen</a>
-        <a class="btn @(Model.Overzicht.VolgendeVoorbereid ? "big" : "secondary")" asp-page="/Uitslag" asp-route-datum="@Weergave.Iso(volgende)">Uitslag invullen</a>
-    </div>
-</div>
-
-<div class="card">
-    <h2>Alle avonden van dit seizoen</h2>
-    @if (Model.Overzicht.Regels.Count == 0)
+    void PuntenCel(WeergaveCel cel)
     {
-        <p class="muted">Er is nog geen avond ingevuld.</p>
+        if (cel.IsLeeg)
+        {
+            <td></td>
+        }
+        else if (cel.IsAfwezig)
+        {
+            <td class="r ca">@Weergave.Getal(cel.Waarde)</td>
+        }
+        else
+        {
+            <td class="r @Weergave.PlaatsKlasse(cel.Plaats)">@Weergave.Getal(cel.Waarde)</td>
+        }
     }
-    else
+}
+
+@if (online.IsLeeg)
+{
+    <h1>De stand</h1>
+    <p>De stand staat nog niet online. Kijk na de volgende clubavond nog eens.</p>
+}
+else
+{
+    var week = Kalender.Week(stand.LaatsteAvond);
+
+    <h1>Stand na week @week</h1>
+    <p class="muted datum">@Weergave.Lang(stand.LaatsteAvond)</p>
+
+    @if (online.Bericht.Length > 0)
     {
-        <table class="list">
-            <thead><tr><th>Datum</th><th>Week</th><th>Spelers</th><th>Slapers</th><th></th></tr></thead>
+        <div class="p-card bericht">@online.Bericht</div>
+    }
+
+    <div class="p-card">
+        <h2>Winnaars van de avond</h2>
+        <ol class="p-winnaars">
+            @foreach (var winnaar in stand.Winnaars)
+            {
+                <li><span class="medal @Weergave.PlaatsKlasse(winnaar.Plaats)">@winnaar.Plaats</span> @winnaar.Naam@(winnaar.IsInvaller ? " (invaller)" : string.Empty) <b>@Weergave.Getal(winnaar.Punten)</b></li>
+            }
+        </ol>
+    </div>
+
+    <div class="alleen-telefoon">
+        <h2>Punten</h2>
+        <table class="ptab">
+            <thead><tr><th class="pl">#</th><th>Naam</th><th class="r">Totaal</th><th class="r">wk @week</th></tr></thead>
             <tbody>
-                @foreach (var regel in Model.Overzicht.Regels)
+                @foreach (var regel in stand.Punten)
                 {
-                    if (regel.IsGeenSpeelavond)
-                    {
-                        <tr class="off"><td>@Weergave.Kort(regel.Datum)</td><td>@Kalender.Week(regel.Datum)</td><td colspan="3">Geen klaverjassen: @regel.GeenSpeelavond</td></tr>
-                    }
-                    else
-                    {
-                        <tr>
-                            <td><b>@Weergave.Kort(regel.Datum)</b></td>
-                            <td>@Kalender.Week(regel.Datum)</td>
-                            <td>@regel.Gespeeld</td>
-                            <td>@regel.Slapers</td>
-                            <td class="knop"><a class="btn secondary small" asp-page="/Uitslag" asp-route-datum="@Weergave.Iso(regel.Datum)">Wijzigen</a></td>
-                        </tr>
-                    }
+                    <tr>
+                        <td class="pl @Weergave.PlaatsKlasse(regel.Plaats)">@regel.Plaats</td>
+                        <td>@regel.Naam</td>
+                        <td class="r"><b>@Weergave.Getal(regel.Totaal)</b></td>
+                        @{ PuntenCel(regel.Cel(laatste)); }
+                    </tr>
                 }
             </tbody>
         </table>
-    }
-    <form method="get" asp-page-handler="Openen" class="inline" style="margin-top:1.25rem">
-        <label for="andere" class="help" style="margin:0">Een andere avond invullen of wijzigen:</label>
-        <input id="andere" class="text" type="date" name="andere" style="max-width:12rem" required>
-        <button type="submit" class="btn secondary small">Openen</button>
-    </form>
-</div>
+
+        <h2>Pitten</h2>
+        <table class="ptab">
+            <thead><tr><th class="pl">#</th><th>Naam</th><th class="r">Pitten</th><th class="r">wk @week</th></tr></thead>
+            <tbody>
+                @foreach (var regel in stand.Pitten)
+                {
+                    var cel = regel.Cel(laatste);
+                    <tr>
+                        <td class="pl @Weergave.PlaatsKlasse(regel.Plaats)">@regel.Plaats</td>
+                        <td>@regel.Naam</td>
+                        <td class="r"><b>@Weergave.Getal(regel.Totaal)</b></td>
+                        <td class="r">@(cel.IsLeeg ? string.Empty : Weergave.Getal(cel.Waarde))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="muted klein">Op een computer ziet u alle weken van de maand.</p>
+    </div>
+
+    <div class="alleen-computer">
+        <partial name="_StandTabellen" model="stand" />
+    </div>
+
+    <p class="muted klein bijgewerkt">Online gezet op @Weergave.Moment(online.OnlineSinds).</p>
+}

@@ -1,0 +1,113 @@
+@model StandWeergave
+@* The month's points and pits tables (R8), as on Dad's sheet: on his Stand screen and on the players' page on a computer. *@
+@{
+    var maandNaam = Model.IsLeeg ? string.Empty : Weergave.Maand(Model.LaatsteAvond);
+
+    void Cellen(WeergaveRegel regel)
+    {
+        for (var i = 0; i < Model.Kolommen.Count; i++)
+        {
+            var kolom = Model.Kolommen[i];
+            var cel = regel.Cel(i);
+            if (kolom.IsVrij)
+            {
+                <td class="vrij">@kolom.Vrij</td>
+            }
+            else if (cel.IsLeeg)
+            {
+                <td></td>
+            }
+            else if (cel.IsAfwezig)
+            {
+                <td class="ca">@Weergave.Getal(cel.Waarde)</td>
+            }
+            else
+            {
+                <td class="@Weergave.PlaatsKlasse(cel.Plaats)">@Weergave.Getal(cel.Waarde)</td>
+            }
+        }
+    }
+}
+
+<div class="stand-wrap">
+    <div class="scroll">
+        <table class="stand">
+            <caption>Punten @Model.Jaar</caption>
+            <thead>
+                <tr><th rowspan="2">Plaats</th><th rowspan="2">Naam</th><th rowspan="2">Totaal</th><th rowspan="2">Verschil<br>met vorige</th><th colspan="@Model.Kolommen.Count">@maandNaam</th></tr>
+                <tr>
+                    @foreach (var dag in Model.Kolommen.Select(k => k.Datum))
+                    {
+                        <th>wk @Kalender.Week(dag)<br>@Weergave.DagMaand(dag)</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var regel in Model.Punten)
+                {
+                    var totaalKlasse = Weergave.PlaatsKlasse(regel.Plaats);
+                    <tr>
+                        <td>@regel.Plaats</td>
+                        <td class="nm">@regel.Naam</td>
+                        <td class="tot @(totaalKlasse.Length > 0 ? totaalKlasse : "cr")">@Weergave.Getal(regel.Totaal)</td>
+                        <td class="gap">@Weergave.Getal(regel.Verschil)</td>
+                        @{ Cellen(regel); }
+                    </tr>
+                }
+                @foreach (var invaller in Model.Invallers)
+                {
+                    <tr class="sub">
+                        <td></td>
+                        <td class="nm">@invaller.Naam (invaller)</td>
+                        <td></td>
+                        <td></td>
+                        @{ Cellen(invaller); }
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="legend"><span class="c1">1e plaats</span><span class="c2">2e plaats</span><span class="c3">3e plaats</span><span class="ca">Niet aanwezig</span></div>
+    </div>
+
+    <div class="scroll">
+        <table class="stand">
+            <caption>Pitten @Model.Jaar</caption>
+            <thead>
+                <tr><th rowspan="2">Plaats</th><th rowspan="2">Naam</th><th rowspan="2">Totaal</th><th colspan="@Model.Kolommen.Count">@maandNaam</th></tr>
+                <tr>
+                    @foreach (var dag in Model.Kolommen.Select(k => k.Datum))
+                    {
+                        <th>wk @Kalender.Week(dag)</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var regel in Model.Pitten)
+                {
+                    var totaalKlasse = Weergave.PlaatsKlasse(regel.Plaats);
+                    <tr>
+                        <td>@regel.Plaats</td>
+                        <td class="nm">@regel.Naam</td>
+                        <td class="tot @(totaalKlasse.Length > 0 ? totaalKlasse : "cr")">@Weergave.Getal(regel.Totaal)</td>
+                        @for (var i = 0; i < Model.Kolommen.Count; i++)
+                        {
+                            var cel = regel.Cel(i);
+                            <td>@(cel.IsLeeg ? string.Empty : Weergave.Getal(cel.Waarde))</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td class="nm">Week totalen</td>
+                    <td></td>
+                    @foreach (var kolom in Model.Kolommen)
+                    {
+                        <td>@(kolom.IsGespeeld ? Weergave.Getal(kolom.PittenTotaal) : string.Empty)</td>
+                    }
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>

@@ -5,10 +5,11 @@ _To understand this, start with this file, then open [mock/index.html](mock/inde
 week-47 standings' real numbers, because this repository is public. What Dad's two workbooks do,
 sheet by sheet, is in `explainer/index.html` (git-ignored: personal reference)._
 
-**Status (2026-11-23):** **slices 1 to 3 are built**: sign-in, players, entering an evening, the
+**Status (2026-11-23):** **slices 1 to 4 are built**: sign-in, players, entering an evening, the
 standings, reading Dad's "Standen" workbook (every points total matches it), downloading every score,
-and preparing an evening (cards, slapers, table plan and score sheets). What they do, the decisions
-taken while building and the gotchas are in [NOTES.md](NOTES.md); next is slice 4 (the players' page). Before that: the plan
+preparing an evening (cards, slapers, table plan and score sheets), and the players' page with "Zet de
+stand online", the slips and both passwords (Dad's admin now lives at /beheer). What they do, the decisions
+taken while building and the gotchas are in [NOTES.md](NOTES.md); next is slice 5 (email + PDF). Before that: the plan
 and the mock, which **Dad approved** (2026-11-23), and his answers to the question sheet
 [vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) (see "Dad's answers" below), which changed
 the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12) and added R16–R19.
@@ -151,9 +152,15 @@ everything else is formulas.
   the score cards and the table plan.
 - **D7** **Two passwords**, each with a 365-day sliding cookie like Kluskat: **Dad's** for /beheer and
   the **players'** password for the standings. Both can be changed in Instellingen. _(Your call, 2026-11-23.)_
+  As built (slice 4): the players' page stays closed until Dad chooses the players' password; capitals
+  and spaces at the ends do not matter for it. Dad's own password is stored as a hash; until he chooses
+  one, the configured `Auth:Password` is his, and it keeps working afterwards as the site keeper's way
+  back in. Changing either password signs every other phone or computer out of that door.
 - **D8** Data: `Speler` (member or substitute), `Avond` (date, per person status/slaper
   round/points/pits, who got a card), `Instellingen`, `Verzending`. Standings are **computed, never
-  stored**, and each save of an evening keeps the previous version.
+  stored**, and each save of an evening keeps the previous version. The one exception is
+  `OnlineStand` (slice 4): the copy of the standings Dad put online, names and numbers only, so a
+  correction reaches the players only when he puts it online again (D2).
 - **D9** **Real club data never goes into git.** The repository is public and the workbook holds
   addresses, phone numbers and birthdays. The import runs against the database, and the tests and
   the mock use invented names.
@@ -284,7 +291,7 @@ Follow-ups, relayed by you the same day:
    one or all numbers of players, with the table score sheets (D18). _Built 2026-11-23 (see NOTES.md)._
 4. **Players' page** at klaverjas.gemberkoekje.nl with the players' password, the handout slips (D5),
    "Zet de stand online", and the /beheer split. This is Dad's main wish, so it comes
-   before email.
+   before email. _Built 2026-11-23 (see NOTES.md)._
 5. **Email + PDF (optional extra).** One HTML mail per member, the PDF like today's month sheet, the
    test mail, the send log and the list of members without email.
 6. **gembernodes.** Manifests, 1Password items, `DEPLOY.md` and a live check.

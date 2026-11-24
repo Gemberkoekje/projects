@@ -1,7 +1,7 @@
 @inject Klaverjas.application.Queries.InstellingenOphalenHandler InstellingenOphalen
 @{
     var instellingen = (await InstellingenOphalen.HandleAsync(new Klaverjas.application.Queries.InstellingenOphalen())).Value;
-    var ingelogd = User.Identity is { IsAuthenticated: true };
+    var beheer = User.IsInRole(Toegang.Beheer);
     var tab = ViewData["Tab"] as string ?? string.Empty;
     string Huidig(string naam) => naam == tab ? "page" : "false";
 }
@@ -19,22 +19,22 @@
     </style>
 </head>
 <body>
-    @if (ingelogd)
+    @if (beheer)
     {
         <header class="top">
             <div class="wrap">
                 <div class="brand"><span class="suit" aria-hidden="true">♣</span> <span>@instellingen.Club</span> <small>Beheer</small></div>
-                <form method="post" asp-page="/Aanmelden" asp-page-handler="Afmelden">
+                <form method="post" asp-page="/Beheer/Aanmelden" asp-page-handler="Afmelden">
                     <button type="submit" class="logout">Uitloggen</button>
                 </form>
             </div>
         </header>
         <nav class="tabs" aria-label="Hoofdmenu">
             <div class="wrap">
-                <a asp-page="/Index" aria-current="@Huidig("avonden")">Avonden</a>
-                <a asp-page="/Stand" aria-current="@Huidig("stand")">Stand</a>
-                <a asp-page="/Spelers" aria-current="@Huidig("spelers")">Spelers</a>
-                <a asp-page="/Instellingen" aria-current="@Huidig("instellingen")">Instellingen</a>
+                <a asp-page="/Beheer/Index" aria-current="@Huidig("avonden")">Avonden</a>
+                <a asp-page="/Beheer/Stand" aria-current="@Huidig("stand")">Stand</a>
+                <a asp-page="/Beheer/Spelers" aria-current="@Huidig("spelers")">Spelers</a>
+                <a asp-page="/Beheer/Instellingen" aria-current="@Huidig("instellingen")">Instellingen</a>
             </div>
         </nav>
     }

@@ -101,3 +101,16 @@ internal sealed class InMemoryVoorbereidingStore : IVoorbereidingStore
         return Task.CompletedTask;
     }
 }
+
+internal sealed class InMemoryOnlineStandStore : IOnlineStandStore
+{
+    public OnlineStand Huidig { get; private set; } = new OnlineStand();
+
+    public Task<OnlineStand> LadenAsync(CancellationToken cancellationToken = default) => Task.FromResult(Huidig);
+
+    public Task OpslaanAsync(OnlineStand online, CancellationToken cancellationToken = default)
+    {
+        Huidig = online;
+        return Task.CompletedTask;
+    }
+}

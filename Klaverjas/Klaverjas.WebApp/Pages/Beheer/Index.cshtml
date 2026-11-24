@@ -1,0 +1,87 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Avonden";
+    ViewData["Tab"] = "avonden";
+    var volgende = Model.Overzicht.VolgendeAvond;
+    var o = Model.Overzicht;
+
+    void OnlineStatus(DateOnly datum)
+    {
+        if (!o.IsOnline(datum))
+        {
+            <span class="status-open">Nog niet online</span>
+        }
+        else if (datum == o.OnlineTot && o.OnlineGewijzigd)
+        {
+            <span class="status-warn">Gewijzigd, nog niet opnieuw online</span>
+        }
+        else if (datum == o.OnlineTot)
+        {
+            <span class="status-ok">✓ Online</span><br><span class="muted" style="font-size:1rem">@Weergave.Kort(Kalender.Datum(o.OnlineSinds)) @Weergave.Tijd(o.OnlineSinds)</span>
+        }
+        else
+        {
+            <span class="status-ok">✓ Online</span>
+        }
+    }
+}
+
+@if (!string.IsNullOrEmpty(Model.Ingelezen))
+{
+    <div class="banner ok"><p>@Model.Ingelezen</p></div>
+}
+
+<h1>Avonden</h1>
+<p class="lead">Vóór de avond: <b>kaartjes en tafels printen</b> (de nummers worden op de avond zelf getrokken). Na de avond: <b>Uitslag invullen</b>.</p>
+
+<div class="card next">
+    <div>
+        <p class="muted" style="margin:0">Volgende speelavond</p>
+        <p class="when">@Weergave.Lang(volgende) <span class="muted" style="font-weight:400">(week @Kalender.Week(volgende))</span></p>
+        <p class="muted" style="margin:0; font-size:1rem">@(Model.Overzicht.VolgendeVoorbereid ? "✓ Kaartjes en tafels klaargezet. Na de avond: Uitslag invullen." : "Vóór de avond: kaartjes en tafels printen.")</p>
+    </div>
+    <div class="actions">
+        <a class="btn @(Model.Overzicht.VolgendeVoorbereid ? "secondary" : "big")" asp-page="/Beheer/Voorbereiden" asp-route-datum="@Weergave.Iso(volgende)">Kaartjes en tafels printen</a>
+        <a class="btn @(Model.Overzicht.VolgendeVoorbereid ? "big" : "secondary")" asp-page="/Beheer/Uitslag" asp-route-datum="@Weergave.Iso(volgende)">Uitslag invullen</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Alle avonden van dit seizoen</h2>
+    @if (Model.Overzicht.Regels.Count == 0)
+    {
+        <p class="muted">Er is nog geen avond ingevuld.</p>
+    }
+    else
+    {
+        <table class="list">
+            <thead><tr><th>Datum</th><th>Week</th><th>Spelers</th><th>Slapers</th><th>Online</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var regel in Model.Overzicht.Regels)
+                {
+                    if (regel.IsGeenSpeelavond)
+                    {
+                        <tr class="off"><td>@Weergave.Kort(regel.Datum)</td><td>@Kalender.Week(regel.Datum)</td><td colspan="4">Geen klaverjassen: @regel.GeenSpeelavond</td></tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td><b>@Weergave.Kort(regel.Datum)</b></td>
+                            <td>@Kalender.Week(regel.Datum)</td>
+                            <td>@regel.Gespeeld</td>
+                            <td>@regel.Slapers</td>
+                            <td>@{ OnlineStatus(regel.Datum); }</td>
+                            <td class="knop"><a class="btn secondary small" asp-page="/Beheer/Uitslag" asp-route-datum="@Weergave.Iso(regel.Datum)">Wijzigen</a></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    }
+    <form method="get" asp-page-handler="Openen" class="inline" style="margin-top:1.25rem">
+        <label for="andere" class="help" style="margin:0">Een andere avond invullen of wijzigen:</label>
+        <input id="andere" class="text" type="date" name="andere" style="max-width:12rem" required>
+        <button type="submit" class="btn secondary small">Openen</button>
+    </form>
+</div>

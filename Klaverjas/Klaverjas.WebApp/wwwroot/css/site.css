@@ -202,3 +202,46 @@ hr.sep { border: 0; border-top: 2px solid var(--line); margin: 1.4rem 0; }
 .login { max-width: 30rem; margin: 3rem auto; }
 .login .brand { color: var(--accent); margin-bottom: 1rem; }
 .login .fout { color: var(--bad-ink); font-weight: 700; }
+
+/* ---------- Spelerspagina (D5; from the mock's phone view) ---------- */
+body.spelers { font-size: 1.1rem; }
+.p-head { background: var(--accent); color: #fff; font-weight: 700; font-size: 1.25rem; }
+.p-head .wrap { padding-top: .8rem; padding-bottom: .8rem; }
+.p-body { padding-top: 1.1rem; padding-bottom: 1.5rem; }
+.p-body h1 { font-size: 1.5rem; margin-bottom: .1rem; }
+.p-body h2 { font-size: 1.2rem; margin: 1.25rem 0 .4rem; }
+.p-body .datum { margin: 0; }
+.p-card { border: 1px solid var(--line); border-radius: 10px; padding: .8rem 1rem; margin: 1rem 0; background: #fbfcfb; }
+.p-card h2 { margin-top: 0; }
+.p-card.bericht { white-space: pre-line; background: var(--accent-soft); border-color: var(--accent); }
+.p-winnaars { list-style: none; margin: 0; padding: 0; }
+.p-winnaars li { display: flex; align-items: center; gap: .6rem; padding: .25rem 0; }
+.p-winnaars li b { margin-left: auto; font-variant-numeric: tabular-nums; }
+table.ptab { width: 100%; border-collapse: collapse; font-size: 1rem; margin-bottom: 1.25rem; background: #fff; }
+table.ptab th { white-space: nowrap; text-align: left; font-size: .85rem; color: var(--ink-soft); border-bottom: 2px solid var(--line); padding: .3rem .35rem; }
+table.ptab td { border-bottom: 1px solid var(--line); padding: .35rem .35rem; font-variant-numeric: tabular-nums; }
+table.ptab td.r, table.ptab th.r { text-align: right; }
+table.ptab td.pl, table.ptab th.pl { width: 2rem; text-align: center; font-weight: 700; }
+.klein { font-size: .9rem; }
+.bijgewerkt { margin-top: 1.25rem; }
+.beheer-link { text-align: right; font-size: .85rem; margin: 1.5rem 0 0; }
+.beheer-link a { color: var(--ink-soft); }
+.alleen-computer { display: none; }
+@media (min-width: 60rem) {
+  .alleen-telefoon { display: none; }
+  .alleen-computer { display: block; margin-top: 1.25rem; }
+  .p-body .p-card { max-width: 40rem; }
+}
+.p-login { max-width: 26rem; }
+.p-login label { display: block; font-weight: 700; margin-bottom: .3rem; }
+.p-login input.text { margin-bottom: 1rem; }
+.p-login .btn { width: 100%; }
+.p-login .fout { color: var(--bad-ink); font-weight: 700; }
+
+/* ---------- Stand online ---------- */
+.status-ok { color: var(--ok-ink); font-weight: 700; }
+.status-warn { color: var(--warn-ink); font-weight: 700; }
+.status-open { color: var(--ink-soft); }
+.banner.big { font-size: 1.35rem; font-weight: 700; }
+textarea.text { font: inherit; width: 100%; max-width: 40rem; min-height: 6rem; padding: .5rem .7rem; border: 2px solid #8a978e; border-radius: 6px; background: #fff; color: var(--ink); }
+.btn:disabled { background: var(--ok-bg); border-color: var(--ok-ink); color: var(--ok-ink); cursor: default; }

@@ -1,6 +1,6 @@
 using Klaverjas.core.Tafels;
 
-namespace Klaverjas.WebApp.Pages.Afdrukken;
+namespace Klaverjas.WebApp.Pages.Beheer.Afdrukken;
 
 /// <summary>
 /// "Deze tafelindeling printen": the overview for the wall plus a score sheet per table per round, two
