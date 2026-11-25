@@ -158,6 +158,7 @@ builder.Services.AddSingleton<IMailVerzender>(sp => sp.GetRequiredService<MailKi
 builder.Services.AddScoped<UitslagOpslaanHandler>();
 builder.Services.AddScoped<SpelerToevoegenHandler>();
 builder.Services.AddScoped<SpelerAanpassenHandler>();
+builder.Services.AddScoped<SpelerWeghalenHandler>();
 builder.Services.AddScoped<InstellingenOpslaanHandler>();
 builder.Services.AddScoped<GeenSpeelavondToevoegenHandler>();
 builder.Services.AddScoped<GeenSpeelavondWeghalenHandler>();

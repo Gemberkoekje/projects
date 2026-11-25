@@ -9,11 +9,13 @@ namespace Klaverjas.WebApp.Pages.Beheer;
 public sealed class SpelersModel(
     SpelersOphalenHandler spelersOphalen,
     SpelerToevoegenHandler toevoegen,
-    SpelerAanpassenHandler aanpassen) : PageModel
+    SpelerAanpassenHandler aanpassen,
+    SpelerWeghalenHandler weghalen) : PageModel
 {
     private readonly SpelersOphalenHandler spelersOphalen = spelersOphalen ?? throw new ArgumentNullException(nameof(spelersOphalen));
     private readonly SpelerToevoegenHandler toevoegen = toevoegen ?? throw new ArgumentNullException(nameof(toevoegen));
     private readonly SpelerAanpassenHandler aanpassen = aanpassen ?? throw new ArgumentNullException(nameof(aanpassen));
+    private readonly SpelerWeghalenHandler weghalen = weghalen ?? throw new ArgumentNullException(nameof(weghalen));
 
     /// <summary>Every player.</summary>
     public IReadOnlyList<Speler> Spelers { get; private set; } = [];
@@ -21,6 +23,10 @@ public sealed class SpelersModel(
     /// <summary>The player being changed; <see cref="Guid.Empty"/> for none.</summary>
     [BindProperty(SupportsGet = true)]
     public Guid Bewerk { get; set; }
+
+    /// <summary>The substitute Dad is asked about before removing; <see cref="Guid.Empty"/> otherwise.</summary>
+    [BindProperty(SupportsGet = true)]
+    public Guid Weghalen { get; set; }
 
     /// <summary>The changed player, as posted.</summary>
     [BindProperty]
@@ -96,6 +102,29 @@ public sealed class SpelersModel(
         Bevestiging = opgeslagen.IsLid && !opgeslagen.InStand
             ? $"Opgeslagen. {opgeslagen.Naam} staat niet meer in de stand van dit seizoen. De scores blijven bewaard; u kunt dit altijd terugzetten."
             : "Opgeslagen.";
+        return RedirectToPage();
+    }
+
+    /// <summary>"Ja, weghalen" for a substitute.</summary>
+    /// <param name="id">The substitute.</param>
+    /// <param name="cancellationToken">Cancels the work.</param>
+    /// <returns>The list with a confirmation, or with what is wrong.</returns>
+    public async Task<IActionResult> OnPostWeghalenAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await LadenAsync(cancellationToken);
+        var naam = Spelers.Where(s => s.Id == id).Select(s => s.Naam).FirstOrDefault() ?? "De invaller";
+        var result = await weghalen.HandleAsync(new SpelerWeghalen { Id = id }, cancellationToken);
+
+        if (!result.IsValid)
+        {
+            Meldingen = [.. result.Messages.Select(m => m.Message ?? string.Empty)];
+            return Page();
+        }
+
+        var avonden = result.Value == 1 ? "avond" : "avonden";
+        Bevestiging = result.Value == 0
+            ? $"{naam} is weggehaald."
+            : $"{naam} is weggehaald, ook uit {result.Value} {avonden}. Zet de stand opnieuw online als dat de winnaars van de laatste avond verandert.";
         return RedirectToPage();
     }
 

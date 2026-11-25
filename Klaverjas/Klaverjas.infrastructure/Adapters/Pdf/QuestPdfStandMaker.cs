@@ -74,17 +74,21 @@ public sealed class QuestPdfStandMaker : IStandPdfMaker
                     rij.RelativeItem(stand.Kolommen.Count + 6).Element(c => PuntenTabel(c, stand, instellingen.Kleuren));
                     rij.RelativeItem(stand.Kolommen.Count + 4).Element(c => PittenTabel(c, stand, instellingen.Kleuren));
                 });
-
-                kolom.Item().Row(rij =>
-                {
-                    rij.Spacing(6);
-                    foreach (var (tekst, kleur) in new[] { ("1e plaats", instellingen.Kleuren.Eerste), ("2e plaats", instellingen.Kleuren.Tweede), ("3e plaats", instellingen.Kleuren.Derde), ("Niet aanwezig", instellingen.Kleuren.Afwezig) })
-                    {
-                        rij.AutoItem().Border(0.5f).BorderColor(Lijn).Background(kleur).PaddingHorizontal(6).PaddingVertical(1).Text(tekst).FontSize(8);
-                    }
-                });
             });
         }));
+    }
+
+    // The colours' legend, right under the points table (Dad, 2026-11-25).
+    private static void Legenda(IContainer container, Kleuren kleuren)
+    {
+        container.PaddingTop(5).Row(rij =>
+        {
+            rij.Spacing(6);
+            foreach (var (tekst, kleur) in new[] { ("1e plaats", kleuren.Eerste), ("2e plaats", kleuren.Tweede), ("3e plaats", kleuren.Derde), ("Niet aanwezig", kleuren.Afwezig) })
+            {
+                rij.AutoItem().Border(0.5f).BorderColor(Lijn).Background(kleur).PaddingHorizontal(6).PaddingVertical(1.5f).Text(tekst).FontSize(9);
+            }
+        });
     }
 
     private static void PuntenTabel(IContainer container, StandWeergave stand, Kleuren kleuren)
@@ -134,6 +138,7 @@ public sealed class QuestPdfStandMaker : IStandPdfMaker
                     PuntenCellen(tabel, stand, invaller, kleuren);
                 }
             });
+            kolom.Item().Element(c => Legenda(c, kleuren));
         });
     }
 

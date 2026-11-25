@@ -36,6 +36,7 @@ else
 
     <h1>Stand na week @week</h1>
     <p class="muted datum">@Weergave.Lang(stand.LaatsteAvond)</p>
+    <p class="printen"><a class="btn secondary" asp-page="/Index" asp-page-handler="Pdf" target="_blank" rel="noopener">🖨 Stand printen</a></p>
 
     @if (online.Bericht.Length > 0)
     {

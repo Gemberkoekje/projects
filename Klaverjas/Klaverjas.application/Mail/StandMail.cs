@@ -5,8 +5,9 @@ using System.Text;
 namespace Klaverjas.application.Mail;
 
 /// <summary>
-/// The standings mail (D2, the approved mock): "Beste …", Dad's note, where the member stands, the
-/// evening's winners, the month's points and pits tables, the address online, and the PDF attached.
+/// The standings mail (D2, the approved mock): "Beste …", Dad's note, the evening's winners, the
+/// month's points and pits tables with the colours' legend, the address online, and the PDF attached.
+/// No "Je staat …e" line: Dad dropped it (2026-11-25).
 /// Inline styles only: mail programs drop style sheets. Everything typed is encoded.
 /// </summary>
 public static class StandMail
@@ -76,12 +77,6 @@ public static class StandMail
             h.Append("<p style=\"margin:0 0 12px\">").Append(E(online.Bericht).Replace("\n", "<br>", StringComparison.Ordinal)).Append("</p>");
         }
 
-        var regel = Positie(stand, lid.Id);
-        if (regel.Length > 0)
-        {
-            h.Append("<p style=\"margin:0 0 12px\">").Append(regel).Append("</p>");
-        }
-
         h.Append("<p style=\"margin:0 0 6px\"><b>Winnaars van ").Append(E(stand.LaatsteAvond.ToString("dddd d MMMM", Nl))).Append(":</b></p>");
         foreach (var winnaar in stand.Winnaars)
         {
@@ -115,13 +110,6 @@ public static class StandMail
             t.Append(online.Bericht).Append("\n\n");
         }
 
-        var punten = stand.Punten.FirstOrDefault(r => r.SpelerId == lid.Id);
-        var pitten = stand.Pitten.FirstOrDefault(r => r.SpelerId == lid.Id);
-        if (punten is not null && pitten is not null)
-        {
-            t.Append("Je staat ").Append(punten.Plaats).Append("e met ").Append(Getal(punten.Totaal)).Append(" punten en ").Append(Getal(pitten.Totaal)).Append(" pitten.\n\n");
-        }
-
         t.Append("Winnaars van ").Append(stand.LaatsteAvond.ToString("dddd d MMMM", Nl)).Append(":\n");
         foreach (var winnaar in stand.Winnaars)
         {
@@ -133,16 +121,6 @@ public static class StandMail
         t.Append(host.Length > 0 ? $", en altijd online op {siteAdres} (met het wachtwoord van de club).\n\n" : ".\n\n");
         t.Append("Groeten,\n").Append(instellingen.AfzenderNaam).Append('\n');
         return t.ToString();
-    }
-
-    private static string Positie(StandWeergave stand, Guid spelerId)
-    {
-        var punten = stand.Punten.FirstOrDefault(r => r.SpelerId == spelerId);
-        var pitten = stand.Pitten.FirstOrDefault(r => r.SpelerId == spelerId);
-
-        return punten is null || pitten is null
-            ? string.Empty
-            : $"Je staat <b>{punten.Plaats}e</b> met <b>{Getal(punten.Totaal)}</b> punten en <b>{Getal(pitten.Totaal)}</b> pitten.";
     }
 
     private static void PuntenTabel(StringBuilder h, StandWeergave stand, Kleuren kleuren)
@@ -176,6 +154,18 @@ public static class StandMail
         }
 
         h.Append("</tbody></table>");
+        Legenda(h, kleuren);
+    }
+
+    private static void Legenda(StringBuilder h, Kleuren kleuren)
+    {
+        h.Append("<p style=\"margin:6px 0 0;font-size:13px;\">");
+        foreach (var (tekst, kleur) in new[] { ("1e plaats", kleuren.Eerste), ("2e plaats", kleuren.Tweede), ("3e plaats", kleuren.Derde), ("Niet aanwezig", kleuren.Afwezig) })
+        {
+            h.Append("<span style=\"display:inline-block;margin:0 6px 4px 0;padding:1px 8px;border:1px solid #6f7a73;background:").Append(kleur).Append(";\">").Append(tekst).Append("</span>");
+        }
+
+        h.Append("</p>");
     }
 
     private static void PuntenCellen(StringBuilder h, StandWeergave stand, WeergaveRegel regel, Kleuren kleuren)

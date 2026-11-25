@@ -4,11 +4,12 @@ _To understand this, read [PLAN.md](PLAN.md) D2, D5 and D7 first. The full runbo
 manifests in gembernodes: `apps/klaverjas/README.md` (start there), plus
 `apps/klaverjas/create-database.sql` and `ingress/klaverjas-route.yaml`._
 
-Klaverjas runs on the gembernodes k3s cluster at https://klaverjas.gemberkoekje.nl, where it replaced
-the design mock (same hostname, Gateway listener and certificate). It's one pod (the old one stops before a new one
+Klaverjas runs on the gembernodes k3s cluster at https://samenspelers.gemberkoekje.nl, the club's
+name (Q2, 2026-11-25). Its first address, https://klaverjas.gemberkoekje.nl, where it replaced the
+design mock, redirects there with the path kept, so the first slips still work. It's one pod (the old one stops before a new one
 starts) on the public Gateway, against the shared PostgreSQL. The image is `ghcr.io/gemberkoekje/klaverjas:<sha>`,
 pushed by `.github/workflows/klaverjas-build-and-push.yml` on every merge to main that touches
-`Klaverjas/`. `gemberkoekje.nl/klaverjas` redirects to the hostname: the app has no path base.
+`Klaverjas/`. `gemberkoekje.nl/klaverjas` redirects there too: the app has no path base.
 
 ## Your steps, in order
 

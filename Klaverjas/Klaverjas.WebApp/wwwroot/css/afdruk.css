@@ -87,7 +87,7 @@ body { margin: 0; background: #c9cfcb; color: #111; font-family: Verdana, Geneva
 .tsheet tr.chk td { background: #fff7cc; border-top: 2px solid #333; border-bottom: 2px solid #333; }
 .tsheet tr.tot th, .tsheet tr.tot td { border-top: 2px solid #333; font-weight: 700; }
 .tsheet tr.tot th { font-size: .55rem; padding: 0 .05rem; }
-.tsheet td.nr { font-weight: 700; font-size: .8rem; padding: 0; }
+.tsheet td.nr { font-size: .8rem; padding: 0; }
 .tsheet th.gs { font-size: .52rem; padding: 0; }
 .tsheet td.lbl2 { font-size: .6rem; text-align: left; padding-left: .3rem; font-weight: 400; }
 .tsheet th.totcol { background: #f3f3f3; font-size: .62rem; font-weight: 700; vertical-align: middle; padding: 0; }
@@ -99,6 +99,6 @@ body { margin: 0; background: #c9cfcb; color: #111; font-family: Verdana, Geneva
 .a4b { page: staand; width: 210mm; height: 297mm; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(5, 1fr); }
 .briefje { border: .3mm dashed #888; padding: 6mm 7mm; display: flex; flex-direction: column; justify-content: center; gap: 1.2mm; font-size: 12pt; line-height: 1.3; min-width: 0; overflow: hidden; }
 .briefje .club { font-weight: 700; font-size: 13pt; }
-.briefje .adres { font-size: 16pt; font-weight: 700; overflow-wrap: anywhere; }
+.briefje .adres { font-size: 15pt; font-weight: 700; overflow-wrap: anywhere; }
 .briefje .ww { font-size: 16pt; overflow-wrap: anywhere; }
 .briefje .uitleg { font-size: 10pt; color: #333; margin-top: 1mm; }

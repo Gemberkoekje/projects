@@ -37,7 +37,7 @@
         <li><b>@b.GeenSpeelavonden.Count avonden zonder klaverjassen</b>@string.Join(", ", b.GeenSpeelavonden.Select(g => g.Reden))</li>
         @if (b.Invallers.Count > 0)
         {
-            <li><b>@b.Invallers.Count keer een invaller</b>de Excel noemt geen namen; ze komen samen onder "@ImportPlanner.InvallerNaam"</li>
+            <li><b>@b.Invallers.Count keer een invaller</b>de Excel noemt geen namen, dus die worden niet ingelezen. Zet invallers zelf bij de avond, met hun naam.</li>
         }
     </ul>
     <p class="help" style="margin:1rem 0 0">Wie @afwezig punten heeft, krijgt in het programma de status Afwezig (groen), behalve wie die avond pitten heeft: die heeft echt @afwezig gespeeld.</p>
