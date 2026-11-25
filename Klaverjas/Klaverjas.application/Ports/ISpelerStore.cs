@@ -1,6 +1,9 @@
 namespace Klaverjas.application.Ports;
 
-/// <summary>Keeps the players, members and substitutes alike. Nobody is ever deleted (D16).</summary>
+/// <summary>
+/// Keeps the players, members and substitutes alike. A member is never deleted (D16); a substitute can
+/// be, with their evenings (Dad, 2026-11-25: the workbook's nameless "Invaller (uit Excel)").
+/// </summary>
 public interface ISpelerStore
 {
     /// <summary>Every player.</summary>
@@ -19,4 +22,10 @@ public interface ISpelerStore
     /// <param name="cancellationToken">Cancels the save.</param>
     /// <returns>A task that completes once stored.</returns>
     Task OpslaanAsync(Speler speler, CancellationToken cancellationToken = default);
+
+    /// <summary>Removes a player.</summary>
+    /// <param name="id">The player's identity.</param>
+    /// <param name="cancellationToken">Cancels the work.</param>
+    /// <returns>A task that completes once removed.</returns>
+    Task WeghalenAsync(Guid id, CancellationToken cancellationToken = default);
 }

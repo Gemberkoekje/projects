@@ -1,13 +1,14 @@
-using System.Collections.Concurrent;
+using System.Globalization;
 
 namespace Klaverjas.core.Tafels;
 
 /// <summary>
-/// The table plans for 4 to 28 players (D13). Dad's workbook holds no clean scheme to import (its
-/// score sheets mix seat numbers, names pulled in from the last draw and broken references), so the
-/// plans are computed, as in the approved mock and with its algorithm: a seeded search, so the same
-/// number of players always gives the same plan. The slapers have the lowest numbers: round 1 is sat
-/// out by numbers 1 up to s, round 2 by the next s, round 3 by the next s (R12).
+/// The table plans for 4 to 28 players (D13): Dad's own, from the score-sheet tabs of his evening
+/// workbook ("16p4ta" and so on, the sheets he prints each Monday), with the workbook's slips repaired.
+/// The numbers his workbook has no tab for are made from his base plans by his own rule: with s extra
+/// players, round r's slapers are numbers (r-1)s+1 to rs, and the extra numbers take their places;
+/// where that would seat the same partners twice (or, from 16 players up, the same people at one table
+/// twice), the fewest swaps in a round that avoid it. Seven players has no plan.
 /// </summary>
 public static class Tafelschemas
 {
@@ -17,7 +18,64 @@ public static class Tafelschemas
     /// <summary>The most players the club has planned for.</summary>
     public const int Maximum = 28;
 
-    private static readonly ConcurrentDictionary<int, Tafelschema> Cache = new ConcurrentDictionary<int, Tafelschema>();
+    /// <summary>
+    /// Each plan: the three rounds split by " / ", the tables by ", ", and per table the four seat numbers as in
+    /// Dad's sheet, read row by row, which is the order around the table: the writer, the first dealer, the first
+    /// player, the fourth (Wij 1, Zij 1, Wij 2, Zij 2). The tables are numbered in this order.
+    /// </summary>
+    private static readonly Dictionary<int, string> Indelingen = new Dictionary<int, string>
+    {
+        // Dad
+        [4] = "1 2 3 4 / 1 3 4 2 / 1 4 2 3",
+        // from 4, one swap
+        [5] = "4 2 3 5 / 1 3 4 5 / 1 4 2 5",
+        // from 4
+        [6] = "5 6 3 4 / 1 5 6 2 / 1 4 2 3",
+        // Dad (sheet Tafelindeling; round 2 table 2 had seat 1 twice, 2 is the one missing)
+        [8] = "1 2 3 4, 5 6 7 8 / 1 6 8 5, 7 3 2 4 / 1 8 6 3, 7 2 4 5",
+        // from 8
+        [9] = "9 2 3 4, 5 6 7 8 / 1 6 8 5, 7 3 9 4 / 1 8 6 9, 7 2 4 5",
+        // from 8
+        [10] = "9 10 3 4, 5 6 7 8 / 1 6 8 5, 7 9 2 10 / 1 8 10 3, 7 2 4 9",
+        // from 8, one swap
+        [11] = "4 10 11 9, 5 6 7 8 / 1 11 8 10, 7 3 2 9 / 1 11 6 3, 10 2 4 5",
+        // Dad
+        [12] = "1 2 3 4, 5 6 7 8, 9 10 11 12 / 1 5 12 9, 7 10 4 3, 2 8 6 11 / 1 7 8 10, 4 6 12 3, 11 9 5 2",
+        // from 12, one swap
+        [13] = "13 2 3 4, 5 6 7 8, 9 10 11 12 / 13 5 12 9, 7 10 4 3, 1 8 6 11 / 1 7 8 10, 4 6 12 13, 11 9 5 2",
+        // from 12
+        [14] = "13 14 3 4, 5 6 7 8, 9 10 11 12 / 1 5 12 9, 7 10 14 13, 2 8 6 11 / 1 7 8 10, 4 14 12 3, 11 9 13 2",
+        // from 12, one swap
+        [15] = "13 14 15 4, 5 6 7 8, 9 10 11 12 / 2 14 12 9, 7 10 13 3, 1 8 15 11 / 1 13 14 10, 4 6 12 3, 11 15 5 2",
+        // Dad
+        [16] = "1 2 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16 / 1 9 5 13, 2 10 6 14, 3 11 7 15, 4 12 8 16 / 1 8 11 14, 2 5 12 15, 3 6 9 16, 4 7 10 13",
+        // Dad
+        [17] = "17 2 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16 / 1 9 5 13, 3 10 6 14, 17 11 7 15, 4 12 8 16 / 1 8 11 14, 2 5 12 15, 17 6 9 16, 4 7 10 13",
+        // Dad (round 1 and round 2 table 1 pointed at the wrong column; by his rule and the seats left)
+        [18] = "17 18 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16 / 1 9 5 13, 2 10 6 14, 17 12 7 15, 18 11 8 16 / 3 7 11 13, 1 18 12 14, 9 17 2 16, 4 8 10 15",
+        // from 16, two swaps
+        [19] = "8 18 19 4, 5 6 7 17, 9 10 11 12, 13 14 15 16 / 1 9 8 13, 2 10 19 14, 3 11 7 15, 17 12 18 16 / 1 18 11 14, 2 5 12 15, 3 6 19 16, 4 17 10 13",
+        // Dad (seat 1 was a typed name)
+        [20] = "1 2 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20 / 14 17 12 7, 1 18 11 16, 2 5 15 20, 6 9 4 19, 10 13 3 8 / 6 13 11 20, 10 15 4 17, 1 14 8 19, 5 18 3 12, 2 9 7 16",
+        // Dad
+        [21] = "21 2 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20 / 14 17 12 7, 1 18 11 16, 21 5 15 20, 6 9 4 19, 10 13 3 8 / 5 13 11 19, 9 15 8 17, 6 14 1 21, 4 16 20 12, 7 10 2 18",
+        // Dad (round 3 table 5 had 15 twice, 9 is the one missing)
+        [22] = "21 22 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20 / 14 17 12 7, 1 18 11 16, 2 5 15 20, 6 9 22 19, 10 13 21 8 / 22 13 11 20, 10 15 4 17, 1 14 8 19, 21 18 2 12, 3 9 7 16",
+        // from 20, two swaps
+        [23] = "5 22 23 4, 21 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20 / 14 17 12 21, 1 18 11 16, 2 22 15 20, 23 9 7 19, 10 13 3 8 / 6 13 11 20, 10 15 4 17, 1 14 22 19, 5 18 3 12, 2 23 21 16",
+        // Dad
+        [24] = "1 2 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20, 21 22 23 24 / 1 9 5 14, 3 18 7 22, 2 19 6 23, 10 4 13 8, 17 12 21 16, 11 20 15 24 / 16 3 19 24, 14 4 21 11, 12 7 13 23, 9 6 18 15, 8 1 17 22, 2 10 5 20",
+        // Dad
+        [25] = "25 2 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20, 21 22 23 24 / 1 9 5 14, 3 18 7 22, 25 19 6 23, 10 4 13 8, 17 12 21 16, 11 20 15 24 / 10 25 14 24, 19 4 21 11, 12 7 13 23, 9 6 18 15, 8 1 17 22, 2 16 5 20",
+        // Dad
+        [26] = "25 26 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20, 21 22 23 24 / 1 9 5 14, 25 18 7 22, 2 19 6 23, 10 26 13 8, 17 12 21 16, 11 20 15 24 / 16 3 19 24, 14 4 21 11, 12 7 13 23, 9 26 18 15, 8 1 17 22, 2 10 25 20",
+        // Dad (26 twice and #REF!: 27 is the one missing)
+        [27] = "25 26 27 4, 5 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20, 21 22 23 24 / 1 9 26 14, 3 18 7 22, 2 19 27 23, 10 25 13 8, 17 12 21 16, 11 20 15 24 / 16 3 19 24, 14 25 21 11, 12 4 13 23, 27 6 18 15, 26 2 17 22, 1 10 5 20",
+        // Dad (#REF!: 27 and 28 are the ones missing)
+        [28] = "1 2 3 4, 5 6 7 8, 9 10 11 12, 13 14 15 16, 17 18 19 20, 21 22 23 24, 25 26 27 28 / 1 10 27 22, 3 7 11 26, 2 5 19 24, 4 6 17 13, 8 9 15 28, 14 18 12 21, 23 16 25 20 / 6 16 12 27, 3 5 22 25, 7 2 28 17, 10 15 18 23, 4 8 24 14, 9 20 21 26, 13 1 19 11",
+    };
+
+    private static readonly Dictionary<int, Tafelschema> Plannen = Indelingen.ToDictionary(kv => kv.Key, kv => Lees(kv.Key, kv.Value));
 
     /// <summary>
     /// Every number of players a plan exists for. Seven is left out: three would have to sit out
@@ -49,186 +107,39 @@ public static class Tafelschemas
             throw new ArgumentOutOfRangeException(nameof(aantal), aantal, "No table plan for this number of players.");
         }
 
-        return Cache.GetOrAdd(aantal, Bereken);
+        return Plannen[aantal];
     }
 
-    private static Tafelschema Bereken(int aantal)
+    private static Tafelschema Lees(int aantal, string indeling)
     {
-        var toeval = new Toeval((uint)(aantal * 7919));
-        var s = aantal % 4;
-        var alle = Enumerable.Range(1, aantal).ToList();
-        var stil = Enumerable.Range(0, 3).Select(r => alle.Skip(r * s).Take(s).ToList()).ToList();
-        var spelend = stil.Select(st => alle.Where(x => !st.Contains(x)).ToList()).ToList();
-        var tafels = aantal / 4;
+        var rondes = indeling.Split(" / ")
+            .Select(ronde => ronde.Split(", ")
+                .Select(tafel => tafel.Split(' ').Select(s => int.Parse(s, CultureInfo.InvariantCulture)).ToList())
+                .Select(s => new Tafel { Wij1 = s[0], Zij1 = s[1], Wij2 = s[2], Zij2 = s[3] })
+                .ToList())
+            .ToList();
 
-        foreach (var streng in tafels >= 4 ? new[] { true, false } : new[] { false })
+        var samen = rondes.SelectMany(r => r).SelectMany(t => Paren(t.Stoelen)).ToList();
+
+        return new Tafelschema
         {
-            for (var poging = 0; poging < 40; poging++)
+            Aantal = aantal,
+            NooitTweeKeerSamen = samen.Count == samen.Distinct().Count(),
+            Rondes = [.. rondes.Select(tafels => new Ronde
             {
-                var plan = Probeer(spelend, streng, toeval);
-                if (plan.Count == 3)
-                {
-                    return Schema(aantal, plan, stil, streng);
-                }
-            }
-        }
-
-        // Not reached for 4–28 players (the specs check every number); kept so a plan always exists.
-        return Schema(aantal, [.. spelend.Select(p => Vieren(Schud([.. p], toeval)))], stil, nooitTweeKeer: false);
-    }
-
-    private static List<List<List<int>>> Probeer(List<List<int>> spelend, bool streng, Toeval toeval)
-    {
-        var ontmoet = new HashSet<(int, int)>();
-        var maten = new HashSet<(int, int)>();
-        var plan = new List<List<List<int>>>();
-
-        foreach (var ronde in spelend)
-        {
-            var tafels = Ronde(ronde, ontmoet, maten, streng, toeval);
-            if (tafels.Count == 0)
-            {
-                return [];
-            }
-
-            foreach (var g in tafels)
-            {
-                for (var i = 0; i < 4; i++)
-                {
-                    for (var j = i + 1; j < 4; j++)
-                    {
-                        ontmoet.Add(Paar(g[i], g[j]));
-                    }
-                }
-
-                maten.Add(Paar(g[0], g[1]));
-                maten.Add(Paar(g[2], g[3]));
-            }
-
-            plan.Add(tafels);
-        }
-
-        return plan;
-    }
-
-    /// <summary>
-    /// Seats one round: each table starts with the next player of a shuffled list; the partner and
-    /// the others are whoever has met the fewest of those already seated.
-    /// </summary>
-    private static List<List<int>> Ronde(List<int> spelend, HashSet<(int, int)> ontmoet, HashSet<(int, int)> maten, bool streng, Toeval toeval)
-    {
-        for (var poging = 0; poging < 400; poging++)
-        {
-            var pot = Schud([.. spelend], toeval);
-            var tafels = new List<List<int>>();
-            var gelukt = true;
-
-            while (pot.Count > 0 && gelukt)
-            {
-                var g = new List<int> { pot[0] };
-                pot.RemoveAt(0);
-                gelukt = Vul(g, pot, ontmoet, maten, streng);
-                tafels.Add(g);
-            }
-
-            if (gelukt)
-            {
-                return tafels;
-            }
-        }
-
-        return [];
-    }
-
-    private static bool Vul(List<int> g, List<int> pot, HashSet<(int, int)> ontmoet, HashSet<(int, int)> maten, bool streng)
-    {
-        while (g.Count < 4)
-        {
-            var beste = Beste(g, pot, ontmoet, maten, streng);
-            if (beste < 0)
-            {
-                return false;
-            }
-
-            g.Add(pot[beste]);
-            pot.RemoveAt(beste);
-        }
-
-        return true;
-    }
-
-    /// <summary>The next to seat: who has met the fewest of those already at the table, never a former partner as partner.</summary>
-    /// <returns>The index in the pot, or -1 when nobody fits.</returns>
-    private static int Beste(List<int> g, List<int> pot, HashSet<(int, int)> ontmoet, HashSet<(int, int)> maten, bool streng)
-    {
-        // The second seat is the first one's partner, the fourth the third one's.
-        var maatVan = g.Count switch
-        {
-            1 => g[0],
-            3 => g[2],
-            _ => 0,
+                Tafels = tafels,
+                Stil = [.. Enumerable.Range(1, aantal).Except(tafels.SelectMany(t => t.Stoelen))],
+            })],
         };
-
-        var beste = -1;
-        var besteKosten = int.MaxValue;
-
-        for (var i = 0; i < pot.Count && besteKosten > 0; i++)
-        {
-            var c = pot[i];
-            var kosten = g.Count(x => ontmoet.Contains(Paar(x, c)));
-            var verboden = (streng && kosten > 0) || (maatVan != 0 && maten.Contains(Paar(maatVan, c)));
-
-            if (!verboden && kosten < besteKosten)
-            {
-                besteKosten = kosten;
-                beste = i;
-            }
-        }
-
-        return beste;
     }
 
-    private static Tafelschema Schema(int aantal, List<List<List<int>>> plan, List<List<int>> stil, bool nooitTweeKeer) => new Tafelschema
+    private static IEnumerable<(int, int)> Paren(IReadOnlyList<int> stoelen)
     {
-        Aantal = aantal,
-        NooitTweeKeerSamen = nooitTweeKeer,
-        Rondes = [.. plan.Select((tafels, r) => new Ronde
+        for (var i = 0; i < stoelen.Count; i++)
         {
-            Tafels = [.. tafels.Select(g => new Tafel { Wij1 = g[0], Wij2 = g[1], Zij1 = g[2], Zij2 = g[3] })],
-            Stil = stil[r],
-        })],
-    };
-
-    private static List<List<int>> Vieren(List<int> spelers)
-        => [.. Enumerable.Range(0, spelers.Count / 4).Select(t => spelers.Skip(t * 4).Take(4).ToList())];
-
-    private static (int, int) Paar(int a, int b) => a < b ? (a, b) : (b, a);
-
-    /// <summary>Fisher–Yates from the end, as in the mock.</summary>
-    private static List<int> Schud(List<int> lijst, Toeval toeval)
-    {
-        for (var i = lijst.Count - 1; i > 0; i--)
-        {
-            var j = (int)Math.Floor(toeval.Volgende() * (i + 1));
-            (lijst[i], lijst[j]) = (lijst[j], lijst[i]);
-        }
-
-        return lijst;
-    }
-
-    /// <summary>The mock's seeded random numbers (mulberry32), so a number of players always gets the same plan.</summary>
-    private sealed class Toeval(uint zaad)
-    {
-        private uint staat = zaad;
-
-        public double Volgende()
-        {
-            unchecked
+            for (var j = i + 1; j < stoelen.Count; j++)
             {
-                staat += 0x6D2B79F5;
-                var t = (staat ^ (staat >> 15)) * (1 | staat);
-                t = (t + ((t ^ (t >> 7)) * (61 | t))) ^ t;
-                return (t ^ (t >> 14)) / 4294967296.0;
+                yield return stoelen[i] < stoelen[j] ? (stoelen[i], stoelen[j]) : (stoelen[j], stoelen[i]);
             }
         }
     }

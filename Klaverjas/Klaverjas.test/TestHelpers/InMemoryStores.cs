@@ -27,6 +27,12 @@ internal sealed class InMemorySpelerStore : ISpelerStore
         spelers[speler.Id] = speler;
         return Task.CompletedTask;
     }
+
+    public Task WeghalenAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        spelers.Remove(id);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class InMemoryAvondStore : IAvondStore

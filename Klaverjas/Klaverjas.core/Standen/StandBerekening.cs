@@ -70,7 +70,7 @@ public static class StandBerekening
         var invallers = alle
             .Where(s => s.Soort == Soort.Invaller)
             .Select(Regel)
-            .Where(r => r.Avonden.Values.Any(c => !c.IsAfwezig))
+            .Where(r => r.Avonden.Count > 0)
             .OrderBy(r => r.Speler.Naam, NaamVolgorde)
             .ToList();
 
@@ -109,9 +109,11 @@ public static class StandBerekening
     {
         if (uitslagen.TryGetValue(speler.Id, out var uitslag))
         {
+            // A substitute is never absent: only the evenings played count (Dad, 2026-11-25). An absence
+            // left over from someone's time as a member shows nowhere once they are a substitute.
             if (uitslag.Status == Status.Afwezig)
             {
-                return new Cel { Status = Status.Afwezig, Punten = puntenAfwezig };
+                return speler.IsLid ? new Cel { Status = Status.Afwezig, Punten = puntenAfwezig } : Cel.Leeg;
             }
 
             var p = plaats(uitslag.Punten);

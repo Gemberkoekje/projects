@@ -7,7 +7,6 @@ namespace Klaverjas.application.Import;
 public static class ImportPlanner
 {
     /// <summary>The name of the player the unnamed "invallers" row becomes; Dad can rename it.</summary>
-    public const string InvallerNaam = "Invaller (uit Excel)";
 
     /// <summary>Plans a workbook.</summary>
     /// <param name="bestand">The workbook as read.</param>
@@ -46,9 +45,6 @@ public static class ImportPlanner
             };
         }).ToList();
 
-        var invaller = bestaand.TryGetValue(NaamVergelijker.Gewoon(InvallerNaam), out var bekend) ? bekend : null;
-        var heeftInvallers = bestand.Invallers.Count > 0;
-
         var voorstel = new ImportVoorstel
         {
             Id = id,
@@ -56,8 +52,6 @@ public static class ImportPlanner
             GemaaktOp = nu,
             Bestand = bestand,
             Spelers = importSpelers,
-            InvallerId = !heeftInvallers ? Guid.Empty : invaller?.Id ?? Guid.NewGuid(),
-            InvallerIsNieuw = heeftInvallers && invaller is null,
         };
 
         return MetVerschillen(voorstel, avonden, instellingen);
@@ -104,10 +98,6 @@ public static class ImportPlanner
         var rijen = voorstel.Spelers.Zip(bestand.Punten).ToList();
 
         var nieuw = voorstel.Spelers.Where(s => s.IsNieuw).Select(s => new Speler { Id = s.SpelerId, Naam = s.Naam, Soort = Soort.Lid }).ToList();
-        if (voorstel.InvallerIsNieuw)
-        {
-            nieuw.Add(new Speler { Id = voorstel.InvallerId, Naam = InvallerNaam, Soort = Soort.Invaller });
-        }
 
         IEnumerable<Uitslag> Uitslagen(DateOnly datum)
         {
@@ -127,11 +117,8 @@ public static class ImportPlanner
                     : new Uitslag { SpelerId = speler.SpelerId, Status = Status.Speelt, Punten = punten, Pitten = pit };
             }
 
-            var invaller = bestand.Invallers.FirstOrDefault(w => w.Datum == datum);
-            if (invaller is not null && voorstel.InvallerId != Guid.Empty)
-            {
-                yield return new Uitslag { SpelerId = voorstel.InvallerId, Status = Status.Speelt, Punten = invaller.Getal };
-            }
+            // The workbook's "invallers" row has scores but no names: not read in. Dad enters the
+            // substitutes himself, by name, on the evenings they play (2026-11-25).
         }
 
         var avonden = bestand.Avonden.Select(d => Avond.Van(d, Uitslagen(d))).ToList();

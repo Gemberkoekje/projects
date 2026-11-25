@@ -116,17 +116,18 @@ public sealed class ImportPlanner_specs
         var plan = Plan(Bestand(), [bestaand], []);
 
         plan.Spelers.Single(s => s.Naam == "Annie de Graaf").Should().Match<ImportSpeler>(s => s.SpelerId == bestaand.Id && !s.IsNieuw);
-        ImportPlanner.Toepassen(plan, Standaard).NieuweSpelers.Select(s => s.Naam).Should().Equal("Joop Verhoeven", "Kees Bakker", ImportPlanner.InvallerNaam);
+        ImportPlanner.Toepassen(plan, Standaard).NieuweSpelers.Select(s => s.Naam).Should().Equal("Joop Verhoeven", "Kees Bakker");
     }
 
     [Test]
-    public void the_unnamed_invallers_row_becomes_one_substitute()
+    public void the_unnamed_invallers_row_is_not_read_in()
     {
+        // Dad, 2026-11-25: no "Invaller (uit Excel)"; he enters substitutes by name on their evenings.
         var plan = Plan(Bestand());
         var resultaat = ImportPlanner.Toepassen(plan, Standaard);
 
-        resultaat.NieuweSpelers.Single(s => s.Id == plan.InvallerId).Soort.Should().Be(Soort.Invaller);
-        resultaat.Avonden.Single(a => a.Datum == Wk45).Uitslagen.Single(u => u.SpelerId == plan.InvallerId).Punten.Should().Be(5292);
+        resultaat.NieuweSpelers.Should().OnlyContain(s => s.Soort == Soort.Lid);
+        resultaat.Avonden.Single(a => a.Datum == Wk45).Uitslagen.Should().NotContain(u => u.Punten == 5292);
     }
 
     [Test]
@@ -193,8 +194,8 @@ public sealed class ImportPlanner_specs
         var result = await new ImportUitvoerenHandler(voorstellen, spelers, avonden, instellingen, NullLogger<ImportUitvoerenHandler>.Instance)
             .HandleAsync(new ImportUitvoeren { Id = plan.Id });
 
-        result.Value.Should().Be(new ImportUitgevoerd { NieuweSpelers = 4, Avonden = 2, GeenSpeelavonden = 1 });
-        (spelers.Alle.Count, avonden.Alle.Count, instellingen.Huidig.GeenSpeelavonden.Count, voorstellen.Alle.Count).Should().Be((4, 2, 1, 0));
+        result.Value.Should().Be(new ImportUitgevoerd { NieuweSpelers = 3, Avonden = 2, GeenSpeelavonden = 1 });
+        (spelers.Alle.Count, avonden.Alle.Count, instellingen.Huidig.GeenSpeelavonden.Count, voorstellen.Alle.Count).Should().Be((3, 2, 1, 0));
 
         var stand = StandBerekening.Bereken(spelers.Alle, avonden.Alle, instellingen.Huidig, 2026);
         stand.Punten.Select(r => r.Totaal).Should().Equal(9186, 8764, 8244);

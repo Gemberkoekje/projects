@@ -21,12 +21,6 @@ public sealed record ImportVoorstel
     /// <summary>One per `Stand` row: the player it becomes, and the `pit` row coupled to it.</summary>
     public IReadOnlyList<ImportSpeler> Spelers { get; init; } = [];
 
-    /// <summary>The player the unnamed "invallers" row becomes; <see cref="Guid.Empty"/> when that row is empty.</summary>
-    public Guid InvallerId { get; init; }
-
-    /// <summary>Whether <see cref="InvallerId"/> is a new player.</summary>
-    public bool InvallerIsNieuw { get; init; }
-
     /// <summary>The `pit` rows coupled to nobody.</summary>
     public IReadOnlyList<string> LossePitNamen { get; init; } = [];
 

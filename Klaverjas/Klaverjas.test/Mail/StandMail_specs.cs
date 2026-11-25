@@ -17,21 +17,22 @@ public sealed class StandMail_specs
     }
 
     [Test]
-    public void the_mail_greets_the_member_by_first_name_and_says_where_they_stand()
+    public void the_mail_greets_the_member_by_first_name_without_a_place_line()
     {
+        // Dad, 2026-11-25: "Je staat 1e met … punten en … pitten" goes.
         var (html, tekst) = StandMail.Inhoud(Online(), Standaard, kees, Site);
 
-        html.Should().Contain("Beste Kees,");
-        html.Should().Contain("Je staat <b>2e</b> met <b>4500</b> punten en <b>5</b> pitten.");
-        tekst.Should().Contain("Je staat 2e met 4500 punten en 5 pitten.");
+        html.Should().Contain("Beste Kees,").And.NotContain("Je staat");
+        tekst.Should().Contain("Beste Kees,").And.NotContain("Je staat");
     }
 
     [Test]
-    public void someone_not_in_the_standings_gets_no_place_line()
+    public void the_tables_have_a_legend_of_the_colours()
     {
-        var (html, _) = StandMail.Inhoud(Online(), Standaard, Lid("Nieuw Lid"), Site);
+        var (html, _) = StandMail.Inhoud(Online(), Standaard, kees, Site);
 
-        html.Should().Contain("Beste Nieuw,").And.NotContain("Je staat");
+        html.Should().Contain("1e plaats").And.Contain("2e plaats").And.Contain("3e plaats").And.Contain("Niet aanwezig");
+        html.Should().Contain($"background:{Standaard.Kleuren.Afwezig};\">Niet aanwezig");
     }
 
     [Test]

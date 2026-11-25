@@ -3,7 +3,7 @@ namespace Klaverjas.core.Tafels;
 /// <summary>One table in one round, by seat number: Wij 1 &amp; Wij 2 against Zij 1 &amp; Zij 2 (partners sit opposite).</summary>
 public sealed record Tafel
 {
-    /// <summary>The first Wij player; deals the first hand (D18).</summary>
+    /// <summary>The first Wij player: the first on the score sheet, who writes (keeps the score) (Dad, 2026-11-25).</summary>
     public int Wij1 { get; init; }
 
     /// <summary>Wij 1's partner.</summary>
@@ -18,18 +18,21 @@ public sealed record Tafel
     /// <summary>The four seats.</summary>
     public IReadOnlyList<int> Stoelen => [Wij1, Wij2, Zij1, Zij2];
 
-    /// <summary>Clockwise round the table, partners opposite: Wij 1, Zij 1, Wij 2, Zij 2 (D18).</summary>
+    /// <summary>Clockwise round the table, partners opposite: Wij 1, Zij 1, Wij 2, Zij 2 (D18), as on the score sheet read row by row.</summary>
     public IReadOnlyList<int> Klokrond => [Wij1, Zij1, Wij2, Zij2];
 
-    /// <summary>Who deals a hand: hand 1 is dealt by Wij 1, then clockwise.</summary>
+    /// <summary>
+    /// Who deals a hand: the first on the sheet writes, the second deals hand 1, then clockwise (Dad,
+    /// 2026-11-25; dealing 3-2-3 clockwise, his rules).
+    /// </summary>
     /// <param name="spel">The hand (1–16).</param>
     /// <returns>The dealer's seat number.</returns>
-    public int Gever(int spel) => Klokrond[(spel - 1) % 4];
+    public int Gever(int spel) => Klokrond[spel % 4];
 
-    /// <summary>Who must play a hand: the player to the dealer's left (Dad confirmed, Q15).</summary>
+    /// <summary>Who must play a hand: the player to the dealer's left, the third on the sheet for hand 1 (Dad, Q15 and 2026-11-25).</summary>
     /// <param name="spel">The hand (1–16).</param>
     /// <returns>The seat number.</returns>
-    public int Speler(int spel) => Klokrond[spel % 4];
+    public int Speler(int spel) => Klokrond[(spel + 1) % 4];
 }
 
 /// <summary>One round: the tables, and the numbers that sit it out.</summary>

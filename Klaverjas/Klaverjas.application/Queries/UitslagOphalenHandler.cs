@@ -40,7 +40,11 @@ public sealed class UitslagOphalenHandler(IAvondStore avonden, ISpelerStore spel
 
         var voorbereid = await voorbereidingen.LadenAsync(datum, cancellationToken);
         var regels = geladen.IsValid
-            ? geladen.Value.Uitslagen.Where(u => perId.ContainsKey(u.SpelerId)).Select(u => Regel(perId[u.SpelerId], u)).ToList()
+            ? geladen.Value.Uitslagen
+                .Where(u => perId.ContainsKey(u.SpelerId))
+                .Where(u => perId[u.SpelerId].IsLid || u.Status != Status.Afwezig)
+                .Select(u => Regel(perId[u.SpelerId], u))
+                .ToList()
             : [.. alle.Where(s => s.IsLid && s.DoetMee).Select(s => Nieuw(s, voorbereid))];
 
         var opHetScherm = regels.Select(r => r.Speler.Id).ToHashSet();

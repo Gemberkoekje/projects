@@ -414,7 +414,7 @@ mock; sent from your Gmail through the cluster's mail secret (Q1).
 **Next: slice 6**, gembernodes: the app replaces the static mock at klaverjas.gemberkoekje.nl, with
 the mail secret, and a live check that starts with a test mail.
 
-## Slice 6: live on gembernodes (2026-11-24, manifests ready)
+## Slice 6: live on gembernodes (2026-11-24)
 
 The app takes over klaverjas.gemberkoekje.nl from the static mock. This slice is two pull requests:
 the gembernodes manifests and [DEPLOY.md](DEPLOY.md) here. It goes live after your two steps
@@ -440,12 +440,29 @@ the gembernodes manifests and [DEPLOY.md](DEPLOY.md) here. It goes live after yo
 - **`Auth__Password` is Dad's first password, then yours:** once Dad has chosen his own, change it
   to one only you keep, since it keeps opening `/beheer` as the way back in.
 
-**Still to do (yours, then mine)**
+**Live check (2026-11-24, after gembernodes#275)**
 
-- The database and the item, then merge the gembernodes PR; I then do the live check with you:
-  `/healthz`, the redirect, signing in at `/beheer`, the players' password, a test mail through Gmail.
-- Q2 (a web address with the club's name) is still open; the slips and links follow the hostname by
-  themselves.
+- Flux applied the merge (`flux reconcile` of `infrastructure`, `ingress` and `apps`, which were
+  waiting on each other): the pod runs the slice 5 image, the Caddy mock is gone, both items came
+  through with their fields, and the app started in Production without errors and with mail on.
+- Public: `/healthz` ok; `/` and `/beheer` go to their own sign-in pages over https; `http` goes to
+  `https`; `gemberkoekje.nl/klaverjas` (and `/klaverjas/beheer`) lands on the app; `noindex` and HSTS set.
+- You, signed in: read Dad's workbook in, set the players' password and the reply address, put the
+  stand after week 47 online, and sent the test mail. The log: "gemaild (proef): 1 van 1 verstuurd",
+  so Gmail took it. Then you handed it to Dad: his device signed in as a player and then into
+  `/beheer` (his first try there with the players' password was refused, as meant). No errors, no restarts; 141 MiB after the
+  import and the PDF, well inside the 512 MiB limit.
+- The data-protection warning "No XML encryptor configured" is expected: the key ring sits in the
+  app's own database, as for the other apps.
+
+**Still open**
+
+- Change `Auth__Password` to one only you keep once Dad has chosen his own (DEPLOY.md, step 5).
+- Q2 (a web address with the club's name); the slips and links follow the hostname by themselves.
+- Slice 7, the hand-over. Dad has it (2026-11-24): he tries it out on December's last evenings,
+  next to his workbooks, and uses it fully from the 2027 season in January. Before January he sets
+  the season's first evening and the evenings without play in Instellingen; the standings start at
+  0 by themselves with the first January evening (R1). His one-page guide still to write.
 
 ## Stand printen: a button of its own (2026-11-24)
 
@@ -490,3 +507,81 @@ the mail buttons. Your call: give him an obvious button outside the mail.
 |---|---|
 | `Klaverjas.WebApp/Pages/Beheer/Stand.cshtml` | the "Stand printen" card, the banner link, the mail card's wording |
 | `Klaverjas.WebApp/Pages/Beheer/Stand.cshtml.cs` | doc comments; the failed-mail summary points at "Stand printen" |
+
+## Dad's first feedback, and samenspelers.gemberkoekje.nl (2026-11-25)
+
+Dad tried it and sent eight points (with his club rules), and you moved the site to the club's name.
+To understand this round, read `Klaverjas.core/Tafels/Tafelschemas.cs` (the plans as data) and
+`Klaverjas.core/Tafels/Tafelschema.cs` (`Gever`, `Speler`).
+
+**What changed, by Dad's point**
+
+1. **Players get "Stand printen"** under the date on their page: it opens the PDF of the standings
+   online (the sheet Dad mails), to print. Dad's own Stand page has had one since projects#284.
+2. **No "Invaller (uit Excel)"**: the import no longer reads the workbook's nameless "invallers" row,
+   and the check screen says so. Substitutes on the Spelers page get **"Weghalen"** (with a
+   confirmation): the person and their results go from every evening. Dad removes the existing
+   "Invaller (uit Excel)" that way. Members are still never removed (D16).
+3. **A substitute shows only on evenings played**: an absence never counts for a substitute, so a
+   member changed to substitute ("Wijzigen" → Invaller) leaves the ranking and drops their 4200s; the
+   entry screen leaves the absence out too.
+4. **The first on the score sheet writes, the second deals, the third plays**: the dealer and player
+   numbers move one seat on (hand 1: dealer Zij 1, player Wij 2).
+5. **The dealer and player numbers are plain**, not bold.
+6. **No "Je staat …e met … punten en … pitten"** in the mail.
+7. **A legend of the colours** under the points table in the mail, and right under the points table
+   in the PDF (it was a small row at the bottom).
+8. **The table plans are Dad's own** (D13 changed back): read from the score-sheet tabs of his
+   evening workbook, repaired where the workbook slips, the missing counts made by his own rule.
+
+Also: **samenspelers.gemberkoekje.nl** (Q2, your call): the gembernodes PR adds a Gateway listener and
+redirects `klaverjas.gemberkoekje.nl` (308, path kept) and `gemberkoekje.nl/klaverjas` there. The slips
+take the address from the request; its size on the slip is 15pt now, so the longer name keeps one line.
+
+**How the plans were read** (scratch scripts, the workbook stays private)
+
+- Each tab has one block per table per round; its two name rows are formulas `=Invulblad!H{r}`, and
+  `Invulblad` row r holds seat r−1. Read row by row, a block is the order around the table, the
+  writer first: [Wij 1, Zij 1, Wij 2, Zij 2].
+- Clean: 4, 12, 16, 17, 20 (seat 1 typed as a name), 21, 24, 25, 26. Repaired: 8 (its tab is a copy
+  of 16's; the `Tafelindeling` sheet has the plan, with seat 1 twice in round 2), 18 (round 1 points at
+  the wrong column; his rule and the seats left fill it), 22 (15 twice, 9 missing), 27 (26 twice,
+  `#REF!`), 28 (`#REF!` for 27 and 28).
+- His extended plans all follow one rule: with s extra players, round r's slapers are (r−1)s+1..rs and
+  the extras take their places; in 17, 18, 21 and 22 he also moved a player so nobody meets twice. The
+  same rule makes 5, 6, 9–11, 13–15, 19 and 23, with the fewest swaps (a small beam search) so nobody
+  gets the same partner twice, and from 16 up nobody sits with the same people twice. 19 is his
+  16-player plan with two swaps, 23 his 20-player plan with two.
+- `Tafelindeling` (the sheet) disagrees with the tabs on who partners whom (its 20-player plan), so the
+  tabs win: they are what Dad prints.
+
+**Checked**
+
+- 267 specs: the plans for every count (everyone once a round, the slapers by his rule, no partner
+  twice, from 16 up no table-mates twice), pins to his tabs (16, 17, 20, 24, 12) and to the repairs
+  (8, 22, 27) and to the rule (19); writer/dealer/player; substitutes (absence never counts, the entry
+  screen, removing one and their evenings, a member never removed); the import without the nameless
+  row; the mail without the place line and with the legend.
+- Locally with invented members: the 16-player sheet reads Wij 1/3 against Zij 2/4, hand 1 dealt by 2
+  and played by 3, plain numbers, round 2 "1 & 5 tegen 9 & 13" as in his tab; a member changed to
+  substitute left the ranking and kept only the evening he played; "Weghalen" asked first and removed
+  the substitute; the players' "Stand printen" returned the PDF; the mail preview has the legend and no
+  place line. Proofs printed through Chrome: the 16-player plan with its sheets, and the standings PDF.
+
+**Gotchas**
+
+- The plans are data now: never "improve" them in code. A change to a count's line changes what Dad
+  prints; the pins in `Tafelschemas_specs` guard his own plans.
+- In Dad's sheets the writer is the first name, not the first dealer: a sheet read row by row is the
+  order around the table.
+
+**Files**
+
+| Where | What |
+|---|---|
+| `Klaverjas.core/Tafels/Tafelschemas.cs` | the plans as data, read into `Tafelschema`; no search any more |
+| `Klaverjas.core/Tafels/Tafelschema.cs` | `Gever`/`Speler` one seat on; who writes |
+| `Klaverjas.core/Standen/StandBerekening.cs` | a substitute's absence is no cell |
+| `Klaverjas.application` | `SpelerWeghalen` (+ handler), `ISpelerStore.WeghalenAsync`; `ImportPlanner` without the nameless row; `UitslagOphalen` leaves a substitute's absence out; `StandMail` without the place line, with the legend |
+| `Klaverjas.infrastructure` | `MartenSpelerStore.WeghalenAsync`; the PDF's legend under the points table |
+| `Klaverjas.WebApp` | the players' "Stand printen" (`/?handler=Pdf`); Spelers "Weghalen"; Inlezen's text; plain dealer numbers and the slip's address size in `afdruk.css` |

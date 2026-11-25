@@ -32,6 +32,14 @@ public sealed class MartenSpelerStore(IDocumentStore store) : ISpelerStore
         return StoreAsync(speler, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task WeghalenAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        using var session = store.LightweightSession();
+        session.Delete<Speler>(id);
+        await session.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task StoreAsync(Speler speler, CancellationToken cancellationToken)
     {
         using var session = store.LightweightSession();

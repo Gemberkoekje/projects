@@ -5,13 +5,14 @@ _To understand this, start with this file, then open [mock/index.html](mock/inde
 week-47 standings' real numbers, because this repository is public. What Dad's two workbooks do,
 sheet by sheet, is in `explainer/index.html` (git-ignored: personal reference)._
 
-**Status (2026-11-24):** **slices 1 to 5 are built**: sign-in, players, entering an evening, the
+**Status (2026-11-24):** **slices 1 to 6 are done**: sign-in, players, entering an evening, the
 standings, reading Dad's "Standen" workbook (every points total matches it), downloading every score,
 preparing an evening (cards, slapers, table plan and score sheets), the players' page with "Zet de
 stand online", the slips and both passwords (Dad's admin now lives at /beheer), and the optional email
 with the PDF. What they do, the decisions taken while building and the gotchas are in
-[NOTES.md](NOTES.md); slice 6 (putting it live on gembernodes) is ready to deploy, see
-[DEPLOY.md](DEPLOY.md). Before that: the plan
+[NOTES.md](NOTES.md). **It is live** since 2026-11-24 (slice 6, [DEPLOY.md](DEPLOY.md)), at
+https://samenspelers.gemberkoekje.nl since 2026-11-25 (the first address redirects). Slice 7, the
+hand-over, is under way: Dad tries it in December, and his first feedback is in (NOTES.md). Before that: the plan
 and the mock, which **Dad approved** (2026-11-23), and his answers to the question sheet
 [vragenblad/vragenblad.pdf](vragenblad/vragenblad.pdf) (see "Dad's answers" below), which changed
 the slapers (he picks them beforehand and they get the numbers 1, 2, 3 …, D12) and added R16–R19.
@@ -145,7 +146,8 @@ everything else is formulas.
   evenings without play, and the "invallers" row becomes substitutes. Names are matched across the
   two sheets despite the spelling differences, with a check that the totals equal the workbook's.
   _(Your call; layout now known.)_
-- **D5** **The players' page is the main output.** It lives at **klaverjas.gemberkoekje.nl**,
+- **D5** **The players' page is the main output.** It lives at **samenspelers.gemberkoekje.nl** (Q2;
+  first klaverjas.gemberkoekje.nl, which redirects),
   read-only, behind **one players' password**. Dad hands out **printed slips** with the address and
   the password (Instellingen → "Briefjes printen", 10 per A4; Dad, Q13). The phone or computer
   remembers it. The page is `noindex` and uses full names, as on the PDF. It shows Dad's note, the
@@ -191,11 +193,15 @@ everything else is formulas.
     players (D18).
   - Absence is set while entering the result (D1). The slapers come pre-set from here, and Dad can
     still change them there if the evening went differently.
-- **D13** The table plans are **computed** with the approved mock's seeded search, so Dad gets the plans
-  he saw (changed 2026-11-23: Dad's workbook holds no clean scheme to import; its score sheets mix seat
-  numbers with names from the last draw and broken references). Seven players has no plan. With
-  16 or more players nobody sits with the same people twice. With fewer (only 3 tables a round)
-  that's impossible, so then nobody gets the same partner twice. Dad's 12-player scheme also repeats.
+- **D13** The table plans are **Dad's own**, from the score-sheet tabs of his evening workbook (`16p4ta`
+  and so on): the names there are formulas into the draw list, and those references give the seat
+  numbers. (Changed back 2026-11-25, Dad: "hou die tafelindelingen zo veel mogelijk aan"; from
+  2026-11-23 they were computed with the mock's search.) The workbook's slips (a seat twice, `#REF!`,
+  a tab copied from another) are repaired with the one seat missing in that round. The numbers without
+  a tab (5, 6, 9–11, 13–15, 19, 23) follow his own rule: with s extra players, round r's slapers are
+  numbers (r−1)s+1 to rs and the extras take their places, plus the fewest swaps so nobody gets the same
+  partner twice (from 16 players up, nobody sits with the same people twice either). Seven players has
+  no plan. Below 16 players some people meet twice, as in his own 12-player plan.
 - **D14** Spelers holds members and substitutes (type Lid / Invaller) with email, phone, address
   and birthday, plus a printable member list (replacing the "Leden" sheet).
 - **D15** The app prints **the personal score cards in Dad's own layout**, 12 per A4 (3 across,
@@ -216,8 +222,9 @@ everything else is formulas.
   0 – 162 split strip. The grid has hands 1–16 with points and roem for both pairs, the **Gever** (dealer) and
   **Speler** (who must play) per hand, filled in by seat number. No suit symbols, and the Spel column
   is narrow: Punten wider, Roem narrower (Dad's pen notes, 2026-11-23). Dealing goes clockwise with partners opposite each other (first Wij, first Zij, second
-  Wij, second Zij), starting with the first Wij number. The Speler is the one to the dealer's left. _(Your call,
-  2026-11-23; Dad confirmed it, Q15.)_ After every 4 hands there's a subtotal row to fill in (a running total), with the
+  Wij, second Zij): the sheet's pairs read row by row. **The first writes, the second deals hand 1, the
+  third plays it** (Dad, 2026-11-25; hand 1 used to start with the first Wij), then clockwise. The Speler is
+  the one to the dealer's left (Dad, Q15). The dealer and player numbers are plain, not bold (Dad). After every 4 hands there's a subtotal row to fill in (a running total), with the
   **control number** across the Gever and Speler columns: what both pairs' points (without roem) must
   add up to so far, 648, 1296, 1944 and 2592, as on Dad's sheets and placemat. At
   the bottom, per pair: totaal punten, totaal roem, eindtotaal and pitten. _(Dad's wish, 2026-11-23.)_
@@ -244,7 +251,6 @@ scores, and there was never a proper fix for it. So:
 - **Q19 (Dad, not blocking)** **4 May**: the pits sheet has 9 pits that evening, but the points sheet
   says "vier mei" (no play). Was there play? The import leaves those pits out; if there was play, Dad
   can enter the evening himself.
-- **Q2 (yours)** The web address: `klaverjas.gemberkoekje.nl` for now, or one with the club's name (De Samenspelers)?
 - **Q17 (Dad, before the Eindstand is built; not blocking)** The weekly standings count every evening,
   as the sheet does (R16). **In the Eindstand in December, are the four lowest evenings (one per
   quarter) taken off?** Or is "vervalt" only a marking? (Points only; the pits sheet has no such column.)
@@ -297,11 +303,13 @@ Follow-ups, relayed by you the same day:
 5. **Email + PDF (optional extra).** One HTML mail per member, the PDF like today's month sheet, the
    test mail, the send log and the list of members without email. Sent from your Gmail through the
    cluster's mail secret (Q1, your answer 2026-11-24). _Built 2026-11-24 (see NOTES.md)._
-6. **gembernodes.** Manifests, 1Password items, `DEPLOY.md` and a live check. _Manifests and
-   [DEPLOY.md](DEPLOY.md) written 2026-11-24; live once you've made the database and the item and
-   merged the gembernodes PR._
+6. **gembernodes.** Manifests, 1Password items, `DEPLOY.md` and a live check. _Live since
+   2026-11-24 (gembernodes#275, projects#282; see [DEPLOY.md](DEPLOY.md)); the test mail went out
+   through Gmail._
 7. **Hand-over.** For two Mondays the app runs alongside the workbooks and the results are compared.
-   Dad gets a one-page printed guide, and I fix whatever he trips over.
+   Dad gets a one-page printed guide, and I fix whatever he trips over. _Started 2026-11-24: Dad has
+   it and tries it on December's last evenings next to his workbooks, then uses it fully from the
+   2027 season in January._
 
 ## Screens (see the mock)
 
