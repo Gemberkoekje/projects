@@ -108,6 +108,7 @@ table.list td { padding: .55rem .6rem; border-bottom: 1px solid var(--line); ver
 table.list tr:last-child td { border-bottom: none; }
 table.list tr.off td { color: var(--ink-soft); font-style: italic; }
 table.list td.knop { text-align: right; white-space: nowrap; }
+table.list td.tel { white-space: nowrap; }
 
 /* ---------- Uitslag invullen ---------- */
 .dateline { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; margin-bottom: 1rem; }

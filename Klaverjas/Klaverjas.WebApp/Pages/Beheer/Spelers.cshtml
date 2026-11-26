@@ -37,14 +37,14 @@
 
 <div class="card">
     <table class="list">
-        <thead><tr><th>Naam</th><th>Soort</th><th>E-mailadres</th><th>Doet mee?</th><th></th></tr></thead>
+        <thead><tr><th>Naam</th><th>Telefoon</th><th>Soort</th><th>E-mailadres</th><th>Doet mee?</th><th></th></tr></thead>
         <tbody>
             @foreach (var s in Model.Spelers)
             {
                 if (s.Id == Model.Bewerk)
                 {
                     <tr>
-                        <td colspan="5">
+                        <td colspan="6">
                             <form method="post" asp-page-handler="Opslaan" class="bewerk" data-bewerk>
                                 <input type="hidden" name="Formulier.Id" value="@s.Id">
                                 <input class="text" name="Formulier.Naam" value="@s.Naam" aria-label="Naam" style="max-width:18rem" required>
@@ -81,6 +81,11 @@
                 {
                     <tr>
                         <td><b>@s.Naam</b></td>
+                        <td class="tel">
+                            @if (SpelersModel.BelLink(s.Telefoon).Length > 0) { <a href="tel:@SpelersModel.BelLink(s.Telefoon)">@s.Telefoon</a> }
+                            else if (s.Telefoon.Length > 0) { @s.Telefoon }
+                            else { <span class="muted">geen nummer</span> }
+                        </td>
                         <td>@(s.IsLid ? "Lid" : "Invaller")</td>
                         <td>@if (s.Email.Length > 0) { @s.Email } else { <span class="muted">geen e-mail</span> }</td>
                         <td>
@@ -103,7 +108,7 @@
         Stopt iemand (of is iemand overleden)? Zet die op <b>Gestopt</b>: de naam komt niet meer op het invulscherm, en gaat <b>uit de stand</b> van dit seizoen.
         De scores blijven bewaard, en u kunt het altijd terugzetten. Wilt u iemand die stopt toch in de stand houden? Kies dan daarna <b>Blijft in de stand</b>.
         Een <b>invaller</b> komt alleen in de stand op de avonden dat die meespeelt; een invaller die er niet meer bij hoort kunt u <b>weghalen</b>.
-        Adres, telefoon en verjaardag staan onder <b>Wijzigen</b>.</p>
+        Telefoon, adres en verjaardag vult u in onder <b>Wijzigen</b>. Op een mobiele telefoon belt u iemand door op het nummer te tikken.</p>
 </div>
 
 <div class="card">
