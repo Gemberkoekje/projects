@@ -45,7 +45,7 @@ public sealed class UitslagOphalenHandler(IAvondStore avonden, ISpelerStore spel
                 .Where(u => perId[u.SpelerId].IsLid || u.Status != Status.Afwezig)
                 .Select(u => Regel(perId[u.SpelerId], u))
                 .ToList()
-            : [.. alle.Where(s => s.IsLid && s.DoetMee).Select(s => Nieuw(s, voorbereid))];
+            : [.. alle.Where(s => s.IsLid && s.DoetMee).Select(s => Nieuw(s, voorbereid)), .. MetKaartje(alle, voorbereid)];
 
         var opHetScherm = regels.Select(r => r.Speler.Id).ToHashSet();
 
@@ -75,6 +75,12 @@ public sealed class UitslagOphalenHandler(IAvondStore avonden, ISpelerStore spel
             ? new UitslagRegel { Speler = speler }
             : new UitslagRegel { Speler = speler, Status = Status.Slaper, Ronde = Tafelschemas.Voor(voorbereid.Value.Verwacht).RondeStil(nummer) };
     }
+
+    /// <summary>The substitutes Dad gave a card when preparing: already on a new evening's entry screen.</summary>
+    private static IEnumerable<UitslagRegel> MetKaartje(IEnumerable<Speler> alle, Result<Voorbereiding> voorbereid)
+        => voorbereid.IsValid
+            ? alle.Where(s => !s.IsLid && s.DoetMee && voorbereid.Value.Kaartjes.Contains(s.Id)).Select(s => new UitslagRegel { Speler = s })
+            : [];
 
     private static UitslagRegel Regel(Speler speler, Uitslag uitslag) => new UitslagRegel
     {

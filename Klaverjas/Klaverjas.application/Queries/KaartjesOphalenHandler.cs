@@ -3,9 +3,9 @@ using Klaverjas.core.Tafels;
 namespace Klaverjas.application.Queries;
 
 /// <summary>
-/// The cards as Dad's own card sheet has them: the first name (the full name when two active members
+/// The cards as Dad's own card sheet has them: the first name (the full name when two active players
 /// share it, Q16), the date, and for a slaper the number top right plus 1600 and "Slaper n" in the
-/// round sat out. Then the blank cards.
+/// round sat out. A substitute's card is the same as a member's. Then the blank cards.
 /// </summary>
 public sealed class KaartjesOphalenHandler(VoorbereidingOphalenHandler voorbereiding, IInstellingenStore instellingen)
 {
@@ -39,7 +39,7 @@ public sealed class KaartjesOphalenHandler(VoorbereidingOphalenHandler voorberei
     {
         var formulier = (await voorbereiding.HandleAsync(new VoorbereidingOphalen { Datum = datum }, cancellationToken)).Value;
         var v = formulier.Voorbereiding;
-        var actief = formulier.Leden.Select(l => l.Speler).ToList();
+        var actief = formulier.Leden.Select(l => l.Speler).Concat(formulier.Invallers).OrderBy(s => s.Naam, StandBerekening.NaamVolgorde).ToList();
         var metKaartje = actief.Where(s => v.Kaartjes.Contains(s.Id)).ToList();
 
         var lijst = metKaartje

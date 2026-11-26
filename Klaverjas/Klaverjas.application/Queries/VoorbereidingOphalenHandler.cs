@@ -4,7 +4,8 @@ namespace Klaverjas.application.Queries;
 
 /// <summary>
 /// Fills the preparation screen: the stored preparation, or for a new one every active member with a
-/// card, two blank cards, and as many players expected as there are cards.
+/// card, two blank cards, and as many players expected as there are cards. Who has a card follows the
+/// players as they are now: a member Dad never unticked has one, a substitute only when ticked.
 /// </summary>
 public sealed class VoorbereidingOphalenHandler(IVoorbereidingStore voorbereidingen, ISpelerStore spelers, IAvondStore avonden)
 {
@@ -25,22 +26,23 @@ public sealed class VoorbereidingOphalenHandler(IVoorbereidingStore voorbereidin
 
     private async Task<Result<VoorbereidingFormulier>> OphalenAsync(DateOnly datum, CancellationToken cancellationToken)
     {
-        var actief = (await spelers.AllesAsync(cancellationToken))
-            .Where(s => s.IsLid && s.DoetMee)
+        var spelend = (await spelers.AllesAsync(cancellationToken))
+            .Where(s => s.DoetMee)
             .OrderBy(s => s.Naam, StandBerekening.NaamVolgorde)
             .ToList();
+        var actief = spelend.Where(s => s.IsLid).ToList();
         var geschiedenis = SlaperKeuze.Tel(await avonden.AllesAsync(cancellationToken), datum.Year);
         var opgeslagen = await voorbereidingen.LadenAsync(datum, cancellationToken);
 
-        var voorbereiding = opgeslagen.IsValid
-            ? opgeslagen.Value
-            : new Voorbereiding
-            {
-                Id = Voorbereiding.IdVan(datum),
-                Datum = datum,
-                Kaartjes = [.. actief.Select(s => s.Id)],
-                Verwacht = Tafelschemas.Dichtstbij(actief.Count),
-            };
+        var bewaard = opgeslagen.IsValid ? opgeslagen.Value : new Voorbereiding { Id = Voorbereiding.IdVan(datum), Datum = datum };
+
+        // The cards as the players are now, so a member added or changed after saving is not lost.
+        var kaartjes = spelend.Where(bewaard.HeeftKaartje).Select(s => s.Id).ToList();
+        var voorbereiding = bewaard with
+        {
+            Kaartjes = kaartjes,
+            Verwacht = bewaard.VerwachtZelfGekozen ? bewaard.Verwacht : Tafelschemas.Dichtstbij(kaartjes.Count),
+        };
 
         var schema = Tafelschemas.Voor(Tafelschemas.Dichtstbij(voorbereiding.Verwacht));
 
@@ -48,6 +50,7 @@ public sealed class VoorbereidingOphalenHandler(IVoorbereidingStore voorbereidin
         {
             Voorbereiding = voorbereiding with { Verwacht = schema.Aantal, Slapers = SlaperKeuze.Passend(voorbereiding.Slapers, schema.Slapers) },
             Leden = [.. actief.Select(s => new Lid { Speler = s, Geslapen = geschiedenis.TryGetValue(s.Id, out var g) ? g : new Slaapgeschiedenis() })],
+            Invallers = [.. spelend.Where(s => !s.IsLid)],
             Schema = schema,
         });
     }
