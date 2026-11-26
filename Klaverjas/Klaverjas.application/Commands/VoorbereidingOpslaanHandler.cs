@@ -3,8 +3,9 @@ using Klaverjas.core.Tafels;
 namespace Klaverjas.application.Commands;
 
 /// <summary>
-/// Stores an evening's preparation. The slapers are kept to members who get a card, cut or padded to
-/// the number the expected players need, and filled fairly when Dad asks for a proposal.
+/// Stores an evening's preparation: who gets a card (members and substitutes, as ticked) and which
+/// members Dad unticked. The slapers are kept to members who get a card, cut or padded to the number
+/// the expected players need, and filled fairly when Dad asks for a proposal.
 /// </summary>
 public sealed class VoorbereidingOpslaanHandler(
     IVoorbereidingStore voorbereidingen,
@@ -36,8 +37,9 @@ public sealed class VoorbereidingOpslaanHandler(
                 $"Voor {command.Verwacht} spelers is er geen tafelindeling. Kies een aantal van {Tafelschemas.Minimum} tot en met {Tafelschemas.Maximum} (behalve 7)."));
         }
 
-        var actief = (await spelers.AllesAsync(cancellationToken)).Where(s => s.IsLid && s.DoetMee).ToDictionary(s => s.Id);
-        var kaartjes = command.Kaartjes.Distinct().Where(actief.ContainsKey).ToList();
+        var spelend = (await spelers.AllesAsync(cancellationToken)).Where(s => s.DoetMee).ToDictionary(s => s.Id);
+        var actief = spelend.Values.Where(s => s.IsLid).ToDictionary(s => s.Id);
+        var kaartjes = command.Kaartjes.Distinct().Where(spelend.ContainsKey).ToList();
 
         // The expected number follows the ticked cards until Dad sets it himself (as in the mock).
         var vorige = await voorbereidingen.LadenAsync(command.Datum, cancellationToken);
@@ -46,13 +48,13 @@ public sealed class VoorbereidingOpslaanHandler(
         var verwacht = zelfGekozen ? command.Verwacht : Tafelschemas.Dichtstbij(kaartjes.Count);
         var schema = Tafelschemas.Voor(verwacht);
 
-        // A slaper must be someone with a card.
-        var gekozen = SlaperKeuze.Passend([.. command.Slapers.Select(id => kaartjes.Contains(id) ? id : Guid.Empty)], schema.Slapers);
+        // A slaper must be a member with a card.
+        var gekozen = SlaperKeuze.Passend([.. command.Slapers.Select(id => kaartjes.Contains(id) && actief.ContainsKey(id) ? id : Guid.Empty)], schema.Slapers);
 
         if (command.Voorstellen)
         {
             var geschiedenis = SlaperKeuze.Tel(await avonden.AllesAsync(cancellationToken), command.Datum.Year);
-            gekozen = SlaperKeuze.EerlijkVoorstel(gekozen, schema.Slapers, kaartjes.Select(id => actief[id]), geschiedenis);
+            gekozen = SlaperKeuze.EerlijkVoorstel(gekozen, schema.Slapers, kaartjes.Where(actief.ContainsKey).Select(id => actief[id]), geschiedenis);
         }
 
         await voorbereidingen.OpslaanAsync(
@@ -61,6 +63,7 @@ public sealed class VoorbereidingOpslaanHandler(
                 Id = Voorbereiding.IdVan(command.Datum),
                 Datum = command.Datum,
                 Kaartjes = kaartjes,
+                ZonderKaartje = [.. actief.Keys.Where(id => !kaartjes.Contains(id))],
                 Blanco = Math.Clamp(command.Blanco, 0, Voorbereiding.MaxBlanco),
                 Verwacht = verwacht,
                 VerwachtZelfGekozen = zelfGekozen,

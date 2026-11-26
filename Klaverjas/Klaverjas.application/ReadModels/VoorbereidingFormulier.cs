@@ -11,6 +11,9 @@ public sealed record VoorbereidingFormulier
     /// <summary>The active members, by name, with how often each sat out this season.</summary>
     public IReadOnlyList<Lid> Leden { get; init; } = [];
 
+    /// <summary>The active substitutes, by name: in the card list, unticked unless Dad ticks one.</summary>
+    public IReadOnlyList<Speler> Invallers { get; init; } = [];
+
     /// <summary>The table plan for the expected number of players.</summary>
     public Tafelschema Schema { get; init; } = new Tafelschema();
 }

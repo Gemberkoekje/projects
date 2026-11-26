@@ -6,7 +6,7 @@ public sealed record VoorbereidingOpslaan : ICommand
     /// <summary>The evening.</summary>
     public DateOnly Datum { get; init; }
 
-    /// <summary>The members who get a card.</summary>
+    /// <summary>The players who get a card: members and substitutes, as ticked.</summary>
     public IReadOnlyList<Guid> Kaartjes { get; init; } = [];
 
     /// <summary>Blank cards for substitutes.</summary>

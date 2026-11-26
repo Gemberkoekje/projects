@@ -179,7 +179,9 @@ everything else is formulas.
   does not draw**: the numbers are drawn on the evening itself (R12, Dad's wish against any
   impression of false play). _(2026-11-23.)_
   - **Kaartjes printen:** a card for every active member (Dad unticks anyone he knows won't come),
-    plus a few blank ones for substitutes, with names and date but **no number**.
+    plus a few blank ones for substitutes, with names and date but **no number**. The known
+    substitutes are in the list too, unticked; a ticked one gets the same card as a member (Dad,
+    2026-11-26). The list follows the players as they are now: a member Dad never unticked has a card.
   - **Wie slaapt er?** (Dad's answers Q10 and Q18 and his note, 2026-11-23.) Before printing, Dad
     picks the slapers. The expected number of players (by default the ticked members) gives how many:
     one row per slaper, "Slaper 1" to "Slaper k", each with its number and the round it sits out

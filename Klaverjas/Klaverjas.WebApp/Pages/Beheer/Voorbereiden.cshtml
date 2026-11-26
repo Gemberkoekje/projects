@@ -40,8 +40,19 @@
                 <label><input type="checkbox" name="Kaartjes" value="@speler.Id" checked="@v.Kaartjes.Contains(speler.Id)" data-kaartje> @speler.Naam</label>
             }
         </div>
+        @if (f.Invallers.Count > 0)
+        {
+            <h3 style="margin-top:1.25rem">Invallers</h3>
+            <p class="help">Weet u dat er een invaller komt? Vink die aan: die krijgt hetzelfde kaartje als de leden.</p>
+            <div class="checklist">
+                @foreach (var speler in f.Invallers)
+                {
+                    <label><input type="checkbox" name="Kaartjes" value="@speler.Id" checked="@v.Kaartjes.Contains(speler.Id)" data-kaartje> @speler.Naam</label>
+                }
+            </div>
+        }
         <div class="inline" style="margin-top:1rem">
-            <label for="blanco" style="font-weight:700">Lege kaartjes voor invallers:</label>
+            <label for="blanco" style="font-weight:700">Lege kaartjes voor andere invallers:</label>
             <input class="text short" id="blanco" name="Blanco" value="@v.Blanco" inputmode="numeric" style="max-width:5rem">
         </div>
     </div>

@@ -17,8 +17,14 @@ public sealed record Voorbereiding
     /// <summary>The evening.</summary>
     public DateOnly Datum { get; init; }
 
-    /// <summary>The members who get a card with their name.</summary>
+    /// <summary>The players who get a card with their name: members, and the substitutes Dad ticked.</summary>
     public IReadOnlyList<Guid> Kaartjes { get; init; } = [];
+
+    /// <summary>
+    /// The members Dad unticked. A member in neither list (new, or a member since this was saved) gets a
+    /// card; a substitute only when ticked (Dad, 2026-11-26).
+    /// </summary>
+    public IReadOnlyList<Guid> ZonderKaartje { get; init; } = [];
 
     /// <summary>Blank cards for substitutes.</summary>
     public int Blanco { get; init; } = 2;
@@ -36,6 +42,16 @@ public sealed record Voorbereiding
     /// <param name="datum">The evening.</param>
     /// <returns>The date as <c>yyyy-MM-dd</c>.</returns>
     public static string IdVan(DateOnly datum) => datum.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    /// <summary>Whether a player gets a card with their name: as ticked or unticked, else members do and substitutes don't.</summary>
+    /// <param name="speler">The player.</param>
+    /// <returns><see langword="true"/> for a card.</returns>
+    public bool HeeftKaartje(Speler speler)
+    {
+        ArgumentNullException.ThrowIfNull(speler);
+
+        return Kaartjes.Contains(speler.Id) || (speler.IsLid && !ZonderKaartje.Contains(speler.Id));
+    }
 
     /// <summary>A player's slaper number.</summary>
     /// <param name="spelerId">The player.</param>

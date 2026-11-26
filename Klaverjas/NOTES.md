@@ -585,3 +585,62 @@ take the address from the request; its size on the slip is 15pt now, so the long
 | `Klaverjas.application` | `SpelerWeghalen` (+ handler), `ISpelerStore.WeghalenAsync`; `ImportPlanner` without the nameless row; `UitslagOphalen` leaves a substitute's absence out; `StandMail` without the place line, with the legend |
 | `Klaverjas.infrastructure` | `MartenSpelerStore.WeghalenAsync`; the PDF's legend under the points table |
 | `Klaverjas.WebApp` | the players' "Stand printen" (`/?handler=Pdf`); Spelers "Weghalen"; Inlezen's text; plain dealer numbers and the slip's address size in `afdruk.css` |
+
+**Live check of the new address (2026-11-25, after gembernodes#278)**
+
+- Flux applied the merge; the pod runs `32684dcf` (this round), no errors. `samenspelers.gemberkoekje.nl`: `/healthz`
+  ok, a Let's Encrypt certificate (`samenspelers-tls`), the players' sign-in, `noindex` and HSTS.
+  `klaverjas.gemberkoekje.nl` redirects 308 on http and https with the path and `ReturnUrl` kept;
+  `gemberkoekje.nl/klaverjas` 301, `/klaverjas/beheer` to `/beheer`.
+
+## Dad's second feedback: the card list and the slips (2026-11-26)
+
+To understand this, read `Klaverjas.core/Models/Voorbereiding.cs` (`HeeftKaartje`) and
+`Klaverjas.application/Queries/VoorbereidingOphalenHandler.cs`.
+
+**What Dad found, and why**
+
+- **The slips broke the address**: "samenspelers.gemberkoekje" with ".nl" on the next line, confusing
+  for older players. The longer name no longer fitted at 15pt and the line was allowed to break
+  anywhere. Now it never breaks (`white-space: nowrap`), at 14pt with a little less side padding;
+  measured in the printed PDF it ends some 40pt before the slip's edge.
+- **"Wie krijgt een kaartje?" showed 19 of the 20 members.** The live data (read with ids and counts
+  only) had all 20 members active, but the saved preparation of 30 November (saved 25 November
+  13:08) held 19 of today's members plus one player who has been a substitute since (the players
+  were changed at 22:16). The screen started from the saved ticks, which listed only who got a
+  card: so one current member showed unticked, and the card of the new substitute was invisible but
+  still counted ("20 kaartjes met naam"). Not a browser or server cache: the saved choice did not
+  follow later changes to who is a member.
+- **Substitutes were not in the list**: only blank cards for them.
+
+**What changed**
+
+- A preparation also keeps the members Dad **unticked** (`ZonderKaartje`). Who has a card is worked out
+  from the players as they are now: ticked, or a member Dad never unticked (so a new member, or one
+  who became a member after saving, gets a card); a substitute only when ticked. For the saved 30
+  November preparation that means the missing member gets a card again, and the player who became a
+  substitute keeps the card Dad gave him (now shown, ticked, among the substitutes).
+- The list has the members, then **"Invallers"**, unticked: a ticked substitute gets **the same card**
+  as a member (first name, nothing that says invaller), counts towards the expected players, and is
+  already on that evening's entry screen among the substitutes. "Lege kaartjes voor andere invallers"
+  stays for the ones he doesn't know beforehand.
+- **Slapers stay members**: a substitute with a card is never a slaper, and "Eerlijk voorstel" only
+  proposes members (it works from this season's sit-outs, which substitutes don't have).
+
+**Checked**
+
+- 274 specs (7 new): substitutes listed but unticked; a member since saving gets a card; an unticked
+  member stays unticked; someone who became a substitute keeps the card; a substitute's card equals a
+  member's; a ticked substitute is on the entry screen; a substitute is never a slaper.
+- Locally with invented players: 30 November's list showed the 20 members ticked and the two
+  substitutes unticked under "Invallers" (counter 20); with Bert ticked, 21 cards, his reading
+  "Bert"; Bert on that evening's entry screen. The slips printed through Chrome with the real
+  address: one line, ten on one A4.
+
+**Files**
+
+| Where | What |
+|---|---|
+| `Klaverjas.core/Models/Voorbereiding.cs` | `ZonderKaartje`, `HeeftKaartje` |
+| `Klaverjas.application` | `VoorbereidingOphalen` (cards as the players are now; `Invallers`), `VoorbereidingOpslaan` (substitutes may have a card; stores who was unticked; slapers members only), `KaartjesOphalen` (substitutes' cards), `UitslagOphalen` (ticked substitutes on a new evening) |
+| `Klaverjas.WebApp` | `Beheer/Voorbereiden` (the "Invallers" part of the list), `afdruk.css` (the slip's address) |
