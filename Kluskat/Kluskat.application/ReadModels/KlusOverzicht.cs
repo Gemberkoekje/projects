@@ -32,6 +32,9 @@ public sealed record KlusOverzicht
     /// <summary>Whether the latest "Gedaan" can still be taken back.</summary>
     public bool KanTerugdraaien { get; init; }
 
+    /// <summary>How often the klus was done, minus completions taken back.</summary>
+    public int KeerGedaan { get; init; }
+
     /// <summary>Whether the klus left the list for good.</summary>
     public bool Geschrapt { get; init; }
 
@@ -47,6 +50,13 @@ public sealed record KlusOverzicht
     /// <param name="nu">The current moment (UTC).</param>
     /// <returns><see langword="true"/> from <see cref="VolgendeKeer"/> on.</returns>
     public bool IsAanDeBeurt(DateTime nu) => nu >= VolgendeKeer;
+
+    /// <summary>
+    /// Whether the app has ever seen the klus done. Until then <see cref="LaatstGedaan"/> is only the
+    /// staggered start, not a real memory.
+    /// </summary>
+    [JsonIgnore]
+    public bool OoitGedaan => KeerGedaan > 0;
 
     /// <summary>Projects a klus onto its read model.</summary>
     /// <param name="klus">The klus.</param>
@@ -64,6 +74,7 @@ public sealed record KlusOverzicht
             Grootte = klus.Grootte,
             LaatstGedaan = klus.LaatstGedaan,
             KanTerugdraaien = klus.KanTerugdraaien,
+            KeerGedaan = klus.KeerGedaan,
             Geschrapt = klus.Geschrapt,
         };
     }

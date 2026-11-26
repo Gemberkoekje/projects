@@ -8,8 +8,8 @@ internal static class Fixtures
     public static Klus.Data Data(string naam = "Stofzuigen", int dagen = 7, Grootte grootte = Grootte.Klein, string ruimte = "Keuken")
         => new Klus.Data { Ruimte = ruimte, Naam = naam, IntervalDagen = dagen, Grootte = grootte };
 
-    /// <summary>A read model with a chosen last-done moment, for picker specs.</summary>
-    public static KlusOverzicht Overzicht(string naam, int dagen, double dagenGeleden, Grootte grootte = Grootte.Klein)
+    /// <summary>A read model with a chosen last-done moment, for picker specs; never done unless <paramref name="keerGedaan"/> says so.</summary>
+    public static KlusOverzicht Overzicht(string naam, int dagen, double dagenGeleden, Grootte grootte = Grootte.Klein, int keerGedaan = 0)
         => new KlusOverzicht
         {
             Id = Guid.NewGuid(),
@@ -18,6 +18,7 @@ internal static class Fixtures
             IntervalDagen = dagen,
             Grootte = grootte,
             LaatstGedaan = Nu.AddDays(-dagenGeleden),
+            KeerGedaan = keerGedaan,
         };
 
     /// <summary>A completion at a moment, for game-rule specs.</summary>

@@ -39,6 +39,13 @@ public sealed class Klus(KlusId aggregateId) : Aggregate<Klus, KlusId>(aggregate
     /// <summary>How often the klus was skipped since it was last done; the "Overwinnaar" badge reads it.</summary>
     public int KeerOvergeslagen { get; private set; }
 
+    /// <summary>
+    /// How often the klus was done (on the klus screen or entered on Beheer), minus completions taken
+    /// back. Zero means the app has never seen it done: <see cref="LaatstGedaan"/> is then only the
+    /// staggered start, or the moment it was added.
+    /// </summary>
+    public int KeerGedaan { get; private set; }
+
     /// <summary>Whether the klus left the list for good.</summary>
     public bool Geschrapt { get; private set; }
 
@@ -188,12 +195,14 @@ public sealed class Klus(KlusId aggregateId) : Aggregate<Klus, KlusId>(aggregate
         LaatstGedaan = @event.GedaanOp;
         KanTerugdraaien = true;
         KeerOvergeslagen = 0;
+        KeerGedaan++;
     }
 
     internal void When(KlusGedaanTeruggedraaid @event)
     {
         LaatstGedaan = @event.LaatstGedaan;
         KanTerugdraaien = false;
+        KeerGedaan--;
     }
 
     internal void When(KlusOvergeslagen @event)

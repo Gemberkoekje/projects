@@ -5,30 +5,55 @@ namespace Kluskat.test.Kiezen;
 public sealed class KlusKiezer_specs
 {
     [Test]
-    public void picks_the_klus_that_has_been_due_longest()
+    public void a_klus_done_before_is_ranked_by_its_own_interval()
     {
-        // A yearly klus thirty days late has waited longer than a weekly klus three days late.
+        // A weekly klus three days late is further behind than a yearly klus thirty days late.
+        var wekelijks = Overzicht("Stofzuigen", dagen: 7, dagenGeleden: 10, keerGedaan: 1);
+        var jaarlijks = Overzicht("Gordijnen", dagen: 365, dagenGeleden: 395, keerGedaan: 1);
+
+        var keuze = KlusKiezer.Kies([jaarlijks, wekelijks], new Sessie(), Nu, vooruit: false);
+
+        keuze.Uitkomst.Should().Be(KeuzeUitkomst.Klus);
+        keuze.Klus.Should().Be(wekelijks, because: "10/7 intervals behind beats 395/365");
+    }
+
+    [Test]
+    public void a_klus_never_done_counts_as_weekly_until_its_first_gedaan()
+    {
+        // Neither was ever done in the app, so both count as weekly: due 30 days beats due 3 days.
         var wekelijks = Overzicht("Stofzuigen", dagen: 7, dagenGeleden: 10);
         var jaarlijks = Overzicht("Gordijnen", dagen: 365, dagenGeleden: 395);
 
         var keuze = KlusKiezer.Kies([wekelijks, jaarlijks], new Sessie(), Nu, vooruit: false);
 
-        keuze.Uitkomst.Should().Be(KeuzeUitkomst.Klus);
-        keuze.Klus.Should().Be(jaarlijks, because: "due 30 days ago beats due 3 days ago, whatever the interval");
+        keuze.Klus.Should().Be(jaarlijks);
     }
 
     [Test]
-    public void a_weekly_klus_does_not_come_round_again_before_a_waiting_fortnightly_one()
+    public void a_klus_never_done_comes_before_a_weekly_klus_comes_round_again()
     {
         // The live case of 2026-11-17: kitchen vacuuming (done 19 days ago) came back while the WC,
-        // due for 19 days, had never been offered. Relative to its interval the vacuuming was further
-        // behind (2.7 against 2.4 intervals), but the WC has waited longer.
-        var stofzuigen = Overzicht("Stofzuigen", dagen: 7, dagenGeleden: 19);
+        // due for 19 days but never done in the app, had never been offered. Relative to its own
+        // interval the vacuuming was further behind (2.7 against 2.4), but nobody knew when the WC
+        // was last cleaned; as a weekly klus it is 3.7 behind.
+        var stofzuigen = Overzicht("Stofzuigen", dagen: 7, dagenGeleden: 19, keerGedaan: 1);
         var wc = Overzicht("WC schoonmaken", dagen: 14, dagenGeleden: 33);
 
         var keuze = KlusKiezer.Kies([stofzuigen, wc], new Sessie(), Nu, vooruit: false);
 
         keuze.Klus.Should().Be(wc);
+    }
+
+    [Test]
+    public void once_done_a_klus_keeps_its_own_interval()
+    {
+        // The same two, but the WC was cleaned once: now it waits its turn by its fortnightly interval.
+        var stofzuigen = Overzicht("Stofzuigen", dagen: 7, dagenGeleden: 19, keerGedaan: 1);
+        var wc = Overzicht("WC schoonmaken", dagen: 14, dagenGeleden: 33, keerGedaan: 1);
+
+        var keuze = KlusKiezer.Kies([wc, stofzuigen], new Sessie(), Nu, vooruit: false);
+
+        keuze.Klus.Should().Be(stofzuigen, because: "19/7 intervals behind beats 33/14");
     }
 
     [Test]

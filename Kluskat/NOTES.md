@@ -191,3 +191,60 @@ afzuigkap, kattenbak; the bathroom sink is 14th.
 | `Kluskat.application/ReadModels/KlusOverzicht.cs` | `Achterstand` removed |
 | `Kluskat.test/Kiezen/KlusKiezer_specs.cs` | flipped first spec + the live case |
 | `DESIGN.md` §1, §3 | the new rule, the old one, and the reason |
+
+## Phase 4 — weekly until done once (2026-11-26)
+
+_Start with `KlusKiezer.Urgentie` and DESIGN.md §3, then `Services/LeesmodelVernieuwingService.cs`._
+
+### Why
+
+Nine days of longest due first (8 chores done, the WC among them; the kattenbak skipped twice)
+did what was asked, but the user wanted a middle between the two rules: things nobody remembers
+doing should come before a weekly chore comes round again, and once a chore has really been done,
+keeping intervals is fine. Longest due first would have stretched the weekly chores to ~50 days for
+good.
+
+### What changed
+
+- **`Klus.KeerGedaan`**: +1 per `KlusGedaan` (klus screen or Beheer), −1 per undo. Derived from
+  the existing events, so no new event and the schema guard is untouched.
+- **`KlusOverzicht.KeerGedaan`** + `OoitGedaan`; `Van` copies it.
+- **`KlusKiezer.Urgentie`**: done at least once → `(now − lastDone) ÷ interval`; never done →
+  `1 + (now − dueDate) ÷ 7 days` (`NooitGedaanIntervalDagen`). Among never-done and weekly chores
+  that is exactly longest due first; after a chore's first completion it is the old rule.
+- **`LeesmodelVernieuwingService`** runs at every start, after the seed: replays each klus stream,
+  stores the `KlusOverzicht` documents that differ, and logs `Leesmodel vernieuwd: N van M` when
+  it wrote anything. Without it the live documents (written before `KeerGedaan` existed) would read
+  0 and the 18 chores already done would count as never done. On the first start of this release
+  expect N = the number of chores done at least once (18 on 2026-11-26).
+- Specs: the old-rule spec is back for done chores, plus never-done-counts-as-weekly, the live
+  case (WC never done beats vacuuming done 19 days ago), once-done-keeps-its-interval, and
+  `KeerGedaan` counting with undo. 83 specs.
+
+### Verification
+
+Build clean, 83 specs. The refresh ran against a throwaway `postgres:17`: first start seeded 64
+and wrote nothing; after stripping `KeerGedaan` from every document and corrupting four by hand,
+the next start logged `4 van 64 klussen bijgewerkt` and restored them (documents only missing the
+field read as 0 and were rightly left alone); a third start wrote nothing.
+
+### Gotchas
+
+- `dotnet run` takes its URL from `launchSettings.json` (8082) even with `ASPNETCORE_URLS` set.
+- The refresh compares records (`vers != bestaand`); `DateTime` equality ignores `Kind`, so a
+  reloaded document compares equal to a fresh projection.
+- With 46 of 64 chores never done on 2026-11-26, the start-up backlog keeps kitchen vacuuming away
+  for ~6 weeks at 5 a week. That is the asked-for trade; `NooitGedaanIntervalDagen = 14` would halve
+  it at the cost of a later bathroom.
+
+### File map
+
+| Where | What |
+|---|---|
+| `Kluskat.core/Models/Klus.cs` | `KeerGedaan` |
+| `Kluskat.application/ReadModels/KlusOverzicht.cs` | `KeerGedaan`, `OoitGedaan` |
+| `Kluskat.application/Kiezen/KlusKiezer.cs` | `Urgentie`, `NooitGedaanIntervalDagen`; the remarks say why |
+| `Kluskat.infrastructure/Services/LeesmodelVernieuwingService.cs` | start-up re-projection |
+| `Kluskat.WebApp/Program.cs` | registers and runs it after the seed |
+| `Kluskat.test/Kiezen/KlusKiezer_specs.cs`, `Models/Klus_specs.cs`, `TestHelpers/Fixtures.cs` | the specs |
+| `DESIGN.md` §1, §3 | the rule, the two before it, and the reasons |

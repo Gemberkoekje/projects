@@ -30,6 +30,20 @@ public sealed class Klus_specs
     }
 
     [Test]
+    public void counts_completions_and_forgets_one_that_is_taken_back()
+    {
+        using var klok = Clock.SetTimeForCurrentContext(() => Nu);
+        var klus = NieuweKlus(Data(), Nu.AddDays(-10));
+        klus.KeerGedaan.Should().Be(0, because: "the seed's last-done date is not a completion");
+
+        var eens = klus.Gedaan(Nu.AddDays(-2), viaBeheer: true).Value;
+        var tweemaal = eens.Gedaan(Nu, viaBeheer: false).Value;
+        tweemaal.KeerGedaan.Should().Be(2);
+
+        tweemaal.Terugdraaien().Value.KeerGedaan.Should().Be(1);
+    }
+
+    [Test]
     public void a_date_filled_in_afterwards_cannot_move_the_klus_backwards()
     {
         using var klok = Clock.SetTimeForCurrentContext(() => Nu);

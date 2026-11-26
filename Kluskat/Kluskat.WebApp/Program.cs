@@ -147,13 +147,16 @@ builder.Services.AddScoped<KlusOphalenHandler>();
 builder.Services.AddScoped<ProfielOphalenHandler>();
 
 builder.Services.AddScoped<StartvullingService>();
+builder.Services.AddScoped<LeesmodelVernieuwingService>();
 
 var app = builder.Build();
 
-// Seed the chore list on the very first start; a no-op ever after.
+// Seed the chore list on the very first start (a no-op ever after), then bring the stored chore
+// overviews in line with their streams, so a read-model field added in a release is filled in.
 using (var scope = app.Services.CreateScope())
 {
     await scope.ServiceProvider.GetRequiredService<StartvullingService>().ToepassenAsync();
+    await scope.ServiceProvider.GetRequiredService<LeesmodelVernieuwingService>().VernieuwenAsync();
 }
 
 app.UseForwardedHeaders();
