@@ -644,3 +644,24 @@ To understand this, read `Klaverjas.core/Models/Voorbereiding.cs` (`HeeftKaartje
 | `Klaverjas.core/Models/Voorbereiding.cs` | `ZonderKaartje`, `HeeftKaartje` |
 | `Klaverjas.application` | `VoorbereidingOphalen` (cards as the players are now; `Invallers`), `VoorbereidingOpslaan` (substitutes may have a card; stores who was unticked; slapers members only), `KaartjesOphalen` (substitutes' cards), `UitslagOphalen` (ticked substitutes on a new evening) |
 | `Klaverjas.WebApp` | `Beheer/Voorbereiden` (the "Invallers" part of the list), `afdruk.css` (the slip's address) |
+
+**Live check (2026-11-26, after gembernodes#279)**
+
+- Flux applied the merge; the pod runs `de0a3120`, no errors since the rollout. `/healthz` ok, `/` and every `/beheer` page
+  send to their sign-in, `klaverjas.gemberkoekje.nl` still 308s, and the served `afdruk.css` has the slip's `nowrap` rule.
+
+## Phone numbers in Dad's player list (2026-11-26)
+
+To understand this, read `Klaverjas.WebApp/Pages/Beheer/Spelers.cshtml` and `SpelersModel.BelLink`.
+
+- Dad wants to call substitutes from the list. The player already had a `Telefoon` field (typed under **Wijzigen**, also in
+  the export), it just wasn't shown. The list now has a **Telefoon** column right after the name, as a `tel:` link: tapping it
+  on a phone calls. Any number is fine (no "06 only" check, at the user's word: "just the phone number").
+- `BelLink` keeps the digits and a leading `+` ("06-12345678" calls `0612345678`, "+31 6 ..." calls `+316...`). Text that is
+  not just a number ("via zijn dochter", "06-... (na 18 uur)") shows as typed, without a link.
+- Next to the name because the list was already wider than a phone (627 px at 375 px before this column): there the name and
+  number fit on screen, the rest scrolls sideways.
+- Only on `/beheer`: the players' page and the online stand stay names only.
+- 283 specs (9 new, `Klaverjas.test/Web/Spelerslijst_specs.cs`). Checked locally with invented players, at computer and phone
+  width; local DB wiped after.
+

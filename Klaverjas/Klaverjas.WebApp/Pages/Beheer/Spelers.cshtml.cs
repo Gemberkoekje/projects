@@ -128,6 +128,21 @@ public sealed class SpelersModel(
         return RedirectToPage();
     }
 
+    /// <summary>The number for a <c>tel:</c> link, so Dad can call a player from his phone.</summary>
+    /// <param name="telefoon">The phone number as Dad typed it, such as <c>06-12345678</c>.</param>
+    /// <returns>Its digits, with a leading <c>+</c> kept; empty when there is nothing to call.</returns>
+    public static string BelLink(string telefoon)
+    {
+        var tekst = (telefoon ?? string.Empty).Trim();
+        var cijfers = new string([.. tekst.Where(char.IsAsciiDigit)]);
+        if (cijfers.Length == 0 || !tekst.All(c => char.IsAsciiDigit(c) || c is ' ' or '-' or '(' or ')' or '.' or '+'))
+        {
+            return string.Empty;
+        }
+
+        return tekst.StartsWith('+') ? "+" + cijfers : cijfers;
+    }
+
     private async Task LadenAsync(CancellationToken cancellationToken)
     {
         Spelers = (await spelersOphalen.HandleAsync(new SpelersOphalen(), cancellationToken)).Value;
