@@ -2,3 +2,11 @@
 # are tracked, so a real photo dropped into mock/img/ can't be committed by accident.
 mock/img/*
 !mock/img/stand-in-*.webp
+
+# The PHP site: its password and Kristoffer's pictures never go into Git.
+site/config.php
+site/data/*
+!site/data/.htaccess
+!site/data/index.html
+site/media/*
+!site/media/.htaccess

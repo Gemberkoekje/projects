@@ -1,0 +1,23 @@
+# Apache (most shared hosting). Keeps private files private and lets phone photos through.
+Options -Indexes
+DirectoryIndex index.php
+
+# No dotfiles, no config.php from the web (PHP would run it, but it has no business being served).
+<FilesMatch "^(\.|config(\.example)?\.php$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Upload limits where PHP runs inside Apache (mod_php). Where it runs as FPM or CGI, .user.ini does this.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 64M
+    php_value post_max_size 72M
+    php_value memory_limit 512M
+    php_value max_execution_time 120
+    php_value max_input_time 300
+</IfModule>
