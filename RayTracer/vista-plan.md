@@ -1014,7 +1014,10 @@ shoots RAW in Pro mode (a DNG beside each JPEG: 12 bits, linear, no curve and no
 measured from the DNG where there is one; the slice asks the user for it (the user keeps them in a shared folder, whose link
 stays out of this public repository). A picture pasted into a chat loses the RAW: it arrives as an 8-bit image. Pro mode's
 RAW is a single frame: the 10-11 night RAW at 1/8 s, brightened, is full of colour noise a merged file would not have. The
-main camera's optical stabiliser steadies a handheld second by moving the optics, without changing the light.
+main camera's optical stabiliser steadies a handheld second by moving the optics, without changing the light. The RAW's
+view depends on the zoom: the main lens gives its full view up to 2× and a 2× centre crop beyond (the rest of the zoom is in
+the JPEG only); the zoom lens gives its own 3× view (8 MP, 10 bits). And the JPEG invents detail the RAW lacks: on the full
+moon of 24-11 its sharp seas, crater texture and dark rim are not in the RAW.
 
 *Dusk under a grey cloud layer, 27-10-2026* (a phone, through a window and a cat net, over flat land
 facing the sunset; sunset at 17:25; white balance automatic throughout, so the series compares
@@ -1097,6 +1100,22 @@ f/1.8, handheld). The low cloud over the town is lit by its lights alone.
 | Photo (CET) | Camera | What it shows | Judges |
 |---|---|---|---|
 | 08:20:10 | Pro mode, 5500 K; the main lens, 1/90 s, ISO 50; RAW | 21 minutes after sunrise, the sun 2.0° up behind the camera: the autumn trees lit gold against a dark grey rain shower; in the shower one leg of a rainbow rising just left of the tower block and leaning right (the bow's centre 2° below the horizon to the west-north-west, its top about 40° up, out of frame). The bow is about 1% brighter than the sky beside it in the RAW; the user noticed it only on the phone's screen | M4 (a shower's curtain behind a sunlit foreground); M10 (the bow's place and strength); the parked rain showers |
+
+*Moonrise, 23 and 24-11-2026* (looking east-north-east, opposite the sunset; Pro mode, 5500 K, with their RAWs; the moon full on
+24-11).
+
+| Photo (CET) | Camera | What it shows | Judges |
+|---|---|---|---|
+| 23-11 16:52:41 | The main lens zoomed 2.85× (its RAW at 2×), 1/50 s, ISO 100 | 17 minutes after sunset, the sun 2.2° down: the nearly full moon (98–99% lit) about 11° up, almost opposite the sun, at the top of the Belt of Venus, a pink band low in the sky; under it the Earth's shadow, a grey-blue band on the skyline; a pink streak of high cloud still in the sun. The bands are in the RAW, a little less saturated than in the JPEG. Exposed for the sky (a stop of room above it in the RAW), the moon is clipped white | The sky as built (M1.3's Earth's shadow and Belt of Venus), a check that can run now; M6 (the moon's place, phase and size for the date; the camera's white disc) |
+| 23-11 17:35:14 | The main lens (its RAW at 2×), 1/2000 s, ISO 50 | Exposed for the moon, about 17° up, the sun 8.1° down: the seas show, nothing clipped, the sky black | M6's display (the eye's detailed moon, against the white disc above) |
+| 24-11 16:57:10, 16:57:47 | The main lens at 10× (RAW at 2×), 1/350 s; the zoom lens at 12× (RAW at its 3×, 8 MP, 10 bits), 1/250 s, f/2.4; both ISO 50 | The full moon about 6° up, the sun 2.9° down, yellow-tan from its long path through the air. In both RAWs the middle of the disc is about 40× brighter than the sky beside it. The JPEGs show sharp seas, crater texture and a dark rim that the RAWs (the moon 51 and 62 px across) do not hold: the phone's processing | M6 (the moon's colour when low; its brightness, about 40× the sky with the sun 3° down) |
+
+*Dusk with the purple light, 27-11-2026* (the dusk series' west view; sunset at 16:37; Pro mode, 5500 K, with its RAW, which agrees
+with the JPEG).
+
+| Photo (CET) | Camera | What it shows | Judges |
+|---|---|---|---|
+| 17:04:18 | The main lens, 1/50 s, ISO 200 | 27 minutes after sunset, the sun 4.2° down: a crimson strip on the horizon in a clear gap; a low cloud band above it, unlit and dark; above that a broad pale glow, faintly lavender (in the RAW red 1.07× and blue 1.19× the green); deep blue higher up. The pale diagonal streak at the lower right is the cat net | The parked purple light (at its classic time); M4 (a cloud band unlit at −4°) |
 
 **M0 — Skeleton & seam.**
 Goal: an end-to-end offline render from a recipe + seed. Deliverable: `Vista.Core` /
@@ -2402,7 +2421,11 @@ and airglow; Purkinje / mesopic display transform. Verify: a moonlit scene reads
 with neutral-white materials, and the moon phase matches the date. *Added 2026-11-11:* the user's night photos (the truth
 references) set the display's question: the user's eyes saw about what a 1/8 s frame shows (dark, little detail or colour),
 while a 1 s frame shows the glow's colour and the reflections; the mesopic transform is judged between the two, the user
-picking. A town's glow on low cloud is parked for M6.
+picking. A town's glow on low cloud is parked for M6. *Added 2026-11-27:* the user's moonrise photos (the truth
+references): the moon's place and phase for the date (about 11° up at 16:52 on 23-11 and 6° at 16:57 on 24-11, opposite
+the sun), its warm colour when low, and its brightness, about 40× the sky beside it with the sun 3° down. And a second display
+question: the camera's white disc against the eye's detailed moon (the eye adapts to each part it looks at, one exposure cannot
+hold both); the display's roll-off can give either, the user picking.
 
 **M7 — Winter.**
 Goal: winter as a first-class season. Deliverable: frozen lakes (ice + snow on ice);
@@ -2615,7 +2638,9 @@ any of them.
   balanced to the photo's own 4400 K, Vista's sky comes out bluer, not violet, so the violet is the sky's and not the setting's. The
   purple light is mostly sunlight reddened on its long path, scattered down by the aerosol of the stratosphere (some 20 km up) and
   mixed with the blue; Vista's aerosol lies in the lowest kilometres (a 1.2 km scale height) and has no stratospheric layer.
-  *Belongs:* M4 (beside the seasonal aerosol load) or M6 (twilight and night).
+  *Belongs:* M4 (beside the seasonal aerosol load) or M6 (twilight and night). *2026-11-27:* the user's photo with the sun
+  4.2° down (the truth references) shows it at its classic time: a faint lavender glow above the horizon's red strip and a dark
+  cloud band, green the weakest channel in its RAW (red 1.07× and blue 1.19× the green).
 - **A camera you wield** (the user, 2026-10-28, picking M1.17's look: "In the future, I'd like it if we can set the ISO, shutter time,
   white balance etcetera as if I'm wielding a real camera"): Vista's camera (§5.6) is a set of display settings with a meter; a real
   camera's controls instead, ISO, shutter time and aperture (the exposure triangle of §5.6, the engine's `plan.md` §4) with the meter as
