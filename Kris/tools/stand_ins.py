@@ -1,10 +1,12 @@
-"""Grey stand-in 'photographs' for the mock (../mock/img/stand-in-*.jpg): one-point concrete
+"""Grey stand-in 'photographs' for the mock (../mock/img/stand-in-*.webp): one-point concrete
 interiors with a skylight, light shafts, beams and formwork texture. Deterministic per seed.
 
     python3 tools/stand_ins.py mock/img
 
-Renders at 1440 px, saves at most 1200 px on the long side at JPEG quality 74, so the sixteen
-files stay near 1.4 MB: gembernodes serves them from two ConfigMaps of at most 1 MiB each.
+Renders at 1440 px, saves at most 1200 px on the long side as WebP. WebP, not JPEG: Flux's
+source-controller leaves *.jpg, *.jpeg, *.gif and *.png out of what it fetches from Git, so
+gembernodes would never see them. The sixteen files must also stay well under 2 MiB: gembernodes
+serves them from two ConfigMaps of at most 1 MiB each.
 Needs numpy and Pillow."""
 import sys, math, random
 import numpy as np
@@ -166,7 +168,7 @@ PLAN = [
 for i, (fmt, kind) in enumerate(PLAN, start=1):
     w, h = SIZES[fmt]
     im = render(1000 + i * 37, w, h, kind)
-    name = f'{OUT}/stand-in-{i:02d}.jpg'
+    name = f'{OUT}/stand-in-{i:02d}.webp'
     im.thumbnail((1200, 1200), Image.LANCZOS)
-    im.save(name, quality=74, optimize=True, progressive=True)
+    im.save(name, 'WEBP', quality=78, method=6)
     print(name, fmt, kind)

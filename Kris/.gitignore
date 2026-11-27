@@ -1,4 +1,4 @@
 # Kristoffer's own photos stay out of Git until he agrees (README.md): only the generated stand-ins
 # are tracked, so a real photo dropped into mock/img/ can't be committed by accident.
 mock/img/*
-!mock/img/stand-in-*.jpg
+!mock/img/stand-in-*.webp
