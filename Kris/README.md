@@ -29,8 +29,11 @@ and by `#hash`; nothing is saved or sent.
   grey stand-in made by `tools/stand_ins.py`; `.gitignore` keeps anything else in `mock/img/` out.
 - **All titles, texts and exhibitions are invented examples** under his real name, so the reviewer bar
   says so and the page is `noindex` (also as a header on gembernodes).
-- **Size:** the stand-ins stay near 1.4 MB in total, because gembernodes serves them from two ConfigMaps
-  of at most 1 MiB each. Real full-size photos would need another way in (an image or an NFS volume).
+- **Pictures are WebP, never JPEG or PNG:** Flux's source-controller leaves `*.jpg`, `*.jpeg`, `*.gif` and
+  `*.png` out of what it fetches from Git (its default exclusions), so gembernodes would not see them and
+  its build fails.
+- **Size:** the stand-ins are about 0.6 MB in total, because gembernodes serves them from one ConfigMap of
+  at most 1 MiB. Real full-size photos would need another way in (an image or an NFS volume).
 
 ## Changing it
 
