@@ -33,7 +33,24 @@ def lerp(a, b, t):
     return a + (b - a) * t
 
 
-def render(seed, w, h, kind):
+# Stand-ins for AI images get coloured light (shadow, middle, highlight), so the mock shows photos and
+# AI images side by side; stand-ins for photos stay black and white.
+AI_PALETTES = [
+    ((18, 10, 46), (176, 37, 122), (255, 214, 176)),
+    ((10, 24, 48), (40, 120, 170), (255, 190, 220)),
+    ((30, 8, 40), (120, 50, 190), (255, 200, 140)),
+]
+
+
+def colorize(g, palette):
+    lo, mid, hi = (np.array(c, np.float32) for c in palette)
+    g = g[..., None]
+    low = lo + (mid - lo) * np.clip(g * 2, 0, 1)
+    high = mid + (hi - mid) * np.clip(g * 2 - 1, 0, 1)
+    return np.where(g < 0.5, low, high)
+
+
+def render(seed, w, h, kind, palette=None):
     rng = np.random.default_rng(seed)
     r = random.Random(seed)
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -153,9 +170,12 @@ def render(seed, w, h, kind):
     pil = Image.fromarray((img * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.7))
     arr = np.asarray(pil).astype(np.float32) + rng.normal(0, 4.5, (h, w))
     gray = np.clip(arr, 0, 255).astype(np.uint8)
-    # a faint warm-neutral split tone, like a fibre print
     g = gray.astype(np.float32) / 255
-    rgb = np.stack([g * 255 * 1.0, g * 255 * 0.992, g * 255 * 0.975], -1)
+    if palette:
+        rgb = colorize(g, palette)
+    else:
+        # a faint warm-neutral split tone, like a fibre print
+        rgb = np.stack([g * 255 * 1.0, g * 255 * 0.992, g * 255 * 0.975], -1)
     return Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8))
 
 
@@ -165,9 +185,12 @@ PLAN = [
     ('p', 'figure'), ('l', 'single'), ('s', 'door'), ('p', 'stairs'), ('l', 'figure'),
     ('p', 'door'), ('s', 'beam'), ('l', 'stairs'), ('p', 'single'), ('l', 'door'), ('s', 'figure'),
 ]
+# The mock's AI album (Sanctuary of Absurdity) uses these numbers.
+AI_IMAGES = {1, 3, 6, 8, 11, 14}
 for i, (fmt, kind) in enumerate(PLAN, start=1):
     w, h = SIZES[fmt]
-    im = render(1000 + i * 37, w, h, kind)
+    palette = AI_PALETTES[i % len(AI_PALETTES)] if i in AI_IMAGES else None
+    im = render(1000 + i * 37, w, h, kind, palette)
     name = f'{OUT}/stand-in-{i:02d}.webp'
     im.thumbnail((1200, 1200), Image.LANCZOS)
     im.save(name, 'WEBP', quality=78, method=6)
