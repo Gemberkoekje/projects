@@ -198,6 +198,31 @@ h3 { font-size: 1.375rem; line-height: 1.2; }
   .hero-text { max-width: 36rem; }
 }
 
+/* ---------- Home: the pictures glide by (Kristoffer's wish) ----------
+   The track holds every picture twice and moves left by exactly half its width, then starts over,
+   so the band never ends. Each picture has its own right margin (not a flex gap), so that half is
+   exact and the loop doesn't jump. */
+.ticker { position: relative; overflow: hidden; background: var(--night); border-bottom: 1px solid var(--ink); padding-block: clamp(.75rem, 1.5vw, 1.25rem); }
+.ticker-track { display: flex; width: max-content; animation: ticker var(--ticker-time, 60s) linear infinite; }
+.ticker:hover .ticker-track, .ticker:focus-within .ticker-track, .ticker.paused .ticker-track { animation-play-state: paused; }
+.ticker-track a { position: relative; display: block; flex: 0 0 auto; margin-right: clamp(.5rem, 1vw, .9rem); }
+.ticker-track img { height: clamp(150px, 20vw, 260px); width: auto; max-width: none; background: var(--stage); transition: opacity .2s; }
+.ticker-track a:hover img { opacity: .85; }
+.ticker-track .tag { top: .5rem; left: .5rem; }
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.ticker-pause {
+  position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: clamp(.75rem, 1.5vw, 1.25rem);
+  background: var(--night); color: var(--night-ink); border: 1px solid var(--night-rule); border-radius: 999px;
+  font-size: .75rem; font-weight: 600; letter-spacing: .04em; padding: .3rem .8rem; cursor: pointer; opacity: .85;
+}
+.ticker-pause:hover { opacity: 1; }
+/* Visitors who asked their device for less motion get a band to swipe through instead. */
+@media (prefers-reduced-motion: reduce) {
+  .ticker { overflow-x: auto; }
+  .ticker-track { animation: none; }
+  .ticker-pause { display: none; }
+}
+
 /* ---------- Bands ---------- */
 .band { border-bottom: 1px solid var(--rule); padding-block: clamp(2.5rem, 5vw, 4.5rem); }
 .band-head {
