@@ -31,7 +31,7 @@ final class Store
             'albums' => [],
             'settings' => [
                 'name' => 'Kristoffer Zegers',
-                'tagline' => 'Foto & AI',
+                'tagline' => 'Beelden',
                 'about' => '',
                 'email' => '',
                 'instagram' => '',
@@ -54,6 +54,10 @@ final class Store
         $data['photos'] = array_values($data['photos'] ?? []);
         $data['albums'] = array_values($data['albums'] ?? []);
         $data['settings'] = array_merge($empty['settings'], $data['settings'] ?? []);
+        // The first version's default line under the name; the site no longer splits photos and AI images.
+        if ($data['settings']['tagline'] === 'Foto & AI') {
+            $data['settings']['tagline'] = $empty['settings']['tagline'];
+        }
         return $data + $empty;
     }
 

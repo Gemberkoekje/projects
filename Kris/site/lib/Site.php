@@ -5,7 +5,9 @@ declare(strict_types=1);
 
 final class Site
 {
-    public const KINDS = ['foto' => 'Foto', 'ai' => 'AI-beeld'];
+    // There is one kind of picture: a "beeld". Kristoffer leaves it to the visitor whether it is a photo
+    // or made with AI. Pictures uploaded before that still carry a "kind" field in site.json; nothing
+    // reads it any more.
     public const TITLE_MAX = 120;
     public const CAPTION_MAX = 500;
 
@@ -48,7 +50,7 @@ final class Site
         return null;
     }
 
-    /** The checked fields of a picture: title, caption, kind, album, year. */
+    /** The checked fields of a picture: title, caption, album, year. */
     public static function photoFields(array $data, array $input): array
     {
         $title = trim((string) ($input['title'] ?? ''));
@@ -62,10 +64,6 @@ final class Site
         if (mb_strlen($caption) > self::CAPTION_MAX) {
             throw new UserError('De omschrijving mag hoogstens ' . self::CAPTION_MAX . ' tekens zijn.');
         }
-        $kind = (string) ($input['kind'] ?? '');
-        if (!isset(self::KINDS[$kind])) {
-            throw new UserError('Kies of het een foto is of een AI-beeld.');
-        }
         $album = (string) ($input['album'] ?? '');
         if ($album !== '' && self::findAlbum($data, $album) === null) {
             throw new UserError('Dat album bestaat niet meer.');
@@ -77,7 +75,6 @@ final class Site
         return [
             'title' => $title,
             'caption' => $caption,
-            'kind' => $kind,
             'album' => $album === '' ? null : $album,
             'year' => $year,
         ];
@@ -206,7 +203,6 @@ final class Site
             'id' => $p['id'],
             'title' => $p['title'],
             'caption' => $p['caption'],
-            'kind' => $p['kind'],
             'album' => $p['album'],
             'year' => $p['year'],
             'w' => $p['w'],
