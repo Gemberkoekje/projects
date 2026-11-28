@@ -70,6 +70,7 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
     <button class="menu-btn" type="button" id="menu-open" aria-expanded="false" aria-controls="menu"><i></i>Menu</button>
   </div>
   <nav class="primary wrap" aria-label="Hoofdmenu">
+    <a href="#home" data-go="home">Home</a>
     <a href="#alles" data-go="alles">Alles</a>
     <a href="#fotos" data-go="fotos">Foto's</a>
     <a href="#ai" data-go="ai">AI</a>
@@ -109,6 +110,12 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
         </figure>
       </div>
     </div>
+
+    <!-- The pictures glide by from right to left; they stop under the mouse, on focus and with the button -->
+    <section class="ticker" id="ticker" hidden aria-label="Alle beelden, bewegend">
+      <div class="ticker-track" id="ticker-track"></div>
+      <button class="ticker-pause" type="button" id="ticker-pause" aria-pressed="false">Pauzeer</button>
+    </section>
 
     <section class="band" id="band-latest" hidden aria-labelledby="h-latest">
       <div class="wrap">

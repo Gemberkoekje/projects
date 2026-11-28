@@ -9,7 +9,8 @@ Two parts:
 - **[`site/`](site/): the real site**, in plain PHP, for Kristoffer's own hosting (he wants it on his own
   site). He uploads his pictures himself in a small beheer, at full quality instead of through WhatsApp.
   How to put it online: [INSTALLEREN.md](INSTALLEREN.md) (Dutch, for whoever installs it).
-- **[`mock/`](mock/): the approved design**, a clickable mock with stand-in pictures. Online as a preview at
+- **[`mock/`](mock/): the approved design**, a clickable mock with stand-in pictures. Since the site went
+  live (kristofferzegers.nl/photography/), changes go into `site/` only; the mock stays as the design it started from. Online as a preview at
   <https://kris.gemberkoekje.nl> (also `gemberkoekje.nl/kris`), served by gembernodes from copies in
   `apps/kris/` there. The site is built from it.
 
@@ -37,6 +38,9 @@ Plain PHP 8.1+ with GD, no Composer, no database, so it runs on ordinary shared 
 - `index.php` is the public site: one page, its screens switched by `assets/site.js` (from the mock),
   filled with the JSON `lib/Site.php` makes from `data/site.json`. Every link is relative, so it works in
   the web root or a subfolder. `#p-<id>` links to one picture.
+- **Kristoffer's own wishes**, added once it was live: Home in the menu, and on the home page a band in which
+  his newest pictures (up to 30) glide from right to left, stopping under the mouse, on focus or with its
+  button; with "reduce motion" on, the band stands still and can be swiped.
 - `beheer/` is the beheer: sign in with one password (`config.php`, or the one Kristoffer set in the
   beheer, in `data/password.json`), upload pictures (each with a title and Foto or AI-beeld; the script
   sends them one at a time with a progress bar, and the plain form works without it), edit or delete

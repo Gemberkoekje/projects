@@ -78,6 +78,32 @@
     $('#hero').classList.add('only-text');
   }
 
+  /* ---------- Home: the pictures glide by ---------- */
+  // Newest first, at most 30, each twice (the copy is hidden from screen readers and the keyboard) so
+  // the band loops without an end. The speed is the same whatever the number of pictures: about 40
+  // pixels a second.
+  const glide = photos.slice(0, 30);
+  if (glide.length >= 3) {
+    const item = (p, copy) => `<a ${opener(p, 'alles')}${copy ? ' tabindex="-1" aria-hidden="true"' : ''} aria-label="${esc(p.title)}, ${KIND[p.kind]}">`
+      + `<img src="${esc(p.thumb)}" ${srcset(p)} sizes="400px" width="${p.w}" height="${p.h}" alt="">${tag(p)}</a>`;
+    const track = $('#ticker-track');
+    track.innerHTML = glide.map(p => item(p, false)).join('') + glide.map(p => item(p, true)).join('');
+    const pace = () => {
+      const half = track.scrollWidth / 2;
+      if (half > 0) track.style.setProperty('--ticker-time', Math.max(20, Math.round(half / 40)) + 's');
+    };
+    pace();
+    track.querySelectorAll('img').forEach(i => i.addEventListener('load', pace, { once: true }));
+    addEventListener('resize', pace);
+    const ticker = $('#ticker'), pause = $('#ticker-pause');
+    pause.addEventListener('click', () => {
+      const paused = ticker.classList.toggle('paused');
+      pause.setAttribute('aria-pressed', String(paused));
+      pause.textContent = paused ? 'Afspelen' : 'Pauzeer';
+    });
+    ticker.hidden = false;
+  }
+
   let albumCarousel = { refresh() {} };
   if (albums.length) {
     $('#car-albums .car-track').innerHTML = albums.map(a => `<a class="car-card linkcard" href="#a-${esc(a.id)}" data-go="a-${esc(a.id)}">
