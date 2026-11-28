@@ -1,6 +1,6 @@
 <?php
-// The beheer: sign in with the one password, upload pictures (each one a photo or an AI image, with a
-// title), change or delete them, keep albums, and set the texts on the site. Plain forms; the upload
+// The beheer: sign in with the one password, upload pictures (each with a title), change or delete
+// them, keep albums, and set the texts on the site. Plain forms; the upload
 // form sends the files one by one with JavaScript, with a progress bar each, and also works without it.
 declare(strict_types=1);
 
@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $album = (string) ($_POST['album'] ?? '');
                             }
                             // Check the fields before the file is processed, so a bad title costs no work.
-                            $fields = Site::photoFields($data, ['title' => $title, 'kind' => $_POST['kind'] ?? '', 'album' => $album, 'year' => date('Y')]);
+                            $fields = Site::photoFields($data, ['title' => $title, 'album' => $album, 'year' => date('Y')]);
                             $image = Images::store((string) $files['tmp_name'][$i], $id, $originalsDir, $mediaDir, true);
                             $fields['year'] = $image['year'] ?? $fields['year'];
                             return Site::addPhoto($data, ['id' => $id] + $fields + [
@@ -323,15 +323,6 @@ $title = ['login' => 'Inloggen', 'beelden' => 'Beelden', 'beeld' => 'Beeld bewer
 
       <div id="file-list" class="file-list" hidden></div>
 
-      <fieldset class="kind-batch" id="kind-batch">
-        <legend>Wat is het?</legend>
-        <p class="muted js-only" hidden>Kies het bij elk beeld hierboven, of zet ze allemaal tegelijk:</p>
-        <div class="choice">
-          <label><input type="radio" name="kind" value="foto" required> Foto</label>
-          <label><input type="radio" name="kind" value="ai" required> AI-beeld</label>
-        </div>
-      </fieldset>
-
       <label for="album">Album <span class="muted">(niet verplicht)</span></label>
       <?= album_select($data['albums'], null) ?>
 
@@ -353,7 +344,6 @@ $title = ['login' => 'Inloggen', 'beelden' => 'Beelden', 'beeld' => 'Beeld bewer
             <span class="photo-meta">
               <strong><?= e($photo['title']) ?></strong>
               <span>
-                <span class="badge badge-<?= e($photo['kind']) ?>"><?= e(Site::KINDS[$photo['kind']]) ?></span>
                 <?= e((string) $photo['year']) ?>
                 <?php if ($photo['album'] && isset($albumsById[$photo['album']])): ?> · <?= e($albumsById[$photo['album']]) ?><?php endif; ?>
                 <?php if ($settings['featured'] === $photo['id']): ?> · op de voorpagina<?php endif; ?>
@@ -385,14 +375,6 @@ $title = ['login' => 'Inloggen', 'beelden' => 'Beelden', 'beeld' => 'Beeld bewer
       <input type="text" id="title" name="title" value="<?= e($photo['title']) ?>" maxlength="<?= Site::TITLE_MAX ?>" required>
       <label for="caption">Omschrijving <span class="muted">(niet verplicht, bijvoorbeeld de plaats)</span></label>
       <textarea id="caption" name="caption" maxlength="<?= Site::CAPTION_MAX ?>" rows="3"><?= e($photo['caption']) ?></textarea>
-      <fieldset>
-        <legend>Wat is het?</legend>
-        <div class="choice">
-          <?php foreach (Site::KINDS as $value => $label): ?>
-          <label><input type="radio" name="kind" value="<?= e($value) ?>"<?= $photo['kind'] === $value ? ' checked' : '' ?> required> <?= e($label) ?></label>
-          <?php endforeach; ?>
-        </div>
-      </fieldset>
       <label for="album">Album</label>
       <?= album_select($data['albums'], $photo['album']) ?>
       <label for="year">Jaar</label>
@@ -417,7 +399,7 @@ $title = ['login' => 'Inloggen', 'beelden' => 'Beelden', 'beeld' => 'Beeld bewer
 <?php elseif ($page === 'albums'): ?>
   <section class="card">
     <h1>Albums</h1>
-    <p class="muted">Een album is niet verplicht: elk beeld staat ook gewoon bij Alles, Foto's of AI.</p>
+    <p class="muted">Een album is niet verplicht: elk beeld staat ook gewoon bij Beelden.</p>
     <form method="post" action="./" class="inline">
       <input type="hidden" name="action" value="album-add">
       <input type="hidden" name="back" value="albums">

@@ -86,6 +86,14 @@ test('update writes site.json and the next read sees it, with no temporary file 
     same([], glob("$dir/*.tmp"), 'temporary files');
 });
 
+test('the first version\'s line under the name, Foto & AI, becomes Beelden; a line of his own stays', function (): void {
+    $dir = temp_dir();
+    file_put_contents("$dir/site.json", json_encode(['photos' => [], 'albums' => [], 'settings' => ['tagline' => 'Foto & AI']]));
+    same('Beelden', (new Store($dir))->read()['settings']['tagline'], 'old default replaced');
+    file_put_contents("$dir/site.json", json_encode(['photos' => [], 'albums' => [], 'settings' => ['tagline' => 'Fotografie']]));
+    same('Fotografie', (new Store($dir))->read()['settings']['tagline'], 'own line kept');
+});
+
 test('settings added in a later version get their defaults when an old site.json is read', function (): void {
     $dir = temp_dir();
     file_put_contents("$dir/site.json", json_encode(['photos' => [], 'albums' => [], 'settings' => ['name' => 'Kris']]));
@@ -101,15 +109,14 @@ test('the newest picture comes first', function (): void {
     same(['new', 'old'], array_column($data['photos'], 'id'), 'order');
 });
 
-test('a picture must be a photo or an AI image, and needs a title', function (): void {
+test('a picture needs a title, and no longer a kind: photo or AI is for the visitor to decide', function (): void {
     $data = Store::empty();
-    throws(fn() => Site::photoFields($data, ['title' => 'x', 'kind' => '']), UserError::class, 'no kind');
-    throws(fn() => Site::photoFields($data, ['title' => 'x', 'kind' => 'video']), UserError::class, 'other kind');
-    throws(fn() => Site::photoFields($data, ['title' => '   ', 'kind' => 'ai']), UserError::class, 'empty title');
-    $fields = Site::photoFields($data, ['title' => '  Heaven\'s Backdoor ', 'kind' => 'ai', 'year' => '2025']);
+    throws(fn() => Site::photoFields($data, ['title' => '   ']), UserError::class, 'empty title');
+    $fields = Site::photoFields($data, ['title' => '  Heaven\'s Backdoor ', 'year' => '2025']);
     same("Heaven's Backdoor", $fields['title'], 'trimmed title');
     same(2025, $fields['year'], 'year');
     same(null, $fields['album'], 'no album');
+    check(!array_key_exists('kind', $fields), 'no kind field');
 });
 
 test('a picture cannot point at an album that does not exist', function (): void {
@@ -175,7 +182,7 @@ test('the public view has the media URLs and none of the original file details',
     $view = Site::publicView($data, 'media');
     same('media/a-thumb.webp', $view['photos'][0]['thumb'], 'thumb url');
     same('media/a-large.webp', $view['photos'][0]['large'], 'large url');
-    foreach (['original_name', 'bytes', 'uploaded', 'ext'] as $private) {
+    foreach (['original_name', 'bytes', 'uploaded', 'ext', 'kind'] as $private) {
         check(!array_key_exists($private, $view['photos'][0]), "$private left out");
     }
 });

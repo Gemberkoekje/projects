@@ -1,11 +1,11 @@
 // The public site's screens, filled from the JSON that index.php puts in #site-data:
-// home, Alles / Foto's / AI (one list, filtered), Albums, the viewer (an album, or a filtered list one
-// picture at a time, with the filmstrip and full screen) and Over. Every screen has a #hash, so a link
-// to it can be shared; #p-<id> opens one picture.
+// home, Beelden (every picture), Albums, the viewer (an album, or all pictures one at a time, with the
+// filmstrip and full screen) and Over. Every screen has a #hash, so a link to it can be shared;
+// #p-<id> opens one picture. There is one kind of picture: Kristoffer leaves it to the visitor whether
+// a picture is a photo or made with AI.
 (() => {
   'use strict';
   const D = JSON.parse(document.getElementById('site-data').textContent);
-  const KIND = { ai: 'AI-beeld', foto: 'Foto' };
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -19,61 +19,41 @@
     .filter(a => a.photos.length)
     .sort((x, y) => photos.indexOf(x.photos[0]) - photos.indexOf(y.photos[0]));
   const albumById = new Map(albums.map(a => [a.id, a]));
+  // Addresses from the first version, when photos and AI images were apart, still lead to all pictures.
+  const OLD_LISTS = ['alles', 'fotos', 'ai'];
 
-  const FILTERS = {
-    alles: { title: 'Alle beelden', lead: 'Foto’s en AI-beelden, de nieuwste eerst.', test: () => true },
-    fotos: { title: 'Foto’s', lead: 'Alle foto’s, de nieuwste eerst.', test: p => p.kind === 'foto' },
-    ai: { title: 'AI-beelden', lead: 'Alle beelden gemaakt met AI, de nieuwste eerst.', test: p => p.kind === 'ai' }
-  };
-
-  const tag = p => p.kind === 'ai' ? '<span class="tag">AI-beeld</span>' : '';
   // Copies: the thumb is 640 px, the large one 2048 px; a sharp screen gets the large one where it is shown big.
   const srcset = p => `srcset="${esc(p.thumb)} 640w, ${esc(p.large)} 2048w"`;
-  const count = list => {
-    const ai = list.filter(p => p.kind === 'ai').length, foto = list.length - ai;
-    return [foto && `${foto} ${foto === 1 ? 'foto' : 'foto’s'}`, ai && `${ai} ${ai === 1 ? 'AI-beeld' : 'AI-beelden'}`].filter(Boolean).join(' · ');
-  };
-  const kinds = list => {
-    const k = new Set(list.map(p => p.kind));
-    return k.size === 2 ? 'Foto’s en AI-beelden' : k.has('ai') ? 'AI-beelden' : 'Foto’s';
-  };
-  const img = (p, size, extra = '') => `<img src="${esc(size === 'large' ? p.large : p.thumb)}" alt="${esc(p.title)}, ${KIND[p.kind]}" loading="lazy"${extra}>`;
+  const count = list => `${list.length} ${list.length === 1 ? 'beeld' : 'beelden'}`;
+  const where = p => { const a = albumById.get(p.album); return `${p.year}${a ? ' · ' + esc(a.title) : ''}`; };
   // A link that opens a picture in the viewer, in the list it was clicked in.
   const opener = (p, ctx) => `href="#p-${esc(p.id)}" data-open="${esc(p.id)}" data-ctx="${esc(ctx)}"`;
 
   /* ---------- Home ---------- */
   const featured = byId.get(D.featured) || photos[0];
   if (featured) {
-    $('#hero-label').textContent = (featured.id === D.featured ? 'Uitgelicht · ' : 'Nieuw · ') + KIND[featured.kind];
+    $('#hero-label').textContent = featured.id === D.featured ? 'Uitgelicht' : 'Nieuw';
     $('#hero-title').textContent = featured.title;
     const album = albumById.get(featured.album);
-    $('#hero-text').textContent = featured.caption || (album ? `Uit het album ${album.title}.` : `${KIND[featured.kind]}, ${featured.year}.`);
-    $('#hero-links').innerHTML = `<a class="more" ${opener(featured, 'alles')}>Bekijk het beeld →</a><a class="more" href="#alles" data-go="alles">Alle beelden →</a>`;
+    const text = featured.caption || (album ? `Uit het album ${album.title}.` : '');
+    $('#hero-text').textContent = text;
+    $('#hero-text').hidden = !text;
+    $('#hero-links').innerHTML = `<a class="more" ${opener(featured, 'beelden')}>Bekijk het beeld →</a><a class="more" href="#beelden" data-go="beelden">Alle beelden →</a>`;
     const open = $('#hero-open');
     open.setAttribute('href', `#p-${featured.id}`);
     open.dataset.open = featured.id;
-    open.dataset.ctx = 'alles';
+    open.dataset.ctx = 'beelden';
     $('#hero-img').src = featured.large;
-    $('#hero-img').alt = `${featured.title}, ${KIND[featured.kind]}`;
-    $('#hero-cap').textContent = `${featured.title}, ${featured.year} · ${KIND[featured.kind]}`;
+    $('#hero-img').alt = featured.title;
+    $('#hero-cap').textContent = `${featured.title}, ${featured.year}`;
     $('#hero-print').hidden = false;
 
-    $('#latest').innerHTML = photos.slice(0, 6).map(p => {
-      const album = albumById.get(p.album);
-      return `<a class="work-card" ${opener(p, 'alles')}>
-        <span class="thumb"><img src="${esc(p.thumb)}" ${srcset(p)} sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 30vw" alt="" loading="lazy">${tag(p)}</span>
+    $('#latest').innerHTML = photos.slice(0, 6).map(p => `<a class="work-card" ${opener(p, 'beelden')}>
+        <span class="thumb"><img src="${esc(p.thumb)}" ${srcset(p)} sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 30vw" alt="" loading="lazy"></span>
         <span class="work-title">${esc(p.title)}</span>
-        <span class="sub">${p.year} · ${KIND[p.kind]}${album ? ' · ' + esc(album.title) : ''}</span>
-      </a>`;
-    }).join('');
+        <span class="sub">${where(p)}</span>
+      </a>`).join('');
     $('#band-latest').hidden = false;
-
-    const newestFoto = photos.find(p => p.kind === 'foto'), newestAi = photos.find(p => p.kind === 'ai');
-    if (newestFoto && newestAi) {
-      $('#pair-foto').src = newestFoto.thumb;
-      $('#pair-ai').src = newestAi.thumb;
-      $('#band-pair').hidden = false;
-    }
   } else {
     $('#hero').classList.add('only-text');
   }
@@ -84,8 +64,8 @@
   // pixels a second.
   const glide = photos.slice(0, 30);
   if (glide.length >= 3) {
-    const item = (p, copy) => `<a ${opener(p, 'alles')}${copy ? ' tabindex="-1" aria-hidden="true"' : ''} aria-label="${esc(p.title)}, ${KIND[p.kind]}">`
-      + `<img src="${esc(p.thumb)}" ${srcset(p)} sizes="400px" width="${p.w}" height="${p.h}" alt="">${tag(p)}</a>`;
+    const item = (p, copy) => `<a ${opener(p, 'beelden')}${copy ? ' tabindex="-1" aria-hidden="true"' : ''} aria-label="${esc(p.title)}">`
+      + `<img src="${esc(p.thumb)}" ${srcset(p)} sizes="400px" width="${p.w}" height="${p.h}" alt=""></a>`;
     const track = $('#ticker-track');
     track.innerHTML = glide.map(p => item(p, false)).join('') + glide.map(p => item(p, true)).join('');
     const pace = () => {
@@ -107,7 +87,7 @@
   let albumCarousel = { refresh() {} };
   if (albums.length) {
     $('#car-albums .car-track').innerHTML = albums.map(a => `<a class="car-card linkcard" href="#a-${esc(a.id)}" data-go="a-${esc(a.id)}">
-        <div class="thumb">${img(a.photos[0], 'large')}<span class="tag">${esc(kinds(a.photos))}</span>
+        <div class="thumb"><img src="${esc(a.photos[0].large)}" alt="" loading="lazy"><span class="tag">Album</span>
           <div class="over"><h3 class="work-title">${esc(a.title)}</h3><span class="meta">${esc(count(a.photos))}</span></div>
         </div>
         ${a.description ? `<p>${esc(a.description)}</p>` : ''}
@@ -116,7 +96,7 @@
     $('#band-albums').hidden = false;
 
     $('#album-list').innerHTML = albums.map(a => `<article class="album-row">
-        <a class="thumb" href="#a-${esc(a.id)}" data-go="a-${esc(a.id)}">${img(a.photos[0], 'large')}${tag(a.photos[0])}</a>
+        <a class="thumb" href="#a-${esc(a.id)}" data-go="a-${esc(a.id)}"><img src="${esc(a.photos[0].large)}" alt="${esc(a.title)}" loading="lazy"></a>
         <div class="txt">
           <h2 class="work-title">${esc(a.title)}</h2>
           <p class="meta">${esc(count(a.photos))}</p>
@@ -154,40 +134,29 @@
     return { refresh: () => set(i) };
   }
 
-  /* ---------- Alles, Foto's, AI ---------- */
-  function renderIndex(filter) {
-    const f = FILTERS[filter];
-    const list = photos.filter(f.test);
-    $('#ix-title').textContent = f.title;
-    $('#ix-lead').textContent = f.lead;
-    $('#chips').innerHTML = [['alles', 'Alles'], ['fotos', 'Foto’s'], ['ai', 'AI-beelden']].map(([id, t]) =>
-      `<button class="chip" type="button" data-go="${id}" aria-pressed="${filter === id}">${t} (${photos.filter(FILTERS[id].test).length})</button>`).join('');
-    $('#masonry').innerHTML = list.map(p => {
-      const album = albumById.get(p.album);
-      return `<figure>
-        <a ${opener(p, filter)}>
-          <span class="thumb"><img src="${esc(p.thumb)}" alt="${esc(p.title)}, ${KIND[p.kind]}" width="${p.w}" height="${p.h}" loading="lazy">${tag(p)}</span>
-          <figcaption><span class="work-title">${esc(p.title)}</span>${p.year} · ${KIND[p.kind]}${album ? ' · ' + esc(album.title) : ''}</figcaption>
+  /* ---------- Beelden: every picture ---------- */
+  function renderIndex() {
+    $('#masonry').innerHTML = photos.map(p => `<figure>
+        <a ${opener(p, 'beelden')}>
+          <span class="thumb"><img src="${esc(p.thumb)}" alt="${esc(p.title)}" width="${p.w}" height="${p.h}" loading="lazy"></span>
+          <figcaption><span class="work-title">${esc(p.title)}</span>${where(p)}</figcaption>
         </a>
-      </figure>`;
-    }).join('');
-    $('#ix-empty').hidden = list.length > 0;
+      </figure>`).join('');
+    $('#ix-empty').hidden = photos.length > 0;
   }
 
   /* ---------- The viewer ---------- */
-  // A context is the list the viewer walks through: an album, or Alles / Foto's / AI.
+  // A context is the list the viewer walks through: an album, or all pictures.
   function context(key) {
     if (key.startsWith('a-')) {
       const a = albumById.get(key.slice(2));
       if (!a) return null;
       return {
         key, list: a.photos, label: 'Album', title: a.title, essay: a.description ? [a.description] : [],
-        specs: [['Beelden', count(a.photos)], ['Soort', kinds(a.photos)]], back: ['albums', '← Alle albums']
+        specs: [['Beelden', count(a.photos)]], back: ['albums', '← Alle albums']
       };
     }
-    const f = FILTERS[key] || FILTERS.alles;
-    const list = photos.filter(f.test);
-    return { key: FILTERS[key] ? key : 'alles', list, label: '', title: f.title, essay: [], specs: [['Beelden', count(list)]], back: [FILTERS[key] ? key : 'alles', '← Terug naar het overzicht'] };
+    return { key: 'beelden', list: photos, label: '', title: 'Alle beelden', essay: [], specs: [['Beelden', count(photos)]], back: ['beelden', '← Alle beelden'] };
   }
 
   const cur = { ctx: null, i: 0 };
@@ -215,8 +184,8 @@
     const p = list[cur.i];
     const image = $('#v-img');
     image.src = p.large;
-    image.alt = `${p.title}, ${p.year}, ${KIND[p.kind]}`;
-    const line = `<b>${pad(cur.i + 1)} / ${esc(p.title)}, ${p.year}</b> — ${KIND[p.kind]}` + (p.caption ? `<span class="sub">${esc(p.caption)}</span>` : '');
+    image.alt = `${p.title}, ${p.year}`;
+    const line = `<b>${pad(cur.i + 1)} / ${esc(p.title)}, ${p.year}</b>` + (p.caption ? `<span class="sub">${esc(p.caption)}</span>` : '');
     $('#v-cap').innerHTML = line;
     $('#v-count').textContent = `${cur.i + 1} / ${n}`;
     $$('#v-strip button').forEach((b, k) => b.setAttribute('aria-current', String(k === cur.i)));
@@ -263,19 +232,20 @@
   }
 
   function show(name, opts = {}) {
+    if (OLD_LISTS.includes(name)) name = 'beelden';
     let screen = name;
     let ctx = null, index = opts.photo || 0;
     if (name.startsWith('a-')) {
       ctx = context(name);
       screen = ctx ? 'viewer' : 'home';
     } else if (name.startsWith('p-')) {
-      // One picture: walk through the list it was opened from (Alles by default).
+      // One picture: walk through the list it was opened from (all pictures by default).
       const p = byId.get(name.slice(2));
-      ctx = p ? context(opts.ctx || 'alles') : null;
-      if (ctx && !ctx.list.includes(p)) ctx = context('alles');
+      ctx = p ? context(opts.ctx || 'beelden') : null;
+      if (ctx && !ctx.list.includes(p)) ctx = context('beelden');
       index = ctx ? ctx.list.indexOf(p) : 0;
       screen = ctx ? 'viewer' : 'home';
-    } else if (name in FILTERS) {
+    } else if (name === 'beelden') {
       screen = 'index';
     } else if (name === 'contact') {
       screen = 'over';
@@ -287,10 +257,10 @@
 
     screens.forEach(s => { s.hidden = s.dataset.screen !== screen; });
     if (screen === 'viewer') openViewer(ctx, index);
-    if (screen === 'index') renderIndex(name);
+    if (screen === 'index') renderIndex();
     if (screen === 'home') albumCarousel.refresh();
 
-    const navKey = screen === 'viewer' ? (ctx.key.startsWith('a-') ? 'albums' : ctx.key) : name;
+    const navKey = screen === 'viewer' ? (ctx.key.startsWith('a-') ? 'albums' : 'beelden') : name;
     $$('.primary a, .menu a.big').forEach(a => {
       if (a.dataset.go === navKey) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -298,7 +268,7 @@
     closeMenu();
     if (!lb.hidden) lb.hidden = true;
     if (name === 'contact') requestAnimationFrame(() => $('#contact').scrollIntoView());
-    else if (!opts.keepScroll) window.scrollTo(0, 0);
+    else window.scrollTo(0, 0);
     if (screen !== 'viewer' || name.startsWith('a-')) {
       current = name;
       if (location.hash.slice(1) !== name) location.hash = name;
@@ -315,8 +285,7 @@
     const go = e.target.closest('[data-go]');
     if (!go) return;
     e.preventDefault();
-    // The filter chips switch the list in place, without jumping to the top.
-    show(go.dataset.go, { photo: +go.dataset.photo || 0, keepScroll: go.classList.contains('chip') });
+    show(go.dataset.go, { photo: +go.dataset.photo || 0 });
   });
   addEventListener('hashchange', () => {
     const h = location.hash.slice(1);

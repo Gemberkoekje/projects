@@ -1,7 +1,7 @@
 // The beheer's script. Without it every form still works; with it:
 // - "Nieuw album…" in an album list shows a name field;
-// - the upload form shows each chosen picture with its own title and its own Foto / AI-beeld choice,
-//   and sends them one at a time with a progress bar, so one failure doesn't lose the rest.
+// - the upload form shows each chosen picture with its own title, and sends them one at a time with a
+//   progress bar, so one failure doesn't lose the rest.
 (() => {
   'use strict';
 
@@ -26,10 +26,7 @@
   const list = document.getElementById('file-list');
   const hint = document.getElementById('upload-hint');
   const button = document.getElementById('upload-btn');
-  const batch = form.querySelectorAll('input[name="kind"]');
   const csrf = form.querySelector('input[name="csrf"]').value;
-  document.querySelectorAll('.js-only').forEach(el => { el.hidden = false; });
-  batch.forEach(radio => { radio.required = false; });
 
   let items = [];
   let busy = false;
@@ -50,10 +47,6 @@
         <div class="file-fields">
           <label for="t-${i}">Titel</label>
           <input type="text" id="t-${i}" maxlength="120" required>
-          <div class="choice" role="radiogroup" aria-label="Wat is het?">
-            <label><input type="radio" name="kind-${i}" value="foto"> Foto</label>
-            <label><input type="radio" name="kind-${i}" value="ai"> AI-beeld</label>
-          </div>
           <p class="file-size muted small"></p>
           <div class="progress" hidden><span></span></div>
           <p class="file-status small" role="status"></p>
@@ -61,10 +54,6 @@
       const title = card.querySelector('input[type="text"]');
       title.value = item.title;
       title.addEventListener('input', () => { item.title = title.value; });
-      card.querySelectorAll(`input[name="kind-${i}"]`).forEach(radio => {
-        radio.checked = radio.value === item.kind;
-        radio.addEventListener('change', () => { item.kind = radio.value; update(); });
-      });
       card.querySelector('.file-size').textContent = item.file.name + ' · ' + size(item.file.size);
       item.card = card;
       list.appendChild(card);
@@ -74,29 +63,16 @@
 
   function update() {
     const open = items.filter(it => !it.done);
-    const missing = open.filter(it => !it.kind).length;
-    hint.hidden = missing === 0 || open.length === 0;
-    hint.textContent = missing === 1 ? 'Kies bij het beeld zonder keuze: Foto of AI-beeld.' : `Kies bij ${missing} beelden: Foto of AI-beeld.`;
-    button.disabled = busy || open.length === 0 || missing > 0;
+    button.disabled = busy || open.length === 0;
     button.textContent = open.length > 1 ? `Uploaden (${open.length})` : 'Uploaden';
   }
 
   input.addEventListener('change', () => {
     items.forEach(it => URL.revokeObjectURL(it.preview));
-    items = [...input.files].map(file => ({ file, title: titleFrom(file.name), kind: null, preview: URL.createObjectURL(file), done: false }));
+    items = [...input.files].map(file => ({ file, title: titleFrom(file.name), preview: URL.createObjectURL(file), done: false }));
+    hint.hidden = true;
     render();
   });
-
-  // The radios under "Wat is het?" set every picture at once.
-  batch.forEach(radio => radio.addEventListener('change', () => {
-    items.forEach((it, i) => {
-      if (it.done) return;
-      it.kind = radio.value;
-      const own = it.card.querySelector(`input[name="kind-${i}"][value="${radio.value}"]`);
-      if (own) own.checked = true;
-    });
-    update();
-  }));
 
   function send(item) {
     return new Promise(resolve => {
@@ -104,7 +80,6 @@
       data.append('action', 'upload');
       data.append('ajax', '1');
       data.append('csrf', csrf);
-      data.append('kind', item.kind);
       data.append('titles[0]', item.title.trim() || titleFrom(item.file.name));
       data.append('album', form.querySelector('[name="album"]').value);
       data.append('album_new', form.querySelector('[name="album_new"]').value);

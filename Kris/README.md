@@ -16,18 +16,20 @@ Two parts:
 
 ## Direction (both)
 
-- **The Guggenheim site's grammar:** a two-line wordmark (KRISTOFFER ZEGERS / FOTO & AI), a row of
+- **The Guggenheim site's grammar:** a two-line wordmark (KRISTOFFER ZEGERS / BEELDEN), a row of
   capital menu items, full-width hairlines between bands, big pictures, a carousel with a
   "← 1 / 3 →" counter, a dark footer.
 - **What Kristoffer liked in his own AI draft:** the picture in a white border with a caption line
-  ("01 / Titel, jaar — AI-beeld") and the black filmstrip under it.
+  ("01 / Titel, jaar") and the black filmstrip under it.
 - **From the Louvre's exhibition pages** (his second example): the names of works (pictures and albums)
-  in thin serif capitals (Marcellus), the AI label as a white pill on the picture (AI-BEELD), section
+  in thin serif capitals (Marcellus), a white pill on the picture (ALBUM on album cards), section
   headings in spaced capitals with a hairline after them, cards with the name under the picture for the
   newest pictures, and album cards with the name over the picture. Interface text stays in Archivo.
-- **Photos and AI images side by side, never mixed up:** every picture is either a photo or an AI
-  image, chosen per picture, and every AI image carries the label AI, on its thumbnail and in its
-  caption. The menu is the filter: Alles, Foto's, AI, then Albums (only when there are albums) and Over.
+- **One kind of picture, a "beeld":** Kristoffer leaves it to the visitor whether a picture is a photo or
+  made with AI (his choice, 2026-11-28; the first version split them and labelled every AI image). The
+  menu is Home, Beelden, Albums (only when there are albums) and Over. Pictures uploaded before still
+  carry a `kind` field in `site.json`; nothing reads it. The first version's line under his name,
+  "Foto & AI", is read as "Beelden".
 - Dutch site text. Archivo for the interface, Marcellus for the names of works (in the site both served
   from `site/assets/fonts/`, not from Google), one light theme on purpose.
 
@@ -42,7 +44,7 @@ Plain PHP 8.1+ with GD, no Composer, no database, so it runs on ordinary shared 
   his newest pictures (up to 30) glide from right to left, stopping under the mouse, on focus or with its
   button; with "reduce motion" on, the band stands still and can be swiped.
 - `beheer/` is the beheer: sign in with one password (`config.php`, or the one Kristoffer set in the
-  beheer, in `data/password.json`), upload pictures (each with a title and Foto or AI-beeld; the script
+  beheer, in `data/password.json`), upload pictures (each with a title; the script
   sends them one at a time with a progress bar, and the plain form works without it), edit or delete
   them, put one on the front page, keep albums, and set the texts. The Gegevens page shows whether the
   host has what the site needs.
@@ -94,5 +96,4 @@ check, use Apache with `AllowOverride All` (as most hosts do) and a `config.php`
 ## Open questions for Kristoffer
 
 1. Which host, and does it meet [INSTALLEREN.md](INSTALLEREN.md)'s list (PHP 8.1+, GD, Apache, HTTPS)?
-2. For AI images: show which tool or prompt made them, or only the label AI?
-3. Order: newest first, as now, or does he want to arrange them himself?
+2. Order: newest first, as now, or does he want to arrange them himself?

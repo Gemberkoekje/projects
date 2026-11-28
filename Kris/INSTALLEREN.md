@@ -65,8 +65,7 @@ Zet de nieuwe bestanden uit `site/` over de oude heen. Je overschrijft daarmee n
 
 - **Kies de beelden in de galerij van de telefoon of op de computer**, niet uit WhatsApp: WhatsApp maakt
   ze klein.
-- Bij elk beeld kies je **Foto** of **AI-beeld**. Met de knoppen onder "Wat is het?" zet je ze allemaal
-  tegelijk; daarna kun je per beeld nog wisselen.
+- Bij elk beeld kun je de titel nog aanpassen voordat je op Uploaden drukt.
 - Geeft de site "Dit is een HEIC-bestand"? Zet dan de camera op JPEG of "Meest compatibel", of exporteer
   het beeld als JPEG.
 - **Groot op de voorpagina**: bewerk een beeld en vink het aan. Zonder keuze staat het nieuwste beeld

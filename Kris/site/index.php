@@ -1,6 +1,6 @@
 <?php
-// The public site: one page, its screens switched by assets/site.js (Alles, Foto's, AI, Albums, an
-// album or a picture, Over), filled from data/site.json. Works in the web root or in a subfolder:
+// The public site: one page, its screens switched by assets/site.js (Home, Beelden, Albums, an album
+// or a picture, Over), filled from data/site.json. Works in the web root or in a subfolder:
 // every link is relative.
 declare(strict_types=1);
 
@@ -33,10 +33,10 @@ $feature = Site::findPhoto($data, (string) $settings['featured']) ?? ($data['pho
 $here = (Auth::isHttps() ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')
     . rtrim(str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/index.php'))), '/') . '/';
 $description = $settings['about'] !== '' ? mb_substr(preg_replace('/\s+/u', ' ', $settings['about']), 0, 180)
-    : "Foto's en AI-beelden van $name.";
+    : "Beelden van $name.";
 
 $about = $settings['about'] !== '' ? $settings['about']
-    : "$name maakt foto's en beelden met AI. Op deze site staan ze allemaal bij elkaar.\n\nElk AI-beeld heeft het label AI, zodat altijd duidelijk is wat een foto is en wat niet.";
+    : "Op deze site staan de beelden van $name.";
 $paragraphs = array_filter(array_map('trim', preg_split('/\R\s*\R/u', $about) ?: []));
 $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawurlencode($settings['instagram']) . '/' : null;
 ?>
@@ -71,9 +71,7 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
   </div>
   <nav class="primary wrap" aria-label="Hoofdmenu">
     <a href="#home" data-go="home">Home</a>
-    <a href="#alles" data-go="alles">Alles</a>
-    <a href="#fotos" data-go="fotos">Foto's</a>
-    <a href="#ai" data-go="ai">AI</a>
+    <a href="#beelden" data-go="beelden">Beelden</a>
     <?php if ($hasAlbums): ?><a href="#albums" data-go="albums">Albums</a><?php endif; ?>
     <a href="#over" data-go="over">Over</a>
   </nav>
@@ -85,27 +83,25 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
     <button class="menu-btn" type="button" id="menu-close" style="display:inline-flex">Sluiten</button>
   </div>
   <a class="big" href="#home" data-go="home">Home</a>
-  <a class="big" href="#alles" data-go="alles">Alles</a>
-  <a class="big" href="#fotos" data-go="fotos">Foto's</a>
-  <a class="big" href="#ai" data-go="ai">AI</a>
+  <a class="big" href="#beelden" data-go="beelden">Beelden</a>
   <?php if ($hasAlbums): ?><a class="big" href="#albums" data-go="albums">Albums</a><?php endif; ?>
   <a class="big" href="#over" data-go="over">Over</a>
   <a class="big" href="#contact" data-go="contact">Contact</a>
 </div>
 
 <main>
-  <!-- Home: the front-page picture, the newest pictures, the albums, photos and AI images -->
+  <!-- Home: the front-page picture, the gliding band, the newest pictures, the albums -->
   <section data-screen="home">
     <div class="hero" id="hero">
       <div class="wrap hero-grid">
         <div class="hero-text">
           <span class="label" id="hero-label"></span>
           <h1 class="display work-title" id="hero-title"><?= e($name) ?></h1>
-          <p id="hero-text">Hier komen de foto's en AI-beelden van <?= e($name) ?>.</p>
+          <p id="hero-text">Hier komen de beelden van <?= e($name) ?>.</p>
           <div class="links" id="hero-links"></div>
         </div>
         <figure class="print" id="hero-print" hidden>
-          <a class="mat" href="#alles" id="hero-open"><img id="hero-img" alt=""></a>
+          <a class="mat" href="#beelden" id="hero-open"><img id="hero-img" alt=""></a>
           <figcaption id="hero-cap"></figcaption>
         </figure>
       </div>
@@ -121,7 +117,7 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
       <div class="wrap">
         <div class="band-head">
           <h2 id="h-latest">Nieuwste beelden</h2>
-          <a class="more" href="#alles" data-go="alles">Alle beelden →</a>
+          <a class="more" href="#beelden" data-go="beelden">Alle beelden →</a>
         </div>
         <div class="latest" id="latest"></div>
       </div>
@@ -144,34 +140,17 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
       </div>
     </section>
 
-    <section class="band" id="band-pair" hidden>
-      <div class="wrap pair">
-        <a href="#fotos" data-go="fotos">
-          <h2>Foto's</h2>
-          <img id="pair-foto" alt="">
-          <p>Gewone foto's, in albums of allemaal bij elkaar.</p>
-          <span class="more">Bekijk de foto's →</span>
-        </a>
-        <a href="#ai" data-go="ai">
-          <h2>AI-beelden</h2>
-          <img id="pair-ai" alt="">
-          <p>Beelden gemaakt met AI. Ze staan ook tussen de foto's, altijd met het label AI.</p>
-          <span class="more">Bekijk de AI-beelden →</span>
-        </a>
-      </div>
-    </section>
   </section>
 
-  <!-- Alles, Foto's, AI: every picture, filtered -->
+  <!-- Beelden: every picture -->
   <section data-screen="index" hidden>
     <div class="page-head">
       <div class="wrap">
-        <h1 id="ix-title">Alle beelden</h1>
-        <p class="lead" id="ix-lead"></p>
+        <h1>Alle beelden</h1>
+        <p class="lead">De nieuwste eerst.</p>
       </div>
     </div>
     <div class="wrap">
-      <div class="chips" id="chips" role="group" aria-label="Toon"></div>
       <div class="masonry" id="masonry"></div>
       <p class="empty" id="ix-empty" hidden>Hier staan nog geen beelden.</p>
     </div>
@@ -182,17 +161,17 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
     <div class="page-head">
       <div class="wrap">
         <h1>Albums</h1>
-        <p class="lead">Foto's en AI-beelden per onderwerp, de nieuwste eerst.</p>
+        <p class="lead">Beelden per onderwerp, de nieuwste eerst.</p>
       </div>
     </div>
     <div class="wrap" id="album-list"></div>
   </section>
 
-  <!-- One album, or the pictures of Alles / Foto's / AI one by one -->
+  <!-- One album, or all pictures, one at a time -->
   <section data-screen="viewer" hidden>
     <div class="wrap viewer">
       <aside class="v-side">
-        <a class="back" href="#alles" id="v-back">← Terug</a>
+        <a class="back" href="#beelden" id="v-back">← Terug</a>
         <div>
           <span class="label muted" id="v-label"></span>
           <h1 id="v-title"></h1>
@@ -259,9 +238,7 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
     <div>
       <h4>Bekijken</h4>
       <ul>
-        <li><a href="#alles" data-go="alles">Alle beelden</a></li>
-        <li><a href="#fotos" data-go="fotos">Foto's</a></li>
-        <li><a href="#ai" data-go="ai">AI-beelden</a></li>
+        <li><a href="#beelden" data-go="beelden">Alle beelden</a></li>
         <?php if ($hasAlbums): ?><li><a href="#albums" data-go="albums">Albums</a></li><?php endif; ?>
       </ul>
     </div>
