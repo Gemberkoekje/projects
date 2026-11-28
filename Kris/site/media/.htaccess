@@ -1,0 +1,15 @@
+# The copies the site shows. Every file has a new name, so browsers may keep them for a year.
+# Nothing in here is ever run as a script.
+<FilesMatch "\.(php\d?|phtml|phar|cgi|pl|py)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+<IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=31536000, immutable"
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

@@ -1,0 +1,61 @@
+name: Kris site (PHP)
+
+# Kristoffer's site runs on his own hosting, so there is no image to build: this lints and tests
+# the PHP on the oldest version it supports (8.1) and a current one, and on main keeps the folder
+# as a download (the "kris-site" artifact) to upload with FTP.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Kris/site/**'
+      - 'Kris/tests/**'
+      - '.github/workflows/kris-site.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Kris/site/**'
+      - 'Kris/tests/**'
+      - '.github/workflows/kris-site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.3']
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: gd, exif, mbstring
+          coverage: none
+
+      - name: Lint
+        run: find Kris/site Kris/tests -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Tests
+        run: php Kris/tests/run.php
+
+  package:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Keep the site folder as a download
+        uses: actions/upload-artifact@v4
+        with:
+          name: kris-site
+          path: Kris/site
+          include-hidden-files: true
