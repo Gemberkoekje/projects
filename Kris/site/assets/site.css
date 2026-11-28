@@ -1,4 +1,5 @@
-/* Archivo (SIL Open Font License, fonts/OFL.txt), served from this site itself: no request to Google. */
+/* Archivo and Marcellus (SIL Open Font License, fonts/OFL-*.txt), served from this site itself:
+   no request to Google. */
 @font-face {
   font-family: "Archivo";
   font-style: normal;
@@ -15,6 +16,22 @@
   font-stretch: 62% 125%;
   font-display: swap;
   src: url("fonts/archivo-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Marcellus";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/marcellus-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Marcellus";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/marcellus-latin.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -40,6 +57,9 @@
   --shadow: rgba(0, 0, 0, .22);
   --shadow-deep: rgba(0, 0, 0, .55);
   --font: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* The names of works (titles of pictures and albums) in serif capitals, as on the Louvre's site. */
+  --serif: "Marcellus", Georgia, "Times New Roman", serif;
+  --on-image: #ffffff;
   --maxw: 90rem;
 }
 
@@ -78,6 +98,7 @@ h1, h2, h3 {
   line-height: 1.08; text-wrap: balance;
 }
 .display { font-size: clamp(2.4rem, 5.4vw, 4.6rem); }
+.display.work-title { font-size: clamp(2.2rem, 4.6vw, 4rem); letter-spacing: .05em; line-height: 1.08; }
 h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); }
 h2 { font-size: clamp(1.7rem, 2.8vw, 2.35rem); }
 h3 { font-size: 1.375rem; line-height: 1.2; }
@@ -90,13 +111,16 @@ h3 { font-size: 1.375rem; line-height: 1.2; }
 .more:hover { text-decoration: underline; text-underline-offset: .22em; }
 .ph { font-style: italic; color: var(--ink-soft); }
 
-/* The AI mark: every AI image carries it, on its thumbnail and in its caption */
+/* The AI mark: every AI image carries it, on its thumbnail and in its caption. A white pill in the
+   corner, as the Louvre's "EN COURS". */
 .thumb { position: relative; display: block; }
 .tag {
-  position: absolute; top: .5rem; left: .5rem; background: var(--ink); color: var(--paper);
-  font-size: .6875rem; font-weight: 640; font-stretch: 112%; letter-spacing: .08em;
-  padding: .15rem .4rem; line-height: 1.3;
+  position: absolute; top: .75rem; left: .75rem; background: var(--paper); color: var(--ink);
+  font-size: .6875rem; font-weight: 640; font-stretch: 112%; letter-spacing: .1em; text-transform: uppercase;
+  padding: .3rem .7rem; line-height: 1.2; border-radius: 999px; box-shadow: 0 1px 3px var(--shadow);
 }
+/* The name of a work: serif capitals, as the Louvre's card titles */
+.work-title { font-family: var(--serif); font-weight: 400; font-stretch: 100%; text-transform: uppercase; letter-spacing: .06em; line-height: 1.15; }
 
 /* ---------- Header ---------- */
 .site {
@@ -177,9 +201,15 @@ h3 { font-size: 1.375rem; line-height: 1.2; }
 /* ---------- Bands ---------- */
 .band { border-bottom: 1px solid var(--rule); padding-block: clamp(2.5rem, 5vw, 4.5rem); }
 .band-head {
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
-  gap: .5rem 1rem; margin-bottom: clamp(1.25rem, 2.5vw, 2rem);
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+  gap: .5rem 1.5rem; margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
 }
+/* A section heading in spaced capitals, followed by a hairline (the Louvre's section headings) */
+.band-head h2 {
+  display: flex; align-items: center; gap: 1.25rem; flex: 1 1 18rem; min-width: 0;
+  font-size: .9375rem; font-weight: 640; font-stretch: 112%; letter-spacing: .14em; text-transform: uppercase; line-height: 1.3;
+}
+.band-head h2::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
 .linkcard { display: block; text-decoration: none; }
 .linkcard:hover h3 { text-decoration: underline; text-underline-offset: .18em; text-decoration-thickness: 2px; }
 
@@ -187,10 +217,17 @@ h3 { font-size: 1.375rem; line-height: 1.2; }
 .car-view { overflow: hidden; }
 .car-track { position: relative; display: flex; gap: clamp(1rem, 2vw, 1.75rem); transition: transform .55s cubic-bezier(.2, .7, .2, 1); }
 .car-card { flex: 0 0 min(64%, 54rem); min-width: 0; }
-.car-card img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: var(--stage); }
-.car-card h3 { margin-top: 1rem; font-size: clamp(1.375rem, 2vw, 1.75rem); }
-.car-card .meta { margin-top: .3rem; font-weight: 560; font-size: .9375rem; }
-.car-card p { margin-top: .5rem; color: var(--ink-soft); max-width: 40rem; }
+.car-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--stage); }
+/* The album's name over its cover, on a dark fade: the Louvre's large card */
+.car-card .over {
+  position: absolute; inset: auto 0 0 0; padding: clamp(1rem, 3vw, 2.25rem); display: grid; gap: .35rem;
+  color: var(--on-image); background: linear-gradient(to top, rgba(0, 0, 0, .78), rgba(0, 0, 0, .35) 60%, rgba(0, 0, 0, 0));
+}
+.car-card h3 { font-size: clamp(1.5rem, 3vw, 2.5rem); }
+.car-card .meta { font-weight: 560; font-size: .9375rem; }
+.car-card p { margin-top: .75rem; color: var(--ink-soft); max-width: 40rem; }
+.linkcard.car-card:hover h3 { text-decoration: none; }
+.linkcard.car-card:hover img { opacity: .9; }
 @media (max-width: 760px) { .car-card { flex-basis: 86%; } }
 .car-ctrl {
   display: flex; justify-content: flex-end; align-items: center; gap: .35rem;
@@ -202,11 +239,16 @@ h3 { font-size: 1.375rem; line-height: 1.2; }
 }
 .arrow:disabled { opacity: .28; cursor: default; }
 
-/* The newest pictures, photos and AI images mixed */
-.latest { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(.5rem, 1.2vw, 1rem); }
-.latest img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--stage); transition: opacity .2s; }
-.latest a:hover img { opacity: .85; }
-@media (max-width: 760px) { .latest { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* The newest pictures, photos and AI images mixed: cards with the picture, its pill and its name
+   underneath, as the Louvre's exhibition cards */
+.latest { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1.75rem, 3vw, 2.75rem) clamp(1rem, 2vw, 1.5rem); }
+.work-card { display: grid; gap: .5rem; align-content: start; text-decoration: none; }
+.work-card img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--stage); transition: opacity .2s; }
+.work-card:hover img { opacity: .88; }
+.work-card .work-title { font-size: clamp(1.25rem, 1.7vw, 1.5rem); margin-top: .4rem; }
+.work-card .sub { font-size: .875rem; font-weight: 560; }
+@media (max-width: 900px) { .latest { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .latest { grid-template-columns: minmax(0, 1fr); } }
 
 /* Photos and AI images, side by side */
 .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1.5rem, 4vw, 4rem); }
@@ -260,13 +302,14 @@ h3 { font-size: 1.375rem; line-height: 1.2; }
 .masonry a { display: block; text-decoration: none; }
 .masonry img { width: 100%; height: auto; background: var(--stage); transition: opacity .2s; }
 .masonry a:hover img { opacity: .85; }
-.masonry figcaption { font-size: .8125rem; margin-top: .5rem; color: var(--ink-soft); }
-.masonry figcaption b { color: var(--ink); font-weight: 620; }
+.masonry figcaption { font-size: .8125rem; margin-top: .6rem; color: var(--ink-soft); }
+.masonry figcaption .work-title { display: block; font-size: 1.125rem; color: var(--ink); margin-bottom: .2rem; }
 
 /* ---------- Album viewer: bordered picture, caption, filmstrip ---------- */
 .viewer { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); border-bottom: 1px solid var(--ink); }
 .v-side { padding-block: 2rem 2.5rem; padding-right: 2rem; border-right: 1px solid var(--rule); display: grid; gap: 1.25rem; align-content: start; }
 .v-side h1 { font-size: 2rem; }
+.v-side h1.work-title { font-size: 1.75rem; }
 .v-side .back { font-size: .9375rem; text-decoration: none; }
 .v-side .back:hover { text-decoration: underline; }
 .v-side .essay { display: grid; gap: .8rem; font-size: 1rem; }

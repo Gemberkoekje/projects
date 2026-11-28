@@ -99,7 +99,7 @@ $instagram = $settings['instagram'] !== '' ? 'https://www.instagram.com/' . rawu
       <div class="wrap hero-grid">
         <div class="hero-text">
           <span class="label" id="hero-label"></span>
-          <h1 class="display" id="hero-title"><?= e($name) ?></h1>
+          <h1 class="display work-title" id="hero-title"><?= e($name) ?></h1>
           <p id="hero-text">Hier komen de foto's en AI-beelden van <?= e($name) ?>.</p>
           <div class="links" id="hero-links"></div>
         </div>

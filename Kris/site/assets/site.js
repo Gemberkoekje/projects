@@ -26,7 +26,9 @@
     ai: { title: 'AI-beelden', lead: 'Alle beelden gemaakt met AI, de nieuwste eerst.', test: p => p.kind === 'ai' }
   };
 
-  const tag = p => p.kind === 'ai' ? '<span class="tag">AI</span>' : '';
+  const tag = p => p.kind === 'ai' ? '<span class="tag">AI-beeld</span>' : '';
+  // Copies: the thumb is 640 px, the large one 2048 px; a sharp screen gets the large one where it is shown big.
+  const srcset = p => `srcset="${esc(p.thumb)} 640w, ${esc(p.large)} 2048w"`;
   const count = list => {
     const ai = list.filter(p => p.kind === 'ai').length, foto = list.length - ai;
     return [foto && `${foto} ${foto === 1 ? 'foto' : 'foto’s'}`, ai && `${ai} ${ai === 1 ? 'AI-beeld' : 'AI-beelden'}`].filter(Boolean).join(' · ');
@@ -56,8 +58,14 @@
     $('#hero-cap').textContent = `${featured.title}, ${featured.year} · ${KIND[featured.kind]}`;
     $('#hero-print').hidden = false;
 
-    $('#latest').innerHTML = photos.slice(0, 8).map(p =>
-      `<a class="thumb" ${opener(p, 'alles')} aria-label="${esc(p.title)}, ${KIND[p.kind]}"><img src="${esc(p.thumb)}" alt="" loading="lazy">${tag(p)}</a>`).join('');
+    $('#latest').innerHTML = photos.slice(0, 6).map(p => {
+      const album = albumById.get(p.album);
+      return `<a class="work-card" ${opener(p, 'alles')}>
+        <span class="thumb"><img src="${esc(p.thumb)}" ${srcset(p)} sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 30vw" alt="" loading="lazy">${tag(p)}</span>
+        <span class="work-title">${esc(p.title)}</span>
+        <span class="sub">${p.year} · ${KIND[p.kind]}${album ? ' · ' + esc(album.title) : ''}</span>
+      </a>`;
+    }).join('');
     $('#band-latest').hidden = false;
 
     const newestFoto = photos.find(p => p.kind === 'foto'), newestAi = photos.find(p => p.kind === 'ai');
@@ -73,9 +81,9 @@
   let albumCarousel = { refresh() {} };
   if (albums.length) {
     $('#car-albums .car-track').innerHTML = albums.map(a => `<a class="car-card linkcard" href="#a-${esc(a.id)}" data-go="a-${esc(a.id)}">
-        <span class="thumb">${img(a.photos[0], 'large', ' style="aspect-ratio:3/2;object-fit:cover"')}${tag(a.photos[0])}</span>
-        <h3>${esc(a.title)}</h3>
-        <p class="meta">${esc(count(a.photos))}</p>
+        <div class="thumb">${img(a.photos[0], 'large')}<span class="tag">${esc(kinds(a.photos))}</span>
+          <div class="over"><h3 class="work-title">${esc(a.title)}</h3><span class="meta">${esc(count(a.photos))}</span></div>
+        </div>
         ${a.description ? `<p>${esc(a.description)}</p>` : ''}
       </a>`).join('');
     albumCarousel = carousel($('#car-albums'));
@@ -84,7 +92,7 @@
     $('#album-list').innerHTML = albums.map(a => `<article class="album-row">
         <a class="thumb" href="#a-${esc(a.id)}" data-go="a-${esc(a.id)}">${img(a.photos[0], 'large')}${tag(a.photos[0])}</a>
         <div class="txt">
-          <h2>${esc(a.title)}</h2>
+          <h2 class="work-title">${esc(a.title)}</h2>
           <p class="meta">${esc(count(a.photos))}</p>
           ${a.description ? `<p>${esc(a.description)}</p>` : ''}
           <div class="minis">${a.photos.slice(0, 6).map((p, i) => `<a href="#a-${esc(a.id)}" data-go="a-${esc(a.id)}" data-photo="${i}" aria-label="${esc(p.title)}"><img src="${esc(p.thumb)}" alt="" loading="lazy"></a>`).join('')}</div>
@@ -133,7 +141,7 @@
       return `<figure>
         <a ${opener(p, filter)}>
           <span class="thumb"><img src="${esc(p.thumb)}" alt="${esc(p.title)}, ${KIND[p.kind]}" width="${p.w}" height="${p.h}" loading="lazy">${tag(p)}</span>
-          <figcaption><b>${esc(p.title)}</b>, ${p.year} · ${KIND[p.kind]}${album ? `<br>${esc(album.title)}` : ''}</figcaption>
+          <figcaption><span class="work-title">${esc(p.title)}</span>${p.year} · ${KIND[p.kind]}${album ? ' · ' + esc(album.title) : ''}</figcaption>
         </a>
       </figure>`;
     }).join('');
@@ -162,6 +170,7 @@
     $('#v-label').textContent = ctx.label;
     $('#v-label').hidden = !ctx.label;
     $('#v-title').textContent = ctx.title;
+    $('#v-title').classList.toggle('work-title', ctx.key.startsWith('a-'));
     $('#v-essay').innerHTML = ctx.essay.map(t => `<p>${esc(t)}</p>`).join('');
     $('#v-specs').innerHTML = ctx.specs.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
     const back = $('#v-back');

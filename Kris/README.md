@@ -20,11 +20,15 @@ Two parts:
   "← 1 / 3 →" counter, a dark footer.
 - **What Kristoffer liked in his own AI draft:** the picture in a white border with a caption line
   ("01 / Titel, jaar — AI-beeld") and the black filmstrip under it.
+- **From the Louvre's exhibition pages** (his second example): the names of works (pictures and albums)
+  in thin serif capitals (Marcellus), the AI label as a white pill on the picture (AI-BEELD), section
+  headings in spaced capitals with a hairline after them, cards with the name under the picture for the
+  newest pictures, and album cards with the name over the picture. Interface text stays in Archivo.
 - **Photos and AI images side by side, never mixed up:** every picture is either a photo or an AI
   image, chosen per picture, and every AI image carries the label AI, on its thumbnail and in its
   caption. The menu is the filter: Alles, Foto's, AI, then Albums (only when there are albums) and Over.
-- Dutch site text. Archivo for all type (in the site, served from `site/assets/fonts/`, not from
-  Google), one light theme on purpose.
+- Dutch site text. Archivo for the interface, Marcellus for the names of works (in the site both served
+  from `site/assets/fonts/`, not from Google), one light theme on purpose.
 
 ## The site (`site/`)
 
